@@ -55,6 +55,7 @@ under the License.
     <module>flink-ml-api</module>
     <module>flink-ml-lib</module>
     <module>flink-ml-uber</module>
+    <module>flink-ml-examples</module>
   </modules>
 
   <properties>
@@ -63,10 +64,13 @@ under the License.
     <jackson.version>2.10.1</jackson.version>
     <target.java.version>1.8</target.java.version>
     <spotless.version>2.4.2</spotless.version>
+    <slf4j.version>1.7.15</slf4j.version>
+    <log4j.version>2.12.1</log4j.version>
     <junit.version>4.12</junit.version>
     <flink.forkCount>1C</flink.forkCount>
     <flink.reuseForks>true</flink.reuseForks>
     <flink.version>1.12.1</flink.version>
+    <zookeeper.version>3.4.14</zookeeper.version>
 
     <!-- Can be set to any value to reproduce a specific build. -->
     <test.randomization.seed/>
@@ -75,12 +79,46 @@ under the License.
 
 
   <dependencies>
+    <!-- Logging API -->
+
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+
     <!-- test dependencies -->
 
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <type>jar</type>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- tests will have log4j as the default logging framework available -->
+
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-slf4j-impl</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-api</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <!-- API bridge between log4j 1 and 2 -->
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-1.2-api</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -94,9 +132,79 @@ under the License.
       </dependency>
 
       <dependency>
+        <groupId>org.apache.flink</groupId>
+        <artifactId>flink-shaded-zookeeper-3</artifactId>
+        <version>${zookeeper.version}-${flink.shaded.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.zookeeper</groupId>
+        <artifactId>zookeeper</artifactId>
+        <version>${zookeeper.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-log4j12</artifactId>
+          </exclusion>
+          <!-- Netty is only needed for ZK servers, not clients -->
+          <exclusion>
+            <groupId>io.netty</groupId>
+            <artifactId>netty</artifactId>
+          </exclusion>
+          <!-- jline is optional for ZK console shell -->
+          <exclusion>
+            <groupId>jline</groupId>
+            <artifactId>jline</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+
+      <dependency>
         <groupId>junit</groupId>
         <artifactId>junit</artifactId>
         <version>${junit.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-api</artifactId>
+        <version>${slf4j.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-slf4j-impl</artifactId>
+        <version>${log4j.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-api</artifactId>
+        <version>${log4j.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-core</artifactId>
+        <version>${log4j.version}</version>
+      </dependency>
+
+      <dependency>
+        <!-- API bridge between log4j 1 and 2 -->
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-1.2-api</artifactId>
+        <version>${log4j.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.flink</groupId>
+        <artifactId>flink-test-utils-junit</artifactId>
+        <version>${flink.version}</version>
+        <scope>test</scope>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -266,6 +374,7 @@ under the License.
             <exclude>**/.idea/**</exclude>
             <!-- Generated content -->
             <exclude>**/target/**</exclude>
+            <exclude>**/scalastyle-output.xml</exclude>
             <!-- Bundled license files -->
             <exclude>**/LICENSE*</exclude>
           </excludes>
@@ -589,6 +698,31 @@ under the License.
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-shade-plugin</artifactId>
           <version>3.1.1</version>
+        </plugin>
+
+        <!-- configure scala style -->
+        <plugin>
+          <groupId>org.scalastyle</groupId>
+          <artifactId>scalastyle-maven-plugin</artifactId>
+          <version>1.0.0</version>
+          <executions>
+            <execution>
+              <goals>
+                <goal>check</goal>
+              </goals>
+            </execution>
+          </executions>
+          <configuration>
+            <verbose>false</verbose>
+            <failOnViolation>true</failOnViolation>
+            <includeTestSourceDirectory>true</includeTestSourceDirectory>
+            <failOnWarning>false</failOnWarning>
+            <sourceDirectory>${basedir}/src/main/scala</sourceDirectory>
+            <testSourceDirectory>${basedir}/src/test/scala</testSourceDirectory>
+            <outputFile>${project.basedir}/target/scalastyle-output.xml</outputFile>
+            <inputEncoding>UTF-8</inputEncoding>
+            <outputEncoding>UTF-8</outputEncoding>
+          </configuration>
         </plugin>
 
         <plugin>
