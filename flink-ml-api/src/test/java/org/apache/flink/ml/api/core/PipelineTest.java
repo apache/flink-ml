@@ -22,11 +22,14 @@ import org.apache.flink.ml.api.misc.param.ParamInfo;
 import org.apache.flink.ml.api.misc.param.ParamInfoFactory;
 import org.apache.flink.ml.api.misc.param.Params;
 import org.apache.flink.table.api.Table;
-import org.apache.flink.table.api.TableEnvironment;
 
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /** Tests the behavior of {@link Pipeline}. */
 public class PipelineTest {
@@ -34,43 +37,22 @@ public class PipelineTest {
 
     @Test
     public void testPipelineBehavior() {
-        Pipeline pipeline = new Pipeline();
-        pipeline.appendStage(new MockTransformer("a"));
-        pipeline.appendStage(new MockEstimator("b"));
-        pipeline.appendStage(new MockEstimator("c"));
-        pipeline.appendStage(new MockTransformer("d"));
-        assert describePipeline(pipeline).equals("a_b_c_d");
+        List<Stage<?>> stages = new ArrayList<>();
+        stages.add(new MockTransformer("a"));
+        stages.add(new MockEstimator("b"));
+        stages.add(new MockEstimator("c"));
+        stages.add(new MockTransformer("d"));
 
-        Pipeline pipelineModel = pipeline.fit(null, null);
-        assert describePipeline(pipelineModel).equals("a_mb_mc_d");
+        Pipeline pipeline = new Pipeline(stages);
+        assert describePipeline(pipeline.getStages()).equals("a_b_c_d");
 
-        thrown.expect(RuntimeException.class);
-        thrown.expectMessage("Pipeline contains Estimator, need to fit first.");
-        pipeline.transform(null, null);
+        PipelineModel pipelineModel = pipeline.fit(null, null);
+        assert describePipeline(pipelineModel.getStages()).equals("a_mb_mc_d");
     }
 
-    @Test
-    public void testPipelineRestore() {
-        Pipeline pipeline = new Pipeline();
-        pipeline.appendStage(new MockTransformer("a"));
-        pipeline.appendStage(new MockEstimator("b"));
-        pipeline.appendStage(new MockEstimator("c"));
-        pipeline.appendStage(new MockTransformer("d"));
-        String pipelineJson = pipeline.toJson();
-
-        Pipeline restoredPipeline = new Pipeline(pipelineJson);
-        assert describePipeline(restoredPipeline).equals("a_b_c_d");
-
-        Pipeline pipelineModel = pipeline.fit(null, null);
-        String modelJson = pipelineModel.toJson();
-
-        Pipeline restoredPipelineModel = new Pipeline(modelJson);
-        assert describePipeline(restoredPipelineModel).equals("a_mb_mc_d");
-    }
-
-    private static String describePipeline(Pipeline p) {
+    private static String describePipeline(List<Stage<?>> stages) {
         StringBuilder res = new StringBuilder();
-        for (PipelineStage s : p.getStages()) {
+        for (Stage<?> s : stages) {
             if (res.length() != 0) {
                 res.append("_");
             }
@@ -98,7 +80,7 @@ public class PipelineTest {
         }
 
         @Override
-        public MockModel fit(TableEnvironment tEnv, Table input) {
+        public MockModel fit(Table... inputs) {
             return new MockModel("m" + describe());
         }
 
@@ -111,6 +93,9 @@ public class PipelineTest {
         public String describe() {
             return get(DESCRIPTION);
         }
+
+        @Override
+        public void save(String path) throws IOException {}
     }
 
     /** Mock transformer for pipeline test. */
@@ -124,8 +109,8 @@ public class PipelineTest {
         }
 
         @Override
-        public Table transform(TableEnvironment tEnv, Table input) {
-            return input;
+        public Table[] transform(Table... inputs) {
+            return inputs;
         }
 
         @Override
@@ -137,6 +122,9 @@ public class PipelineTest {
         public String describe() {
             return get(DESCRIPTION);
         }
+
+        @Override
+        public void save(String path) throws IOException {}
     }
 
     /** Mock model for pipeline test. */
@@ -150,8 +138,8 @@ public class PipelineTest {
         }
 
         @Override
-        public Table transform(TableEnvironment tEnv, Table input) {
-            return input;
+        public Table[] transform(Table... inputs) {
+            return inputs;
         }
 
         @Override
@@ -163,5 +151,8 @@ public class PipelineTest {
         public String describe() {
             return get(DESCRIPTION);
         }
+
+        @Override
+        public void save(String path) throws IOException {}
     }
 }

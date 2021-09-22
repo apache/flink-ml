@@ -18,29 +18,22 @@
 
 package org.apache.flink.ml.api.core;
 
-import org.apache.flink.ml.api.misc.param.WithParams;
-
-import java.io.Serializable;
+import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.table.api.Table;
 
 /**
- * Base class for a stage in a pipeline. The interface is only a concept, and does not have any
- * actual functionality. Its subclasses must be either Estimator or Transformer. No other classes
- * should inherit this interface directly.
+ * An AlgoOperator takes a list of tables as inputs and produces a list of tables as results. It can
+ * be used to encode generic multi-input multi-output computation logic.
  *
- * <p>Each pipeline stage is with parameters, and requires a public empty constructor for
- * restoration in Pipeline.
- *
- * @param <T> The class type of the PipelineStage implementation itself, used by {@link
- *     org.apache.flink.ml.api.misc.param.WithParams}
- * @see WithParams
+ * @param <T> The class type of the AlgoOperator implementation itself.
  */
-interface PipelineStage<T extends PipelineStage<T>> extends WithParams<T>, Serializable {
-
-    default String toJson() {
-        return getParams().toJson();
-    }
-
-    default void loadJson(String json) {
-        getParams().loadJson(json);
-    }
+@PublicEvolving
+public interface AlgoOperator<T extends AlgoOperator<T>> extends Stage<T> {
+    /**
+     * Applies the AlgoOperator on the given input tables and returns the result tables.
+     *
+     * @param inputs a list of tables
+     * @return a list of tables
+     */
+    Table[] transform(Table... inputs);
 }
