@@ -19,6 +19,9 @@
 package org.apache.flink.iteration.utils;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.Collections;
+import java.util.List;
 
 /** Utility class to provide some reflection tools. */
 public class ReflectionUtils {
@@ -48,5 +51,33 @@ public class ReflectionUtils {
             Object targetObject, Class<?> declaredClass, String fieldName) {
         Field field = getClassField(declaredClass, fieldName);
         return getFieldValue(targetObject, field);
+    }
+
+    public static <T> T callMethod(Object targetObject, Class<?> declaredClass, String methodName) {
+        return callMethod(
+                targetObject,
+                declaredClass,
+                methodName,
+                Collections.emptyList(),
+                Collections.emptyList());
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <T> T callMethod(
+            Object targetObject,
+            Class<?> declaredClass,
+            String methodName,
+            List<Class<?>> parameterClass,
+            List<Object> parameters) {
+        try {
+            Method method =
+                    declaredClass.getDeclaredMethod(
+                            methodName, parameterClass.toArray(new Class[0]));
+            method.setAccessible(true);
+            return (T) method.invoke(targetObject, parameters.toArray());
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    "Failed to get method" + methodName + " from " + targetObject, e);
+        }
     }
 }

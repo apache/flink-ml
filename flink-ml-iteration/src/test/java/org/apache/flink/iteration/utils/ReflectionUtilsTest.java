@@ -21,6 +21,7 @@ package org.apache.flink.iteration.utils;
 import org.junit.Test;
 
 import java.lang.reflect.Field;
+import java.util.Collections;
 
 import static org.junit.Assert.assertEquals;
 
@@ -39,11 +40,46 @@ public class ReflectionUtilsTest {
         assertEquals("field2", ReflectionUtils.getFieldValue(child, Child.class, "field2"));
     }
 
+    @Test
+    public void testCallMethod() {
+        assertEquals(
+                5,
+                (int)
+                        ReflectionUtils.callMethod(
+                                null,
+                                Child.class,
+                                "staticParseInteger",
+                                Collections.singletonList(String.class),
+                                Collections.singletonList("5")));
+
+        Child child = new Child();
+        assertEquals("field1", ReflectionUtils.callMethod(child, Base.class, "getField1"));
+        ReflectionUtils.callMethod(
+                child,
+                Base.class,
+                "setField1",
+                Collections.singletonList(String.class),
+                Collections.singletonList("value"));
+        assertEquals("value", ReflectionUtils.callMethod(child, Base.class, "getField1"));
+    }
+
     private static class Base {
         private String field1 = "field1";
+
+        public void setField1(String field1) {
+            this.field1 = field1;
+        }
+
+        public String getField1() {
+            return field1;
+        }
     }
 
     private static class Child extends Base {
         private String field2 = "field2";
+
+        private static int staticParseInteger(String s) {
+            return Integer.parseInt(s);
+        }
     }
 }
