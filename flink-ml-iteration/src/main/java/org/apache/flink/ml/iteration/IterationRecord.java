@@ -20,7 +20,7 @@ package org.apache.flink.ml.iteration;
 import java.util.Objects;
 
 /** The wrapper for the records in iterative stream. */
-public class IterationRecord<T> {
+public class IterationRecord<T> implements Cloneable {
 
     /** The type of mini-batch stream records. */
     public enum Type {
@@ -82,6 +82,10 @@ public class IterationRecord<T> {
         this.round = round;
     }
 
+    public void incrementalRound() {
+        this.round += 1;
+    }
+
     public T getValue() {
         return value;
     }
@@ -104,6 +108,20 @@ public class IterationRecord<T> {
 
     public void setCheckpointId(long checkpointId) {
         this.checkpointId = checkpointId;
+    }
+
+    @Override
+    public IterationRecord<T> clone() {
+        switch (type) {
+            case RECORD:
+                return IterationRecord.newRecord(value, round);
+            case EPOCH_WATERMARK:
+                return IterationRecord.newEpochWatermark(round, sender);
+            case BARRIER:
+                return IterationRecord.newBarrier(checkpointId);
+            default:
+                throw new RuntimeException("Unsupported type: " + type);
+        }
     }
 
     @Override
