@@ -46,17 +46,17 @@ public class TailOperatorTest extends TestLogger {
                 new OneInputStreamOperatorTestHarness<>(new TailOperator(iterationId, 0));
         testHarness.open();
 
-        testHarness.processElement(new StreamRecord<>(IterationRecord.newRecord(1, 1)));
-        testHarness.processElement(new StreamRecord<>(IterationRecord.newRecord(2, 1)));
-        testHarness.processElement(
-                new StreamRecord<>(IterationRecord.newEpochWatermark(2, "sender1")));
+        testHarness.processElement(IterationRecord.newRecord(1, 1), 2);
+        testHarness.processElement(IterationRecord.newRecord(2, 1), 3);
+        testHarness.processElement(IterationRecord.newEpochWatermark(2, "sender1"), 4);
 
-        List<IterationRecord<?>> iterationRecords = getFeedbackRecords(iterationId, 0, 0, 0);
+        List<StreamRecord<IterationRecord<?>>> iterationRecords =
+                getFeedbackRecords(iterationId, 0, 0, 0);
         assertEquals(
                 Arrays.asList(
-                        IterationRecord.newRecord(1, 2),
-                        IterationRecord.newRecord(2, 2),
-                        IterationRecord.newEpochWatermark(3, "sender1")),
+                        new StreamRecord<>(IterationRecord.newRecord(1, 2), 2),
+                        new StreamRecord<>(IterationRecord.newRecord(2, 2), 3),
+                        new StreamRecord<>(IterationRecord.newEpochWatermark(3, "sender1"), 4)),
                 iterationRecords);
     }
 
@@ -70,34 +70,35 @@ public class TailOperatorTest extends TestLogger {
         testHarness.open();
 
         IterationRecord<Integer> reuse = IterationRecord.newRecord(1, 1);
-        testHarness.processElement(new StreamRecord<>(reuse));
+        testHarness.processElement(reuse, 2);
 
         reuse.setValue(2);
-        testHarness.processElement(new StreamRecord<>(reuse));
+        testHarness.processElement(reuse, 3);
 
         reuse.setType(IterationRecord.Type.EPOCH_WATERMARK);
         reuse.setEpoch(2);
         reuse.setSender("sender1");
-        testHarness.processElement(new StreamRecord<>(reuse));
+        testHarness.processElement(reuse, 4);
 
-        List<IterationRecord<?>> iterationRecords = getFeedbackRecords(iterationId, 0, 0, 0);
+        List<StreamRecord<IterationRecord<?>>> iterationRecords =
+                getFeedbackRecords(iterationId, 0, 0, 0);
         assertEquals(
                 Arrays.asList(
-                        IterationRecord.newRecord(1, 2),
-                        IterationRecord.newRecord(2, 2),
-                        IterationRecord.newEpochWatermark(3, "sender1")),
+                        new StreamRecord<>(IterationRecord.newRecord(1, 2), 2),
+                        new StreamRecord<>(IterationRecord.newRecord(2, 2), 3),
+                        new StreamRecord<>(IterationRecord.newEpochWatermark(3, "sender1"), 4)),
                 iterationRecords);
     }
 
-    private static List<IterationRecord<?>> getFeedbackRecords(
+    static List<StreamRecord<IterationRecord<?>>> getFeedbackRecords(
             IterationID iterationId, int feedbackIndex, int subtaskIndex, int attemptNumber) {
-        FeedbackChannel<IterationRecord<?>> feedbackChannel =
+        FeedbackChannel<StreamRecord<IterationRecord<?>>> feedbackChannel =
                 FeedbackChannelBroker.get()
                         .getChannel(
-                                OperatorUtils.<IterationRecord<?>>createFeedbackKey(
+                                OperatorUtils.<StreamRecord<IterationRecord<?>>>createFeedbackKey(
                                                 iterationId, feedbackIndex)
                                         .withSubTaskIndex(subtaskIndex, attemptNumber));
-        List<IterationRecord<?>> iterationRecords = new ArrayList<>();
+        List<StreamRecord<IterationRecord<?>>> iterationRecords = new ArrayList<>();
         OperatorUtils.registerFeedbackConsumer(
                 feedbackChannel, iterationRecords::add, new DirectScheduledExecutorService());
         return iterationRecords;
