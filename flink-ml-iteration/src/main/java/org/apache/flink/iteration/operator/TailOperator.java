@@ -44,9 +44,9 @@ public class TailOperator extends AbstractStreamOperator<Void>
     private final int feedbackIndex;
 
     /** We distinguish how the record is processed according to if objectReuse is enabled. */
-    private transient Consumer<IterationRecord<?>> recordConsumer;
+    private transient Consumer<StreamRecord<IterationRecord<?>>> recordConsumer;
 
-    private transient FeedbackChannel<IterationRecord<?>> channel;
+    private transient FeedbackChannel<StreamRecord<IterationRecord<?>>> channel;
 
     public TailOperator(IterationID iterationId, int feedbackIndex) {
         this.iterationId = Objects.requireNonNull(iterationId);
@@ -60,9 +60,9 @@ public class TailOperator extends AbstractStreamOperator<Void>
         int indexOfThisSubtask = getRuntimeContext().getIndexOfThisSubtask();
         int attemptNum = getRuntimeContext().getAttemptNumber();
 
-        FeedbackKey<IterationRecord<?>> feedbackKey =
+        FeedbackKey<StreamRecord<IterationRecord<?>>> feedbackKey =
                 OperatorUtils.createFeedbackKey(iterationId, feedbackIndex);
-        SubtaskFeedbackKey<IterationRecord<?>> key =
+        SubtaskFeedbackKey<StreamRecord<IterationRecord<?>>> key =
                 feedbackKey.withSubTaskIndex(indexOfThisSubtask, attemptNum);
 
         FeedbackChannelBroker broker = FeedbackChannelBroker.get();
@@ -76,20 +76,20 @@ public class TailOperator extends AbstractStreamOperator<Void>
 
     @Override
     public void processElement(StreamRecord<IterationRecord<?>> streamRecord) {
-        recordConsumer.accept(streamRecord.getValue());
+        recordConsumer.accept(streamRecord);
     }
 
-    private void processIfObjectReuseEnabled(IterationRecord<?> record) {
+    private void processIfObjectReuseEnabled(StreamRecord<IterationRecord<?>> record) {
         // Since the record would be reused, we have to clone a new one
-        IterationRecord<?> cloned = record.clone();
+        IterationRecord<?> cloned = record.getValue().clone();
         cloned.incrementEpoch();
-        channel.put(cloned);
+        channel.put(new StreamRecord<>(cloned, record.getTimestamp()));
     }
 
-    private void processIfObjectReuseNotEnabled(IterationRecord<?> record) {
+    private void processIfObjectReuseNotEnabled(StreamRecord<IterationRecord<?>> record) {
         // Since the record would not be reused, we could modify it in place.
-        record.incrementEpoch();
-        channel.put(record);
+        record.getValue().incrementEpoch();
+        channel.put(new StreamRecord<>(record.getValue(), record.getTimestamp()));
     }
 
     @Override
