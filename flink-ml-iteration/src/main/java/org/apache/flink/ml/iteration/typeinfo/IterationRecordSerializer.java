@@ -108,6 +108,7 @@ public class IterationRecordSerializer<T> extends TypeSerializer<IterationRecord
         // Write the mini-batch id & type, type saved as the last 2 bits of the round
         target.writeByte((byte) record.getType().ordinal());
         serializerNumber(record.getRound(), target);
+
         switch (record.getType()) {
             case RECORD:
                 innerSerializer.serialize(record.getValue(), target);
