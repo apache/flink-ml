@@ -104,6 +104,7 @@ under the License.
             <scope>test</scope>
         </dependency>
 
+        <!-- We depends on StreamTaskMailboxTestHarnessBuilder and it requires this dependency -->
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
