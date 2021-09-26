@@ -20,13 +20,17 @@ package org.apache.flink.ml.api.core;
 
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.annotation.VisibleForTesting;
-import org.apache.flink.ml.api.misc.param.Params;
+import org.apache.flink.ml.param.Param;
+import org.apache.flink.ml.util.ParamUtils;
+import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.table.api.Table;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * A Pipeline acts as an Estimator. It consists of an ordered list of stages, each of which could be
@@ -36,10 +40,11 @@ import java.util.List;
 public final class Pipeline implements Estimator<Pipeline, PipelineModel> {
     private static final long serialVersionUID = 6384850154817512318L;
     private final List<Stage<?>> stages;
-    private final Params params = new Params();
+    private final Map<Param<?>, Object> paramMap = new HashMap<>();
 
     public Pipeline(List<Stage<?>> stages) {
         this.stages = stages;
+        ParamUtils.initializeMapWithDefaultValues(paramMap, this);
     }
 
     /**
@@ -97,17 +102,17 @@ public final class Pipeline implements Estimator<Pipeline, PipelineModel> {
     }
 
     @Override
-    public void save(String path) throws IOException {
-        throw new UnsupportedOperationException();
-    }
-
-    public static Pipeline load(String path) throws IOException {
-        throw new UnsupportedOperationException();
+    public Map<Param<?>, Object> getParamMap() {
+        return paramMap;
     }
 
     @Override
-    public Params getParams() {
-        return params;
+    public void save(String path) throws IOException {
+        ReadWriteUtils.savePipeline(this, stages, path);
+    }
+
+    public static Pipeline load(String path) throws IOException {
+        return new Pipeline(ReadWriteUtils.loadPipeline(path, Pipeline.class.getName()));
     }
 
     /**

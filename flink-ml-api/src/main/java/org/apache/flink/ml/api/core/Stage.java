@@ -19,7 +19,7 @@
 package org.apache.flink.ml.api.core;
 
 import org.apache.flink.annotation.PublicEvolving;
-import org.apache.flink.ml.api.misc.param.WithParams;
+import org.apache.flink.ml.param.WithParams;
 
 import java.io.IOException;
 import java.io.Serializable;

@@ -18,141 +18,103 @@
 
 package org.apache.flink.ml.api.core;
 
-import org.apache.flink.ml.api.misc.param.ParamInfo;
-import org.apache.flink.ml.api.misc.param.ParamInfoFactory;
-import org.apache.flink.ml.api.misc.param.Params;
+import org.apache.flink.ml.api.core.ExampleStages.SumEstimator;
+import org.apache.flink.ml.api.core.ExampleStages.SumModel;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
+import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
+import org.apache.flink.test.util.AbstractTestBase;
 
-import org.junit.Rule;
+import org.apache.commons.collections.IteratorUtils;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 
-import java.io.IOException;
-import java.util.ArrayList;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 
-/** Tests the behavior of {@link Pipeline}. */
-public class PipelineTest {
-    @Rule public ExpectedException thrown = ExpectedException.none();
+/** Tests the behavior of Pipeline and PipelineModel. */
+public class PipelineTest extends AbstractTestBase {
+
+    // Executes the given stage and verifies that it produces the expected output.
+    private static void executeAndCheckOutput(
+            Stage<?> stage, List<Integer> input, List<Integer> expectedOutput) throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+        env.setParallelism(4);
+
+        Table inputTable = tEnv.fromDataStream(env.fromCollection(input));
+
+        Table outputTable;
+
+        if (stage instanceof AlgoOperator) {
+            outputTable = ((AlgoOperator<?>) stage).transform(inputTable)[0];
+        } else {
+            Estimator<?, ?> estimator = (Estimator<?, ?>) stage;
+            Model<?> model = estimator.fit(inputTable);
+            outputTable = model.transform(inputTable)[0];
+        }
+
+        List<Integer> output =
+                IteratorUtils.toList(
+                        tEnv.toDataStream(outputTable, Integer.class).executeAndCollect());
+        compareResultCollections(expectedOutput, output, Comparator.naturalOrder());
+    }
 
     @Test
-    public void testPipelineBehavior() {
-        List<Stage<?>> stages = new ArrayList<>();
-        stages.add(new MockTransformer("a"));
-        stages.add(new MockEstimator("b"));
-        stages.add(new MockEstimator("c"));
-        stages.add(new MockTransformer("d"));
+    public void testPipelineModel() throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+        // Builds a PipelineModel that increments input value by 60. This PipelineModel consists of
+        // three stages where each stage increments input value by 10, 20, and 30 respectively.
+        SumModel modelA = new SumModel();
+        modelA.setModelData(tEnv.fromValues(10));
+        SumModel modelB = new SumModel();
+        modelB.setModelData(tEnv.fromValues(20));
+        SumModel modelC = new SumModel();
+        modelC.setModelData(tEnv.fromValues(30));
 
-        Pipeline pipeline = new Pipeline(stages);
-        assert describePipeline(pipeline.getStages()).equals("a_b_c_d");
+        List<Stage<?>> stages = Arrays.asList(modelA, modelB, modelC);
+        Model<?> model = new PipelineModel(stages);
 
-        PipelineModel pipelineModel = pipeline.fit(null, null);
-        assert describePipeline(pipelineModel.getStages()).equals("a_mb_mc_d");
+        // Executes the original PipelineModel and verifies that it produces the expected output.
+        executeAndCheckOutput(model, Arrays.asList(1, 2, 3), Arrays.asList(61, 62, 63));
+
+        // Saves and loads the PipelineModel.
+        Path tempDir = Files.createTempDirectory("PipelineTest");
+        String path = Paths.get(tempDir.toString(), "testPipelineModelSaveLoad").toString();
+        model.save(path);
+        Model<?> loadedModel = PipelineModel.load(path);
+
+        // Executes the loaded PipelineModel and verifies that it produces the expected output.
+        executeAndCheckOutput(loadedModel, Arrays.asList(1, 2, 3), Arrays.asList(61, 62, 63));
     }
 
-    private static String describePipeline(List<Stage<?>> stages) {
-        StringBuilder res = new StringBuilder();
-        for (Stage<?> s : stages) {
-            if (res.length() != 0) {
-                res.append("_");
-            }
-            res.append(((SelfDescribe) s).describe());
-        }
-        return res.toString();
-    }
+    @Test
+    public void testPipeline() throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+        // Builds a Pipeline that consists of a Model, an Estimator, and a model.
+        SumModel modelA = new SumModel();
+        modelA.setModelData(tEnv.fromValues(10));
+        SumModel modelB = new SumModel();
+        modelB.setModelData(tEnv.fromValues(30));
 
-    /** Interface to describe a class with a string, only for pipeline test. */
-    private interface SelfDescribe {
-        ParamInfo<String> DESCRIPTION =
-                ParamInfoFactory.createParamInfo("description", String.class).build();
+        List<Stage<?>> stages = Arrays.asList(modelA, new SumEstimator(), modelB);
+        Estimator<?, ?> estimator = new Pipeline(stages);
 
-        String describe();
-    }
+        // Executes the original Pipeline and verifies that it produces the expected output.
+        executeAndCheckOutput(estimator, Arrays.asList(1, 2, 3), Arrays.asList(77, 78, 79));
 
-    /** Mock estimator for pipeline test. */
-    public static class MockEstimator implements Estimator<MockEstimator, MockModel>, SelfDescribe {
-        private final Params params = new Params();
+        // Saves and loads the Pipeline.
+        Path tempDir = Files.createTempDirectory("PipelineTest");
+        String path = Paths.get(tempDir.toString(), "testPipeline").toString();
+        estimator.save(path);
+        Estimator<?, ?> loadedEstimator = Pipeline.load(path);
 
-        public MockEstimator() {}
-
-        MockEstimator(String description) {
-            set(DESCRIPTION, description);
-        }
-
-        @Override
-        public MockModel fit(Table... inputs) {
-            return new MockModel("m" + describe());
-        }
-
-        @Override
-        public Params getParams() {
-            return params;
-        }
-
-        @Override
-        public String describe() {
-            return get(DESCRIPTION);
-        }
-
-        @Override
-        public void save(String path) throws IOException {}
-    }
-
-    /** Mock transformer for pipeline test. */
-    public static class MockTransformer implements Transformer<MockTransformer>, SelfDescribe {
-        private final Params params = new Params();
-
-        public MockTransformer() {}
-
-        MockTransformer(String description) {
-            set(DESCRIPTION, description);
-        }
-
-        @Override
-        public Table[] transform(Table... inputs) {
-            return inputs;
-        }
-
-        @Override
-        public Params getParams() {
-            return params;
-        }
-
-        @Override
-        public String describe() {
-            return get(DESCRIPTION);
-        }
-
-        @Override
-        public void save(String path) throws IOException {}
-    }
-
-    /** Mock model for pipeline test. */
-    public static class MockModel implements Model<MockModel>, SelfDescribe {
-        private final Params params = new Params();
-
-        public MockModel() {}
-
-        MockModel(String description) {
-            set(DESCRIPTION, description);
-        }
-
-        @Override
-        public Table[] transform(Table... inputs) {
-            return inputs;
-        }
-
-        @Override
-        public Params getParams() {
-            return params;
-        }
-
-        @Override
-        public String describe() {
-            return get(DESCRIPTION);
-        }
-
-        @Override
-        public void save(String path) throws IOException {}
+        // Executes the loaded Pipeline and verifies that it produces the expected output.
+        executeAndCheckOutput(loadedEstimator, Arrays.asList(1, 2, 3), Arrays.asList(77, 78, 79));
     }
 }
