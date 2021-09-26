@@ -53,9 +53,6 @@ under the License.
 
   <modules>
     <module>flink-ml-api</module>
-    <module>flink-ml-lib</module>
-    <module>flink-ml-uber</module>
-    <module>flink-ml-examples</module>
   </modules>
 
   <properties>
@@ -69,7 +66,7 @@ under the License.
     <junit.version>4.12</junit.version>
     <flink.forkCount>1C</flink.forkCount>
     <flink.reuseForks>true</flink.reuseForks>
-    <flink.version>1.12.1</flink.version>
+    <flink.version>1.14.0</flink.version>
     <zookeeper.version>3.4.14</zookeeper.version>
 
     <!-- Can be set to any value to reproduce a specific build. -->
