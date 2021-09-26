@@ -42,7 +42,7 @@ public class OperatorEpochWatermarkTracker {
 
     private final LowerBoundMaintainer allInputsLowerBound;
 
-    public OperatorEpochWatermarkTracker(
+    OperatorEpochWatermarkTracker(
             int[] numberOfChannels, OperatorEpochWatermarkTrackerListener progressTrackerListener) {
         checkState(numberOfChannels != null && numberOfChannels.length >= 1);
         this.progressTrackerListener = checkNotNull(progressTrackerListener);

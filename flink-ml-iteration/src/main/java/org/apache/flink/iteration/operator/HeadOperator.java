@@ -72,6 +72,8 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
 
     private final Map<Integer, Long> numFeedbackRecordsPerEpoch;
 
+    private transient String uniqueSenderId;
+
     private transient BroadcastOutput<?> eventBroadcastOutput;
 
     private transient StreamRecord<IterationRecord<?>> reusable;
@@ -104,6 +106,9 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
             StreamConfig config,
             Output<StreamRecord<IterationRecord<?>>> output) {
         super.setup(containingTask, config, output);
+        uniqueSenderId =
+                OperatorUtils.getUniqueSenderId(
+                        getOperatorID(), getRuntimeContext().getIndexOfThisSubtask());
         eventBroadcastOutput =
                 BroadcastOutputFactory.createBroadcastOutput(
                         output, metrics.getIOMetricGroup().getNumRecordsOutCounter());
@@ -167,9 +172,7 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
                                 globallyAlignedEvent.isTerminated()
                                         ? Integer.MAX_VALUE
                                         : globallyAlignedEvent.getEpoch(),
-                                OperatorUtils.getUniqueSenderId(
-                                        getOperatorID(),
-                                        getRuntimeContext().getIndexOfThisSubtask())),
+                                uniqueSenderId),
                         0);
                 eventBroadcastOutput.broadcastEmit((StreamRecord) reusable);
                 numFeedbackRecordsPerEpoch.remove(globallyAlignedEvent.getEpoch());
