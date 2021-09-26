@@ -24,9 +24,12 @@ import org.apache.flink.statefun.flink.core.feedback.FeedbackChannel;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackChannelBroker;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackKey;
 import org.apache.flink.statefun.flink.core.feedback.SubtaskFeedbackKey;
+import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
+import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.util.IOUtils;
 
 import java.util.Objects;
@@ -51,6 +54,14 @@ public class TailOperator extends AbstractStreamOperator<Void>
     public TailOperator(IterationID iterationId, int feedbackIndex) {
         this.iterationId = Objects.requireNonNull(iterationId);
         this.feedbackIndex = feedbackIndex;
+    }
+
+    @Override
+    public void setup(
+            StreamTask<?, ?> containingTask,
+            StreamConfig config,
+            Output<StreamRecord<Void>> output) {
+        super.setup(containingTask, config, output);
     }
 
     @Override
