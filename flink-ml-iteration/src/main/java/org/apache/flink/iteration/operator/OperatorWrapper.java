@@ -19,9 +19,12 @@
 package org.apache.flink.iteration.operator;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
+import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
+import org.apache.flink.util.OutputTag;
 
 import java.io.Serializable;
 
@@ -31,6 +34,12 @@ public interface OperatorWrapper<T, R> extends Serializable {
     StreamOperator<R> wrap(
             StreamOperatorParameters<R> operatorParameters,
             StreamOperatorFactory<T> operatorFactory);
+
+    <KEY> KeySelector<R, KEY> wrapKeySelector(KeySelector<T, KEY> keySelector);
+
+    StreamPartitioner<R> wrapStreamPartitioner(StreamPartitioner<T> streamPartitioner);
+
+    OutputTag<R> wrapOutputTag(OutputTag<T> outputTag);
 
     TypeInformation<R> getWrappedTypeInfo(TypeInformation<T> typeInfo);
 }

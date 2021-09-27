@@ -19,6 +19,8 @@
 package org.apache.flink.iteration;
 
 import org.apache.flink.annotation.Experimental;
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.streaming.api.datastream.DataStream;
 
 /**
  * The builder of the subgraph that will be executed inside the iteration.
@@ -26,6 +28,16 @@ import org.apache.flink.annotation.Experimental;
  * <p>Notes that inside the iteration body, users could only create the subgraph from the {@code
  * variableStreams} and {@code dataStreams}. Users could not refers to other data stream outside the
  * iteration through the closure, and could not add new sources / sinks inside the iteration.
+ *
+ * <p>Some operations are not supported inside the iterations:
+ *
+ * <ul>
+ *   <li>Sources and Sinks.
+ *   <li>{@link DataStream#assignTimestampsAndWatermarks(WatermarkStrategy)}.
+ *   <li>{@link DataStream#iterate()}.
+ * </ul>
+ *
+ * <p>Currently we also not support nested exception.
  *
  * <p>The iteration body also requires that the parallelism of any stream in the initial variable
  * streams must equal to the parallelism of the stream at the same index of the feedback variable

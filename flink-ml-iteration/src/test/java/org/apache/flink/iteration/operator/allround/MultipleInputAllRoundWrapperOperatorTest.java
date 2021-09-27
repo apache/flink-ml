@@ -216,7 +216,8 @@ public class MultipleInputAllRoundWrapperOperatorTest extends TestLogger {
         }
     }
 
-    private static class LifeCycleTrackingTwoInputStreamOperatorFactory
+    /** The operator factory for the lifecycle-tracking operator. */
+    public static class LifeCycleTrackingTwoInputStreamOperatorFactory
             extends AbstractStreamOperatorFactory<Integer> {
 
         @Override
