@@ -19,17 +19,24 @@
 package org.apache.flink.ml.iteration.operator.allround;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.ml.iteration.IterationRecord;
 import org.apache.flink.ml.iteration.operator.OperatorWrapper;
+import org.apache.flink.ml.iteration.proxy.ProxyKeySelector;
+import org.apache.flink.ml.iteration.proxy.ProxyStreamPartitioner;
+import org.apache.flink.ml.iteration.typeinfo.IterationRecordTypeInfo;
 import org.apache.flink.streaming.api.operators.MultipleInputStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
+import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
+import org.apache.flink.util.OutputTag;
 
 /** The operator wrapper implementation for all-round wrappers. */
 public class AllRoundOperatorWrapper<T> implements OperatorWrapper<T, IterationRecord<T>> {
+
     @Override
     public StreamOperator<IterationRecord<T>> wrap(
             StreamOperatorParameters<IterationRecord<T>> operatorParameters,
@@ -49,7 +56,25 @@ public class AllRoundOperatorWrapper<T> implements OperatorWrapper<T, IterationR
     }
 
     @Override
+    public <KEY> KeySelector<IterationRecord<T>, KEY> wrapKeySelector(
+            KeySelector<T, KEY> keySelector) {
+        return new ProxyKeySelector<>(keySelector);
+    }
+
+    @Override
+    public StreamPartitioner<IterationRecord<T>> wrapStreamPartitioner(
+            StreamPartitioner<T> streamPartitioner) {
+        return new ProxyStreamPartitioner<>(streamPartitioner);
+    }
+
+    @Override
+    public OutputTag<IterationRecord<T>> wrapOutputTag(OutputTag<T> outputTag) {
+        return new OutputTag<>(
+                outputTag.getId(), new IterationRecordTypeInfo<>(outputTag.getTypeInfo()));
+    }
+
+    @Override
     public TypeInformation<IterationRecord<T>> getWrappedTypeInfo(TypeInformation<T> typeInfo) {
-        return null;
+        return new IterationRecordTypeInfo<>(typeInfo);
     }
 }

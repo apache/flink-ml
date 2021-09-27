@@ -18,6 +18,7 @@
 
 package org.apache.flink.ml.iteration.operator;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.ml.iteration.IterationRecord;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperator;
@@ -48,5 +49,15 @@ public class WrapperOperatorFactory<OUT>
     @Override
     public Class<? extends StreamOperator> getStreamOperatorClass(ClassLoader classLoader) {
         return AbstractWrapperOperator.class;
+    }
+
+    @VisibleForTesting
+    public StreamOperatorFactory<OUT> getOperatorFactory() {
+        return operatorFactory;
+    }
+
+    @VisibleForTesting
+    public OperatorWrapper<OUT, IterationRecord<OUT>> getWrapper() {
+        return wrapper;
     }
 }

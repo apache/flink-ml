@@ -215,7 +215,7 @@ public class MultipleInputAllRoundWrapperOperatorTest {
         }
     }
 
-    private static class LifeCycleTrackingTwoInputStreamOperatorFactory
+    public static class LifeCycleTrackingTwoInputStreamOperatorFactory
             extends AbstractStreamOperatorFactory<Integer> {
 
         @Override
