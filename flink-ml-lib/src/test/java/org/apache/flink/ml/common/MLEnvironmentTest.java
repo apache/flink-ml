@@ -19,10 +19,8 @@
 
 package org.apache.flink.ml.common;
 
-import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
-import org.apache.flink.table.api.bridge.java.BatchTableEnvironment;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 
 import org.junit.Assert;
@@ -35,23 +33,8 @@ public class MLEnvironmentTest {
     @Test
     public void testDefaultConstructor() {
         MLEnvironment mlEnvironment = new MLEnvironment();
-        Assert.assertNotNull(mlEnvironment.getExecutionEnvironment());
-        Assert.assertNotNull(mlEnvironment.getBatchTableEnvironment());
         Assert.assertNotNull(mlEnvironment.getStreamExecutionEnvironment());
         Assert.assertNotNull(mlEnvironment.getStreamTableEnvironment());
-    }
-
-    @Test
-    public void testConstructWithBatchEnv() {
-        ExecutionEnvironment executionEnvironment = ExecutionEnvironment.getExecutionEnvironment();
-        BatchTableEnvironment batchTableEnvironment =
-                BatchTableEnvironment.create(executionEnvironment);
-
-        MLEnvironment mlEnvironment =
-                new MLEnvironment(executionEnvironment, batchTableEnvironment);
-
-        Assert.assertSame(mlEnvironment.getExecutionEnvironment(), executionEnvironment);
-        Assert.assertSame(mlEnvironment.getBatchTableEnvironment(), batchTableEnvironment);
     }
 
     @Test
@@ -60,8 +43,7 @@ public class MLEnvironmentTest {
                 StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment streamTableEnvironment =
                 StreamTableEnvironment.create(
-                        streamExecutionEnvironment,
-                        EnvironmentSettings.newInstance().useOldPlanner().build());
+                        streamExecutionEnvironment, EnvironmentSettings.newInstance().build());
 
         MLEnvironment mlEnvironment =
                 new MLEnvironment(streamExecutionEnvironment, streamTableEnvironment);

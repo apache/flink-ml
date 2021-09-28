@@ -71,6 +71,7 @@ under the License.
     <flink.forkCount>1C</flink.forkCount>
     <flink.reuseForks>true</flink.reuseForks>
     <flink.version>1.13.2</flink.version>
+    <flink.version>1.14-SNAPSHOT</flink.version>
     <zookeeper.version>3.4.14</zookeeper.version>
 
     <!-- Can be set to any value to reproduce a specific build. -->
