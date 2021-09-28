@@ -19,6 +19,7 @@
 package org.apache.flink.ml.iteration;
 
 import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.ml.iteration.operator.allround.AllRoundOperatorWrapper;
 
 /** A helper class to create iterations. */
 @PublicEvolving
@@ -60,7 +61,8 @@ public class Iterations {
      */
     public static DataStreamList iterateUnboundedStreams(
             DataStreamList initVariableStreams, DataStreamList dataStreams, IterationBody body) {
-        return null;
+        return IterationFactory.createIteration(
+                initVariableStreams, dataStreams, body, new AllRoundOperatorWrapper(), false);
     }
 
     /**
