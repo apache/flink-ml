@@ -19,6 +19,7 @@
 package org.apache.flink.iteration;
 
 import org.apache.flink.annotation.Experimental;
+import org.apache.flink.iteration.operator.allround.AllRoundOperatorWrapper;
 
 /**
  * A helper class to create iterations. To construct an iteration, Users are required to provide
@@ -86,7 +87,8 @@ public class Iterations {
      */
     public static DataStreamList iterateUnboundedStreams(
             DataStreamList initVariableStreams, DataStreamList dataStreams, IterationBody body) {
-        return null;
+        return IterationFactory.createIteration(
+                initVariableStreams, dataStreams, body, new AllRoundOperatorWrapper(), false);
     }
 
     /**
