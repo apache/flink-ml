@@ -18,7 +18,6 @@
 
 package org.apache.flink.iteration.compile;
 
-import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.JobExecutionResult;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
@@ -51,8 +50,10 @@ import org.apache.flink.streaming.api.transformations.TwoInputTransformation;
 import org.apache.flink.streaming.api.transformations.UnionTransformation;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import static org.apache.flink.util.Preconditions.checkState;
 
@@ -88,6 +89,8 @@ public class DraftExecutionEnvironment extends StreamExecutionEnvironment {
 
     private final StreamExecutionEnvironment actualEnv;
 
+    private final Set<Integer> explicitlyAddedTransformations;
+
     private final Map<Integer, OperatorWrapper<?, ?>> draftWrappers;
 
     private final Map<Integer, Transformation<?>> draftToActualTransformations;
@@ -103,6 +106,7 @@ public class DraftExecutionEnvironment extends StreamExecutionEnvironment {
                 ReflectionUtils.getFieldValue(
                         actualEnv, StreamExecutionEnvironment.class, "userClassloader"));
         this.actualEnv = actualEnv;
+        this.explicitlyAddedTransformations = new HashSet<>();
         this.draftWrappers = new HashMap<>();
         this.draftToActualTransformations = new HashMap<>();
 
@@ -126,6 +130,7 @@ public class DraftExecutionEnvironment extends StreamExecutionEnvironment {
         // Record the wrapper
         recordWrapper(transformation);
         super.addOperator(transformation);
+        explicitlyAddedTransformations.add(transformation.getId());
     }
 
     private void recordWrapper(Transformation<?> transformation) {
@@ -138,6 +143,12 @@ public class DraftExecutionEnvironment extends StreamExecutionEnvironment {
 
         for (Transformation<?> input : transformation.getInputs()) {
             recordWrapper(input);
+        }
+    }
+
+    public void addOperatorIfNotExists(Transformation<?> transformation) {
+        if (!explicitlyAddedTransformations.contains(transformation.getId())) {
+            addOperator(transformation);
         }
     }
 
@@ -216,8 +227,8 @@ public class DraftExecutionEnvironment extends StreamExecutionEnvironment {
         }
     }
 
-    @VisibleForTesting
-    static class EmptySource<T> extends RichParallelSourceFunction<T> {
+    /** A special source that emits no data. */
+    public static class EmptySource<T> extends RichParallelSourceFunction<T> {
 
         @Override
         public void run(SourceContext<T> ctx) throws Exception {}

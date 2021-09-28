@@ -47,6 +47,6 @@ public abstract class EpochAwareAllRoundProcessFunction<I, O> extends ProcessFun
         processElement(input, epochSupplier.get(), context, collector);
     }
 
-    public abstract void processElement(
-            I input, int epoch, Context context, Collector<O> collector);
+    public abstract void processElement(I input, int epoch, Context context, Collector<O> collector)
+            throws Exception;
 }
