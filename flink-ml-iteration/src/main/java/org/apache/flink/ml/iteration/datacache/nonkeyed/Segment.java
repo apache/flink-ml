@@ -30,9 +30,17 @@ public class Segment implements Serializable {
 
     private final int count;
 
+    /** number of bytes in this segment. */
+    private final long size;
+
     public Segment(Path path, int count) {
+        this(path, count, 0L);
+    }
+
+    public Segment(Path path, int count, long size) {
         this.path = path;
         this.count = count;
+        this.size = size;
     }
 
     public Path getPath() {
@@ -41,6 +49,10 @@ public class Segment implements Serializable {
 
     public int getCount() {
         return count;
+    }
+
+    public long getSize() {
+        return this.size;
     }
 
     @Override
@@ -52,16 +64,16 @@ public class Segment implements Serializable {
             return false;
         }
         Segment segment = (Segment) o;
-        return count == segment.count && Objects.equals(path, segment.path);
+        return count == segment.count && Objects.equals(path, segment.path) && size == segment.size;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(path, count);
+        return Objects.hash(path, count, size);
     }
 
     @Override
     public String toString() {
-        return "Segment{" + "path=" + path + ", count=" + count + '}';
+        return "Segment{" + "path=" + path + ", count=" + count + ", size=" + size + '}';
     }
 }

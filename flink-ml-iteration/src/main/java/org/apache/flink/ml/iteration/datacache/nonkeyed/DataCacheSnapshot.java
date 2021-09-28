@@ -101,6 +101,11 @@ public class DataCacheSnapshot {
                 checkState(totalRecords >= 0, "overflowed: " + totalRecords);
                 dos.writeInt(totalRecords);
 
+                long totalBytes = 0L;
+                for (Segment segment: segments) {
+                    totalBytes += segment.getSize();
+                }
+                dos.writeLong(totalBytes);
                 for (Segment segment : segments) {
                     try (FSDataInputStream inputStream = fileSystem.open(segment.getPath())) {
                         IOUtils.copyBytes(inputStream, checkpointOutputStream, false);
@@ -135,6 +140,7 @@ public class DataCacheSnapshot {
             } else {
                 DataInputViewStreamWrapper dataInputView = new DataInputViewStreamWrapper(dis);
                 int totalRecords = dis.readInt();
+                dis.readLong();
                 for (int i = 0; i < totalRecords; ++i) {
                     feedbackConsumer.processFeedback(serializer.deserialize(dataInputView));
                 }
@@ -166,15 +172,34 @@ public class DataCacheSnapshot {
                 segments = parseSegments(dis);
             } else {
                 int totalRecords = dis.readInt();
+                long totalBytes = dis.readLong();
                 Path path = pathGenerator.get();
                 try (FSDataOutputStream outputStream =
                         fileSystem.create(path, FileSystem.WriteMode.NO_OVERWRITE)) {
-                    IOUtils.copyBytes(checkpointInputStream, outputStream, false);
+                    copyBytes(checkpointInputStream, outputStream, totalBytes);
                 }
-                segments = Collections.singletonList(new Segment(path, totalRecords));
+                segments = Collections.singletonList(new Segment(path, totalRecords, totalBytes));
             }
 
             return new DataCacheSnapshot(fileSystem, readerPosition, segments);
+        }
+    }
+
+    private static void copyBytes(final InputStream in, final OutputStream out, long len) throws IOException {
+        final int BUFFER_SIZE = 4096;
+        final byte[] buf = new byte[BUFFER_SIZE];
+        try {
+            int byteToRead = (int) Math.min(buf.length, len);
+            int bytesRead = in.read(buf, 0, byteToRead);
+            while (len > 0 && bytesRead >= 0) {
+                len -= bytesRead;
+                out.write(buf, 0, bytesRead);
+                byteToRead = (int) Math.min(buf.length, len);
+                bytesRead = in.read(buf, 0, byteToRead);
+            }
+            assert len == 0L;
+        }
+        finally {
         }
     }
 
