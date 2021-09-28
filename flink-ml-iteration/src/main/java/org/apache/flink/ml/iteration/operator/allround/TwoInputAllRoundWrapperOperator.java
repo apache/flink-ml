@@ -25,6 +25,7 @@ import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
 import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.LatencyMarker;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.streaming.runtime.watermarkstatus.WatermarkStatus;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.function.ThrowingConsumer;
 
@@ -96,5 +97,15 @@ public class TwoInputAllRoundWrapperOperator<IN1, IN2, OUT>
     @Override
     public void processLatencyMarker2(LatencyMarker latencyMarker) throws Exception {
         wrappedOperator.processLatencyMarker2(latencyMarker);
+    }
+
+    @Override
+    public void processWatermarkStatus1(WatermarkStatus watermarkStatus) throws Exception {
+        wrappedOperator.processWatermarkStatus1(watermarkStatus);
+    }
+
+    @Override
+    public void processWatermarkStatus2(WatermarkStatus watermarkStatus) throws Exception {
+        wrappedOperator.processWatermarkStatus2(watermarkStatus);
     }
 }

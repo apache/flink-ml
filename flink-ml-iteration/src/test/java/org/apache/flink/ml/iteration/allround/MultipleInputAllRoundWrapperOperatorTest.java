@@ -112,7 +112,7 @@ public class MultipleInputAllRoundWrapperOperatorTest {
             harness.getStreamTask().notifyCheckpointCompleteAsync(5);
             harness.processAll();
 
-            harness.getStreamTask().notifyCheckpointAbortAsync(6);
+            harness.getStreamTask().notifyCheckpointAbortAsync(6, 5);
             harness.processAll();
 
             harness.endInput();
@@ -183,8 +183,8 @@ public class MultipleInputAllRoundWrapperOperatorTest {
         }
 
         @Override
-        public void dispose() throws Exception {
-            super.dispose();
+        public void finish() throws Exception {
+            super.finish();
             lifeCycles.add(LifeCycle.DISPOSE);
         }
 

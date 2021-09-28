@@ -40,7 +40,7 @@ public class PartitionTransformationTranslator
                                 draftTransformation.getInputs().get(0).getId()),
                         operatorWrapper.wrapStreamPartitioner(
                                 (StreamPartitioner) draftTransformation.getPartitioner()),
-                        draftTransformation.getShuffleMode()),
+                        draftTransformation.getExchangeMode()),
                 draftTransformation);
     }
 }

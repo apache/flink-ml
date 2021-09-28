@@ -19,6 +19,7 @@
 package org.apache.flink.ml.iteration.operator.allround;
 
 import org.apache.flink.metrics.MetricGroup;
+import org.apache.flink.metrics.groups.OperatorMetricGroup;
 import org.apache.flink.ml.iteration.IterationListener;
 import org.apache.flink.ml.iteration.IterationRecord;
 import org.apache.flink.ml.iteration.operator.AbstractWrapperOperator;
@@ -101,8 +102,8 @@ public abstract class AbstractAllRoundWrapperOperator<T, S extends StreamOperato
     }
 
     @Override
-    public void dispose() throws Exception {
-        wrappedOperator.dispose();
+    public void finish() throws Exception {
+        wrappedOperator.finish();
     }
 
     @Override
@@ -138,7 +139,7 @@ public abstract class AbstractAllRoundWrapperOperator<T, S extends StreamOperato
     }
 
     @Override
-    public MetricGroup getMetricGroup() {
+    public OperatorMetricGroup getMetricGroup() {
         return wrappedOperator.getMetricGroup();
     }
 

@@ -24,6 +24,7 @@ import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.LatencyMarker;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.streaming.runtime.watermarkstatus.WatermarkStatus;
 import org.apache.flink.util.OutputTag;
 
 import java.util.HashMap;
@@ -53,6 +54,11 @@ public class ProxyOutput<T> implements Output<StreamRecord<T>> {
     @Override
     public void emitWatermark(Watermark mark) {
         output.emitWatermark(mark);
+    }
+
+    @Override
+    public void emitWatermarkStatus(WatermarkStatus watermarkStatus) {
+        output.emitWatermarkStatus(watermarkStatus);
     }
 
     @Override

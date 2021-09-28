@@ -26,7 +26,8 @@ import org.apache.flink.ml.iteration.progresstrack.ProgressTrackerFactory;
 import org.apache.flink.ml.iteration.progresstrack.ProgressTrackerListener;
 import org.apache.flink.ml.iteration.proxy.ProxyOutput;
 import org.apache.flink.runtime.execution.Environment;
-import org.apache.flink.runtime.metrics.groups.OperatorMetricGroup;
+import org.apache.flink.metrics.groups.OperatorMetricGroup;
+import org.apache.flink.runtime.metrics.groups.InternalOperatorIOMetricGroup;
 import org.apache.flink.runtime.metrics.groups.UnregisteredMetricGroups;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.BoundedOneInput;
@@ -131,7 +132,7 @@ public abstract class AbstractWrapperOperator<T>
                             .getOrAddOperator(
                                     streamConfig.getOperatorID(), streamConfig.getOperatorName());
             if (streamConfig.isChainEnd()) {
-                operatorMetricGroup.getIOMetricGroup().reuseOutputMetricsForTask();
+                ((InternalOperatorIOMetricGroup) operatorMetricGroup.getIOMetricGroup()).reuseOutputMetricsForTask();
             }
             return operatorMetricGroup;
         } catch (Exception e) {

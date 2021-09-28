@@ -47,7 +47,7 @@ public interface DraftTransformationTranslator<TF extends Transformation<?>> {
                 actual.setBufferTimeout(draft.getBufferTimeout());
             }
 
-            actual.setSlotSharingGroup(draft.getSlotSharingGroup());
+            actual.setSlotSharingGroup(draft.getSlotSharingGroup().get());
             actual.setCoLocationGroupKey(draft.getCoLocationGroupKey());
 
             actual.setUid(draft.getUid());
