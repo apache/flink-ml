@@ -25,8 +25,6 @@ import org.apache.flink.ml.common.linalg.DenseVector;
 import org.apache.flink.ml.common.linalg.SparseVector;
 import org.apache.flink.ml.common.linalg.Vector;
 
-import org.apache.flink.shaded.guava18.com.google.common.primitives.Doubles;
-
 import com.github.fommil.netlib.LAPACK;
 import org.netlib.util.intW;
 
@@ -116,7 +114,10 @@ public class MultivariateGaussian {
         System.arraycopy(cov.getData(), 0, matU, 0, k * k);
         LAPACK_INST.dsyev("V", "U", k, matU, k, evs, work, lwork, info);
 
-        double maxEv = Doubles.max(evs);
+        double maxEv = Double.MIN_VALUE;
+        for (double ev : evs) {
+            maxEv = Math.max(maxEv, ev);
+        }
         double tol = EPSILON * k * maxEv;
 
         // log(pseudo-determinant) is sum of the logs of all non-zero singular values
