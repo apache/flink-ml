@@ -16,12 +16,13 @@
  * limitations under the License.
  */
 
-package org.apache.flink.iteration.operator.allround;
+package org.apache.flink.iteration.operator.perround;
 
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.iteration.operator.OperatorUtils;
 import org.apache.flink.iteration.operator.WrapperOperatorFactory;
+import org.apache.flink.iteration.operator.allround.LifeCycle;
 import org.apache.flink.iteration.typeinfo.IterationRecordTypeInfo;
 import org.apache.flink.runtime.checkpoint.CheckpointMetaData;
 import org.apache.flink.runtime.checkpoint.CheckpointMetricsBuilder;
@@ -54,8 +55,8 @@ import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 
-/** Tests the {@link OneInputAllRoundWrapperOperator}. */
-public class TwoInputAllRoundWrapperOperatorTest extends TestLogger {
+/** Tests the {@link OneInputPerRoundWrapperOperator}. */
+public class TwoInputPerRoundWrapperOperatorTest extends TestLogger {
 
     private static final List<LifeCycle> LIFE_CYCLES = new ArrayList<>();
 
@@ -64,7 +65,7 @@ public class TwoInputAllRoundWrapperOperatorTest extends TestLogger {
         StreamOperatorFactory<IterationRecord<Integer>> wrapperFactory =
                 new WrapperOperatorFactory<>(
                         SimpleOperatorFactory.of(new LifeCycleTrackingTwoInputStreamOperator()),
-                        new AllRoundOperatorWrapper<>());
+                        new PerRoundOperatorWrapper<>());
         OperatorID operatorId = new OperatorID();
 
         try (StreamTaskMailboxTestHarness<IterationRecord<Integer>> harness =
@@ -77,19 +78,12 @@ public class TwoInputAllRoundWrapperOperatorTest extends TestLogger {
                         .build()) {
             harness.processElement(new StreamRecord<>(IterationRecord.newRecord(5, 1), 2), 0);
             harness.processElement(new StreamRecord<>(IterationRecord.newRecord(6, 2), 3), 1);
-            harness.processElement(
-                    new StreamRecord<>(IterationRecord.newEpochWatermark(5, "only-one-0")), 0);
-            harness.processElement(
-                    new StreamRecord<>(IterationRecord.newEpochWatermark(5, "only-one-1")), 1);
 
             // Checks the output
             assertEquals(
                     Arrays.asList(
                             new StreamRecord<>(IterationRecord.newRecord(5, 1), 2),
-                            new StreamRecord<>(IterationRecord.newRecord(6, 2), 3),
-                            new StreamRecord<>(
-                                    IterationRecord.newEpochWatermark(
-                                            5, OperatorUtils.getUniqueSenderId(operatorId, 0)))),
+                            new StreamRecord<>(IterationRecord.newRecord(6, 2), 3)),
                     new ArrayList<>(harness.getOutput()));
 
             // Checks the other lifecycles.
@@ -110,6 +104,27 @@ public class TwoInputAllRoundWrapperOperatorTest extends TestLogger {
             harness.getStreamTask().notifyCheckpointAbortAsync(6, 5);
             harness.processAll();
 
+            harness.getOutput().clear();
+            harness.processElement(
+                    new StreamRecord<>(IterationRecord.newEpochWatermark(1, "only-one")), 0);
+            harness.processElement(
+                    new StreamRecord<>(IterationRecord.newEpochWatermark(1, "only-one")), 1);
+            harness.processElement(
+                    new StreamRecord<>(IterationRecord.newEpochWatermark(2, "only-one")), 0);
+            harness.processElement(
+                    new StreamRecord<>(IterationRecord.newEpochWatermark(2, "only-one")), 1);
+
+            // Checks the output
+            assertEquals(
+                    Arrays.asList(
+                            new StreamRecord<>(
+                                    IterationRecord.newEpochWatermark(
+                                            1, OperatorUtils.getUniqueSenderId(operatorId, 0))),
+                            new StreamRecord<>(
+                                    IterationRecord.newEpochWatermark(
+                                            2, OperatorUtils.getUniqueSenderId(operatorId, 0)))),
+                    new ArrayList<>(harness.getOutput()));
+
             harness.processEvent(EndOfData.INSTANCE, 0);
             harness.processEvent(EndOfData.INSTANCE, 1);
             harness.endInput();
@@ -117,15 +132,31 @@ public class TwoInputAllRoundWrapperOperatorTest extends TestLogger {
 
             assertEquals(
                     Arrays.asList(
+                            /* First wrapped operator */
                             LifeCycle.SETUP,
                             LifeCycle.INITIALIZE_STATE,
                             LifeCycle.OPEN,
                             LifeCycle.PROCESS_ELEMENT_1,
+                            /* second wrapped operator */
+                            LifeCycle.SETUP,
+                            LifeCycle.INITIALIZE_STATE,
+                            LifeCycle.OPEN,
                             LifeCycle.PROCESS_ELEMENT_2,
+                            /* states */
+                            LifeCycle.PREPARE_SNAPSHOT_PRE_BARRIER,
                             LifeCycle.PREPARE_SNAPSHOT_PRE_BARRIER,
                             LifeCycle.SNAPSHOT_STATE,
+                            LifeCycle.SNAPSHOT_STATE,
+                            LifeCycle.NOTIFY_CHECKPOINT_COMPLETE,
                             LifeCycle.NOTIFY_CHECKPOINT_COMPLETE,
                             LifeCycle.NOTIFY_CHECKPOINT_ABORT,
+                            LifeCycle.NOTIFY_CHECKPOINT_ABORT,
+                            // The first input
+                            LifeCycle.END_INPUT,
+                            // The second input
+                            LifeCycle.END_INPUT,
+                            LifeCycle.FINISH,
+                            LifeCycle.CLOSE,
                             // The first input
                             LifeCycle.END_INPUT,
                             // The second input

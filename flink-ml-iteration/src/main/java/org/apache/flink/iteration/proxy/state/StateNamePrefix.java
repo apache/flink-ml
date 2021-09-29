@@ -16,22 +16,22 @@
  * limitations under the License.
  */
 
-package org.apache.flink.iteration.operator.allround;
+package org.apache.flink.iteration.proxy.state;
 
-/** Utilities to track the life-cycle of the operators. */
-public enum LifeCycle {
-    SETUP,
-    OPEN,
-    INITIALIZE_STATE,
-    PROCESS_ELEMENT,
-    PROCESS_ELEMENT_1,
-    PROCESS_ELEMENT_2,
-    PREPARE_SNAPSHOT_PRE_BARRIER,
-    SNAPSHOT_STATE,
-    NOTIFY_CHECKPOINT_COMPLETE,
-    NOTIFY_CHECKPOINT_ABORT,
-    END_INPUT,
-    MAX_WATERMARK,
-    FINISH,
-    CLOSE,
+/** The prefix for the state name. */
+public class StateNamePrefix {
+
+    private final String namePrefix;
+
+    public StateNamePrefix(String namePrefix) {
+        this.namePrefix = namePrefix;
+    }
+
+    public String getNamePrefix() {
+        return namePrefix;
+    }
+
+    public String prefix(String stateName) {
+        return namePrefix + stateName;
+    }
 }

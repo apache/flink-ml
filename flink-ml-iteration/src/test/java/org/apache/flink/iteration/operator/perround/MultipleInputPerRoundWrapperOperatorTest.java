@@ -16,12 +16,14 @@
  * limitations under the License.
  */
 
-package org.apache.flink.iteration.operator.allround;
+package org.apache.flink.iteration.operator.perround;
 
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.iteration.operator.OperatorUtils;
 import org.apache.flink.iteration.operator.WrapperOperatorFactory;
+import org.apache.flink.iteration.operator.allround.LifeCycle;
+import org.apache.flink.iteration.operator.allround.OneInputAllRoundWrapperOperator;
 import org.apache.flink.iteration.typeinfo.IterationRecordTypeInfo;
 import org.apache.flink.runtime.checkpoint.CheckpointMetaData;
 import org.apache.flink.runtime.checkpoint.CheckpointMetricsBuilder;
@@ -32,18 +34,19 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.state.CheckpointStorageLocationReference;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
-import org.apache.flink.streaming.api.graph.StreamConfig;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
+import org.apache.flink.streaming.api.operators.AbstractInput;
+import org.apache.flink.streaming.api.operators.AbstractStreamOperatorFactory;
+import org.apache.flink.streaming.api.operators.AbstractStreamOperatorV2;
 import org.apache.flink.streaming.api.operators.BoundedMultiInput;
-import org.apache.flink.streaming.api.operators.Output;
-import org.apache.flink.streaming.api.operators.SimpleOperatorFactory;
+import org.apache.flink.streaming.api.operators.Input;
+import org.apache.flink.streaming.api.operators.MultipleInputStreamOperator;
+import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
-import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
+import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
-import org.apache.flink.streaming.runtime.tasks.StreamTask;
+import org.apache.flink.streaming.runtime.tasks.MultipleInputStreamTask;
 import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarness;
 import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarnessBuilder;
-import org.apache.flink.streaming.runtime.tasks.TwoInputStreamTask;
 import org.apache.flink.util.TestLogger;
 
 import org.junit.Test;
@@ -55,7 +58,7 @@ import java.util.List;
 import static org.junit.Assert.assertEquals;
 
 /** Tests the {@link OneInputAllRoundWrapperOperator}. */
-public class TwoInputAllRoundWrapperOperatorTest extends TestLogger {
+public class MultipleInputPerRoundWrapperOperatorTest extends TestLogger {
 
     private static final List<LifeCycle> LIFE_CYCLES = new ArrayList<>();
 
@@ -63,33 +66,27 @@ public class TwoInputAllRoundWrapperOperatorTest extends TestLogger {
     public void testProcessElementsAndEpochWatermarks() throws Exception {
         StreamOperatorFactory<IterationRecord<Integer>> wrapperFactory =
                 new WrapperOperatorFactory<>(
-                        SimpleOperatorFactory.of(new LifeCycleTrackingTwoInputStreamOperator()),
-                        new AllRoundOperatorWrapper<>());
+                        new LifeCycleTrackingMultiInputStreamOperatorFactory(),
+                        new PerRoundOperatorWrapper<>());
         OperatorID operatorId = new OperatorID();
 
         try (StreamTaskMailboxTestHarness<IterationRecord<Integer>> harness =
                 new StreamTaskMailboxTestHarnessBuilder<>(
-                                TwoInputStreamTask::new,
+                                MultipleInputStreamTask::new,
                                 new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO))
+                        .addInput(new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO))
                         .addInput(new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO))
                         .addInput(new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO))
                         .setupOutputForSingletonOperatorChain(wrapperFactory, operatorId)
                         .build()) {
             harness.processElement(new StreamRecord<>(IterationRecord.newRecord(5, 1), 2), 0);
-            harness.processElement(new StreamRecord<>(IterationRecord.newRecord(6, 2), 3), 1);
-            harness.processElement(
-                    new StreamRecord<>(IterationRecord.newEpochWatermark(5, "only-one-0")), 0);
-            harness.processElement(
-                    new StreamRecord<>(IterationRecord.newEpochWatermark(5, "only-one-1")), 1);
+            harness.processElement(new StreamRecord<>(IterationRecord.newRecord(6, 2), 3), 2);
 
             // Checks the output
             assertEquals(
                     Arrays.asList(
                             new StreamRecord<>(IterationRecord.newRecord(5, 1), 2),
-                            new StreamRecord<>(IterationRecord.newRecord(6, 2), 3),
-                            new StreamRecord<>(
-                                    IterationRecord.newEpochWatermark(
-                                            5, OperatorUtils.getUniqueSenderId(operatorId, 0)))),
+                            new StreamRecord<>(IterationRecord.newRecord(6, 2), 3)),
                     new ArrayList<>(harness.getOutput()));
 
             // Checks the other lifecycles.
@@ -110,25 +107,69 @@ public class TwoInputAllRoundWrapperOperatorTest extends TestLogger {
             harness.getStreamTask().notifyCheckpointAbortAsync(6, 5);
             harness.processAll();
 
+            harness.getOutput().clear();
+            harness.processElement(
+                    new StreamRecord<>(IterationRecord.newEpochWatermark(1, "only-one-0")), 0);
+            harness.processElement(
+                    new StreamRecord<>(IterationRecord.newEpochWatermark(1, "only-one-1")), 1);
+            harness.processElement(
+                    new StreamRecord<>(IterationRecord.newEpochWatermark(1, "only-one-2")), 2);
+            harness.processElement(
+                    new StreamRecord<>(IterationRecord.newEpochWatermark(2, "only-one-0")), 0);
+            harness.processElement(
+                    new StreamRecord<>(IterationRecord.newEpochWatermark(2, "only-one-1")), 1);
+            harness.processElement(
+                    new StreamRecord<>(IterationRecord.newEpochWatermark(2, "only-one-2")), 2);
+
+            // Checks the output
+            assertEquals(
+                    Arrays.asList(
+                            new StreamRecord<>(
+                                    IterationRecord.newEpochWatermark(
+                                            1, OperatorUtils.getUniqueSenderId(operatorId, 0))),
+                            new StreamRecord<>(
+                                    IterationRecord.newEpochWatermark(
+                                            2, OperatorUtils.getUniqueSenderId(operatorId, 0)))),
+                    new ArrayList<>(harness.getOutput()));
+
             harness.processEvent(EndOfData.INSTANCE, 0);
             harness.processEvent(EndOfData.INSTANCE, 1);
+            harness.processEvent(EndOfData.INSTANCE, 2);
             harness.endInput();
             harness.finishProcessing();
 
             assertEquals(
                     Arrays.asList(
-                            LifeCycle.SETUP,
+                            /* First wrapped operator */
                             LifeCycle.INITIALIZE_STATE,
                             LifeCycle.OPEN,
-                            LifeCycle.PROCESS_ELEMENT_1,
-                            LifeCycle.PROCESS_ELEMENT_2,
+                            LifeCycle.PROCESS_ELEMENT,
+                            /* second wrapped operator */
+                            LifeCycle.INITIALIZE_STATE,
+                            LifeCycle.OPEN,
+                            LifeCycle.PROCESS_ELEMENT,
+                            /* states */
+                            LifeCycle.PREPARE_SNAPSHOT_PRE_BARRIER,
                             LifeCycle.PREPARE_SNAPSHOT_PRE_BARRIER,
                             LifeCycle.SNAPSHOT_STATE,
+                            LifeCycle.SNAPSHOT_STATE,
                             LifeCycle.NOTIFY_CHECKPOINT_COMPLETE,
+                            LifeCycle.NOTIFY_CHECKPOINT_COMPLETE,
+                            LifeCycle.NOTIFY_CHECKPOINT_ABORT,
                             LifeCycle.NOTIFY_CHECKPOINT_ABORT,
                             // The first input
                             LifeCycle.END_INPUT,
                             // The second input
+                            LifeCycle.END_INPUT,
+                            // The third input
+                            LifeCycle.END_INPUT,
+                            LifeCycle.FINISH,
+                            LifeCycle.CLOSE,
+                            // The first input
+                            LifeCycle.END_INPUT,
+                            // The second input
+                            LifeCycle.END_INPUT,
+                            // The third input
                             LifeCycle.END_INPUT,
                             LifeCycle.FINISH,
                             LifeCycle.CLOSE),
@@ -136,17 +177,33 @@ public class TwoInputAllRoundWrapperOperatorTest extends TestLogger {
         }
     }
 
-    private static class LifeCycleTrackingTwoInputStreamOperator
-            extends AbstractStreamOperator<Integer>
-            implements TwoInputStreamOperator<Integer, Integer, Integer>, BoundedMultiInput {
+    private static class LifeCycleTrackingMultiInputStreamOperator
+            extends AbstractStreamOperatorV2<Integer>
+            implements MultipleInputStreamOperator<Integer>, BoundedMultiInput {
+
+        private final int numberOfInputs;
+
+        public LifeCycleTrackingMultiInputStreamOperator(
+                StreamOperatorParameters<Integer> parameters, int numberOfInputs) {
+            super(parameters, numberOfInputs);
+            this.numberOfInputs = numberOfInputs;
+        }
 
         @Override
-        public void setup(
-                StreamTask<?, ?> containingTask,
-                StreamConfig config,
-                Output<StreamRecord<Integer>> output) {
-            super.setup(containingTask, config, output);
-            LIFE_CYCLES.add(LifeCycle.SETUP);
+        public List<Input> getInputs() {
+            List<Input> inputs = new ArrayList<>();
+            for (int i = 0; i < numberOfInputs; ++i) {
+                inputs.add(
+                        new AbstractInput(this, i + 1) {
+                            @Override
+                            public void processElement(StreamRecord element) throws Exception {
+                                output.collect(element);
+                                LIFE_CYCLES.add(LifeCycle.PROCESS_ELEMENT);
+                            }
+                        });
+            }
+
+            return inputs;
         }
 
         @Override
@@ -198,20 +255,24 @@ public class TwoInputAllRoundWrapperOperatorTest extends TestLogger {
         }
 
         @Override
-        public void processElement1(StreamRecord<Integer> element) throws Exception {
-            output.collect(element);
-            LIFE_CYCLES.add(LifeCycle.PROCESS_ELEMENT_1);
-        }
-
-        @Override
-        public void processElement2(StreamRecord<Integer> element) throws Exception {
-            output.collect(element);
-            LIFE_CYCLES.add(LifeCycle.PROCESS_ELEMENT_2);
-        }
-
-        @Override
         public void endInput(int inputId) throws Exception {
             LIFE_CYCLES.add(LifeCycle.END_INPUT);
+        }
+    }
+
+    /** Life-cycle tracking stream operator factory. */
+    private static class LifeCycleTrackingMultiInputStreamOperatorFactory
+            extends AbstractStreamOperatorFactory<Integer> {
+
+        @Override
+        public <T extends StreamOperator<Integer>> T createStreamOperator(
+                StreamOperatorParameters<Integer> parameters) {
+            return (T) new LifeCycleTrackingMultiInputStreamOperator(parameters, 3);
+        }
+
+        @Override
+        public Class<? extends StreamOperator> getStreamOperatorClass(ClassLoader classLoader) {
+            return LifeCycleTrackingMultiInputStreamOperator.class;
         }
     }
 }
