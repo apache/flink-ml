@@ -61,6 +61,14 @@ under the License.
             <scope>provided</scope>
         </dependency>
 
+        <!-- We have special treatment with the rocksdb state. -->
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-statebackend-rocksdb_${scala.binary.version}</artifactId>
+            <version>${flink.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- Required for feedback edge implementation -->
         <dependency>
             <groupId>org.apache.flink</groupId>

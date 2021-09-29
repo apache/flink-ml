@@ -26,10 +26,11 @@ import org.apache.flink.statefun.flink.core.feedback.FeedbackConsumer;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackKey;
 import org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperator;
+import org.apache.flink.util.ExceptionUtils;
+import org.apache.flink.util.function.ThrowingConsumer;
 
 import java.util.Arrays;
 import java.util.concurrent.Executor;
-import java.util.function.Consumer;
 
 /** Utility class for operators. */
 public class OperatorUtils {
@@ -58,14 +59,20 @@ public class OperatorUtils {
     }
 
     public static <T> void processOperatorOrUdfIfSatisfy(
-            StreamOperator<?> operator, Class<T> targetInterface, Consumer<T> action) {
-        if (targetInterface.isAssignableFrom(operator.getClass())) {
-            action.accept((T) operator);
-        } else if (operator instanceof AbstractUdfStreamOperator<?, ?>) {
-            Object udf = ((AbstractUdfStreamOperator<?, ?>) operator).getUserFunction();
-            if (targetInterface.isAssignableFrom(udf.getClass())) {
-                action.accept((T) udf);
+            StreamOperator<?> operator,
+            Class<T> targetInterface,
+            ThrowingConsumer<T, Exception> action) {
+        try {
+            if (targetInterface.isAssignableFrom(operator.getClass())) {
+                action.accept((T) operator);
+            } else if (operator instanceof AbstractUdfStreamOperator<?, ?>) {
+                Object udf = ((AbstractUdfStreamOperator<?, ?>) operator).getUserFunction();
+                if (targetInterface.isAssignableFrom(udf.getClass())) {
+                    action.accept((T) udf);
+                }
             }
+        } catch (Exception e) {
+            ExceptionUtils.rethrow(e);
         }
     }
 }
