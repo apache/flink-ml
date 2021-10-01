@@ -33,6 +33,10 @@ public class IterationConfig {
         return new IterationConfigBuilder();
     }
 
+    public OperatorLifeCycle getOperatorLifeCycle() {
+        return operatorLifeCycle;
+    }
+
     /** The builder of the {@link IterationConfig}. */
     public static class IterationConfigBuilder {
 

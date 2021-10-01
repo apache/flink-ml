@@ -20,6 +20,7 @@ package org.apache.flink.iteration;
 
 import org.apache.flink.annotation.Experimental;
 import org.apache.flink.iteration.operator.allround.AllRoundOperatorWrapper;
+import org.apache.flink.util.Preconditions;
 
 /**
  * A helper class to create iterations. To construct an iteration, Users are required to provide
@@ -111,6 +112,15 @@ public class Iterations {
             ReplayableDataStreamList dataStreams,
             IterationConfig config,
             IterationBody body) {
-        return null;
+        Preconditions.checkArgument(
+                config.getOperatorLifeCycle() == IterationConfig.OperatorLifeCycle.ALL_ROUND);
+        Preconditions.checkArgument(dataStreams.getReplayedDataStreams().size() == 0);
+
+        return IterationFactory.createIteration(
+                initVariableStreams,
+                new DataStreamList(dataStreams.getNonReplayedStreams()),
+                body,
+                new AllRoundOperatorWrapper(),
+                true);
     }
 }

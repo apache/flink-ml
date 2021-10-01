@@ -19,22 +19,22 @@
 package org.apache.flink.iteration.itcases;
 
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.configuration.Configuration;
-import org.apache.flink.configuration.RestOptions;
 import org.apache.flink.iteration.DataStreamList;
+import org.apache.flink.iteration.IterationBody;
 import org.apache.flink.iteration.IterationBodyResult;
+import org.apache.flink.iteration.IterationConfig;
 import org.apache.flink.iteration.Iterations;
+import org.apache.flink.iteration.ReplayableDataStreamList;
 import org.apache.flink.iteration.compile.DraftExecutionEnvironment;
 import org.apache.flink.iteration.itcases.operators.CollectSink;
 import org.apache.flink.iteration.itcases.operators.EpochRecord;
 import org.apache.flink.iteration.itcases.operators.IncrementEpochMap;
 import org.apache.flink.iteration.itcases.operators.OutputRecord;
-import org.apache.flink.iteration.itcases.operators.ReduceAllRoundProcessFunction;
+import org.apache.flink.iteration.itcases.operators.RoundBasedTerminationCriteria;
 import org.apache.flink.iteration.itcases.operators.SequenceSource;
 import org.apache.flink.iteration.itcases.operators.TwoInputReduceAllRoundProcessFunction;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.minicluster.MiniCluster;
-import org.apache.flink.runtime.minicluster.MiniClusterConfiguration;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -48,15 +48,22 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
-import java.util.HashMap;
+import javax.annotation.Nullable;
+
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import static org.apache.flink.iteration.itcases.UnboundedStreamIterationITCase.computeRoundStat;
+import static org.apache.flink.iteration.itcases.UnboundedStreamIterationITCase.createMiniClusterConfiguration;
+import static org.apache.flink.iteration.itcases.UnboundedStreamIterationITCase.verifyResult;
 import static org.junit.Assert.assertEquals;
 
-/** Integration cases for unbounded iteration. */
-public class UnboundedStreamIterationITCase extends TestLogger {
+/**
+ * Tests the cases of {@link Iterations#iterateBoundedStreamsUntilTermination(DataStreamList,
+ * ReplayableDataStreamList, IterationConfig, IterationBody)} that using all-round iterations.
+ */
+public class BoundedAllRoundStreamIterationITCase extends TestLogger {
 
     @Rule public final SharedObjects sharedObjects = SharedObjects.create();
 
@@ -80,84 +87,68 @@ public class UnboundedStreamIterationITCase extends TestLogger {
     }
 
     @Test(timeout = 60000)
-    public void testVariableOnlyUnboundedIteration() throws Exception {
-        // Create the test job
-        JobGraph jobGraph = createVariableOnlyJobGraph(4, 1000, true, 0, false, 1, false, result);
-        miniCluster.submitJob(jobGraph);
-
-        // Expected records is round * parallelism * numRecordsPerSource
-        Map<Integer, Tuple2<Integer, Integer>> roundsStat =
-                computeRoundStat(result.get(), OutputRecord.Event.PROCESS_ELEMENT, 2 * 4 * 1000);
-        verifyResult(roundsStat, 2, 4000, 4 * (0 + 999) * 1000 / 2);
-    }
-
-    @Test(timeout = 60000)
-    public void testVariableOnlyBoundedIteration() throws Exception {
-        // Create the test job
-        JobGraph jobGraph = createVariableOnlyJobGraph(4, 1000, false, 0, false, 1, false, result);
+    public void testSyncVariableOnlyBoundedIteration() throws Exception {
+        JobGraph jobGraph =
+                createVariableOnlyJobGraph(4, 1000, false, 0, true, 4, null, false, result);
         miniCluster.executeJobBlocking(jobGraph);
 
-        assertEquals(8001, result.get().size());
-
-        // Expected records is round * parallelism * numRecordsPerSource
+        assertEquals(6, result.get().size());
         Map<Integer, Tuple2<Integer, Integer>> roundsStat =
-                computeRoundStat(result.get(), OutputRecord.Event.PROCESS_ELEMENT, 2 * 4 * 1000);
-        verifyResult(roundsStat, 2, 4000, 4 * (0 + 999) * 1000 / 2);
+                computeRoundStat(result.get(), OutputRecord.Event.EPOCH_WATERMARK_INCREMENTED, 5);
+
+        verifyResult(roundsStat, 5, 1, 4 * (0 + 999) * 1000 / 2);
         assertEquals(OutputRecord.Event.TERMINATED, result.get().take().getEvent());
     }
 
-    @Test(timeout = 60000)
-    public void testVariableOnlyBoundedIterationWithBroadcast() throws Exception {
-        // Create the test job
-        JobGraph jobGraph = createVariableOnlyJobGraph(4, 1000, false, 0, false, 1, true, result);
+    @Test
+    public void testSyncVariableOnlyBoundedIterationWithVariableTerminationCriteria()
+            throws Exception {
+        testSyncVariableOnlyBoundedIterationWithTerminationCriteria(false);
+    }
+
+    @Test
+    public void testSyncVariableOnlyBoundedIterationWithConstantTerminationCriteria()
+            throws Exception {
+        testSyncVariableOnlyBoundedIterationWithTerminationCriteria(true);
+    }
+
+    private void testSyncVariableOnlyBoundedIterationWithTerminationCriteria(
+            boolean terminationCriteriaFollowsConstantsStreams) throws Exception {
+        JobGraph jobGraph =
+                createVariableOnlyJobGraph(
+                        4,
+                        1000,
+                        false,
+                        0,
+                        true,
+                        40,
+                        4,
+                        terminationCriteriaFollowsConstantsStreams,
+                        result);
         miniCluster.executeJobBlocking(jobGraph);
 
-        assertEquals(8001, result.get().size());
-
-        // Expected records is round * parallelism * numRecordsPerSource * parallelism of reduce
-        // operators
+        // If termination criteria is created only with the constants streams, it would not have
+        // records after the round 1 if the input is not replayed.
+        int numOfRound = terminationCriteriaFollowsConstantsStreams ? 1 : 5;
         Map<Integer, Tuple2<Integer, Integer>> roundsStat =
                 computeRoundStat(
-                        result.get(), OutputRecord.Event.PROCESS_ELEMENT, 2 * 4 * 1000 * 1);
-        verifyResult(roundsStat, 2, 4000, 4 * (0 + 999) * 1000 / 2);
+                        result.get(), OutputRecord.Event.EPOCH_WATERMARK_INCREMENTED, numOfRound);
+
+        verifyResult(roundsStat, numOfRound, 1, 4 * (0 + 999) * 1000 / 2);
         assertEquals(OutputRecord.Event.TERMINATED, result.get().take().getEvent());
     }
 
     @Test(timeout = 60000)
-    public void testVariableAndConstantsUnboundedIteration() throws Exception {
-        // Create the test job
-        JobGraph jobGraph = createVariableAndConstantJobGraph(4, 1000, true, 0, false, 1, result);
-        miniCluster.submitJob(jobGraph);
-
-        // Expected records is round * parallelism * numRecordsPerSource
-        Map<Integer, Tuple2<Integer, Integer>> roundsStat =
-                computeRoundStat(result.get(), OutputRecord.Event.PROCESS_ELEMENT, 2 * 4 * 1000);
-        verifyResult(roundsStat, 2, 4000, 4 * (0 + 999) * 1000 / 2);
-    }
-
-    @Test(timeout = 60000)
-    public void testVariableAndConstantBoundedIteration() throws Exception {
-        // Create the test job
-        JobGraph jobGraph = createVariableAndConstantJobGraph(4, 1000, false, 0, false, 1, result);
+    public void testSyncVariableAndConstantBoundedIteration() throws Exception {
+        JobGraph jobGraph = createVariableAndConstantJobGraph(4, 1000, false, 0, true, 4, result);
         miniCluster.executeJobBlocking(jobGraph);
 
-        assertEquals(8001, result.get().size());
-
-        // Expected records is round * parallelism * numRecordsPerSource
+        assertEquals(6, result.get().size());
         Map<Integer, Tuple2<Integer, Integer>> roundsStat =
-                computeRoundStat(result.get(), OutputRecord.Event.PROCESS_ELEMENT, 2 * 4 * 1000);
-        verifyResult(roundsStat, 2, 4000, 4 * (0 + 999) * 1000 / 2);
-        assertEquals(OutputRecord.Event.TERMINATED, result.get().take().getEvent());
-    }
+                computeRoundStat(result.get(), OutputRecord.Event.EPOCH_WATERMARK_INCREMENTED, 5);
 
-    static MiniClusterConfiguration createMiniClusterConfiguration(int numTm, int numSlot) {
-        Configuration configuration = new Configuration();
-        configuration.set(RestOptions.BIND_PORT, "18081-19091");
-        return new MiniClusterConfiguration.Builder()
-                .setConfiguration(configuration)
-                .setNumTaskManagers(numTm)
-                .setNumSlotsPerTaskManager(numSlot)
-                .build();
+        verifyResult(roundsStat, 5, 1, 4 * (0 + 999) * 1000 / 2);
+        assertEquals(OutputRecord.Event.TERMINATED, result.get().take().getEvent());
     }
 
     private static JobGraph createVariableOnlyJobGraph(
@@ -167,26 +158,32 @@ public class UnboundedStreamIterationITCase extends TestLogger {
             int period,
             boolean sync,
             int maxRound,
-            boolean doBroadcast,
+            @Nullable Integer terminationCriteriaRound,
+            boolean terminationCriteriaFollowsConstantsStreams,
             SharedReference<BlockingQueue<OutputRecord<Integer>>> result) {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
-        DataStream<EpochRecord> source =
+        DataStream<EpochRecord> variableSource =
+                env.addSource(new DraftExecutionEnvironment.EmptySource<EpochRecord>() {})
+                        .setParallelism(numSources)
+                        .name("Variable");
+        DataStream<EpochRecord> constSource =
                 env.addSource(new SequenceSource(numRecordsPerSource, holdSource, period))
-                        .setParallelism(numSources);
+                        .setParallelism(numSources)
+                        .name("Constant");
         DataStreamList outputs =
-                Iterations.iterateUnboundedStreams(
-                        DataStreamList.of(source),
-                        DataStreamList.of(),
+                Iterations.iterateBoundedStreamsUntilTermination(
+                        DataStreamList.of(variableSource),
+                        ReplayableDataStreamList.notReplay(constSource),
+                        IterationConfig.newBuilder().build(),
                         (variableStreams, dataStreams) -> {
-                            DataStream<EpochRecord> variable = variableStreams.get(0);
-                            if (doBroadcast) {
-                                variable = variable.broadcast();
-                            }
-
                             SingleOutputStreamOperator<EpochRecord> reducer =
-                                    variable.process(
-                                            new ReduceAllRoundProcessFunction(sync, maxRound));
+                                    variableStreams
+                                            .<EpochRecord>get(0)
+                                            .connect(dataStreams.<EpochRecord>get(0))
+                                            .process(
+                                                    new TwoInputReduceAllRoundProcessFunction(
+                                                            sync, maxRound));
                             return new IterationBodyResult(
                                     DataStreamList.of(
                                             reducer.map(new IncrementEpochMap())
@@ -194,7 +191,15 @@ public class UnboundedStreamIterationITCase extends TestLogger {
                                     DataStreamList.of(
                                             reducer.getSideOutput(
                                                     new OutputTag<OutputRecord<Integer>>(
-                                                            "output") {})));
+                                                            "output") {})),
+                                    terminationCriteriaRound == null
+                                            ? null
+                                            : (terminationCriteriaFollowsConstantsStreams
+                                                            ? dataStreams.<EpochRecord>get(0)
+                                                            : reducer)
+                                                    .flatMap(
+                                                            new RoundBasedTerminationCriteria(
+                                                                    terminationCriteriaRound)));
                         });
         outputs.<OutputRecord<Integer>>get(0).addSink(new CollectSink(result));
 
@@ -220,9 +225,10 @@ public class UnboundedStreamIterationITCase extends TestLogger {
                         .setParallelism(numSources)
                         .name("Constant");
         DataStreamList outputs =
-                Iterations.iterateUnboundedStreams(
+                Iterations.iterateBoundedStreamsUntilTermination(
                         DataStreamList.of(variableSource),
-                        DataStreamList.of(constSource),
+                        ReplayableDataStreamList.notReplay(constSource),
+                        IterationConfig.newBuilder().build(),
                         (variableStreams, dataStreams) -> {
                             SingleOutputStreamOperator<EpochRecord> reducer =
                                     variableStreams
@@ -243,35 +249,5 @@ public class UnboundedStreamIterationITCase extends TestLogger {
         outputs.<OutputRecord<Integer>>get(0).addSink(new CollectSink(result));
 
         return env.getStreamGraph().getJobGraph();
-    }
-
-    static Map<Integer, Tuple2<Integer, Integer>> computeRoundStat(
-            BlockingQueue<OutputRecord<Integer>> result,
-            OutputRecord.Event event,
-            int expectedRecords)
-            throws InterruptedException {
-        Map<Integer, Tuple2<Integer, Integer>> roundsStat = new HashMap<>();
-        for (int i = 0; i < expectedRecords; ++i) {
-            OutputRecord<Integer> next = result.take();
-            assertEquals(event, next.getEvent());
-            Tuple2<Integer, Integer> state =
-                    roundsStat.computeIfAbsent(next.getRound(), ignored -> new Tuple2<>(0, 0));
-            state.f0++;
-            state.f1 = next.getValue();
-        }
-
-        return roundsStat;
-    }
-
-    static void verifyResult(
-            Map<Integer, Tuple2<Integer, Integer>> roundsStat,
-            int expectedRound,
-            int recordsEachRound,
-            int valueEachRound) {
-        assertEquals(expectedRound, roundsStat.size());
-        for (int i = 0; i < expectedRound; ++i) {
-            assertEquals(recordsEachRound, (int) roundsStat.get(i).f0);
-            assertEquals(valueEachRound, (int) roundsStat.get(i).f1);
-        }
     }
 }
