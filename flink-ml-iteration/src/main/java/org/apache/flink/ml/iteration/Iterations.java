@@ -110,7 +110,8 @@ public class Iterations {
      */
     public static DataStreamList iterateBoundedStreamsUntilTermination(
             DataStreamList initVariableStreams, DataStreamList dataStreams, IterationBody body) {
-        return null;
+        return IterationFactory.createIteration(
+                initVariableStreams, dataStreams, body, new AllRoundOperatorWrapper(), true);
     }
 
     /**
