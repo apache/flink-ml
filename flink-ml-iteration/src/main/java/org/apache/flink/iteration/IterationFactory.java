@@ -19,6 +19,7 @@
 package org.apache.flink.iteration;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.iteration.compile.DraftExecutionEnvironment;
 import org.apache.flink.iteration.operator.HeadOperatorFactory;
@@ -31,6 +32,7 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.transformations.OneInputTransformation;
+import org.apache.flink.util.OutputTag;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -119,9 +121,76 @@ public class IterationFactory {
                 mayHaveCriteria || iterationBodyResult.getTerminationCriteria() == null,
                 "The current iteration type does not support the termination criteria.");
 
-        // TODO: will consider the termination criteria in the next.
+        if (iterationBodyResult.getTerminationCriteria() != null) {
+            addCriteriaStream(
+                    iterationBodyResult.getTerminationCriteria(),
+                    iterationId,
+                    env,
+                    draftEnv,
+                    initVariableStreams,
+                    headStreams,
+                    totalInitVariableParallelism);
+        }
 
         return addOutputs(getActualDataStreams(iterationBodyResult.getOutputStreams(), draftEnv));
+    }
+
+    private static void addCriteriaStream(
+            DataStream<?> draftCriteriaStream,
+            IterationID iterationId,
+            StreamExecutionEnvironment env,
+            DraftExecutionEnvironment draftEnv,
+            DataStreamList initVariableStreams,
+            DataStreamList headStreams,
+            int totalInitVariableParallelism) {
+        // deal with the criteria streams
+        DataStream<?> terminationCriteria = draftEnv.getActualStream(draftCriteriaStream.getId());
+        // It should always has the IterationRecordTypeInfo
+        checkState(
+                terminationCriteria.getType().getClass().equals(IterationRecordTypeInfo.class),
+                "The termination criteria should always returns IterationRecord.");
+        TypeInformation<?> innerType =
+                ((IterationRecordTypeInfo<?>) terminationCriteria.getType()).getInnerTypeInfo();
+
+        DataStream<?> emptyCriteriaSource =
+                env.addSource(new DraftExecutionEnvironment.EmptySource())
+                        .returns(innerType)
+                        .name(terminationCriteria.getTransformation().getName())
+                        .setParallelism(terminationCriteria.getParallelism());
+        DataStreamList criteriaSources = DataStreamList.of(emptyCriteriaSource);
+        DataStreamList criteriaInputs = addInputs(criteriaSources, false);
+        DataStreamList criteriaHeaders =
+                addHeads(
+                        criteriaSources,
+                        criteriaInputs,
+                        iterationId,
+                        totalInitVariableParallelism,
+                        true,
+                        initVariableStreams.size());
+        DataStreamList criteriaTails =
+                addTails(
+                        DataStreamList.of(terminationCriteria),
+                        iterationId,
+                        initVariableStreams.size());
+
+        String coLocationGroupKey = "co-" + iterationId.toHexString() + "-cri";
+        criteriaHeaders.get(0).getTransformation().setCoLocationGroupKey(coLocationGroupKey);
+        criteriaTails.get(0).getTransformation().setCoLocationGroupKey(coLocationGroupKey);
+
+        // Since co-located task must be in the same region, we will have to add a fake op.
+        ((SingleOutputStreamOperator<?>) criteriaHeaders.get(0))
+                .getSideOutput(new OutputTag<IterationRecord<Integer>>("fake") {})
+                .union(
+                        ((SingleOutputStreamOperator<?>) criteriaTails.get(0))
+                                .getSideOutput(new OutputTag<IterationRecord<Integer>>("fake") {}))
+                .map(x -> x)
+                .returns(new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO))
+                .name("criteria-discard")
+                .setParallelism(1);
+
+        // Now we notify all the head operators to count the criteria stream.
+        setCriteriaParallelism(headStreams, terminationCriteria.getParallelism());
+        setCriteriaParallelism(criteriaHeaders, terminationCriteria.getParallelism());
     }
 
     private static List<TypeInformation<?>> getTypeInfos(DataStreamList dataStreams) {
