@@ -30,10 +30,16 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.watermarkstatus.WatermarkStatus;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /** Per-round wrapper operator for the one-input operator. */
 public class OneInputPerRoundWrapperOperator<IN, OUT>
         extends AbstractPerRoundWrapperOperator<OUT, OneInputStreamOperator<IN, OUT>>
         implements OneInputStreamOperator<IterationRecord<IN>, IterationRecord<OUT>> {
+
+    private static final Logger LOG =
+            LoggerFactory.getLogger(OneInputPerRoundWrapperOperator.class);
 
     private final StreamRecord<IN> reusedInput;
 
