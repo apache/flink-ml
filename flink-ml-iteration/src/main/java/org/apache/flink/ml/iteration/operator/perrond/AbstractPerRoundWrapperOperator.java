@@ -393,10 +393,12 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
     }
 
     private void closeStreamOperator(S operator, int round) throws Exception {
+        setIterationContextRound(round);
         OperatorUtils.processOperatorOrUdfIfSatisfy(
                 operator, BoundedOneInput.class, BoundedOneInput::endInput);
         operator.finish();
         operator.close();
+        setIterationContextRound(null);
 
         // Cleanup the states used by this operator.
         cleanupOperatorStates(round);

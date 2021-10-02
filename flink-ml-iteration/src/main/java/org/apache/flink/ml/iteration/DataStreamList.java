@@ -26,6 +26,7 @@ import java.util.List;
 
 /** An utility class to maintain a list of {@link DataStream}, which might have different types. */
 public class DataStreamList {
+
     public static DataStreamList of(DataStream<?>... streams) {
         return new DataStreamList(Arrays.asList(streams));
     }

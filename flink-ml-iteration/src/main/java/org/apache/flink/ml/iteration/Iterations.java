@@ -21,6 +21,12 @@ package org.apache.flink.ml.iteration;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.ml.iteration.operator.allround.AllRoundOperatorWrapper;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
 /** A helper class to create iterations. */
 @PublicEvolving
 public class Iterations {
@@ -62,7 +68,12 @@ public class Iterations {
     public static DataStreamList iterateUnboundedStreams(
             DataStreamList initVariableStreams, DataStreamList dataStreams, IterationBody body) {
         return IterationFactory.createIteration(
-                initVariableStreams, dataStreams, body, new AllRoundOperatorWrapper(), false);
+                initVariableStreams,
+                dataStreams,
+                Collections.emptySet(),
+                body,
+                new AllRoundOperatorWrapper(),
+                false);
     }
 
     /**
@@ -111,7 +122,12 @@ public class Iterations {
     public static DataStreamList iterateBoundedStreamsUntilTermination(
             DataStreamList initVariableStreams, DataStreamList dataStreams, IterationBody body) {
         return IterationFactory.createIteration(
-                initVariableStreams, dataStreams, body, new AllRoundOperatorWrapper(), true);
+                initVariableStreams,
+                dataStreams,
+                Collections.emptySet(),
+                body,
+                new AllRoundOperatorWrapper(),
+                true);
     }
 
     /**
@@ -161,10 +177,31 @@ public class Iterations {
      *     variable/output streams.
      * @return The list of output streams returned by the iteration boy.
      */
-    static DataStreamList iterateAndReplayBoundedStreamsUntilTermination(
+    public static DataStreamList iterateAndReplayBoundedStreamsUntilTermination(
             DataStreamList initVariableStreams,
             DataStreamList initDataStreams,
             IterationBody body) {
-        return null;
+        return IterationFactory.createIteration(
+                initVariableStreams,
+                initDataStreams,
+                IntStream.range(0, initDataStreams.size()).boxed().collect(Collectors.toSet()),
+                (variableStreams, dataStreams) -> {
+                    List<DataStreamList> outputs =
+                            PerRoundSubGraphBuilder.forEachRound(
+                                    Arrays.asList(variableStreams, dataStreams),
+                                    inputs -> {
+                                        IterationBodyResult actualResult =
+                                                body.process(inputs.get(0), inputs.get(1));
+                                        return Arrays.asList(
+                                                actualResult.getFeedbackVariableStreams(),
+                                                actualResult.getOutputStreams(),
+                                                DataStreamList.of(
+                                                        actualResult.getTerminationCriteria()));
+                                    });
+                    return new IterationBodyResult(
+                            outputs.get(0), outputs.get(1), outputs.get(2).get(0));
+                },
+                new AllRoundOperatorWrapper(),
+                true);
     }
 }

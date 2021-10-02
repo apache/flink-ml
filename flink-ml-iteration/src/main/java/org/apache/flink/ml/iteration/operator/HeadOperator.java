@@ -20,12 +20,14 @@ package org.apache.flink.ml.iteration.operator;
 
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.operators.MailboxExecutor;
+import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.ml.iteration.IterationID;
 import org.apache.flink.ml.iteration.IterationRecord;
 import org.apache.flink.ml.iteration.broadcast.BroadcastOutput;
 import org.apache.flink.ml.iteration.broadcast.BroadcastOutputFactory;
 import org.apache.flink.ml.iteration.operator.event.GloballyAlignedEvent;
 import org.apache.flink.ml.iteration.operator.event.SubtaskAlignedEvent;
+import org.apache.flink.ml.iteration.typeinfo.IterationRecordTypeInfo;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.runtime.operators.coordination.OperatorEventGateway;
 import org.apache.flink.runtime.operators.coordination.OperatorEventHandler;
@@ -44,6 +46,7 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.ProcessingTimeService;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.util.ExceptionUtils;
+import org.apache.flink.util.OutputTag;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -59,6 +62,9 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
                 FeedbackConsumer<StreamRecord<IterationRecord<?>>>,
                 OperatorEventHandler,
                 BoundedOneInput {
+
+    public static final OutputTag<IterationRecord<Void>> ALIGN_NOTIFY_OUTPUT_TAG =
+            new OutputTag<>("aligned", new IterationRecordTypeInfo<>(BasicTypeInfo.VOID_TYPE_INFO));
 
     private final IterationID iterationId;
 
@@ -171,6 +177,9 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
                                         getRuntimeContext().getIndexOfThisSubtask())),
                         0);
                 eventBroadcastOutput.broadcastEmit((StreamRecord) reusable);
+
+                // Also notify the listener
+                output.collect(ALIGN_NOTIFY_OUTPUT_TAG, (StreamRecord) reusable);
             } catch (Exception e) {
                 ExceptionUtils.rethrow(e);
             }

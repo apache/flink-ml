@@ -22,20 +22,24 @@ import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.ml.iteration.compile.DraftExecutionEnvironment;
+import org.apache.flink.ml.iteration.operator.HeadOperator;
 import org.apache.flink.ml.iteration.operator.HeadOperatorFactory;
 import org.apache.flink.ml.iteration.operator.InputOperator;
 import org.apache.flink.ml.iteration.operator.OperatorWrapper;
 import org.apache.flink.ml.iteration.operator.OutputOperator;
+import org.apache.flink.ml.iteration.operator.ReplayOperator;
 import org.apache.flink.ml.iteration.operator.TailOperator;
 import org.apache.flink.ml.iteration.typeinfo.IterationRecordTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.transformations.OneInputTransformation;
 import org.apache.flink.util.OutputTag;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
@@ -49,6 +53,7 @@ public class IterationFactory {
     public static DataStreamList createIteration(
             DataStreamList initVariableStreams,
             DataStreamList dataStreams,
+            Set<Integer> replayedDataStreamIndices,
             IterationBody body,
             OperatorWrapper<?, IterationRecord<?>> initialOperatorWrapper,
             boolean mayHaveCriteria) {
@@ -75,6 +80,14 @@ public class IterationFactory {
                         0);
 
         DataStreamList dataStreamInputs = addInputs(dataStreams, true);
+        if (replayedDataStreamIndices.size() > 0) {
+            dataStreamInputs =
+                    addReplayer(
+                            headStreams.get(0),
+                            dataStreams,
+                            dataStreamInputs,
+                            replayedDataStreamIndices);
+        }
 
         // Create the iteration body.
         StreamExecutionEnvironment env = initVariableStreams.get(0).getExecutionEnvironment();
@@ -123,6 +136,42 @@ public class IterationFactory {
         }
 
         return addOutputs(getActualDataStreams(iterationBodyResult.getOutputStreams(), draftEnv));
+    }
+
+    private static DataStreamList addReplayer(
+            DataStream<?> firstHeadStream,
+            DataStreamList originalDataStreams,
+            DataStreamList dataStreamInputs,
+            Set<Integer> replayedDataStreamIndices) {
+
+        List<DataStream<?>> result = new ArrayList<>(dataStreamInputs.size());
+        for (int i = 0; i < dataStreamInputs.size(); ++i) {
+            if (!replayedDataStreamIndices.contains(i)) {
+                result.add(dataStreamInputs.get(i));
+                continue;
+            }
+
+            DataStream<?> replayedInput =
+                    ((SingleOutputStreamOperator<IterationRecord<?>>) firstHeadStream)
+                            .getSideOutput(HeadOperator.ALIGN_NOTIFY_OUTPUT_TAG)
+                            .map(x -> x, dataStreamInputs.get(i).getType())
+                            .setParallelism(firstHeadStream.getParallelism())
+                            .name("signal-change-typeinfo")
+                            .broadcast()
+                            .union(dataStreamInputs.get(i))
+                            .transform(
+                                    "Replayer-"
+                                            + originalDataStreams
+                                                    .get(i)
+                                                    .getTransformation()
+                                                    .getName(),
+                                    dataStreamInputs.get(i).getType(),
+                                    (OneInputStreamOperator) new ReplayOperator<>())
+                            .setParallelism(dataStreamInputs.get(i).getParallelism());
+            result.add(replayedInput);
+        }
+
+        return new DataStreamList(result);
     }
 
     private static void addCriteriaStream(

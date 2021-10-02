@@ -54,7 +54,8 @@ public class TwoInputPerRoundWrapperOperator<IN1, IN2, OUT>
                 element,
                 0,
                 reusedInput1,
-                getWrappedOperator(element.getValue().getRound())::processElement1);
+                record ->
+                        getWrappedOperator(element.getValue().getRound()).processElement1(record));
     }
 
     @Override
@@ -63,7 +64,8 @@ public class TwoInputPerRoundWrapperOperator<IN1, IN2, OUT>
                 element,
                 1,
                 reusedInput2,
-                getWrappedOperator(element.getValue().getRound())::processElement2);
+                record ->
+                        getWrappedOperator(element.getValue().getRound()).processElement2(record));
     }
 
     private <IN> void processElement(
