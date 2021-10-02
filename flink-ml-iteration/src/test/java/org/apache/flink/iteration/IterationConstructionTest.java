@@ -87,7 +87,7 @@ public class IterationConstructionTest extends TestLogger {
                         .name("Variable0");
         DataStream<Integer> variableSource2 =
                 env.addSource(new DraftExecutionEnvironment.EmptySource<Integer>() {})
-                        .setParallelism(2)
+                        .setParallelism(3)
                         .name("Variable1");
 
         DataStream<Integer> constantSource =
@@ -158,7 +158,7 @@ public class IterationConstructionTest extends TestLogger {
                         /* 7 */ "tail-Feedback0",
                         /* 8 */ "Feedback1",
                         /* 9 */ "tail-Feedback1");
-        List<Integer> expectedParallelisms = Arrays.asList(2, 2, 3, 2, 2, 4, 2, 2, 3, 3);
+        List<Integer> expectedParallelisms = Arrays.asList(2, 3, 3, 2, 3, 4, 2, 2, 3, 3);
 
         JobGraph jobGraph = env.getStreamGraph().getJobGraph();
         List<JobVertex> vertices = jobGraph.getVerticesSortedTopologicallyFromSources();
@@ -184,7 +184,7 @@ public class IterationConstructionTest extends TestLogger {
                         .name("Variable0");
         DataStream<Integer> variableSource2 =
                 env.addSource(new DraftExecutionEnvironment.EmptySource<Integer>() {})
-                        .setParallelism(2)
+                        .setParallelism(3)
                         .name("Variable1");
 
         DataStream<Integer> constantSource =
@@ -258,7 +258,7 @@ public class IterationConstructionTest extends TestLogger {
                         /* 13 */ "criteria-merge",
                         /* 14 */ "tail-criteria-merge");
         List<Integer> expectedParallelisms =
-                Arrays.asList(2, 2, 3, 5, 2, 2, 4, 2, 2, 3, 3, 5, 5, 5, 5);
+                Arrays.asList(2, 3, 3, 5, 2, 3, 4, 2, 2, 3, 3, 5, 5, 5, 5);
 
         JobGraph jobGraph = env.getStreamGraph().getJobGraph();
         List<JobVertex> vertices = jobGraph.getVerticesSortedTopologicallyFromSources();
@@ -275,5 +275,94 @@ public class IterationConstructionTest extends TestLogger {
         assertSame(vertices.get(4).getCoLocationGroup(), vertices.get(8).getCoLocationGroup());
         assertSame(vertices.get(5).getCoLocationGroup(), vertices.get(10).getCoLocationGroup());
         assertSame(vertices.get(12).getCoLocationGroup(), vertices.get(14).getCoLocationGroup());
+    }
+
+    @Test
+    public void testReplayedIteration() {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        DataStream<Integer> variableSource =
+                env.addSource(new DraftExecutionEnvironment.EmptySource<Integer>() {})
+                        .setParallelism(2)
+                        .name("Variable");
+
+        DataStream<Integer> constantSource =
+                env.addSource(new DraftExecutionEnvironment.EmptySource<Integer>() {})
+                        .setParallelism(3)
+                        .name("Constant");
+
+        DataStreamList result =
+                Iterations.iterateBoundedStreamsUntilTermination(
+                        DataStreamList.of(variableSource),
+                        ReplayableDataStreamList.replay(constantSource),
+                        IterationConfig.newBuilder()
+                                .setOperatorLifeCycle(IterationConfig.OperatorLifeCycle.PER_ROUND)
+                                .build(),
+                        (variableStreams, dataStreams) -> {
+                            SingleOutputStreamOperator<Integer> processor =
+                                    variableStreams
+                                            .<Integer>get(0)
+                                            .connect(dataStreams.<Integer>get(0))
+                                            .process(
+                                                    new CoProcessFunction<
+                                                            Integer, Integer, Integer>() {
+                                                        @Override
+                                                        public void processElement1(
+                                                                Integer value,
+                                                                Context ctx,
+                                                                Collector<Integer> out)
+                                                                throws Exception {}
+
+                                                        @Override
+                                                        public void processElement2(
+                                                                Integer value,
+                                                                Context ctx,
+                                                                Collector<Integer> out)
+                                                                throws Exception {}
+                                                    })
+                                            .name("Processor")
+                                            .setParallelism(4);
+
+                            return new IterationBodyResult(
+                                    DataStreamList.of(
+                                            processor
+                                                    .map(x -> x)
+                                                    .name("Feedback")
+                                                    .setParallelism(2)),
+                                    DataStreamList.of(
+                                            processor.getSideOutput(
+                                                    new OutputTag<Integer>("output") {})),
+                                    processor.map(x -> x).name("Termination").setParallelism(5));
+                        });
+        result.get(0).addSink(new DiscardingSink<>()).name("Sink").setParallelism(4);
+
+        List<String> expectedVertexNames =
+                Arrays.asList(
+                        /* 0 */ "Source: Variable -> input-Variable",
+                        /* 1 */ "Source: Constant -> input-Constant",
+                        /* 2 */ "Source: Termination -> input-Termination",
+                        /* 3 */ "head-Variable -> signal-change-typeinfo",
+                        /* 4 */ "Replayer-Constant",
+                        /* 5 */ "Processor -> output-SideOutput -> Sink: Sink",
+                        /* 6 */ "Feedback",
+                        /* 7 */ "tail-Feedback",
+                        /* 8 */ "Termination",
+                        /* 9 */ "head-Termination",
+                        /* 10 */ "criteria-merge",
+                        /* 11 */ "tail-criteria-merge");
+        List<Integer> expectedParallelisms = Arrays.asList(2, 3, 5, 2, 3, 4, 2, 2, 5, 5, 5, 5);
+
+        JobGraph jobGraph = env.getStreamGraph().getJobGraph();
+        List<JobVertex> vertices = jobGraph.getVerticesSortedTopologicallyFromSources();
+        assertEquals(
+                expectedVertexNames,
+                vertices.stream().map(JobVertex::getName).collect(Collectors.toList()));
+        assertEquals(
+                expectedParallelisms,
+                vertices.stream().map(JobVertex::getParallelism).collect(Collectors.toList()));
+
+        assertNotNull(vertices.get(3).getCoLocationGroup());
+        assertNotNull(vertices.get(9).getCoLocationGroup());
+        assertSame(vertices.get(3).getCoLocationGroup(), vertices.get(7).getCoLocationGroup());
+        assertSame(vertices.get(9).getCoLocationGroup(), vertices.get(11).getCoLocationGroup());
     }
 }

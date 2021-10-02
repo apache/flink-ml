@@ -21,25 +21,32 @@ package org.apache.flink.iteration;
 import org.apache.flink.annotation.Experimental;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.iteration.compile.DraftExecutionEnvironment;
+import org.apache.flink.iteration.operator.HeadOperator;
 import org.apache.flink.iteration.operator.HeadOperatorFactory;
 import org.apache.flink.iteration.operator.InputOperator;
 import org.apache.flink.iteration.operator.OperatorWrapper;
 import org.apache.flink.iteration.operator.OutputOperator;
+import org.apache.flink.iteration.operator.ReplayOperator;
 import org.apache.flink.iteration.operator.TailOperator;
 import org.apache.flink.iteration.operator.allround.AllRoundOperatorWrapper;
+import org.apache.flink.iteration.operator.perround.PerRoundOperatorWrapper;
 import org.apache.flink.iteration.typeinfo.IterationRecordTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.co.CoProcessFunction;
+import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.transformations.OneInputTransformation;
 import org.apache.flink.util.Collector;
-import org.apache.flink.util.Preconditions;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.apache.flink.util.Preconditions.checkState;
 
@@ -110,7 +117,12 @@ public class Iterations {
     public static DataStreamList iterateUnboundedStreams(
             DataStreamList initVariableStreams, DataStreamList dataStreams, IterationBody body) {
         return createIteration(
-                initVariableStreams, dataStreams, body, new AllRoundOperatorWrapper(), false);
+                initVariableStreams,
+                dataStreams,
+                Collections.emptySet(),
+                body,
+                new AllRoundOperatorWrapper(),
+                false);
     }
 
     /**
@@ -133,15 +145,26 @@ public class Iterations {
             ReplayableDataStreamList dataStreams,
             IterationConfig config,
             IterationBody body) {
-        Preconditions.checkArgument(
-                config.getOperatorLifeCycle() == IterationConfig.OperatorLifeCycle.ALL_ROUND);
-        Preconditions.checkArgument(dataStreams.getReplayedDataStreams().size() == 0);
+        OperatorWrapper wrapper =
+                config.getOperatorLifeCycle() == IterationConfig.OperatorLifeCycle.ALL_ROUND
+                        ? new AllRoundOperatorWrapper<>()
+                        : new PerRoundOperatorWrapper<>();
+
+        List<DataStream<?>> allDatastreams = new ArrayList<>();
+        allDatastreams.addAll(dataStreams.getReplayedDataStreams());
+        allDatastreams.addAll(dataStreams.getNonReplayedStreams());
+
+        Set<Integer> replayedIndices =
+                IntStream.range(0, dataStreams.getReplayedDataStreams().size())
+                        .boxed()
+                        .collect(Collectors.toSet());
 
         return createIteration(
                 initVariableStreams,
-                new DataStreamList(dataStreams.getNonReplayedStreams()),
+                new DataStreamList(allDatastreams),
+                replayedIndices,
                 body,
-                new AllRoundOperatorWrapper(),
+                wrapper,
                 true);
     }
 
@@ -149,6 +172,7 @@ public class Iterations {
     private static DataStreamList createIteration(
             DataStreamList initVariableStreams,
             DataStreamList dataStreams,
+            Set<Integer> replayedDataStreamIndices,
             IterationBody body,
             OperatorWrapper<?, IterationRecord<?>> initialOperatorWrapper,
             boolean mayHaveCriteria) {
@@ -184,8 +208,16 @@ public class Iterations {
                         0);
 
         DataStreamList dataStreamInputs = addInputs(dataStreams, true);
+        if (replayedDataStreamIndices.size() > 0) {
+            dataStreamInputs =
+                    addReplayer(
+                            headStreams.get(0),
+                            dataStreams,
+                            dataStreamInputs,
+                            replayedDataStreamIndices);
+        }
 
-        // Create the iteration body. We map the inputs of iteration body into the draft sources,
+        // Creates the iteration body. We map the inputs of iteration body into the draft sources,
         // which serve as the start points to build the draft subgraph.
         StreamExecutionEnvironment env = initVariableStreams.get(0).getExecutionEnvironment();
         DraftExecutionEnvironment draftEnv =
@@ -201,7 +233,7 @@ public class Iterations {
         ensuresTransformationAdded(iterationBodyResult.getOutputStreams(), draftEnv);
         draftEnv.copyToActualEnvironment();
 
-        // Add tails and co-locate them with the heads.
+        // Adds tails and co-locate them with the heads.
         DataStreamList feedbackStreams =
                 getActualDataStreams(iterationBodyResult.getFeedbackVariableStreams(), draftEnv);
         checkState(
@@ -210,6 +242,16 @@ public class Iterations {
                         + feedbackStreams.size()
                         + " does not match the initialized one "
                         + initVariableStreams.size());
+        for (int i = 0; i < feedbackStreams.size(); ++i) {
+            checkState(
+                    feedbackStreams.get(i).getParallelism() == headStreams.get(i).getParallelism(),
+                    String.format(
+                            "The feedback stream %d have different parallelism %d with the initial stream, which is %d",
+                            i,
+                            feedbackStreams.get(i).getParallelism(),
+                            headStreams.get(i).getParallelism()));
+        }
+
         DataStreamList tails = addTails(feedbackStreams, iterationId, 0);
         for (int i = 0; i < headStreams.size(); ++i) {
             String coLocationGroupKey = "co-" + iterationId.toHexString() + "-" + i;
@@ -235,6 +277,44 @@ public class Iterations {
         return addOutputs(getActualDataStreams(iterationBodyResult.getOutputStreams(), draftEnv));
     }
 
+    private static DataStreamList addReplayer(
+            DataStream<?> firstHeadStream,
+            DataStreamList originalDataStreams,
+            DataStreamList dataStreamInputs,
+            Set<Integer> replayedDataStreamIndices) {
+
+        List<DataStream<?>> result = new ArrayList<>(dataStreamInputs.size());
+        for (int i = 0; i < dataStreamInputs.size(); ++i) {
+            if (!replayedDataStreamIndices.contains(i)) {
+                result.add(dataStreamInputs.get(i));
+                continue;
+            }
+
+            // Notes that the HeadOperator would broadcast the globally aligned events,
+            // thus the operator does not require emit to the sideoutput specially.
+            DataStream<?> replayedInput =
+                    ((SingleOutputStreamOperator<IterationRecord<?>>) firstHeadStream)
+                            .getSideOutput(HeadOperator.ALIGN_NOTIFY_OUTPUT_TAG)
+                            .map(x -> x, dataStreamInputs.get(i).getType())
+                            .setParallelism(firstHeadStream.getParallelism())
+                            .name("signal-change-typeinfo")
+                            .broadcast()
+                            .union(dataStreamInputs.get(i))
+                            .transform(
+                                    "Replayer-"
+                                            + originalDataStreams
+                                                    .get(i)
+                                                    .getTransformation()
+                                                    .getName(),
+                                    dataStreamInputs.get(i).getType(),
+                                    (OneInputStreamOperator) new ReplayOperator<>())
+                            .setParallelism(dataStreamInputs.get(i).getParallelism());
+            result.add(replayedInput);
+        }
+
+        return new DataStreamList(result);
+    }
+
     private static void addCriteriaStream(
             DataStream<?> draftCriteriaStream,
             IterationID iterationId,
@@ -243,7 +323,7 @@ public class Iterations {
             DataStreamList initVariableStreams,
             DataStreamList headStreams,
             int totalInitVariableParallelism) {
-        // deal with the criteria streams
+        // Deals with the criteria streams
         DataStream<?> terminationCriteria = draftEnv.getActualStream(draftCriteriaStream.getId());
         // It should always has the IterationRecordTypeInfo
         checkState(
