@@ -25,11 +25,11 @@ import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
+import org.apache.flink.util.function.SupplierWithException;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Supplier;
 
 /** Records the data received and replayed them on required. */
 public class DataCacheWriter<T> {
@@ -38,7 +38,7 @@ public class DataCacheWriter<T> {
 
     private final FileSystem fileSystem;
 
-    private final Supplier<Path> pathGenerator;
+    private final SupplierWithException<Path, IOException> pathGenerator;
 
     private final List<Segment> finishSegments;
 
@@ -51,7 +51,9 @@ public class DataCacheWriter<T> {
     private int currentSegmentCount;
 
     public DataCacheWriter(
-            TypeSerializer<T> serializer, FileSystem fileSystem, Supplier<Path> pathGenerator)
+            TypeSerializer<T> serializer,
+            FileSystem fileSystem,
+            SupplierWithException<Path, IOException> pathGenerator)
             throws IOException {
         this.serializer = serializer;
         this.fileSystem = fileSystem;
@@ -72,6 +74,10 @@ public class DataCacheWriter<T> {
         return finishSegments;
     }
 
+    public FileSystem getFileSystem() {
+        return fileSystem;
+    }
+
     public List<Segment> getFinishSegments() {
         return finishSegments;
     }
@@ -89,6 +95,13 @@ public class DataCacheWriter<T> {
         this.outputStream.close();
         if (currentSegmentCount > 0) {
             finishSegments.add(new Segment(currentPath, currentSegmentCount));
+        }
+    }
+
+    public void cleanup() throws IOException {
+        finishCurrentSegment();
+        for (Segment segment : finishSegments) {
+            fileSystem.delete(segment.getPath(), false);
         }
     }
 }
