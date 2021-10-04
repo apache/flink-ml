@@ -20,6 +20,7 @@ package org.apache.flink.iteration.operator.coordinator;
 
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.iteration.IterationID;
+import org.apache.flink.iteration.operator.event.CoordinatorCheckpointEvent;
 import org.apache.flink.iteration.operator.event.GloballyAlignedEvent;
 import org.apache.flink.iteration.operator.event.SubtaskAlignedEvent;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -31,12 +32,14 @@ import org.apache.flink.util.function.ThrowingRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import static org.apache.flink.util.Preconditions.checkState;
@@ -44,7 +47,7 @@ import static org.apache.flink.util.Preconditions.checkState;
 /**
  * The progress aligner shared between multiple {@link HeadOperatorCoordinator}. It maintains the
  * information for each round, once one round is aligned, it would notify all the register
- * consumers.
+ * listeners.
  */
 public class SharedProgressAligner {
 
@@ -63,7 +66,9 @@ public class SharedProgressAligner {
 
     private final Map<Integer, EpochStatus> statusByEpoch;
 
-    private final Map<OperatorID, Consumer<GloballyAlignedEvent>> alignedConsumers;
+    private final Map<OperatorID, SharedProgressAlignerListener> listeners;
+
+    private final Map<Long, CheckpointStatus> checkpointStatuses;
 
     public static SharedProgressAligner getOrCreate(
             IterationID iterationId,
@@ -93,29 +98,28 @@ public class SharedProgressAligner {
         this.executor = Objects.requireNonNull(executor);
 
         this.statusByEpoch = new HashMap<>();
-        this.alignedConsumers = new HashMap<>();
+        this.listeners = new HashMap<>();
+        this.checkpointStatuses = new HashMap<>();
     }
 
-    public void registerAlignedConsumer(
-            OperatorID operatorID, Consumer<GloballyAlignedEvent> alignedConsumer) {
+    public void registerAlignedListener(
+            OperatorID operatorID, SharedProgressAlignerListener alignedConsumer) {
         runInEventLoop(
-                () -> this.alignedConsumers.put(operatorID, alignedConsumer),
-                "Register consumer %s",
+                () -> this.listeners.put(operatorID, alignedConsumer),
+                "Register listeners %s",
                 operatorID.toHexString());
     }
 
-    public void unregisterConsumer(OperatorID operatorID) {
-        synchronized (this) {
-            runInEventLoop(
-                    () -> {
-                        this.alignedConsumers.remove(operatorID);
-                        if (alignedConsumers.isEmpty()) {
-                            instances.remove(iterationId);
-                        }
-                    },
-                    "Unregister consumer %s",
-                    operatorID.toHexString());
-        }
+    public void unregisterListener(OperatorID operatorID) {
+        runInEventLoop(
+                () -> {
+                    this.listeners.remove(operatorID);
+                    if (listeners.isEmpty()) {
+                        instances.remove(iterationId);
+                    }
+                },
+                "Unregister listeners %s",
+                operatorID.toHexString());
     }
 
     public void reportSubtaskProgress(
@@ -137,14 +141,45 @@ public class SharedProgressAligner {
                         GloballyAlignedEvent globallyAlignedEvent =
                                 new GloballyAlignedEvent(
                                         subtaskAlignedEvent.getEpoch(), roundStatus.isTerminated());
-                        for (Consumer<GloballyAlignedEvent> consumer : alignedConsumers.values()) {
-                            consumer.accept(globallyAlignedEvent);
+                        for (SharedProgressAlignerListener listeners : listeners.values()) {
+                            listeners.onAligned(globallyAlignedEvent);
                         }
                     }
                 },
                 "Report subtask %s-%d",
                 operatorId.toHexString(),
                 subtaskIndex);
+    }
+
+    public void requestCheckpoint(
+            long checkpointId,
+            int operatorParallelism,
+            CompletableFuture<byte[]> snapshotStateFuture) {
+        runInEventLoop(
+                () -> {
+                    CheckpointStatus checkpointStatus =
+                            checkpointStatuses.computeIfAbsent(
+                                    checkpointId,
+                                    ignored -> new CheckpointStatus(totalHeadParallelism));
+                    boolean aligned =
+                            checkpointStatus.notify(operatorParallelism, snapshotStateFuture);
+                    if (aligned) {
+                        CoordinatorCheckpointEvent checkpointEvent =
+                                new CoordinatorCheckpointEvent(checkpointId);
+                        for (SharedProgressAlignerListener listener : listeners.values()) {
+                            listener.onCheckpointAligned(checkpointEvent);
+                        }
+
+                        for (CompletableFuture<byte[]> stateFuture :
+                                checkpointStatus.getStateFutures()) {
+                            stateFuture.complete(new byte[0]);
+                        }
+
+                        checkpointStatuses.remove(checkpointId);
+                    }
+                },
+                "Coordinator report checkpoint %d",
+                checkpointId);
     }
 
     private void runInEventLoop(
@@ -170,8 +205,8 @@ public class SharedProgressAligner {
     }
 
     @VisibleForTesting
-    int getNumberConsumers() {
-        return alignedConsumers.size();
+    int getNumberListeners() {
+        return listeners.size();
     }
 
     private static class EpochStatus {
@@ -222,6 +257,30 @@ public class SharedProgressAligner {
             }
 
             return totalRecord == 0 || (hasCriteriaStream && totalCriteriaRecord == 0);
+        }
+    }
+
+    private static class CheckpointStatus {
+
+        private final long totalHeadParallelism;
+
+        private final List<CompletableFuture<byte[]>> stateFutures = new ArrayList<>();
+
+        private int notifiedCoordinatorParallelism;
+
+        private CheckpointStatus(long totalHeadParallelism) {
+            this.totalHeadParallelism = totalHeadParallelism;
+        }
+
+        public boolean notify(int parallelism, CompletableFuture<byte[]> stateFuture) {
+            stateFutures.add(stateFuture);
+            notifiedCoordinatorParallelism += parallelism;
+
+            return notifiedCoordinatorParallelism == totalHeadParallelism;
+        }
+
+        public List<CompletableFuture<byte[]>> getStateFutures() {
+            return stateFutures;
         }
     }
 }

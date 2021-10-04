@@ -21,15 +21,20 @@ package org.apache.flink.iteration.operator;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.iteration.IterationID;
 import org.apache.flink.iteration.IterationRecord;
+import org.apache.flink.iteration.operator.event.CoordinatorCheckpointEvent;
 import org.apache.flink.iteration.operator.event.GloballyAlignedEvent;
 import org.apache.flink.iteration.operator.event.SubtaskAlignedEvent;
 import org.apache.flink.iteration.operator.headprocessor.RegularHeadOperatorRecordProcessor;
 import org.apache.flink.iteration.typeinfo.IterationRecordTypeInfo;
+import org.apache.flink.runtime.checkpoint.CheckpointOptions;
+import org.apache.flink.runtime.checkpoint.CheckpointType;
 import org.apache.flink.runtime.checkpoint.TaskStateSnapshot;
+import org.apache.flink.runtime.io.network.api.CheckpointBarrier;
 import org.apache.flink.runtime.io.network.api.EndOfData;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.runtime.operators.coordination.OperatorEventGateway;
+import org.apache.flink.runtime.state.CheckpointStorageLocationReference;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackChannel;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackChannelBroker;
 import org.apache.flink.streaming.api.operators.StreamOperator;
@@ -152,7 +157,7 @@ public class HeadOperatorTest extends TestLogger {
 
                                             while (RecordingHeadOperatorFactory.latestHeadOperator
                                                             .getStatus()
-                                                    == HeadOperator.HeadOperatorStatus.RUNNING) ;
+                                                    == HeadOperator.HeadOperatorStatus.RUNNING) {}
                                             putFeedbackRecords(
                                                     iterationId,
                                                     IterationRecord.newEpochWatermark(
@@ -190,6 +195,116 @@ public class HeadOperatorTest extends TestLogger {
                                     new StreamRecord<>(
                                             IterationRecord.newEpochWatermark(
                                                     Integer.MAX_VALUE,
+                                                    OperatorUtils.getUniqueSenderId(operatorId, 0)),
+                                            0)),
+                            new ArrayList<>(harness.getOutput()));
+                    return null;
+                });
+    }
+
+    @Test(timeout = 60000)
+    public void testHoldCheckpointTillCoordinatorNotified() throws Exception {
+        IterationID iterationId = new IterationID();
+        OperatorID operatorId = new OperatorID();
+
+        createHarnessAndRun(
+                iterationId,
+                operatorId,
+                null,
+                harness -> {
+                    CompletableFuture<Void> coordinatorResult =
+                            CompletableFuture.supplyAsync(
+                                    () -> {
+                                        try {
+                                            // Slight postpone the notification
+                                            Thread.sleep(2000);
+
+                                            harness.getStreamTask()
+                                                    .dispatchOperatorEvent(
+                                                            operatorId,
+                                                            new SerializedValue<>(
+                                                                    new GloballyAlignedEvent(
+                                                                            5, false)));
+                                            harness.getStreamTask()
+                                                    .dispatchOperatorEvent(
+                                                            operatorId,
+                                                            new SerializedValue<>(
+                                                                    new CoordinatorCheckpointEvent(
+                                                                            5)));
+                                            return null;
+                                        } catch (Throwable e) {
+                                            RecordingHeadOperatorFactory.latestHeadOperator
+                                                    .getMailboxExecutor()
+                                                    .execute(
+                                                            () -> {
+                                                                throw e;
+                                                            },
+                                                            "poison mail");
+                                            throw new CompletionException(e);
+                                        }
+                                    });
+
+                    CheckpointBarrier barrier =
+                            new CheckpointBarrier(
+                                    5,
+                                    5000,
+                                    CheckpointOptions.alignedNoTimeout(
+                                            CheckpointType.CHECKPOINT,
+                                            CheckpointStorageLocationReference.getDefault()));
+                    harness.processEvent(barrier);
+
+                    // There should be no exception
+                    coordinatorResult.get();
+
+                    // If the task do not hold, it would be likely snapshot state before received
+                    // the globally aligned event.
+                    assertEquals(
+                            Arrays.asList(
+                                    new StreamRecord<>(
+                                            IterationRecord.newEpochWatermark(
+                                                    5,
+                                                    OperatorUtils.getUniqueSenderId(operatorId, 0)),
+                                            0),
+                                    barrier),
+                            new ArrayList<>(harness.getOutput()));
+                    return null;
+                });
+    }
+
+    @Test(timeout = 60000)
+    public void testPostponeGloballyAlignedEventsAfterSnapshot() throws Exception {
+        IterationID iterationId = new IterationID();
+        OperatorID operatorId = new OperatorID();
+
+        createHarnessAndRun(
+                iterationId,
+                operatorId,
+                null,
+                harness -> {
+                    harness.getStreamTask()
+                            .dispatchOperatorEvent(
+                                    operatorId,
+                                    new SerializedValue<>(new CoordinatorCheckpointEvent(5)));
+                    harness.getStreamTask()
+                            .dispatchOperatorEvent(
+                                    operatorId,
+                                    new SerializedValue<>(new GloballyAlignedEvent(5, false)));
+                    CheckpointBarrier barrier =
+                            new CheckpointBarrier(
+                                    5,
+                                    5000,
+                                    CheckpointOptions.alignedNoTimeout(
+                                            CheckpointType.CHECKPOINT,
+                                            CheckpointStorageLocationReference.getDefault()));
+                    harness.processEvent(barrier);
+                    harness.processAll();
+
+                    assertEquals(
+                            Arrays.asList(
+                                    barrier,
+                                    new StreamRecord<>(
+                                            IterationRecord.newEpochWatermark(
+                                                    5,
                                                     OperatorUtils.getUniqueSenderId(operatorId, 0)),
                                             0)),
                             new ArrayList<>(harness.getOutput()));

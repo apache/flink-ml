@@ -20,6 +20,7 @@ package org.apache.flink.iteration.operator.coordinator;
 
 import org.apache.flink.iteration.IterationID;
 import org.apache.flink.iteration.operator.HeadOperator;
+import org.apache.flink.iteration.operator.event.CoordinatorCheckpointEvent;
 import org.apache.flink.iteration.operator.event.GloballyAlignedEvent;
 import org.apache.flink.iteration.operator.event.SubtaskAlignedEvent;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -37,7 +38,7 @@ import java.util.concurrent.Executors;
  * SharedProgressAligner} when received aligned event from the operator, and emit the globally
  * aligned event back after one round is globally aligned.
  */
-public class HeadOperatorCoordinator implements OperatorCoordinator {
+public class HeadOperatorCoordinator implements OperatorCoordinator, SharedProgressAlignerListener {
 
     private final Context context;
 
@@ -50,16 +51,22 @@ public class HeadOperatorCoordinator implements OperatorCoordinator {
         this.sharedProgressAligner = Objects.requireNonNull(sharedProgressAligner);
         this.subtaskGateways = new SubtaskGateway[context.currentParallelism()];
 
-        sharedProgressAligner.registerAlignedConsumer(context.getOperatorId(), this::onAligned);
+        sharedProgressAligner.registerAlignedListener(context.getOperatorId(), this);
     }
 
     @Override
     public void start() {}
 
     @Override
-    public void subtaskReady(int i, SubtaskGateway subtaskGateway) {
-        this.subtaskGateways[i] = subtaskGateway;
+    public void subtaskReady(int subtaskIndex, SubtaskGateway subtaskGateway) {
+        this.subtaskGateways[subtaskIndex] = subtaskGateway;
     }
+
+    @Override
+    public void resetToCheckpoint(long checkpointId, @Nullable byte[] bytes) {}
+
+    @Override
+    public void subtaskFailed(int subtaskIndex, @Nullable Throwable throwable) {}
 
     @Override
     public void handleEventFromOperator(int subtaskIndex, OperatorEvent operatorEvent) {
@@ -71,6 +78,11 @@ public class HeadOperatorCoordinator implements OperatorCoordinator {
         }
     }
 
+    @Override
+    public void checkpointCoordinator(long l, CompletableFuture<byte[]> completableFuture) {
+        sharedProgressAligner.requestCheckpoint(l, context.currentParallelism(), completableFuture);
+    }
+
     public void onAligned(GloballyAlignedEvent globallyAlignedEvent) {
         for (int i = 0; i < context.currentParallelism(); ++i) {
             subtaskGateways[i].sendEvent(globallyAlignedEvent);
@@ -78,23 +90,19 @@ public class HeadOperatorCoordinator implements OperatorCoordinator {
     }
 
     @Override
-    public void close() {
-        sharedProgressAligner.unregisterConsumer(context.getOperatorId());
+    public void onCheckpointAligned(CoordinatorCheckpointEvent coordinatorCheckpointEvent) {
+        for (int i = 0; i < context.currentParallelism(); ++i) {
+            subtaskGateways[i].sendEvent(coordinatorCheckpointEvent);
+        }
     }
 
     @Override
-    public void checkpointCoordinator(long l, CompletableFuture<byte[]> completableFuture) {
-        completableFuture.complete(new byte[0]);
+    public void close() {
+        sharedProgressAligner.unregisterListener(context.getOperatorId());
     }
 
     @Override
     public void notifyCheckpointComplete(long l) {}
-
-    @Override
-    public void resetToCheckpoint(long l, @Nullable byte[] bytes) {}
-
-    @Override
-    public void subtaskFailed(int i, @Nullable Throwable throwable) {}
 
     @Override
     public void subtaskReset(int i, long l) {}
