@@ -70,4 +70,9 @@ public class Segment implements Serializable {
     public int hashCode() {
         return Objects.hash(path, count, size);
     }
+
+    @Override
+    public String toString() {
+        return "Segment{" + "path=" + path + ", count=" + count + ", size=" + size + '}';
+    }
 }

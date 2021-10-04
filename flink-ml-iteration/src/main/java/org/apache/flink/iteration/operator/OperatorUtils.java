@@ -30,13 +30,14 @@ import org.apache.flink.statefun.flink.core.feedback.FeedbackKey;
 import org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.util.ExceptionUtils;
+import org.apache.flink.util.function.SupplierWithException;
 import org.apache.flink.util.function.ThrowingConsumer;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Executor;
-import java.util.function.Supplier;
 
 /** Utility class for operators. */
 public class OperatorUtils {
@@ -92,7 +93,7 @@ public class OperatorUtils {
         return new Path(pathStr);
     }
 
-    public static Supplier<Path> createDataCacheFileGenerator(
+    public static SupplierWithException<Path, IOException> createDataCacheFileGenerator(
             Path basePath, String fileTypeName, OperatorID operatorId) {
         return () ->
                 new Path(
