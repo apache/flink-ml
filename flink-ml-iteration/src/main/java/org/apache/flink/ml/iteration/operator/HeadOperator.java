@@ -26,6 +26,7 @@ import org.apache.flink.ml.iteration.IterationID;
 import org.apache.flink.ml.iteration.IterationRecord;
 import org.apache.flink.ml.iteration.broadcast.BroadcastOutput;
 import org.apache.flink.ml.iteration.broadcast.BroadcastOutputFactory;
+import org.apache.flink.ml.iteration.operator.event.CoordinatorCheckpointEvent;
 import org.apache.flink.ml.iteration.operator.event.GloballyAlignedEvent;
 import org.apache.flink.ml.iteration.operator.event.SubtaskAlignedEvent;
 import org.apache.flink.ml.iteration.operator.headprocessor.HeadOperatorRecordProcessor;
@@ -36,6 +37,7 @@ import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.runtime.operators.coordination.OperatorEventGateway;
 import org.apache.flink.runtime.operators.coordination.OperatorEventHandler;
 import org.apache.flink.runtime.state.StateInitializationContext;
+import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackChannel;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackChannelBroker;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackConsumer;
@@ -91,6 +93,8 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
 
     private HeadOperatorRecordProcessor recordProcessor;
 
+    private HeadOperatorCheckpointAligner checkpointAligner;
+
     public HeadOperator(
             IterationID iterationId,
             int feedbackIndex,
@@ -129,6 +133,8 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
         status = HeadOperatorStatus.RUNNING;
         recordProcessor = new RegularHeadOperatorRecordProcessor(processorContext);
 
+        checkpointAligner = new HeadOperatorCheckpointAligner();
+
         // Here we register a record
         registerFeedbackConsumer(
                 (Runnable runnable) -> {
@@ -136,6 +142,21 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
                         mailboxExecutor.execute(runnable::run, "Head feedback");
                     }
                 });
+    }
+
+    @Override
+    public void prepareSnapshotPreBarrier(long checkpointId) throws Exception {
+        super.prepareSnapshotPreBarrier(checkpointId);
+
+        checkpointAligner.waitTillCoordinatorNotified(checkpointId, mailboxExecutor::yield);
+    }
+
+    @Override
+    public void snapshotState(StateSnapshotContext context) throws Exception {
+        super.snapshotState(context);
+        checkpointAligner
+                .onStateSnapshot(context.getCheckpointId())
+                .forEach(this::processGloballyAlignedEvent);
     }
 
     @Override
@@ -155,12 +176,19 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
     @Override
     public void handleOperatorEvent(OperatorEvent operatorEvent) {
         if (operatorEvent instanceof GloballyAlignedEvent) {
-            boolean shouldTerminate =
-                    recordProcessor.onGloballyAligned((GloballyAlignedEvent) operatorEvent);
-            if (shouldTerminate) {
-                status = HeadOperatorStatus.TERMINATING;
-                recordProcessor = new TerminatingHeadOperatorRecordProcessor();
-            }
+            checkpointAligner
+                    .checkHoldingGloballyAlignedEvent((GloballyAlignedEvent) operatorEvent)
+                    .ifPresent(this::processGloballyAlignedEvent);
+        } else if (operatorEvent instanceof CoordinatorCheckpointEvent) {
+            checkpointAligner.coordinatorNotify((CoordinatorCheckpointEvent) operatorEvent);
+        }
+    }
+
+    private void processGloballyAlignedEvent(GloballyAlignedEvent globallyAlignedEvent) {
+        boolean shouldTerminate = recordProcessor.onGloballyAligned(globallyAlignedEvent);
+        if (shouldTerminate) {
+            status = HeadOperatorStatus.TERMINATING;
+            recordProcessor = new TerminatingHeadOperatorRecordProcessor();
         }
     }
 
