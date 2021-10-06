@@ -24,6 +24,7 @@ import org.apache.flink.util.function.RunnableWithException;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
 
@@ -39,6 +40,8 @@ class HeadOperatorCheckpointAligner {
     private final TreeMap<Long, CheckpointAlignment> checkpointAlignmments;
 
     private long latestCheckpointFromCoordinator;
+
+    private long latestAbortedCheckpoint;
 
     HeadOperatorCheckpointAligner() {
         this.checkpointAlignmments = new TreeMap<>();
@@ -58,6 +61,13 @@ class HeadOperatorCheckpointAligner {
     void coordinatorNotify(CoordinatorCheckpointEvent checkpointEvent) {
         checkState(checkpointEvent.getCheckpointId() > latestCheckpointFromCoordinator);
         latestCheckpointFromCoordinator = checkpointEvent.getCheckpointId();
+
+        // Do nothing if later checkpoint is aborted. In this case there should not be
+        // the notification from the task side.
+        if (latestCheckpointFromCoordinator <= latestAbortedCheckpoint) {
+            return;
+        }
+
         CheckpointAlignment checkpointAlignment =
                 checkpointAlignmments.computeIfAbsent(
                         checkpointEvent.getCheckpointId(),
@@ -84,6 +94,22 @@ class HeadOperatorCheckpointAligner {
                         && checkpointAlignment.notifiedFromChannels,
                 "Checkpoint " + checkpointId + " is not fully aligned");
         return checkpointAlignment.pendingGlobalEvents;
+    }
+
+    List<GloballyAlignedEvent> onCheckpointAborted(long checkpointId) {
+        // Here we need to abort all the checkpoints <= notified checkpoint id.
+        checkState(checkpointId > latestAbortedCheckpoint);
+        latestAbortedCheckpoint = checkpointId;
+
+        Map<Long, CheckpointAlignment> abortedAlignments =
+                checkpointAlignmments.headMap(latestAbortedCheckpoint, true);
+        List<GloballyAlignedEvent> events = new ArrayList<>();
+        abortedAlignments
+                .values()
+                .forEach(alignment -> events.addAll(alignment.pendingGlobalEvents));
+        abortedAlignments.clear();
+
+        return events;
     }
 
     private static class CheckpointAlignment {

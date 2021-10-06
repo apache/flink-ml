@@ -20,6 +20,8 @@ package org.apache.flink.iteration.operator;
 
 import org.apache.flink.iteration.IterationID;
 import org.apache.flink.iteration.IterationRecord;
+import org.apache.flink.iteration.checkpoint.Checkpoints;
+import org.apache.flink.iteration.checkpoint.CheckpointsBroker;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackChannel;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackChannelBroker;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackKey;
@@ -88,6 +90,31 @@ public class TailOperator extends AbstractStreamOperator<Void>
     @Override
     public void processElement(StreamRecord<IterationRecord<?>> streamRecord) {
         recordConsumer.accept(streamRecord);
+    }
+
+    @Override
+    public void prepareSnapshotPreBarrier(long checkpointId) throws Exception {
+        super.prepareSnapshotPreBarrier(checkpointId);
+        channel.put(new StreamRecord<>(IterationRecord.newBarrier(checkpointId)));
+    }
+
+    @Override
+    public void notifyCheckpointAborted(long checkpointId) throws Exception {
+        super.notifyCheckpointAborted(checkpointId);
+
+        // TODO: Unfortunately, we have to rely on the tail operator to help
+        // abort the checkpoint since the task thread of the head operator
+        // might get blocked due to not be able to close the raw state files.
+        // We would try to fix it in the Flink side in the future.
+        SubtaskFeedbackKey<?> key =
+                OperatorUtils.createFeedbackKey(iterationId, feedbackIndex)
+                        .withSubTaskIndex(
+                                getRuntimeContext().getIndexOfThisSubtask(),
+                                getRuntimeContext().getAttemptNumber());
+        Checkpoints<?> checkpoints = CheckpointsBroker.get().getCheckpoints(key);
+        if (checkpoints != null) {
+            checkpoints.abort(checkpointId);
+        }
     }
 
     private void processIfObjectReuseEnabled(StreamRecord<IterationRecord<?>> record) {
