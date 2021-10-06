@@ -19,6 +19,7 @@
 package org.apache.flink.iteration.operator;
 
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.api.common.TaskInfo;
 import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.iteration.IterationID;
@@ -27,6 +28,9 @@ import org.apache.flink.iteration.broadcast.BroadcastOutput;
 import org.apache.flink.iteration.broadcast.BroadcastOutputFactory;
 import org.apache.flink.iteration.operator.event.GloballyAlignedEvent;
 import org.apache.flink.iteration.operator.event.SubtaskAlignedEvent;
+import org.apache.flink.iteration.operator.headprocessor.HeadOperatorRecordProcessor;
+import org.apache.flink.iteration.operator.headprocessor.RegularHeadOperatorRecordProcessor;
+import org.apache.flink.iteration.operator.headprocessor.TerminatingHeadOperatorRecordProcessor;
 import org.apache.flink.iteration.typeinfo.IterationRecordTypeInfo;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.runtime.operators.coordination.OperatorEventGateway;
@@ -45,17 +49,18 @@ import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.ProcessingTimeService;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
-import org.apache.flink.util.ExceptionUtils;
+import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.OutputTag;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.Executor;
 
+import static org.apache.flink.util.Preconditions.checkState;
+
 /**
- * The head operators unions the initialized variable stream and the feedback stream, and
- * synchronize the epoch watermark (round).
+ * The head operator unions the initialized variable stream and the feedback stream, and synchronize
+ * the epoch watermark (round).
  */
 public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
         implements OneInputStreamOperator<IterationRecord<?>, IterationRecord<?>>,
@@ -76,15 +81,15 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
 
     private final MailboxExecutor mailboxExecutor;
 
-    private final Map<Integer, Long> numFeedbackRecordsPerEpoch;
-
-    private transient String uniqueSenderId;
-
     private transient BroadcastOutput<?> eventBroadcastOutput;
 
-    private transient StreamRecord<IterationRecord<?>> reusable;
+    private transient ContextImpl processorContext;
 
-    private transient boolean shouldTerminate;
+    // ------------- runtime -------------------
+
+    private HeadOperatorStatus status;
+
+    private HeadOperatorRecordProcessor recordProcessor;
 
     public HeadOperator(
             IterationID iterationId,
@@ -98,7 +103,6 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
         this.isCriteriaStream = isCriteriaStream;
         this.mailboxExecutor = Objects.requireNonNull(mailboxExecutor);
         this.operatorEventGateway = Objects.requireNonNull(operatorEventGateway);
-        this.numFeedbackRecordsPerEpoch = new HashMap<>();
 
         // Even though this operator does not use the processing
         // time service, AbstractStreamOperator requires this
@@ -112,9 +116,6 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
             StreamConfig config,
             Output<StreamRecord<IterationRecord<?>>> output) {
         super.setup(containingTask, config, output);
-        uniqueSenderId =
-                OperatorUtils.getUniqueSenderId(
-                        getOperatorID(), getRuntimeContext().getIndexOfThisSubtask());
         eventBroadcastOutput =
                 BroadcastOutputFactory.createBroadcastOutput(
                         output, metrics.getIOMetricGroup().getNumRecordsOutCounter());
@@ -124,12 +125,14 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
     public void initializeState(StateInitializationContext context) throws Exception {
         super.initializeState(context);
 
-        reusable = new StreamRecord<>(null);
+        processorContext = new ContextImpl();
+        status = HeadOperatorStatus.RUNNING;
+        recordProcessor = new RegularHeadOperatorRecordProcessor(processorContext);
 
         // Here we register a mail
         registerFeedbackConsumer(
                 (Runnable runnable) -> {
-                    if (!shouldTerminate) {
+                    if (status != HeadOperatorStatus.TERMINATED) {
                         mailboxExecutor.execute(runnable::run, "Head feedback");
                     }
                 });
@@ -137,71 +140,37 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
 
     @Override
     public void processElement(StreamRecord<IterationRecord<?>> element) throws Exception {
-        processRecord(element);
+        recordProcessor.processElement(element);
     }
 
     @Override
     public void processFeedback(StreamRecord<IterationRecord<?>> iterationRecord) throws Exception {
-        if (iterationRecord.getValue().getType() == IterationRecord.Type.RECORD) {
-            numFeedbackRecordsPerEpoch.compute(
-                    iterationRecord.getValue().getEpoch(),
-                    (round, count) -> count == null ? 1 : count + 1);
-        }
-        processRecord(iterationRecord);
-    }
-
-    private void processRecord(StreamRecord<IterationRecord<?>> iterationRecord) {
-        switch (iterationRecord.getValue().getType()) {
-            case RECORD:
-                reusable.replace(iterationRecord.getValue(), iterationRecord.getTimestamp());
-                output.collect(reusable);
-                break;
-            case EPOCH_WATERMARK:
-                LOG.debug(
-                        "Head Received epoch watermark {}", iterationRecord.getValue().getEpoch());
-                sendEpochWatermarkToCoordinator(iterationRecord.getValue().getEpoch());
-                break;
+        boolean terminated = recordProcessor.processFeedbackElement(iterationRecord);
+        if (terminated) {
+            checkState(status == HeadOperatorStatus.TERMINATING);
+            status = HeadOperatorStatus.TERMINATED;
         }
     }
 
     @Override
-    @SuppressWarnings({"unchecked", "rawtypes"})
     public void handleOperatorEvent(OperatorEvent operatorEvent) {
         if (operatorEvent instanceof GloballyAlignedEvent) {
-            try {
-                GloballyAlignedEvent globallyAlignedEvent = (GloballyAlignedEvent) operatorEvent;
-                LOG.info("Received global event {}", globallyAlignedEvent);
-
-                shouldTerminate = globallyAlignedEvent.isTerminated();
-                reusable.replace(
-                        IterationRecord.newEpochWatermark(
-                                globallyAlignedEvent.isTerminated()
-                                        ? Integer.MAX_VALUE
-                                        : globallyAlignedEvent.getEpoch(),
-                                uniqueSenderId),
-                        0);
-                eventBroadcastOutput.broadcastEmit((StreamRecord) reusable);
-                numFeedbackRecordsPerEpoch.remove(globallyAlignedEvent.getEpoch());
-            } catch (Exception e) {
-                ExceptionUtils.rethrow(e);
+            boolean shouldTerminate =
+                    recordProcessor.onGloballyAligned((GloballyAlignedEvent) operatorEvent);
+            if (shouldTerminate) {
+                status = HeadOperatorStatus.TERMINATING;
+                recordProcessor = new TerminatingHeadOperatorRecordProcessor();
             }
         }
     }
 
     @Override
     public void endInput() throws Exception {
-        sendEpochWatermarkToCoordinator(0);
-        while (!shouldTerminate) {
+        recordProcessor.processElement(
+                new StreamRecord<>(IterationRecord.newEpochWatermark(0, "fake")));
+        while (status != HeadOperatorStatus.TERMINATED) {
             mailboxExecutor.yield();
         }
-    }
-
-    private void sendEpochWatermarkToCoordinator(int round) {
-        operatorEventGateway.sendEventToCoordinator(
-                new SubtaskAlignedEvent(
-                        round,
-                        numFeedbackRecordsPerEpoch.getOrDefault(round, 0L),
-                        isCriteriaStream));
     }
 
     private void registerFeedbackConsumer(Executor mailboxExecutor) {
@@ -217,11 +186,6 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
     }
 
     @VisibleForTesting
-    Map<Integer, Long> getNumFeedbackRecordsPerEpoch() {
-        return numFeedbackRecordsPerEpoch;
-    }
-
-    @VisibleForTesting
     public OperatorEventGateway getOperatorEventGateway() {
         return operatorEventGateway;
     }
@@ -229,5 +193,63 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
     @VisibleForTesting
     MailboxExecutor getMailboxExecutor() {
         return mailboxExecutor;
+    }
+
+    @VisibleForTesting
+    HeadOperatorRecordProcessor getRecordProcessor() {
+        return recordProcessor;
+    }
+
+    @VisibleForTesting
+    public HeadOperatorStatus getStatus() {
+        return status;
+    }
+
+    @VisibleForTesting
+    enum HeadOperatorStatus {
+        RUNNING,
+
+        TERMINATING,
+
+        TERMINATED
+    }
+
+    private class ContextImpl implements HeadOperatorRecordProcessor.Context {
+
+        @Override
+        public StreamConfig getStreamConfig() {
+            return HeadOperator.this.config;
+        }
+
+        @Override
+        public TaskInfo getTaskInfo() {
+            return getContainingTask().getEnvironment().getTaskInfo();
+        }
+
+        @Override
+        public void output(StreamRecord<IterationRecord<?>> record) {
+            output.collect(record);
+        }
+
+        @Override
+        public void output(
+                OutputTag<IterationRecord<?>> outputTag, StreamRecord<IterationRecord<?>> record) {
+            output.collect(outputTag, record);
+        }
+
+        @Override
+        public void broadcastOutput(StreamRecord<IterationRecord<?>> record) {
+            try {
+                eventBroadcastOutput.broadcastEmit((StreamRecord) record);
+            } catch (IOException e) {
+                throw new FlinkRuntimeException("Failed to broadcast event", e);
+            }
+        }
+
+        @Override
+        public void updateEpochToCoordinator(int epoch, long numFeedbackRecords) {
+            operatorEventGateway.sendEventToCoordinator(
+                    new SubtaskAlignedEvent(epoch, numFeedbackRecords, isCriteriaStream));
+        }
     }
 }
