@@ -22,6 +22,7 @@ import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.iteration.operator.OperatorUtils;
 import org.apache.flink.iteration.operator.event.GloballyAlignedEvent;
+import org.apache.flink.runtime.state.StatePartitionStreamProvider;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 import org.slf4j.Logger;
@@ -29,6 +30,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
+
+import static org.apache.flink.util.Preconditions.checkArgument;
+import static org.apache.flink.util.Preconditions.checkState;
 
 /**
  * Processes the event before we received the terminated global aligned event from the coordinator.
@@ -40,26 +44,46 @@ public class RegularHeadOperatorRecordProcessor implements HeadOperatorRecordPro
 
     private final Context headOperatorContext;
 
-    private final StreamRecord<IterationRecord<?>> reusable;
-
     private final Map<Integer, Long> numFeedbackRecordsPerEpoch;
 
     private final String senderId;
 
+    private int latestRoundAligned;
+
+    private int latestRoundGloballyAligned;
+
     public RegularHeadOperatorRecordProcessor(Context headOperatorContext) {
         this.headOperatorContext = headOperatorContext;
 
-        this.reusable = new StreamRecord<>(null);
         this.numFeedbackRecordsPerEpoch = new HashMap<>();
 
         this.senderId =
                 OperatorUtils.getUniqueSenderId(
                         headOperatorContext.getStreamConfig().getOperatorID(),
                         headOperatorContext.getTaskInfo().getIndexOfThisSubtask());
+
+        this.latestRoundAligned = -1;
+        this.latestRoundGloballyAligned = -1;
     }
 
     @Override
-    public void initializeState(HeadOperatorState headOperatorState) throws Exception {}
+    public void initializeState(
+            HeadOperatorState headOperatorState, Iterable<StatePartitionStreamProvider> rawStates) {
+        checkArgument(headOperatorState != null, "The initialized state should not be null");
+
+        numFeedbackRecordsPerEpoch.putAll(headOperatorState.getNumFeedbackRecordsEachRound());
+        latestRoundAligned = headOperatorState.getLatestRoundAligned();
+        latestRoundGloballyAligned = headOperatorState.getLatestRoundGloballyAligned();
+
+        // If the only round not fully aligned is round 0, then wait till endOfInput in
+        // case the input is changed.
+        if (!(latestRoundAligned == 0 && latestRoundGloballyAligned == -1)) {
+            for (int i = latestRoundGloballyAligned + 1; i <= latestRoundAligned; ++i) {
+                headOperatorContext.updateEpochToCoordinator(
+                        i, numFeedbackRecordsPerEpoch.getOrDefault(i, 0L));
+            }
+        }
+    }
 
     @Override
     public void processElement(StreamRecord<IterationRecord<?>> element) {
@@ -81,22 +105,34 @@ public class RegularHeadOperatorRecordProcessor implements HeadOperatorRecordPro
     @Override
     public boolean onGloballyAligned(GloballyAlignedEvent globallyAlignedEvent) {
         LOG.info("Received global event {}", globallyAlignedEvent);
+        checkState(
+                (globallyAlignedEvent.getEpoch() == 0 && latestRoundGloballyAligned == 0)
+                        || globallyAlignedEvent.getEpoch() > latestRoundGloballyAligned,
+                String.format(
+                        "Receive unexpected global aligned event, latest = %d, this one = %d",
+                        latestRoundGloballyAligned, globallyAlignedEvent.getEpoch()));
 
-        reusable.replace(
-                IterationRecord.newEpochWatermark(
-                        globallyAlignedEvent.isTerminated()
-                                ? Integer.MAX_VALUE
-                                : globallyAlignedEvent.getEpoch(),
-                        senderId),
-                0);
-        headOperatorContext.broadcastOutput(reusable);
+        StreamRecord<IterationRecord<?>> record =
+                new StreamRecord<>(
+                        IterationRecord.newEpochWatermark(
+                                globallyAlignedEvent.isTerminated()
+                                        ? Integer.MAX_VALUE
+                                        : globallyAlignedEvent.getEpoch(),
+                                senderId),
+                        0);
+        headOperatorContext.broadcastOutput(record);
 
+        latestRoundGloballyAligned =
+                Math.max(globallyAlignedEvent.getEpoch(), latestRoundGloballyAligned);
         return globallyAlignedEvent.isTerminated();
     }
 
     @Override
     public HeadOperatorState snapshotState() {
-        return new HeadOperatorState();
+        return new HeadOperatorState(
+                new HashMap<>(numFeedbackRecordsPerEpoch),
+                latestRoundAligned,
+                latestRoundGloballyAligned);
     }
 
     @VisibleForTesting
@@ -104,18 +140,50 @@ public class RegularHeadOperatorRecordProcessor implements HeadOperatorRecordPro
         return numFeedbackRecordsPerEpoch;
     }
 
+    @VisibleForTesting
+    public int getLatestRoundAligned() {
+        return latestRoundAligned;
+    }
+
+    @VisibleForTesting
+    public int getLatestRoundGloballyAligned() {
+        return latestRoundGloballyAligned;
+    }
+
     private void processRecord(StreamRecord<IterationRecord<?>> iterationRecord) {
         switch (iterationRecord.getValue().getType()) {
             case RECORD:
-                reusable.replace(iterationRecord.getValue(), iterationRecord.getTimestamp());
-                headOperatorContext.output(reusable);
+                headOperatorContext.output(iterationRecord);
                 break;
             case EPOCH_WATERMARK:
                 LOG.info("Head Received epoch watermark {}", iterationRecord.getValue().getEpoch());
-                headOperatorContext.updateEpochToCoordinator(
-                        iterationRecord.getValue().getEpoch(),
-                        numFeedbackRecordsPerEpoch.getOrDefault(
-                                iterationRecord.getValue().getEpoch(), 0L));
+
+                boolean needNotifyCoordinator = false;
+                if (iterationRecord.getValue().getEpoch() == 0) {
+                    if (latestRoundAligned <= 0) {
+                        needNotifyCoordinator = true;
+                    }
+                } else {
+                    checkState(
+                            iterationRecord.getValue().getEpoch() > latestRoundAligned,
+                            String.format(
+                                    "Unexpected epoch watermark: latest = %d, this one = %d",
+                                    latestRoundAligned, iterationRecord.getValue().getEpoch()));
+                    headOperatorContext.updateEpochToCoordinator(
+                            iterationRecord.getValue().getEpoch(),
+                            numFeedbackRecordsPerEpoch.getOrDefault(
+                                    iterationRecord.getValue().getEpoch(), 0L));
+                }
+
+                if (needNotifyCoordinator) {
+                    headOperatorContext.updateEpochToCoordinator(
+                            iterationRecord.getValue().getEpoch(),
+                            numFeedbackRecordsPerEpoch.getOrDefault(
+                                    iterationRecord.getValue().getEpoch(), 0L));
+                }
+
+                latestRoundAligned =
+                        Math.max(iterationRecord.getValue().getEpoch(), latestRoundAligned);
                 break;
         }
     }

@@ -79,6 +79,44 @@ public class IterationConstructionTest extends TestLogger {
     }
 
     @Test
+    public void testNotChainingHeadOperator() {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(4);
+        DataStream<Integer> variableSource =
+                env.addSource(new DraftExecutionEnvironment.EmptySource<Integer>() {})
+                        .name("Variable")
+                        .map(x -> x)
+                        .name("map")
+                        .setParallelism(2);
+        DataStreamList result =
+                Iterations.iterateUnboundedStreams(
+                        DataStreamList.of(variableSource),
+                        DataStreamList.of(),
+                        ((variableStreams, dataStreams) ->
+                                new IterationBodyResult(variableStreams, dataStreams)));
+
+        JobGraph jobGraph = env.getStreamGraph().getJobGraph();
+
+        List<String> expectedVertexNames =
+                Arrays.asList(
+                        /* 0 */ "Source: Variable",
+                        /* 1 */ "map -> input-map",
+                        /* 2 */ "head-map",
+                        /* 3 */ "tail-head-map");
+        List<Integer> expectedParallelisms = Arrays.asList(4, 2, 2, 2);
+
+        List<JobVertex> vertices = jobGraph.getVerticesSortedTopologicallyFromSources();
+        assertEquals(
+                expectedVertexNames,
+                vertices.stream().map(JobVertex::getName).collect(Collectors.toList()));
+        assertEquals(
+                expectedParallelisms,
+                vertices.stream().map(JobVertex::getParallelism).collect(Collectors.toList()));
+        assertNotNull(vertices.get(2).getCoLocationGroup());
+        assertSame(vertices.get(2).getCoLocationGroup(), vertices.get(3).getCoLocationGroup());
+    }
+
+    @Test
     public void testUnboundedIteration() {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         DataStream<Integer> variableSource1 =

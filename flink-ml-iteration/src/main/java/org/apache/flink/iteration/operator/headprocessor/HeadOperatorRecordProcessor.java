@@ -22,14 +22,18 @@ import org.apache.flink.api.common.TaskInfo;
 import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.iteration.operator.HeadOperator;
 import org.apache.flink.iteration.operator.event.GloballyAlignedEvent;
+import org.apache.flink.runtime.state.StatePartitionStreamProvider;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.util.OutputTag;
 
+import javax.annotation.Nullable;
+
 /** The component to actually deal with the event received in the {@link HeadOperator}. */
 public interface HeadOperatorRecordProcessor {
 
-    void initializeState(HeadOperatorState headOperatorState) throws Exception;
+    void initializeState(
+            HeadOperatorState headOperatorState, Iterable<StatePartitionStreamProvider> rawStates);
 
     void processElement(StreamRecord<IterationRecord<?>> record);
 
@@ -37,6 +41,7 @@ public interface HeadOperatorRecordProcessor {
 
     boolean onGloballyAligned(GloballyAlignedEvent globallyAlignedEvent);
 
+    @Nullable
     HeadOperatorState snapshotState();
 
     /** The context for {@link HeadOperatorRecordProcessor}. */

@@ -18,5 +18,35 @@
 
 package org.apache.flink.iteration.operator.headprocessor;
 
+import java.util.Map;
+
 /** The state entry for the head operator. */
-public class HeadOperatorState {}
+public class HeadOperatorState {
+
+    private Map<Integer, Long> numFeedbackRecordsEachRound;
+
+    private int latestRoundAligned;
+
+    private int latestRoundGloballyAligned;
+
+    public HeadOperatorState(
+            Map<Integer, Long> numFeedbackRecordsEachRound,
+            int latestRoundAligned,
+            int latestRoundGloballyAligned) {
+        this.numFeedbackRecordsEachRound = numFeedbackRecordsEachRound;
+        this.latestRoundAligned = latestRoundAligned;
+        this.latestRoundGloballyAligned = latestRoundGloballyAligned;
+    }
+
+    public Map<Integer, Long> getNumFeedbackRecordsEachRound() {
+        return numFeedbackRecordsEachRound;
+    }
+
+    public int getLatestRoundAligned() {
+        return latestRoundAligned;
+    }
+
+    public int getLatestRoundGloballyAligned() {
+        return latestRoundGloballyAligned;
+    }
+}
