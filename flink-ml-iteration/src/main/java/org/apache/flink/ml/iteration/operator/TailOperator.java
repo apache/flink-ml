@@ -20,6 +20,8 @@ package org.apache.flink.ml.iteration.operator;
 
 import org.apache.flink.ml.iteration.IterationID;
 import org.apache.flink.ml.iteration.IterationRecord;
+import org.apache.flink.ml.iteration.checkpoint.Checkpoints;
+import org.apache.flink.ml.iteration.checkpoint.CheckpointsBroker;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackChannel;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackChannelBroker;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackKey;
@@ -77,6 +79,27 @@ public class TailOperator extends AbstractStreamOperator<Void>
     @Override
     public void processElement(StreamRecord<IterationRecord<?>> streamRecord) {
         recordConsumer.accept(streamRecord);
+    }
+
+    @Override
+    public void prepareSnapshotPreBarrier(long checkpointId) throws Exception {
+        super.prepareSnapshotPreBarrier(checkpointId);
+        channel.put(new StreamRecord<>(IterationRecord.newBarrier(checkpointId)));
+    }
+
+    @Override
+    public void notifyCheckpointAborted(long checkpointId) throws Exception {
+        super.notifyCheckpointAborted(checkpointId);
+
+        SubtaskFeedbackKey<?> key =
+                OperatorUtils.createFeedbackKey(iterationId, feedbackIndex)
+                        .withSubTaskIndex(
+                                getRuntimeContext().getIndexOfThisSubtask(),
+                                getRuntimeContext().getAttemptNumber());
+        Checkpoints<?> checkpoints = CheckpointsBroker.get().getCheckpoints(key);
+        if (checkpoints != null) {
+            checkpoints.abort(checkpointId);
+        }
     }
 
     private void processIfObjectReuseEnabled(StreamRecord<IterationRecord<?>> record) {

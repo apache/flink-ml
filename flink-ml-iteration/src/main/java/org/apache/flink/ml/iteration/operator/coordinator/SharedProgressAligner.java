@@ -184,6 +184,24 @@ public class SharedProgressAligner {
                 checkpointId);
     }
 
+    public void removeProgressInfo(OperatorID operatorId) {
+        runInEventLoop(
+                () -> statusByRound.values().forEach(status -> status.remove(operatorId)),
+                "remove the progress information for {}",
+                operatorId);
+    }
+
+    public void removeProgressInfo(OperatorID operatorId, int subtaskIndex) {
+        runInEventLoop(
+                () ->
+                        statusByRound
+                                .values()
+                                .forEach(status -> status.remove(operatorId, subtaskIndex)),
+                "remove the progress information for {}-{}",
+                operatorId,
+                subtaskIndex);
+    }
+
     private void runInEventLoop(
             ThrowingRunnable<Throwable> action,
             String actionName,
@@ -234,6 +252,16 @@ public class SharedProgressAligner {
                             + "than the expected total parallelism "
                             + totalHeadParallelism);
             return reportedSubtasks.size() == totalHeadParallelism;
+        }
+
+        public void remove(OperatorID operatorID) {
+            reportedSubtasks
+                    .entrySet()
+                    .removeIf(entry -> entry.getKey().getOperatorId().equals(operatorID));
+        }
+
+        public void remove(OperatorID operatorID, int subtaskIndex) {
+            reportedSubtasks.remove(new OperatorInstanceID(subtaskIndex, operatorID));
         }
 
         public boolean isTerminated() {

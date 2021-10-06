@@ -20,6 +20,7 @@ package org.apache.flink.ml.iteration.operator.headprocessor;
 
 import org.apache.flink.ml.iteration.IterationRecord;
 import org.apache.flink.ml.iteration.operator.event.GloballyAlignedEvent;
+import org.apache.flink.runtime.state.StatePartitionStreamProvider;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.util.FlinkRuntimeException;
 
@@ -30,7 +31,9 @@ import org.apache.flink.util.FlinkRuntimeException;
 public class TerminatingHeadOperatorRecordProcessor implements HeadOperatorRecordProcessor {
 
     @Override
-    public void initializeState(HeadOperatorState headOperatorState) throws Exception {}
+    public void initializeState(
+            HeadOperatorState headOperatorState,
+            Iterable<StatePartitionStreamProvider> rawStates) {}
 
     @Override
     public void processElement(StreamRecord<IterationRecord<?>> record) {
@@ -55,6 +58,6 @@ public class TerminatingHeadOperatorRecordProcessor implements HeadOperatorRecor
 
     @Override
     public HeadOperatorState snapshotState() {
-        return new HeadOperatorState();
+        return null;
     }
 }
