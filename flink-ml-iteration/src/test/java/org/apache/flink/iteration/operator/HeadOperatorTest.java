@@ -23,6 +23,7 @@ import org.apache.flink.iteration.IterationID;
 import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.iteration.operator.event.GloballyAlignedEvent;
 import org.apache.flink.iteration.operator.event.SubtaskAlignedEvent;
+import org.apache.flink.iteration.operator.headprocessor.RegularHeadOperatorRecordProcessor;
 import org.apache.flink.iteration.typeinfo.IterationRecordTypeInfo;
 import org.apache.flink.runtime.io.network.api.EndOfData;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -86,12 +87,12 @@ public class HeadOperatorTest extends TestLogger {
                             new StreamRecord<>(IterationRecord.newRecord(2, 0), 3),
                             new StreamRecord<>(IterationRecord.newRecord(4, 1), 4));
             assertEquals(expectedOutput, new ArrayList<>(harness.getOutput()));
-            assertEquals(
-                    2,
-                    (long)
-                            RecordingHeadOperatorFactory.latestHeadOperator
-                                    .getNumFeedbackRecordsPerEpoch()
-                                    .get(1));
+
+            RegularHeadOperatorRecordProcessor recordProcessor =
+                    (RegularHeadOperatorRecordProcessor)
+                            RecordingHeadOperatorFactory.latestHeadOperator.getRecordProcessor();
+
+            assertEquals(2, (long) recordProcessor.getNumFeedbackRecordsPerEpoch().get(1));
         }
     }
 
@@ -152,6 +153,16 @@ public class HeadOperatorTest extends TestLogger {
                                                     operatorId,
                                                     new SerializedValue<>(
                                                             new GloballyAlignedEvent(1, true)));
+
+                                    while (RecordingHeadOperatorFactory.latestHeadOperator
+                                                    .getStatus()
+                                            == HeadOperator.HeadOperatorStatus.RUNNING) {}
+                                    putFeedbackRecords(
+                                            iterationId,
+                                            0,
+                                            new StreamRecord<>(
+                                                    IterationRecord.newEpochWatermark(
+                                                            Integer.MAX_VALUE + 1, "tail")));
 
                                     return null;
                                 } catch (Throwable e) {
