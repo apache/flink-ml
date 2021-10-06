@@ -34,6 +34,7 @@ import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.minicluster.MiniClusterConfiguration;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
+import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.util.OutputTag;
@@ -213,6 +214,8 @@ public class UnboundedStreamIterationITCase {
     static MiniClusterConfiguration createMiniClusterConfiguration(int numTm, int numSlot) {
         Configuration configuration = new Configuration();
         configuration.set(RestOptions.PORT, 18081);
+        configuration.set(
+                ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
         return new MiniClusterConfiguration.Builder()
                 .setConfiguration(configuration)
                 .setNumTaskManagers(numTm)

@@ -18,10 +18,19 @@
 
 package org.apache.flink.ml.iteration.itcases.operators;
 
+import org.apache.flink.api.common.state.ListState;
+import org.apache.flink.api.common.state.ListStateDescriptor;
+import org.apache.flink.ml.iteration.operator.OperatorStateUtils;
+import org.apache.flink.runtime.state.FunctionInitializationContext;
+import org.apache.flink.runtime.state.FunctionSnapshotContext;
+import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
 import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunction;
 
-/** Sources emitting the continuous int sequences */
-public class SequenceSource extends RichParallelSourceFunction<Integer> {
+import java.util.Collections;
+
+/** Sources emitting the continuous int sequences. */
+public class SequenceSource extends RichParallelSourceFunction<Integer>
+        implements CheckpointedFunction {
 
     private final int maxValue;
 
@@ -31,6 +40,10 @@ public class SequenceSource extends RichParallelSourceFunction<Integer> {
 
     private volatile boolean canceled;
 
+    private int next;
+
+    private ListState<Integer> nextState;
+
     public SequenceSource(int maxValue, boolean holdAfterMaxValue, int period) {
         this.maxValue = maxValue;
         this.holdAfterMaxValue = holdAfterMaxValue;
@@ -38,9 +51,22 @@ public class SequenceSource extends RichParallelSourceFunction<Integer> {
     }
 
     @Override
+    public void initializeState(FunctionInitializationContext functionInitializationContext)
+            throws Exception {
+        nextState =
+                functionInitializationContext
+                        .getOperatorStateStore()
+                        .getListState(new ListStateDescriptor<>("next", Integer.class));
+        next = OperatorStateUtils.getUniqueElement(nextState, "next").orElse(0);
+    }
+
+    @Override
     public void run(SourceContext<Integer> ctx) throws Exception {
-        for (int i = 0; i < maxValue && !canceled; ++i) {
-            ctx.collect(i);
+        while (next < maxValue && !canceled) {
+            synchronized (ctx.getCheckpointLock()) {
+                ctx.collect(next++);
+            }
+
             if (period > 0) {
                 Thread.sleep(period);
             }
@@ -56,5 +82,11 @@ public class SequenceSource extends RichParallelSourceFunction<Integer> {
     @Override
     public void cancel() {
         canceled = true;
+    }
+
+    @Override
+    public void snapshotState(FunctionSnapshotContext functionSnapshotContext) throws Exception {
+        nextState.clear();
+        nextState.update(Collections.singletonList(next));
     }
 }
