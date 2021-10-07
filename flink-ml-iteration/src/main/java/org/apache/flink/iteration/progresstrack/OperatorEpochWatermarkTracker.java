@@ -60,9 +60,21 @@ public class OperatorEpochWatermarkTracker {
         InputStatus inputStatus = inputStatuses.get(inputIndex);
         inputStatus.onUpdate(sender, epochWatermark);
 
-        if (inputStatus.getInputLowerBound() > allInputsLowerBound.getValue(inputIndex)) {
+        tryUpdateLowerBound(inputIndex);
+    }
+
+    public void finish(int inputIndex) throws IOException {
+        inputStatuses.get(inputIndex).finish();
+
+        tryUpdateLowerBound(inputIndex);
+    }
+
+    private void tryUpdateLowerBound(int changedInputIndex) throws IOException {
+        if (inputStatuses.get(changedInputIndex).getInputLowerBound()
+                > allInputsLowerBound.getValue(changedInputIndex)) {
             int oldLowerBound = allInputsLowerBound.getLowerBound();
-            allInputsLowerBound.updateValue(inputIndex, inputStatus.getInputLowerBound());
+            allInputsLowerBound.updateValue(
+                    changedInputIndex, inputStatuses.get(changedInputIndex).getInputLowerBound());
             if (allInputsLowerBound.getLowerBound() > oldLowerBound) {
                 progressTrackerListener.onEpochWatermarkIncrement(
                         allInputsLowerBound.getLowerBound());
@@ -95,6 +107,12 @@ public class OperatorEpochWatermarkTracker {
             allChannelsLowerBound.updateValue(index, epochWatermark);
         }
 
+        public void finish() {
+            for (int i = 0; i < numberOfChannels; ++i) {
+                allChannelsLowerBound.updateValue(i, Integer.MAX_VALUE);
+            }
+        }
+
         public int getInputLowerBound() {
             return allChannelsLowerBound.getLowerBound();
         }
@@ -122,7 +140,7 @@ public class OperatorEpochWatermarkTracker {
 
         public void updateValue(int channel, int value) {
             checkState(
-                    value > values[channel],
+                    value >= values[channel],
                     String.format(
                             "The channel %d received an outdated value %d, which currently is %d",
                             channel, value, values[channel]));

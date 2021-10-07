@@ -31,8 +31,9 @@ import org.apache.flink.iteration.typeinfo.IterationRecordSerializer;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
-import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
+import org.apache.flink.streaming.api.operators.BoundedMultiInput;
 import org.apache.flink.streaming.api.operators.Output;
+import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.util.ExceptionUtils;
@@ -46,8 +47,10 @@ import static org.apache.flink.util.Preconditions.checkState;
 
 /** Replays the data received in the round 0 in the following round. */
 public class ReplayOperator<T> extends AbstractStreamOperator<IterationRecord<T>>
-        implements OneInputStreamOperator<IterationRecord<T>, IterationRecord<T>>,
-                OperatorEpochWatermarkTrackerListener {
+        implements TwoInputStreamOperator<
+                        IterationRecord<T>, IterationRecord<Void>, IterationRecord<T>>,
+                OperatorEpochWatermarkTrackerListener,
+                BoundedMultiInput {
 
     private OperatorEpochWatermarkTracker progressTracker;
 
@@ -115,7 +118,7 @@ public class ReplayOperator<T> extends AbstractStreamOperator<IterationRecord<T>
     }
 
     @Override
-    public void processElement(StreamRecord<IterationRecord<T>> element) throws Exception {
+    public void processElement1(StreamRecord<IterationRecord<T>> element) throws Exception {
         switch (element.getValue().getType()) {
             case RECORD:
                 dataCacheWriter.addRecord(element.getValue().getValue());
@@ -129,6 +132,23 @@ public class ReplayOperator<T> extends AbstractStreamOperator<IterationRecord<T>
                 throw new UnsupportedOperationException(
                         "Not supported element type: " + element.getValue());
         }
+    }
+
+    @Override
+    public void processElement2(StreamRecord<IterationRecord<Void>> element) throws Exception {
+        if (element.getValue().getType() == IterationRecord.Type.EPOCH_WATERMARK) {
+            progressTracker.onEpochWatermark(
+                    1, element.getValue().getSender(), element.getValue().getEpoch());
+        } else {
+            throw new UnsupportedOperationException(
+                    "Not supported element type: " + element.getValue());
+        }
+    }
+
+    @Override
+    public void endInput(int i) throws Exception {
+        // The notification ranges from 1 to N while the track uses 0 to N -1.
+        progressTracker.finish(i - 1);
     }
 
     @Override

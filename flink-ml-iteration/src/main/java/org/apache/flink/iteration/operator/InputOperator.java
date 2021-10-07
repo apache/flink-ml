@@ -20,21 +20,17 @@ package org.apache.flink.iteration.operator;
 
 import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
-import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 /** Input operator that wraps the user record into {@link IterationRecord}. */
 public class InputOperator<T> extends AbstractStreamOperator<IterationRecord<T>>
-        implements OneInputStreamOperator<T, IterationRecord<T>>, BoundedOneInput {
-
-    private final boolean insertMaxEpochWatermark;
+        implements OneInputStreamOperator<T, IterationRecord<T>> {
 
     private transient StreamRecord<IterationRecord<T>> reusable;
 
-    public InputOperator(boolean insertMaxEpochWatermark) {
-        this.insertMaxEpochWatermark = insertMaxEpochWatermark;
+    public InputOperator() {
         this.chainingStrategy = ChainingStrategy.ALWAYS;
     }
 
@@ -49,17 +45,5 @@ public class InputOperator<T> extends AbstractStreamOperator<IterationRecord<T>>
         reusable.setTimestamp(streamRecord.getTimestamp());
         reusable.getValue().setValue(streamRecord.getValue());
         output.collect(reusable);
-    }
-
-    @Override
-    public void endInput() throws Exception {
-        if (insertMaxEpochWatermark) {
-            reusable.replace(
-                    IterationRecord.newEpochWatermark(
-                            Integer.MAX_VALUE,
-                            OperatorUtils.getUniqueSenderId(
-                                    getOperatorID(), getRuntimeContext().getIndexOfThisSubtask())));
-            output.collect(reusable);
-        }
     }
 }

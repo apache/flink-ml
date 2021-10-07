@@ -35,7 +35,7 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.co.CoProcessFunction;
-import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
+import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
 import org.apache.flink.streaming.api.transformations.OneInputTransformation;
 import org.apache.flink.util.Collector;
 
@@ -197,7 +197,7 @@ public class Iterations {
                         .stream()
                         .mapToInt(i -> i)
                         .sum();
-        DataStreamList initVariableInputs = addInputs(initVariableStreams, false);
+        DataStreamList initVariableInputs = addInputs(initVariableStreams);
         DataStreamList headStreams =
                 addHeads(
                         initVariableStreams,
@@ -207,7 +207,7 @@ public class Iterations {
                         false,
                         0);
 
-        DataStreamList dataStreamInputs = addInputs(dataStreams, true);
+        DataStreamList dataStreamInputs = addInputs(dataStreams);
         if (replayedDataStreamIndices.size() > 0) {
             dataStreamInputs =
                     addReplayer(
@@ -293,13 +293,13 @@ public class Iterations {
             // Notes that the HeadOperator would broadcast the globally aligned events,
             // thus the operator does not require emit to the sideoutput specially.
             DataStream<?> replayedInput =
-                    ((SingleOutputStreamOperator<IterationRecord<?>>) firstHeadStream)
-                            .getSideOutput(HeadOperator.ALIGN_NOTIFY_OUTPUT_TAG)
-                            .map(x -> x, dataStreamInputs.get(i).getType())
-                            .setParallelism(firstHeadStream.getParallelism())
-                            .name("signal-change-typeinfo")
-                            .broadcast()
-                            .union(dataStreamInputs.get(i))
+                    dataStreamInputs
+                            .get(i)
+                            .connect(
+                                    ((SingleOutputStreamOperator<IterationRecord<?>>)
+                                                    firstHeadStream)
+                                            .getSideOutput(HeadOperator.ALIGN_NOTIFY_OUTPUT_TAG)
+                                            .broadcast())
                             .transform(
                                     "Replayer-"
                                             + originalDataStreams
@@ -307,7 +307,7 @@ public class Iterations {
                                                     .getTransformation()
                                                     .getName(),
                                     dataStreamInputs.get(i).getType(),
-                                    (OneInputStreamOperator) new ReplayOperator<>())
+                                    (TwoInputStreamOperator) new ReplayOperator<>())
                             .setParallelism(dataStreamInputs.get(i).getParallelism());
             result.add(replayedInput);
         }
@@ -338,7 +338,7 @@ public class Iterations {
                         .name(terminationCriteria.getTransformation().getName())
                         .setParallelism(terminationCriteria.getParallelism());
         DataStreamList criteriaSources = DataStreamList.of(emptyCriteriaSource);
-        DataStreamList criteriaInputs = addInputs(criteriaSources, false);
+        DataStreamList criteriaInputs = addInputs(criteriaSources);
         DataStreamList criteriaHeaders =
                 addHeads(
                         criteriaSources,
@@ -398,8 +398,7 @@ public class Iterations {
         return map(dataStreams, DataStream::getType);
     }
 
-    private static DataStreamList addInputs(
-            DataStreamList dataStreams, boolean insertMaxEpochWatermark) {
+    private static DataStreamList addInputs(DataStreamList dataStreams) {
         return new DataStreamList(
                 map(
                         dataStreams,
@@ -408,7 +407,7 @@ public class Iterations {
                                         .transform(
                                                 "input-" + dataStream.getTransformation().getName(),
                                                 new IterationRecordTypeInfo<>(dataStream.getType()),
-                                                new InputOperator(insertMaxEpochWatermark))
+                                                new InputOperator())
                                         .setParallelism(dataStream.getParallelism())));
     }
 
