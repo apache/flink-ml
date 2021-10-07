@@ -80,6 +80,8 @@ public class MultipleInputAllRoundWrapperOperator<OUT>
 
     @Override
     public void endInput(int i) throws Exception {
+        super.endInput(i);
+
         if (wrappedOperator instanceof BoundedMultiInput) {
             ((BoundedMultiInput) wrappedOperator).endInput(i);
         }

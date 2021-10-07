@@ -34,7 +34,7 @@ public class InputOperatorTest extends TestLogger {
     @Test
     public void testWrapRecord() throws Exception {
         OneInputStreamOperatorTestHarness<Integer, IterationRecord<Integer>> testHarness =
-                new OneInputStreamOperatorTestHarness<>(new InputOperator<>(false));
+                new OneInputStreamOperatorTestHarness<>(new InputOperator<>());
         testHarness.open();
 
         ConcurrentLinkedQueue<Object> expectedOutput = new ConcurrentLinkedQueue<>();
@@ -45,37 +45,5 @@ public class InputOperatorTest extends TestLogger {
 
         TestHarnessUtil.assertOutputEquals(
                 "Output was not correct", expectedOutput, testHarness.getOutput());
-    }
-
-    @Test
-    public void testInsertMaxEpochWatermarkIfSpecified() throws Exception {
-        OneInputStreamOperatorTestHarness<Integer, IterationRecord<Integer>> testHarness =
-                new OneInputStreamOperatorTestHarness<>(new InputOperator<>(true));
-        testHarness.open();
-
-        testHarness.endInput();
-
-        ConcurrentLinkedQueue<Object> expectedOutput = new ConcurrentLinkedQueue<>();
-        expectedOutput.add(
-                new StreamRecord<>(
-                        IterationRecord.newEpochWatermark(
-                                Integer.MAX_VALUE,
-                                OperatorUtils.getUniqueSenderId(
-                                        testHarness.getOperator().getOperatorID(), 0))));
-
-        TestHarnessUtil.assertOutputEquals(
-                "Output was not correct", expectedOutput, testHarness.getOutput());
-    }
-
-    @Test
-    public void testNotInsertMaxEpochWatermarkIfSpecified() throws Exception {
-        OneInputStreamOperatorTestHarness<Integer, IterationRecord<Integer>> testHarness =
-                new OneInputStreamOperatorTestHarness<>(new InputOperator<>(false));
-        testHarness.open();
-
-        testHarness.endInput();
-
-        TestHarnessUtil.assertOutputEquals(
-                "Output was not correct", new ConcurrentLinkedQueue<>(), testHarness.getOutput());
     }
 }

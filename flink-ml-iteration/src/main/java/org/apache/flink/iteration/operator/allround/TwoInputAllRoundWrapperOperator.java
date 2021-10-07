@@ -113,6 +113,8 @@ public class TwoInputAllRoundWrapperOperator<IN1, IN2, OUT>
 
     @Override
     public void endInput(int i) throws Exception {
+        super.endInput(i);
+
         if (wrappedOperator instanceof BoundedMultiInput) {
             ((BoundedMultiInput) wrappedOperator).endInput(i);
         }
