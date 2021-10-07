@@ -210,15 +210,12 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
     }
 
     @Override
-    public void endInput() throws Exception {
+    public void finish() throws Exception {
         for (Map.Entry<Integer, S> entry : wrappedOperators.entrySet()) {
             closeStreamOperator(entry.getValue(), entry.getKey());
         }
         wrappedOperators.clear();
     }
-
-    @Override
-    public void finish() throws Exception {}
 
     @Override
     public void close() throws Exception {

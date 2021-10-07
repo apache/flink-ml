@@ -33,7 +33,7 @@ import org.apache.flink.ml.iteration.typeinfo.IterationRecordTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
+import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
 import org.apache.flink.streaming.api.transformations.OneInputTransformation;
 import org.apache.flink.util.OutputTag;
 
@@ -152,13 +152,13 @@ public class IterationFactory {
             }
 
             DataStream<?> replayedInput =
-                    ((SingleOutputStreamOperator<IterationRecord<?>>) firstHeadStream)
-                            .getSideOutput(HeadOperator.ALIGN_NOTIFY_OUTPUT_TAG)
-                            .map(x -> x, dataStreamInputs.get(i).getType())
-                            .setParallelism(firstHeadStream.getParallelism())
-                            .name("signal-change-typeinfo")
-                            .broadcast()
-                            .union(dataStreamInputs.get(i))
+                    dataStreamInputs
+                            .get(i)
+                            .connect(
+                                    ((SingleOutputStreamOperator<IterationRecord<?>>)
+                                                    firstHeadStream)
+                                            .getSideOutput(HeadOperator.ALIGN_NOTIFY_OUTPUT_TAG)
+                                            .broadcast())
                             .transform(
                                     "Replayer-"
                                             + originalDataStreams
@@ -166,7 +166,7 @@ public class IterationFactory {
                                                     .getTransformation()
                                                     .getName(),
                                     dataStreamInputs.get(i).getType(),
-                                    (OneInputStreamOperator) new ReplayOperator<>())
+                                    (TwoInputStreamOperator) new ReplayOperator<>())
                             .setParallelism(dataStreamInputs.get(i).getParallelism());
             result.add(replayedInput);
         }

@@ -308,7 +308,7 @@ public class IterationConstructionTest {
                         /* 0 */ "Source: Variable -> input-Variable",
                         /* 1 */ "Source: Constant -> input-Constant",
                         /* 2 */ "Source: Termination -> input-Termination",
-                        /* 3 */ "head-Variable -> signal-change-typeinfo",
+                        /* 3 */ "head-Variable",
                         /* 4 */ "Replayer-Constant",
                         /* 5 */ "Processor -> output-SideOutput -> Sink: Sink",
                         /* 6 */ "Feedback",

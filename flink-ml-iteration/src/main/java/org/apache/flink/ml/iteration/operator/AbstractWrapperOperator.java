@@ -18,7 +18,6 @@
 
 package org.apache.flink.ml.iteration.operator;
 
-import org.apache.flink.metrics.groups.OperatorMetricGroup;
 import org.apache.flink.ml.iteration.IterationRecord;
 import org.apache.flink.ml.iteration.broadcast.BroadcastOutput;
 import org.apache.flink.ml.iteration.broadcast.BroadcastOutputFactory;
@@ -30,7 +29,7 @@ import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.metrics.groups.InternalOperatorMetricGroup;
 import org.apache.flink.runtime.metrics.groups.UnregisteredMetricGroups;
 import org.apache.flink.streaming.api.graph.StreamConfig;
-import org.apache.flink.streaming.api.operators.BoundedOneInput;
+import org.apache.flink.streaming.api.operators.BoundedMultiInput;
 import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
@@ -49,7 +48,7 @@ import static org.apache.flink.util.Preconditions.checkState;
 
 /** The base class of all the wrapper operators. It provides the alignment functionality. */
 public abstract class AbstractWrapperOperator<T>
-        implements StreamOperator<IterationRecord<T>>, ProgressTrackerListener, BoundedOneInput {
+        implements StreamOperator<IterationRecord<T>>, ProgressTrackerListener, BoundedMultiInput {
 
     private static final Logger LOG = LoggerFactory.getLogger(AbstractWrapperOperator.class);
 
@@ -131,6 +130,11 @@ public abstract class AbstractWrapperOperator<T>
     protected void clearIterationContextRound() {
         proxyOutput.setContextRound(null);
         epochWatermarkSupplier.set(null);
+    }
+
+    @Override
+    public void endInput(int i) throws Exception {
+        progressTracker.finish(i - 1);
     }
 
     private InternalOperatorMetricGroup createOperatorMetricGroup(

@@ -53,13 +53,14 @@ public class InputOperator<T> extends AbstractStreamOperator<IterationRecord<T>>
 
     @Override
     public void endInput() throws Exception {
-        if (insertMaxEpochWatermark) {
-            reusable.replace(
-                    IterationRecord.newEpochWatermark(
-                            Integer.MAX_VALUE,
-                            OperatorUtils.getUniqueSenderId(
-                                    getOperatorID(), getRuntimeContext().getIndexOfThisSubtask())));
-            output.collect(reusable);
-        }
+        //        if (insertMaxEpochWatermark) {
+        //            reusable.replace(
+        //                    IterationRecord.newEpochWatermark(
+        //                            Integer.MAX_VALUE,
+        //                            OperatorUtils.getUniqueSenderId(
+        //                                    getOperatorID(),
+        // getRuntimeContext().getIndexOfThisSubtask())));
+        //            output.collect(reusable);
+        //        }
     }
 }

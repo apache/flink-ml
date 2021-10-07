@@ -57,6 +57,23 @@ public class ProgressTrackerTest {
         assertEquals(Collections.singletonList(3), recordingProgressListener.notifications);
     }
 
+    @Test
+    public void testFinish() throws IOException {
+        RecordingProgressListener recordingProgressListener = new RecordingProgressListener();
+        int[] numberOfChannels = new int[] {2, 3};
+        ProgressTracker progressTracker =
+                new ProgressTracker(numberOfChannels, recordingProgressListener);
+        progressTracker.finish(0);
+
+        testOnEpochWatermark(
+                new int[] {0, 0, 1},
+                progressTracker,
+                recordingProgressListener,
+                new int[] {1, 1, 1},
+                new String[] {"1-1", "1-2", "1-3"},
+                3);
+    }
+
     private void testOnEpochWatermark(
             int[] expectedNumNotifications,
             ProgressTracker tracker,

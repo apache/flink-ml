@@ -60,9 +60,21 @@ public class ProgressTracker {
         InputStatus inputStatus = inputStatuses.get(inputIndex);
         inputStatus.onUpdate(sender, epochWatermark);
 
-        if (inputStatus.getInputLowerBound() > allInputsLowerBound.getValue(inputIndex)) {
+        tryUpdateLowerBound(inputIndex);
+    }
+
+    public void finish(int inputIndex) throws IOException {
+        inputStatuses.get(inputIndex).finish();
+
+        tryUpdateLowerBound(inputIndex);
+    }
+
+    private void tryUpdateLowerBound(int changedInputIndex) throws IOException {
+        if (inputStatuses.get(changedInputIndex).getInputLowerBound()
+                > allInputsLowerBound.getValue(changedInputIndex)) {
             int oldLowerBound = allInputsLowerBound.getLowerBound();
-            allInputsLowerBound.updateValue(inputIndex, inputStatus.getInputLowerBound());
+            allInputsLowerBound.updateValue(
+                    changedInputIndex, inputStatuses.get(changedInputIndex).getInputLowerBound());
             if (allInputsLowerBound.getLowerBound() > oldLowerBound) {
                 progressTrackerListener.onEpochWatermarkIncrement(
                         allInputsLowerBound.getLowerBound());
@@ -93,6 +105,12 @@ public class ProgressTracker {
             checkState(index < numberOfChannels);
 
             allChannelsLowerBound.updateValue(index, epochWatermark);
+        }
+
+        public void finish() {
+            for (int i = 0; i < numberOfChannels; ++i) {
+                allChannelsLowerBound.updateValue(i, Integer.MAX_VALUE);
+            }
         }
 
         public int getInputLowerBound() {

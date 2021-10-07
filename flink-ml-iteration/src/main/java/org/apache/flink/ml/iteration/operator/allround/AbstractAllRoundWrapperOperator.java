@@ -101,19 +101,18 @@ public abstract class AbstractAllRoundWrapperOperator<T, S extends StreamOperato
 
     @Override
     public void onEpochWatermarkIncrement(int epochWatermark) throws IOException {
-        if (epochWatermark <= latestEpochWatermark) {
-            return;
+        if (epochWatermark > latestEpochWatermark) {
+            latestEpochWatermark = epochWatermark;
+
+            setIterationContextRound(epochWatermark);
+            processOperatorOrUdfIfSatisfy(
+                    wrappedOperator,
+                    IterationListener.class,
+                    listener -> notifyEpochWatermarkIncrement(listener, epochWatermark));
+            clearIterationContextRound();
         }
-        latestEpochWatermark = epochWatermark;
 
-        setIterationContextRound(epochWatermark);
-        processOperatorOrUdfIfSatisfy(
-                wrappedOperator,
-                IterationListener.class,
-                listener -> notifyEpochWatermarkIncrement(listener, epochWatermark));
-        clearIterationContextRound();
-
-        // Broadcast the events.
+        // Always broadcast the events.
         super.onEpochWatermarkIncrement(epochWatermark);
     }
 
@@ -199,6 +198,9 @@ public abstract class AbstractAllRoundWrapperOperator<T, S extends StreamOperato
 
     @Override
     public void finish() throws Exception {
+        if (wrappedOperator instanceof BoundedOneInput) {
+            ((BoundedOneInput) wrappedOperator).endInput();
+        }
         wrappedOperator.finish();
     }
 
@@ -250,13 +252,6 @@ public abstract class AbstractAllRoundWrapperOperator<T, S extends StreamOperato
     @Override
     public Object getCurrentKey() {
         return wrappedOperator.getCurrentKey();
-    }
-
-    @Override
-    public void endInput() throws Exception {
-        if (wrappedOperator instanceof BoundedOneInput) {
-            ((BoundedOneInput) wrappedOperator).endInput();
-        }
     }
 
     @VisibleForTesting
