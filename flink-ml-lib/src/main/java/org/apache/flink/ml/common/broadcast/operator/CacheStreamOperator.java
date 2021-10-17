@@ -24,6 +24,7 @@ import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.common.broadcast.BroadcastContext;
+import org.apache.flink.ml.iteration.operator.OperatorStateUtils;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.operators.AbstractInput;
@@ -43,37 +44,45 @@ import java.util.List;
 /** The operator that process all broadcast inputs and stores them in {@link BroadcastContext}. */
 public class CacheStreamOperator<OUT> extends AbstractStreamOperatorV2<OUT>
         implements MultipleInputStreamOperator<OUT>, BoundedMultiInput, Serializable {
-    /** names of the broadcast DataStreams. */
-    private final String[] broadcastNames;
-    /** input list of the multi-input operator. */
-    private final List<Input> inputList;
-    /** output types of input DataStreams. */
+
+    /** names of the broadcast data streams. */
+    private final String[] broadcastStreamNames;
+
+    /** output types of input data streams. */
     private final TypeInformation<?>[] inTypes;
+
+    /** input list of the multi-input operator. */
+    @SuppressWarnings("rawtypes")
+    private final List<Input> inputList;
+
     /** caches of the broadcast inputs. */
-    private final List<?>[] caches;
+    @SuppressWarnings("rawtypes")
+    private final List[] caches;
+
     /** state storage of the broadcast inputs. */
     private ListState<?>[] cacheStates;
+
     /** cacheReady state storage of the broadcast inputs. */
     private ListState<Boolean>[] cacheReadyStates;
 
-    public CacheStreamOperator(
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    CacheStreamOperator(
             StreamOperatorParameters<OUT> parameters,
-            String[] broadcastNames,
+            String[] broadcastStreamNames,
             TypeInformation<?>[] inTypes) {
-        super(parameters, broadcastNames.length);
-        this.broadcastNames = broadcastNames;
+        super(parameters, broadcastStreamNames.length);
+        this.broadcastStreamNames = broadcastStreamNames;
         this.inTypes = inTypes;
+        inputList = new ArrayList<>();
+        for (int i = 0; i < inTypes.length; i++) {
+            inputList.add(new ProxyInput(this, i + 1));
+        }
         this.caches = new List[inTypes.length];
         for (int i = 0; i < inTypes.length; i++) {
             caches[i] = new ArrayList<>();
         }
         this.cacheStates = new ListState[inTypes.length];
         this.cacheReadyStates = new ListState[inTypes.length];
-
-        inputList = new ArrayList<>();
-        for (int i = 0; i < inTypes.length; i++) {
-            inputList.add(new ProxyInput(this, i + 1));
-        }
     }
 
     @Override
@@ -84,26 +93,28 @@ public class CacheStreamOperator<OUT> extends AbstractStreamOperatorV2<OUT>
     @Override
     public void endInput(int i) {
         BroadcastContext.markCacheFinished(
-                Tuple2.of(broadcastNames[i - 1], getRuntimeContext().getIndexOfThisSubtask()));
+                broadcastStreamNames[i - 1] + "-" + getRuntimeContext().getIndexOfThisSubtask());
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public void snapshotState(StateSnapshotContext context) throws Exception {
         super.snapshotState(context);
         for (int i = 0; i < inTypes.length; i++) {
             cacheStates[i].clear();
-            cacheStates[i].addAll((List) caches[i]);
+            cacheStates[i].addAll(caches[i]);
             cacheReadyStates[i].clear();
             boolean isCacheFinished =
                     BroadcastContext.isCacheFinished(
-                            Tuple2.of(
-                                    broadcastNames[i],
-                                    getRuntimeContext().getIndexOfThisSubtask()));
+                            broadcastStreamNames[i]
+                                    + "-"
+                                    + getRuntimeContext().getIndexOfThisSubtask());
             cacheReadyStates[i].add(isCacheFinished);
         }
     }
 
     @Override
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public void initializeState(StateInitializationContext context) throws Exception {
         super.initializeState(context);
         for (int i = 0; i < inTypes.length; i++) {
@@ -115,27 +126,29 @@ public class CacheStreamOperator<OUT> extends AbstractStreamOperatorV2<OUT>
             cacheReadyStates[i] =
                     context.getOperatorStateStore()
                             .getListState(
-                                    new ListStateDescriptor<Boolean>(
+                                    new ListStateDescriptor<>(
                                             "cache_ready_state_" + i,
                                             BasicTypeInfo.BOOLEAN_TYPE_INFO));
-            List<Boolean> restoredCacheReady =
-                    IteratorUtils.toList(cacheReadyStates[i].get().iterator());
-            boolean cacheReady = restoredCacheReady.size() == 0 ? false : restoredCacheReady.get(0);
+            boolean cacheReady =
+                    OperatorStateUtils.getUniqueElement(
+                                    cacheReadyStates[i], "cache_ready_state_" + i)
+                            .orElse(false);
             BroadcastContext.putBroadcastVariable(
-                    Tuple2.of(broadcastNames[i], getRuntimeContext().getIndexOfThisSubtask()),
+                    broadcastStreamNames[i] + "-" + getRuntimeContext().getIndexOfThisSubtask(),
                     Tuple2.of(cacheReady, caches[i]));
         }
     }
 
-    private class ProxyInput<IN, OUT> extends AbstractInput<IN, OUT> {
+    private class ProxyInput<IN, OT> extends AbstractInput<IN, OT> {
 
-        public ProxyInput(AbstractStreamOperatorV2<OUT> owner, int inputId) {
+        public ProxyInput(AbstractStreamOperatorV2<OT> owner, int inputId) {
             super(owner, inputId);
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         public void processElement(StreamRecord<IN> element) {
-            ((List<IN>) caches[inputId - 1]).add(element.getValue());
+            (caches[inputId - 1]).add(element.getValue());
         }
     }
 }

@@ -1,3 +1,21 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.flink.ml.common.broadcast;
 
 import org.apache.flink.api.common.state.ListState;
@@ -11,13 +29,17 @@ import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunctio
 
 import java.util.Iterator;
 
-public class TestSource extends RichParallelSourceFunction<Long> implements CheckpointedFunction {
+public class TestSource extends RichParallelSourceFunction<Integer>
+        implements CheckpointedFunction {
 
     private static volatile boolean hasThrown = false;
 
-    private ListState<Long> currentIdxState;
-    private long currentIdx;
-    private long mod, numPartitions, numPerPartition;
+    private ListState<Integer> currentIdxState;
+
+    private Integer currentIdx;
+
+    private Integer mod, numPartitions, numPerPartition;
+
     private transient volatile boolean running = true;
 
     public TestSource(int numPerPartition) {
@@ -44,9 +66,9 @@ public class TestSource extends RichParallelSourceFunction<Long> implements Chec
                 functionInitializationContext
                         .getOperatorStateStore()
                         .getListState(
-                                new ListStateDescriptor<Long>(
-                                        "currentIdx", BasicTypeInfo.LONG_TYPE_INFO));
-        Iterator<Long> iterator = currentIdxState.get().iterator();
+                                new ListStateDescriptor<>(
+                                        "currentIdx", BasicTypeInfo.INT_TYPE_INFO));
+        Iterator<Integer> iterator = currentIdxState.get().iterator();
         currentIdx = 0;
         if (iterator.hasNext()) {
             currentIdx = iterator.next();
@@ -54,7 +76,7 @@ public class TestSource extends RichParallelSourceFunction<Long> implements Chec
     }
 
     @Override
-    public void run(SourceContext<Long> sourceContext) throws Exception {
+    public void run(SourceContext<Integer> sourceContext) throws Exception {
         while (running && currentIdx < numPerPartition) {
             synchronized (sourceContext.getCheckpointLock()) {
                 sourceContext.collect(currentIdx * numPartitions + mod);

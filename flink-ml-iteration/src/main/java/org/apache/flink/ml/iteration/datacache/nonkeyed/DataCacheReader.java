@@ -30,8 +30,6 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 
-import static org.apache.flink.util.Preconditions.checkArgument;
-
 /** Reads the cached data from a list of paths. */
 public class DataCacheReader<T> implements Iterator<T> {
 
@@ -46,10 +44,6 @@ public class DataCacheReader<T> implements Iterator<T> {
     public DataCacheReader(
             TypeSerializer<T> serializer, FileSystem fileSystem, List<Segment> segments)
             throws IOException {
-
-        for (Segment segment : segments) {
-            checkArgument(segment.getCount() > 0, "Do not support empty segment");
-        }
 
         this.serializer = serializer;
         this.fileSystem = fileSystem;

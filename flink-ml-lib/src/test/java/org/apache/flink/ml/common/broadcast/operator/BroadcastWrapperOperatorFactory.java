@@ -23,6 +23,7 @@ import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 
+/** Factory class for {@link AbstractBroadcastWrapperOperator}. */
 class BroadcastWrapperOperatorFactory<OUT> extends AbstractStreamOperatorFactory<OUT> {
 
     private final StreamOperatorFactory<OUT> operatorFactory;

@@ -19,7 +19,8 @@
 package org.apache.flink.ml.common.broadcast.operator;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.ml.iteration.datacache.nonkeyed.DataCacheReader;
+import org.apache.flink.ml.iteration.operator.OperatorUtils;
+import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
@@ -28,71 +29,30 @@ import org.apache.flink.streaming.runtime.streamrecord.LatencyMarker;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.watermarkstatus.WatermarkStatus;
 
-/** Wrapper for WithBroadcastOneInputStreamOperator. */
+/** Wrapper for {@link OneInputStreamOperator} that implements {@link HasBroadcastVariable}. */
 public class OneInputBroadcastWrapperOperator<IN, OUT>
         extends AbstractBroadcastWrapperOperator<OUT, OneInputStreamOperator<IN, OUT>>
-        implements OneInputStreamOperator<IN, OUT> {
+        implements OneInputStreamOperator<IN, OUT>, BoundedOneInput {
 
-    public OneInputBroadcastWrapperOperator(
+    OneInputBroadcastWrapperOperator(
             StreamOperatorParameters<OUT> parameters,
             StreamOperatorFactory<OUT> operatorFactory,
             String[] broadcastStreamNames,
-            TypeInformation[] inTypes,
+            TypeInformation<?>[] inTypes,
             boolean[] isBlocking) {
         super(parameters, operatorFactory, broadcastStreamNames, inTypes, isBlocking);
     }
 
     @Override
     public void processElement(StreamRecord<IN> streamRecord) throws Exception {
-        if (isBlocking[0]) {
-            if (areBroadcastVariablesReady()) {
-                dataCacheWriters[0].finishCurrentSegmentAndStartNewSegment();
-                segmentLists[0].addAll(dataCacheWriters[0].getNewlyFinishedSegments());
-                if (segmentLists[0].size() != 0) {
-                    DataCacheReader dataCacheReader =
-                            new DataCacheReader<>(
-                                    inTypes[0].createSerializer(
-                                            containingTask.getExecutionConfig()),
-                                    fileSystem,
-                                    segmentLists[0]);
-                    while (dataCacheReader.hasNext()) {
-                        wrappedOperator.processElement(new StreamRecord(dataCacheReader.next()));
-                    }
-                }
-                segmentLists[0].clear();
-                wrappedOperator.processElement(streamRecord);
-
-            } else {
-                dataCacheWriters[0].addRecord(streamRecord.getValue());
-            }
-
-        } else {
-            while (!areBroadcastVariablesReady()) {
-                mailboxExecutor.yield();
-            }
-            wrappedOperator.processElement(streamRecord);
-        }
+        processElementX(streamRecord, 0, wrappedOperator::processElement);
     }
 
     @Override
-    public void endInput(int inputId) throws Exception {
-        while (!areBroadcastVariablesReady()) {
-            mailboxExecutor.yield();
-        }
-        dataCacheWriters[0].finishCurrentSegmentAndStartNewSegment();
-        segmentLists[0].addAll(dataCacheWriters[0].getNewlyFinishedSegments());
-        if (segmentLists[0].size() != 0) {
-            DataCacheReader dataCacheReader =
-                    new DataCacheReader(
-                            inTypes[0].createSerializer(containingTask.getExecutionConfig()),
-                            fileSystem,
-                            segmentLists[0]);
-            while (dataCacheReader.hasNext()) {
-                wrappedOperator.processElement(new StreamRecord(dataCacheReader.next()));
-            }
-            segmentLists[0].clear();
-        }
-        super.endInput(inputId);
+    public void endInput() throws Exception {
+        endInputX(0, wrappedOperator::processElement);
+        OperatorUtils.processOperatorOrUdfIfSatisfy(
+                wrappedOperator, BoundedOneInput.class, BoundedOneInput::endInput);
     }
 
     @Override

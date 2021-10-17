@@ -19,7 +19,8 @@
 package org.apache.flink.ml.common.broadcast.operator;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.ml.iteration.datacache.nonkeyed.DataCacheReader;
+import org.apache.flink.ml.iteration.operator.OperatorUtils;
+import org.apache.flink.streaming.api.operators.BoundedMultiInput;
 import org.apache.flink.streaming.api.operators.Input;
 import org.apache.flink.streaming.api.operators.MultipleInputStreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
@@ -32,143 +33,80 @@ import org.apache.flink.streaming.runtime.watermarkstatus.WatermarkStatus;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Wrapper for WithBroadcastMultipleInputStreamOperator. */
+/** Wrapper for {@link MultipleInputStreamOperator} that implements {@link HasBroadcastVariable}. */
 public class MultipleInputBroadcastWrapperOperator<OUT>
         extends AbstractBroadcastWrapperOperator<OUT, MultipleInputStreamOperator<OUT>>
-        implements MultipleInputStreamOperator<OUT> {
+        implements MultipleInputStreamOperator<OUT>, BoundedMultiInput {
 
-    public MultipleInputBroadcastWrapperOperator(
+    private final List<Input> inputList;
+
+    @SuppressWarnings("rawtypes")
+    MultipleInputBroadcastWrapperOperator(
             StreamOperatorParameters<OUT> parameters,
             StreamOperatorFactory<OUT> operatorFactory,
             String[] broadcastStreamNames,
             TypeInformation[] inTypes,
-            boolean[] isBlocking) {
-        super(parameters, operatorFactory, broadcastStreamNames, inTypes, isBlocking);
+            boolean[] isBlocked) {
+        super(parameters, operatorFactory, broadcastStreamNames, inTypes, isBlocked);
+        inputList = new ArrayList<>();
+        for (int i = 0; i < wrappedOperator.getInputs().size(); i++) {
+            inputList.add(new ProxyInput(i));
+        }
     }
 
     @Override
     public List<Input> getInputs() {
-        List<Input> proxyInputs = new ArrayList<>();
-        for (int i = 0; i < wrappedOperator.getInputs().size(); i++) {
-            proxyInputs.add(new ProxyInput(i));
-        }
-        return proxyInputs;
-    }
-
-    private <IN> void processElement(StreamRecord streamRecord, Input<IN> input) throws Exception {
-        input.processElement(streamRecord);
-    }
-
-    private <IN> void processWatermark(Watermark watermark, Input<IN> input) throws Exception {
-        input.processWatermark(watermark);
-    }
-
-    private <IN> void processLatencyMarker(LatencyMarker latencyMarker, Input<IN> input)
-            throws Exception {
-        input.processLatencyMarker(latencyMarker);
-    }
-
-    private <IN> void setKeyContextElement(StreamRecord streamRecord, Input<IN> input)
-            throws Exception {
-        input.setKeyContextElement(streamRecord);
-    }
-
-    private <IN> void processWatermarkStatus(WatermarkStatus watermarkStatus, Input<IN> input)
-            throws Exception {
-        input.processWatermarkStatus(watermarkStatus);
+        return inputList;
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public void endInput(int inputId) throws Exception {
-        ((ProxyInput) (getInputs().get(inputId - 1))).endInput();
+        endInputX(inputId - 1, wrappedOperator.getInputs().get(inputId - 1)::processElement);
+        OperatorUtils.processOperatorOrUdfIfSatisfy(
+                wrappedOperator,
+                BoundedMultiInput.class,
+                boundedMultiInput -> boundedMultiInput.endInput(inputId));
     }
 
     private class ProxyInput<IN> implements Input<IN> {
 
-        private final int inputIdMinusOne;
+        /** input index of this input. */
+        private final int inputIndex;
 
-        private final Input<IN> input;
+        private final Input input;
 
-        public ProxyInput(int inputIdMinusOne) {
-            this.inputIdMinusOne = inputIdMinusOne;
-            this.input = wrappedOperator.getInputs().get(inputIdMinusOne);
+        public ProxyInput(int inputIndex) {
+            this.inputIndex = inputIndex;
+            this.input = wrappedOperator.getInputs().get(inputIndex);
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         public void processElement(StreamRecord<IN> streamRecord) throws Exception {
-            if (isBlocking[inputIdMinusOne]) {
-                if (areBroadcastVariablesReady()) {
-                    dataCacheWriters[inputIdMinusOne].finishCurrentSegmentAndStartNewSegment();
-                    segmentLists[inputIdMinusOne].addAll(
-                            dataCacheWriters[inputIdMinusOne].getNewlyFinishedSegments());
-                    if (segmentLists[inputIdMinusOne].size() != 0) {
-                        DataCacheReader dataCacheReader =
-                                new DataCacheReader<>(
-                                        inTypes[inputIdMinusOne].createSerializer(
-                                                containingTask.getExecutionConfig()),
-                                        fileSystem,
-                                        segmentLists[inputIdMinusOne]);
-                        while (dataCacheReader.hasNext()) {
-                            MultipleInputBroadcastWrapperOperator.this.processElement(
-                                    new StreamRecord(dataCacheReader.next()), input);
-                        }
-                    }
-                    segmentLists[inputIdMinusOne].clear();
-                    MultipleInputBroadcastWrapperOperator.this.processElement(streamRecord, input);
-
-                } else {
-                    dataCacheWriters[inputIdMinusOne].addRecord(streamRecord.getValue());
-                }
-
-            } else {
-                while (!areBroadcastVariablesReady()) {
-                    mailboxExecutor.yield();
-                }
-                MultipleInputBroadcastWrapperOperator.this.processElement(streamRecord, input);
-            }
+            MultipleInputBroadcastWrapperOperator.this.processElementX(
+                    streamRecord, inputIndex, input::processElement);
         }
 
         @Override
         public void processWatermark(Watermark watermark) throws Exception {
-            MultipleInputBroadcastWrapperOperator.this.processWatermark(watermark, input);
+            input.processWatermark(watermark);
         }
 
         @Override
         public void processWatermarkStatus(WatermarkStatus watermarkStatus) throws Exception {
-            MultipleInputBroadcastWrapperOperator.this.processWatermarkStatus(
-                    watermarkStatus, input);
+            input.processWatermarkStatus(watermarkStatus);
         }
 
         @Override
         public void processLatencyMarker(LatencyMarker latencyMarker) throws Exception {
-            MultipleInputBroadcastWrapperOperator.this.processLatencyMarker(latencyMarker, input);
+            input.processLatencyMarker(latencyMarker);
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         public void setKeyContextElement(StreamRecord<IN> streamRecord) throws Exception {
-            MultipleInputBroadcastWrapperOperator.this.setKeyContextElement(streamRecord, input);
-        }
-
-        public void endInput() throws Exception {
-            while (!areBroadcastVariablesReady()) {
-                mailboxExecutor.yield();
-            }
-            dataCacheWriters[inputIdMinusOne].finishCurrentSegmentAndStartNewSegment();
-            segmentLists[inputIdMinusOne].addAll(
-                    dataCacheWriters[inputIdMinusOne].getNewlyFinishedSegments());
-            if (segmentLists[inputIdMinusOne].size() != 0) {
-                DataCacheReader dataCacheReader =
-                        new DataCacheReader(
-                                inTypes[inputIdMinusOne].createSerializer(
-                                        containingTask.getExecutionConfig()),
-                                fileSystem,
-                                segmentLists[inputIdMinusOne]);
-                while (dataCacheReader.hasNext()) {
-                    MultipleInputBroadcastWrapperOperator.this.processElement(
-                            new StreamRecord(dataCacheReader.next()), input);
-                }
-                segmentLists[inputIdMinusOne].clear();
-            }
+            input.setKeyContextElement(streamRecord);
         }
     }
 }

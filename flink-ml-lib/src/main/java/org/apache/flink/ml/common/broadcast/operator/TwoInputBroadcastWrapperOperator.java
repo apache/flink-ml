@@ -19,7 +19,8 @@
 package org.apache.flink.ml.common.broadcast.operator;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.ml.iteration.datacache.nonkeyed.DataCacheReader;
+import org.apache.flink.ml.iteration.operator.OperatorUtils;
+import org.apache.flink.streaming.api.operators.BoundedMultiInput;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
@@ -28,122 +29,41 @@ import org.apache.flink.streaming.runtime.streamrecord.LatencyMarker;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.watermarkstatus.WatermarkStatus;
 
-/** Wrapper for WithBroadcastTwoInputStreamOperator. */
+/** Wrapper for {@link TwoInputStreamOperator} that implements {@link HasBroadcastVariable}. */
 public class TwoInputBroadcastWrapperOperator<IN1, IN2, OUT>
         extends AbstractBroadcastWrapperOperator<OUT, TwoInputStreamOperator<IN1, IN2, OUT>>
-        implements TwoInputStreamOperator<IN1, IN2, OUT> {
+        implements TwoInputStreamOperator<IN1, IN2, OUT>, BoundedMultiInput {
 
-    public TwoInputBroadcastWrapperOperator(
+    TwoInputBroadcastWrapperOperator(
             StreamOperatorParameters<OUT> parameters,
             StreamOperatorFactory<OUT> operatorFactory,
             String[] broadcastStreamNames,
-            TypeInformation[] inTypes,
+            TypeInformation<?>[] inTypes,
             boolean[] isBlocking) {
         super(parameters, operatorFactory, broadcastStreamNames, inTypes, isBlocking);
     }
 
     @Override
     public void processElement1(StreamRecord<IN1> streamRecord) throws Exception {
-        if (isBlocking[0]) {
-            if (areBroadcastVariablesReady()) {
-                dataCacheWriters[0].finishCurrentSegmentAndStartNewSegment();
-                segmentLists[0].addAll(dataCacheWriters[0].getNewlyFinishedSegments());
-                if (segmentLists[0].size() != 0) {
-                    DataCacheReader dataCacheReader =
-                            new DataCacheReader<>(
-                                    inTypes[0].createSerializer(
-                                            containingTask.getExecutionConfig()),
-                                    fileSystem,
-                                    segmentLists[0]);
-                    while (dataCacheReader.hasNext()) {
-                        wrappedOperator.processElement1(new StreamRecord(dataCacheReader.next()));
-                    }
-                }
-                segmentLists[0].clear();
-                wrappedOperator.processElement1(streamRecord);
-
-            } else {
-                dataCacheWriters[0].addRecord(streamRecord.getValue());
-            }
-
-        } else {
-            while (!areBroadcastVariablesReady()) {
-                mailboxExecutor.yield();
-            }
-            wrappedOperator.processElement1(streamRecord);
-        }
+        processElementX(streamRecord, 0, wrappedOperator::processElement1);
     }
 
     @Override
     public void processElement2(StreamRecord<IN2> streamRecord) throws Exception {
-        if (isBlocking[1]) {
-            if (areBroadcastVariablesReady()) {
-                dataCacheWriters[1].finishCurrentSegmentAndStartNewSegment();
-                segmentLists[1].addAll(dataCacheWriters[1].getNewlyFinishedSegments());
-                if (segmentLists[1].size() != 0) {
-                    DataCacheReader dataCacheReader =
-                            new DataCacheReader<>(
-                                    inTypes[1].createSerializer(
-                                            containingTask.getExecutionConfig()),
-                                    fileSystem,
-                                    segmentLists[1]);
-                    while (dataCacheReader.hasNext()) {
-                        wrappedOperator.processElement2(new StreamRecord(dataCacheReader.next()));
-                    }
-                }
-                segmentLists[1].clear();
-                wrappedOperator.processElement2(streamRecord);
-
-            } else {
-                dataCacheWriters[1].addRecord(streamRecord.getValue());
-            }
-
-        } else {
-            while (!areBroadcastVariablesReady()) {
-                mailboxExecutor.yield();
-            }
-            wrappedOperator.processElement2(streamRecord);
-        }
+        processElementX(streamRecord, 1, wrappedOperator::processElement2);
     }
 
     @Override
     public void endInput(int inputId) throws Exception {
         if (inputId == 1) {
-            while (!areBroadcastVariablesReady()) {
-                mailboxExecutor.yield();
-            }
-            dataCacheWriters[0].finishCurrentSegmentAndStartNewSegment();
-            segmentLists[0].addAll(dataCacheWriters[0].getNewlyFinishedSegments());
-            if (segmentLists[0].size() != 0) {
-                DataCacheReader dataCacheReader =
-                        new DataCacheReader(
-                                inTypes[0].createSerializer(containingTask.getExecutionConfig()),
-                                fileSystem,
-                                segmentLists[0]);
-                while (dataCacheReader.hasNext()) {
-                    wrappedOperator.processElement1(new StreamRecord(dataCacheReader.next()));
-                }
-                segmentLists[0].clear();
-            }
-        } else if (inputId == 2) {
-            while (!areBroadcastVariablesReady()) {
-                mailboxExecutor.yield();
-            }
-            dataCacheWriters[1].finishCurrentSegmentAndStartNewSegment();
-            segmentLists[1].addAll(dataCacheWriters[1].getNewlyFinishedSegments());
-            if (segmentLists[1].size() != 0) {
-                DataCacheReader dataCacheReader =
-                        new DataCacheReader(
-                                inTypes[0].createSerializer(containingTask.getExecutionConfig()),
-                                fileSystem,
-                                segmentLists[1]);
-                while (dataCacheReader.hasNext()) {
-                    wrappedOperator.processElement2(new StreamRecord(dataCacheReader.next()));
-                }
-                segmentLists[1].clear();
-            }
+            endInputX(inputId - 1, wrappedOperator::processElement1);
+        } else {
+            endInputX(inputId - 1, wrappedOperator::processElement2);
         }
-        super.endInput(inputId);
+        OperatorUtils.processOperatorOrUdfIfSatisfy(
+                wrappedOperator,
+                BoundedMultiInput.class,
+                boundedMultipleInput -> boundedMultipleInput.endInput(inputId));
     }
 
     @Override

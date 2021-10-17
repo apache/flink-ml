@@ -24,59 +24,51 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.common.broadcast.BroadcastContext;
 import org.apache.flink.ml.iteration.config.IterationOptions;
 import org.apache.flink.runtime.jobgraph.OperatorID;
-import org.apache.flink.streaming.api.operators.AbstractInput;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperatorFactory;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperatorV2;
-import org.apache.flink.streaming.api.operators.Input;
-import org.apache.flink.streaming.api.operators.MultipleInputStreamOperator;
-import org.apache.flink.streaming.api.operators.StreamOperator;
-import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.MultipleInputStreamTask;
 import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarness;
 import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarnessBuilder;
 import org.apache.flink.streaming.util.TestHarnessUtil;
 
-import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import static org.junit.Assert.*;
-
+/** Tests the {@link MultipleInputBroadcastWrapperOperator}. */
 public class MultipleInputBroadcastWrapperOperatorTest {
-    @Rule public TemporaryFolder tempFolder = new TemporaryFolder();
-    private static final String[] broadcastNames = new String[] {"source1", "source2"};
-    private static final TypeInformation[] typeInformations =
-            new TypeInformation[] {BasicTypeInfo.INT_TYPE_INFO, BasicTypeInfo.INT_TYPE_INFO};
-    private static List<Integer> source1 = new ArrayList<>();
-    private static List<Integer> source2 = new ArrayList<>();
 
-    @Before
-    public void setup() {
-        source1.add(1);
-        source2.add(1);
-        source2.add(2);
-    }
+    @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
+
+    private static final String[] BROADCAST_NAMES = new String[] {"source1", "source2"};
+
+    private static final TypeInformation<?>[] TYPE_INFORMATIONS =
+            new TypeInformation[] {BasicTypeInfo.INT_TYPE_INFO, BasicTypeInfo.INT_TYPE_INFO};
+
+    private static final List<Integer> SOURCE_1 = Collections.singletonList(1);
+
+    private static final List<Integer> SOURCE_2 = Arrays.asList(1, 2, 3);
 
     @Test
     public void testProcessElementsAndEpochWatermarks() throws Exception {
-        TestMultiInputOpFactory multiOpFactory = new TestMultiInputOpFactory(2);
-        BroadcastWrapper broadcastWrapper = new BroadcastWrapper(broadcastNames, typeInformations);
-        BroadcastWrapperOperatorFactory wrapperFactory =
-                new BroadcastWrapperOperatorFactory(multiOpFactory, broadcastWrapper);
+        TestMultiInputOpFactory multiOpFactory =
+                new TestMultiInputOpFactory(2, BROADCAST_NAMES, new int[] {1, 3});
+        BroadcastWrapper<Integer> broadcastWrapper =
+                new BroadcastWrapper<>(BROADCAST_NAMES, TYPE_INFORMATIONS);
+        BroadcastWrapperOperatorFactory<Integer> wrapperFactory =
+                new BroadcastWrapperOperatorFactory<>(multiOpFactory, broadcastWrapper);
         OperatorID operatorId = new OperatorID();
 
         try (StreamTaskMailboxTestHarness<Integer> harness =
                 new StreamTaskMailboxTestHarnessBuilder<>(
                                 MultipleInputStreamTask::new, BasicTypeInfo.INT_TYPE_INFO)
-                        .addInput(typeInformations[0])
-                        .addInput(typeInformations[1])
+                        .addInput(TYPE_INFORMATIONS[0])
+                        .addInput(TYPE_INFORMATIONS[1])
                         .setupOutputForSingletonOperatorChain(wrapperFactory, operatorId)
                         .buildUnrestored()) {
             harness.getStreamTask()
@@ -88,9 +80,9 @@ public class MultipleInputBroadcastWrapperOperatorTest {
                             "file://" + tempFolder.newFolder().getAbsolutePath());
             harness.getStreamTask().restore();
             BroadcastContext.putBroadcastVariable(
-                    Tuple2.of(broadcastNames[0], 0), Tuple2.of(true, source1));
+                    BROADCAST_NAMES[0] + "-" + 0, Tuple2.of(true, SOURCE_1));
             BroadcastContext.putBroadcastVariable(
-                    Tuple2.of(broadcastNames[1], 0), Tuple2.of(true, source2));
+                    BROADCAST_NAMES[1] + "-" + 0, Tuple2.of(true, SOURCE_2));
 
             Queue<Object> expectedOutput = new ConcurrentLinkedQueue<>();
             for (int i = 0; i < 5; ++i) {
@@ -101,64 +93,6 @@ public class MultipleInputBroadcastWrapperOperatorTest {
             }
             TestHarnessUtil.assertOutputEquals(
                     "Output was not correct", expectedOutput, harness.getOutput());
-        }
-    }
-
-    /** Factory class for {@link TestMultiInputOp}. */
-    private static class TestMultiInputOpFactory extends AbstractStreamOperatorFactory<Long> {
-        private int numInputs;
-
-        public TestMultiInputOpFactory(int numInputs) {
-            this.numInputs = numInputs;
-        }
-
-        @Override
-        public <T extends StreamOperator<Long>> T createStreamOperator(
-                StreamOperatorParameters<Long> streamOperatorParameters) {
-            return (T) new TestMultiInputOp(streamOperatorParameters, numInputs);
-        }
-
-        @Override
-        public Class<? extends StreamOperator> getStreamOperatorClass(ClassLoader classLoader) {
-            return TestMultiInputOp.class;
-        }
-    }
-
-    /**
-     * The MultiInputStreamOperator that checks the size of the broadcast inputs and pass the input
-     * to downstream operator directly.
-     */
-    private static class TestMultiInputOp extends AbstractStreamOperatorV2<Long>
-            implements MultipleInputStreamOperator<Long> {
-        private List<Input> inputList;
-
-        public TestMultiInputOp(StreamOperatorParameters<Long> parameters, int numberOfInputs) {
-            super(parameters, numberOfInputs);
-            this.inputList = new ArrayList<>(numberOfInputs);
-            for (int i = 0; i < numberOfInputs; i++) {
-                inputList.add(new ProxyInput(this, i + 1));
-            }
-        }
-
-        @Override
-        public List<Input> getInputs() {
-            return inputList;
-        }
-
-        private class ProxyInput extends AbstractInput<Long, Long> {
-
-            public ProxyInput(AbstractStreamOperatorV2<Long> owner, int inputId) {
-                super(owner, inputId);
-            }
-
-            @Override
-            public void processElement(StreamRecord<Long> streamRecord) throws Exception {
-                List<Long> bcSource1 = BroadcastContext.getBroadcastVariable(broadcastNames[0]);
-                List<Long> bcSource2 = BroadcastContext.getBroadcastVariable(broadcastNames[1]);
-                assertEquals(source1, bcSource1);
-                assertEquals(source2, bcSource2);
-                output.collect(streamRecord);
-            }
         }
     }
 }

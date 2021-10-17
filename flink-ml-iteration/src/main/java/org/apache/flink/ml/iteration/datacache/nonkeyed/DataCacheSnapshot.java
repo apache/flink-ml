@@ -102,7 +102,7 @@ public class DataCacheSnapshot {
                 dos.writeInt(totalRecords);
 
                 long totalBytes = 0L;
-                for (Segment segment: segments) {
+                for (Segment segment : segments) {
                     totalBytes += segment.getSize();
                 }
                 dos.writeLong(totalBytes);
@@ -185,7 +185,8 @@ public class DataCacheSnapshot {
         }
     }
 
-    private static void copyBytes(final InputStream in, final OutputStream out, long len) throws IOException {
+    private static void copyBytes(final InputStream in, final OutputStream out, long len)
+            throws IOException {
         final int BUFFER_SIZE = 4096;
         final byte[] buf = new byte[BUFFER_SIZE];
         try {
@@ -198,8 +199,7 @@ public class DataCacheSnapshot {
                 bytesRead = in.read(buf, 0, byteToRead);
             }
             assert len == 0L;
-        }
-        finally {
+        } finally {
         }
     }
 

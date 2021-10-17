@@ -18,6 +18,7 @@
 
 package org.apache.flink.ml.common.broadcast.operator;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.ml.iteration.operator.OperatorWrapper;
@@ -31,25 +32,29 @@ import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
 import org.apache.flink.util.OutputTag;
 import org.apache.flink.util.Preconditions;
 
-/** The operator wrapper for broadcast wrappers. */
+/** The operator wrapper for {@link AbstractBroadcastWrapperOperator}. */
 public class BroadcastWrapper<T> implements OperatorWrapper<T, T> {
-    /** name of the broadcast DataStreams. */
-    private final String[] broadcastStreamNames;
-    /** types of input DataStreams. */
-    private final TypeInformation[] inTypes;
-    /** whether each input is blocking or not. */
-    private final boolean[] isBlocking;
 
-    public BroadcastWrapper(String[] broadcastStreamNames, TypeInformation[] inTypes) {
+    /** names of the broadcast data streams. */
+    private final String[] broadcastStreamNames;
+
+    /** types of input data streams. */
+    private final TypeInformation<?>[] inTypes;
+
+    /** whether each input is blocked or not. */
+    private final boolean[] isBlocked;
+
+    @VisibleForTesting
+    public BroadcastWrapper(String[] broadcastStreamNames, TypeInformation<?>[] inTypes) {
         this(broadcastStreamNames, inTypes, new boolean[inTypes.length]);
     }
 
     public BroadcastWrapper(
-            String[] broadcastStreamNames, TypeInformation[] inTypes, boolean[] isBlocking) {
-        Preconditions.checkState(inTypes.length == isBlocking.length);
+            String[] broadcastStreamNames, TypeInformation<?>[] inTypes, boolean[] isBlocked) {
+        Preconditions.checkArgument(inTypes.length == isBlocked.length);
         this.broadcastStreamNames = broadcastStreamNames;
         this.inTypes = inTypes;
-        this.isBlocking = isBlocking;
+        this.isBlocked = isBlocked;
     }
 
     @Override
@@ -60,13 +65,13 @@ public class BroadcastWrapper<T> implements OperatorWrapper<T, T> {
                 operatorFactory.getStreamOperatorClass(getClass().getClassLoader());
         if (OneInputStreamOperator.class.isAssignableFrom(operatorClass)) {
             return new OneInputBroadcastWrapperOperator<>(
-                    operatorParameters, operatorFactory, broadcastStreamNames, inTypes, isBlocking);
+                    operatorParameters, operatorFactory, broadcastStreamNames, inTypes, isBlocked);
         } else if (TwoInputStreamOperator.class.isAssignableFrom(operatorClass)) {
             return new TwoInputBroadcastWrapperOperator<>(
-                    operatorParameters, operatorFactory, broadcastStreamNames, inTypes, isBlocking);
+                    operatorParameters, operatorFactory, broadcastStreamNames, inTypes, isBlocked);
         } else if (MultipleInputStreamOperator.class.isAssignableFrom(operatorClass)) {
             return new MultipleInputBroadcastWrapperOperator<>(
-                    operatorParameters, operatorFactory, broadcastStreamNames, inTypes, isBlocking);
+                    operatorParameters, operatorFactory, broadcastStreamNames, inTypes, isBlocked);
         } else {
             throw new UnsupportedOperationException(
                     "Unsupported operator class for with-broadcast wrapper: " + operatorClass);

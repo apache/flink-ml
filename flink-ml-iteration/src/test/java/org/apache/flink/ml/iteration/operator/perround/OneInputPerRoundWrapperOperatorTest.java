@@ -64,8 +64,7 @@ public class OneInputPerRoundWrapperOperatorTest {
     public void testProcessElementsAndEpochWatermarks() throws Exception {
         StreamOperatorFactory<IterationRecord<Integer>> wrapperFactory =
                 new WrapperOperatorFactory<>(
-                        SimpleOperatorFactory.of(
-                                new LifeCycleTrackingOneInputStreamOperator()),
+                        SimpleOperatorFactory.of(new LifeCycleTrackingOneInputStreamOperator()),
                         new PerRoundOperatorWrapper<>());
         OperatorID operatorId = new OperatorID();
 
@@ -154,16 +153,15 @@ public class OneInputPerRoundWrapperOperatorTest {
         }
     }
 
-
     private static class LifeCycleTrackingOneInputStreamOperator
-        extends AbstractStreamOperator<Integer>
-        implements OneInputStreamOperator<Integer, Integer> {
+            extends AbstractStreamOperator<Integer>
+            implements OneInputStreamOperator<Integer, Integer> {
 
         @Override
         public void setup(
-            StreamTask<?, ?> containingTask,
-            StreamConfig config,
-            Output<StreamRecord<Integer>> output) {
+                StreamTask<?, ?> containingTask,
+                StreamConfig config,
+                Output<StreamRecord<Integer>> output) {
             super.setup(containingTask, config, output);
             lifeCycles.add(LifeCycle.SETUP);
         }

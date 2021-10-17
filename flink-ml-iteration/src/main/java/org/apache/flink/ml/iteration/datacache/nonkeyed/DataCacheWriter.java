@@ -42,7 +42,9 @@ public class DataCacheWriter<T> {
 
     private final List<Segment> finishSegments;
 
-    /** The segments that are newly added that has not been retrieved by getNewlyFinishedSegments(). */
+    /**
+     * The segments that are newly added that has not been retrieved by getNewlyFinishedSegments().
+     */
     private final List<Segment> newlyFinishedSegments;
 
     private Path currentPath;
@@ -63,7 +65,7 @@ public class DataCacheWriter<T> {
         this.pathGenerator = pathGenerator;
 
         this.finishSegments = new ArrayList<>();
-        this.newlyFinishedSegments = new ArrayList <>();
+        this.newlyFinishedSegments = new ArrayList<>();
 
         startNewSegment();
     }
@@ -105,7 +107,7 @@ public class DataCacheWriter<T> {
         }
     }
 
-    public void finishCurrentSegmentAndStartNewSegment() throws IOException{
+    public void finishCurrentSegmentAndStartNewSegment() throws IOException {
         finishCurrentSegment();
         startNewSegment();
     }

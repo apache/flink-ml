@@ -18,36 +18,35 @@
 
 package org.apache.flink.ml.common.broadcast.operator;
 
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 
-import java.io.Serializable;
+/** Factory class for {@link TestMultiInputOp}. */
+public class TestMultiInputOpFactory extends AbstractStreamOperatorFactory<Integer> {
 
-/** Factory class for {@link CacheStreamOperator}. */
-public class CacheStreamOperatorFactory<OUT> extends AbstractStreamOperatorFactory<OUT>
-        implements Serializable {
+    private int numInputs;
 
-    /** names of the broadcast data streams. */
-    private final String[] broadcastNames;
+    private String[] broadcastNames;
 
-    /** types of the broadcast data streams. */
-    private final TypeInformation<?>[] inTypes;
+    private int[] expectedSizes;
 
-    public CacheStreamOperatorFactory(String[] broadcastNames, TypeInformation<?>[] inTypes) {
+    public TestMultiInputOpFactory(int numInputs, String[] broadcastNames, int[] expectedSizes) {
+        this.numInputs = numInputs;
         this.broadcastNames = broadcastNames;
-        this.inTypes = inTypes;
+        this.expectedSizes = expectedSizes;
     }
 
     @Override
-    public <T extends StreamOperator<OUT>> T createStreamOperator(
-            StreamOperatorParameters<OUT> parameters) {
-        return (T) new CacheStreamOperator(parameters, broadcastNames, inTypes);
+    public <T extends StreamOperator<Integer>> T createStreamOperator(
+            StreamOperatorParameters<Integer> streamOperatorParameters) {
+        return (T)
+                new TestMultiInputOp(
+                        streamOperatorParameters, numInputs, broadcastNames, expectedSizes);
     }
 
     @Override
     public Class<? extends StreamOperator> getStreamOperatorClass(ClassLoader classLoader) {
-        return CacheStreamOperator.class;
+        return TestMultiInputOp.class;
     }
 }

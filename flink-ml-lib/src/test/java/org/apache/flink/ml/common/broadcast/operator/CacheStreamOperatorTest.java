@@ -34,9 +34,12 @@ import java.util.List;
 
 import static org.junit.Assert.*;
 
+/** Tests the {@link CacheStreamOperator}. */
 public class CacheStreamOperatorTest {
-    private static final String[] broadcastNames = new String[] {"source1", "source2"};
-    private static final TypeInformation[] typeInformations =
+
+    private static final String[] BROADCAST_NAMES = new String[] {"source1", "source2"};
+
+    private static final TypeInformation<?>[] TYPE_INFORMATIONS =
             new TypeInformation[] {BasicTypeInfo.INT_TYPE_INFO, BasicTypeInfo.INT_TYPE_INFO};
 
     @Test
@@ -49,7 +52,8 @@ public class CacheStreamOperatorTest {
                         .addInput(BasicTypeInfo.INT_TYPE_INFO)
                         .addInput(BasicTypeInfo.INT_TYPE_INFO)
                         .setupOutputForSingletonOperatorChain(
-                                new CacheStreamOperatorFactory<>(broadcastNames, typeInformations),
+                                new CacheStreamOperatorFactory<>(
+                                        BROADCAST_NAMES, TYPE_INFORMATIONS),
                                 operatorId)
                         .build()) {
             harness.processElement(new StreamRecord<>(1, 2), 0);
@@ -57,15 +61,14 @@ public class CacheStreamOperatorTest {
             harness.processElement(new StreamRecord<>(3, 2), 1);
             harness.processElement(new StreamRecord<>(4, 2), 1);
             harness.processElement(new StreamRecord<>(5, 3), 1);
-            List<Integer> cache1 = BroadcastContext.getBroadcastVariable(broadcastNames[0]);
-            List<Integer> cache2 = BroadcastContext.getBroadcastVariable(broadcastNames[1]);
+            boolean cacheReady1 = BroadcastContext.isCacheFinished(BROADCAST_NAMES[0] + "-" + 0);
+            boolean cacheReady2 = BroadcastContext.isCacheFinished(BROADCAST_NAMES[1] + "-" + 0);
             // check broadcast inputs before task finishes.
-            assertEquals(null, cache1);
-            assertEquals(null, cache2);
+            assertFalse(cacheReady1 || cacheReady2);
 
             harness.waitForTaskCompletion();
-            cache1 = BroadcastContext.getBroadcastVariable(broadcastNames[0]);
-            cache2 = BroadcastContext.getBroadcastVariable(broadcastNames[1]);
+            List<?> cache1 = BroadcastContext.getBroadcastVariable(BROADCAST_NAMES[0] + "-" + 0);
+            List<?> cache2 = BroadcastContext.getBroadcastVariable(BROADCAST_NAMES[1] + "-" + 0);
             // check broadcast inputs after task finishes.
             assertEquals(Arrays.asList(1, 2), cache1);
             assertEquals(Arrays.asList(3, 4, 5), cache2);

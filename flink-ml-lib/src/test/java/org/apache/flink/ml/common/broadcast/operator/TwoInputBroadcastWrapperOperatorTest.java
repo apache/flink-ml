@@ -24,7 +24,6 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.common.broadcast.BroadcastContext;
 import org.apache.flink.ml.iteration.config.IterationOptions;
 import org.apache.flink.runtime.jobgraph.OperatorID;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.SimpleOperatorFactory;
 import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -33,39 +32,38 @@ import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarnessBuil
 import org.apache.flink.streaming.runtime.tasks.TwoInputStreamTask;
 import org.apache.flink.streaming.util.TestHarnessUtil;
 
-import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import static org.junit.Assert.*;
-
+/** Tests the ${@link TwoInputBroadcastWrapperOperator}. */
 public class TwoInputBroadcastWrapperOperatorTest {
-    @Rule public TemporaryFolder tempFolder = new TemporaryFolder();
-    private static final String[] broadcastNames = new String[] {"source1", "source2"};
-    private static final TypeInformation[] typeInformations =
-            new TypeInformation[] {BasicTypeInfo.INT_TYPE_INFO, BasicTypeInfo.INT_TYPE_INFO};
-    private static List<Integer> source1 = new ArrayList<>();
-    private static List<Integer> source2 = new ArrayList<>();
 
-    @Before
-    public void setup() {
-        source1.add(1);
-        source2.add(1);
-        source2.add(2);
-    }
+    @Rule public TemporaryFolder tempFolder = new TemporaryFolder();
+
+    private static final String[] BROADCAST_NAMES = new String[] {"source1", "source2"};
+
+    private static final TypeInformation[] TYPE_INFORMATIONS =
+            new TypeInformation[] {BasicTypeInfo.INT_TYPE_INFO, BasicTypeInfo.INT_TYPE_INFO};
+
+    private static final List<Integer> SOURCE_1 = Collections.singletonList(1);
+
+    private static final List<Integer> SOURCE_2 = Arrays.asList(1, 2, 3);
 
     @Test
     public void testProcessElements() throws Exception {
-        TwoInputStreamOperator inputOp = new TestTwoInputOp();
-        BroadcastWrapper broadcastWrapper = new BroadcastWrapper(broadcastNames, typeInformations);
-        BroadcastWrapperOperatorFactory wrapperFactory =
-                new BroadcastWrapperOperatorFactory(
+        TwoInputStreamOperator<Integer, Integer, Integer> inputOp =
+                new TestTwoInputOp(BROADCAST_NAMES, new int[] {1, 3});
+        BroadcastWrapper<Integer> broadcastWrapper =
+                new BroadcastWrapper<>(BROADCAST_NAMES, TYPE_INFORMATIONS);
+        BroadcastWrapperOperatorFactory<Integer> wrapperFactory =
+                new BroadcastWrapperOperatorFactory<>(
                         SimpleOperatorFactory.of(inputOp), broadcastWrapper);
         OperatorID operatorId = new OperatorID();
 
@@ -85,9 +83,9 @@ public class TwoInputBroadcastWrapperOperatorTest {
                             "file://" + tempFolder.newFolder().getAbsolutePath());
             harness.getStreamTask().restore();
             BroadcastContext.putBroadcastVariable(
-                    Tuple2.of(broadcastNames[0], 0), Tuple2.of(true, source1));
+                    BROADCAST_NAMES[0] + "-" + 0, Tuple2.of(true, SOURCE_1));
             BroadcastContext.putBroadcastVariable(
-                    Tuple2.of(broadcastNames[1], 0), Tuple2.of(true, source2));
+                    BROADCAST_NAMES[1] + "-" + 0, Tuple2.of(true, SOURCE_2));
 
             Queue<Object> expectedOutput = new ConcurrentLinkedQueue<>();
             for (int i = 0; i < 5; ++i) {
@@ -98,27 +96,6 @@ public class TwoInputBroadcastWrapperOperatorTest {
             }
             TestHarnessUtil.assertOutputEquals(
                     "Output was not correct", expectedOutput, harness.getOutput());
-        }
-    }
-
-    private static class TestTwoInputOp extends AbstractStreamOperator<Long>
-            implements TwoInputStreamOperator<Long, Long, Long> {
-        @Override
-        public void processElement1(StreamRecord<Long> streamRecord) throws Exception {
-            List<Long> bcSource1 = BroadcastContext.getBroadcastVariable(broadcastNames[0]);
-            List<Long> bcSource2 = BroadcastContext.getBroadcastVariable(broadcastNames[1]);
-            assertEquals(bcSource1, source1);
-            assertEquals(bcSource2, source2);
-            output.collect(streamRecord);
-        }
-
-        @Override
-        public void processElement2(StreamRecord<Long> streamRecord) throws Exception {
-            List<Long> bcSource1 = BroadcastContext.getBroadcastVariable(broadcastNames[0]);
-            List<Long> bcSource2 = BroadcastContext.getBroadcastVariable(broadcastNames[1]);
-            assertEquals(bcSource1, source1);
-            assertEquals(bcSource2, source2);
-            output.collect(streamRecord);
         }
     }
 }

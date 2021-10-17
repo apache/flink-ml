@@ -18,106 +18,96 @@
 
 package org.apache.flink.ml.common.broadcast;
 
+import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.java.tuple.Tuple2;
 
-import java.util.HashMap;
+import javax.annotation.Nullable;
+
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Context to hold the broadcast variables and provides some utility function for accessing
+ * broadcast variables.
+ */
 public class BroadcastContext {
-    /**
-     * Store broadcast DataStreams in a Map. The key is (broadcastName, partitionId) and the value
-     * is (isBroaddcastVariableReady, cacheList).
-     */
-    private static Map<Tuple2<String, Integer>, Tuple2<Boolean, List<?>>> broadcastVariables =
-            new HashMap<>();
-    /**
-     * We use lock because we want to enable `getBroadcastVariable(String)` in a TM with multiple
-     * slots here. Note that using ConcurrentHashMap is not enough since we need "contains and get
-     * in an atomic operation".
-     */
-    private static ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
-
-    public static void putBroadcastVariable(
-            Tuple2<String, Integer> key, Tuple2<Boolean, List<?>> variable) {
-        lock.writeLock().lock();
-        try {
-            broadcastVariables.put(key, variable);
-        } finally {
-            lock.writeLock().unlock();
-        }
-    }
 
     /**
-     * get the cached list with the given key.
-     *
-     * @param key
-     * @param <T>
-     * @return the cache list.
+     * stores broadcast data streams in a map. The key is broadcastName-partitionId and the value is
+     * {@link BroadcastItem}.
      */
-    public static <T> List<T> getBroadcastVariable(Tuple2<String, Integer> key) {
-        lock.readLock().lock();
-        List<?> result = null;
-        try {
-            result = broadcastVariables.get(key).f1;
-        } finally {
-            lock.readLock().unlock();
-        }
-        return (List<T>) result;
+    private static final ConcurrentHashMap<String, BroadcastItem> BROADCAST_VARIABLES =
+            new ConcurrentHashMap<>();
+
+    @VisibleForTesting
+    public static void putBroadcastVariable(String key, Tuple2<Boolean, List<?>> variable) {
+        BROADCAST_VARIABLES.compute(
+                key,
+                (k, v) ->
+                        null == v
+                                ? new BroadcastItem(variable.f0, variable.f1, null)
+                                : new BroadcastItem(variable.f0, variable.f1, v.mailboxExecutor));
     }
 
-    /**
-     * get broadcast variables by name
-     *
-     * @param name
-     * @param <T>
-     * @return
-     */
-    public static <T> List<T> getBroadcastVariable(String name) {
-        lock.readLock().lock();
-        List<?> result = null;
-        try {
-            for (Tuple2<String, Integer> nameAndPartitionId : broadcastVariables.keySet()) {
-                if (name.equals(nameAndPartitionId.f0) && isCacheFinished(nameAndPartitionId)) {
-                    result = broadcastVariables.get(nameAndPartitionId).f1;
-                    break;
-                }
-            }
-        } finally {
-            lock.readLock().unlock();
-        }
-        return (List<T>) result;
+    @VisibleForTesting
+    public static void putMailBoxExecutor(String key, MailboxExecutor mailboxExecutor) {
+        BROADCAST_VARIABLES.compute(
+                key,
+                (k, v) ->
+                        null == v
+                                ? new BroadcastItem(false, null, mailboxExecutor)
+                                : new BroadcastItem(v.cacheReady, v.cacheList, mailboxExecutor));
     }
 
-    public static void remove(Tuple2<String, Integer> key) {
-        lock.writeLock().lock();
-        try {
-            broadcastVariables.remove(key);
-        } finally {
-            lock.writeLock().unlock();
-        }
+    @VisibleForTesting
+    @SuppressWarnings({"unchecked"})
+    public static <T> List<T> getBroadcastVariable(String key) {
+        return (List<T>) BROADCAST_VARIABLES.get(key).cacheList;
     }
 
-    public static void markCacheFinished(Tuple2<String, Integer> key) {
-        lock.writeLock().lock();
-        try {
-            broadcastVariables.get(key).f0 = true;
-        } finally {
-            lock.writeLock().unlock();
-        }
+    @VisibleForTesting
+    public static void remove(String key) {
+        BROADCAST_VARIABLES.remove(key);
     }
 
-    public static boolean isCacheFinished(Tuple2<String, Integer> key) {
-        lock.readLock().lock();
-        boolean isFinished = false;
-        try {
-            if (broadcastVariables.containsKey(key)) {
-                isFinished = broadcastVariables.get(key).f0;
-            }
-        } finally {
-            lock.readLock().unlock();
+    @VisibleForTesting
+    public static void markCacheFinished(String key) {
+        BROADCAST_VARIABLES.computeIfPresent(
+                key,
+                (k, v) -> {
+                    // sends an dummy email to avoid possible stuck.
+                    if (null != v.mailboxExecutor) {
+                        v.mailboxExecutor.execute(() -> {}, "empty mail");
+                    }
+                    return new BroadcastItem(true, v.cacheList, v.mailboxExecutor);
+                });
+    }
+
+    @VisibleForTesting
+    public static boolean isCacheFinished(String key) {
+        return BROADCAST_VARIABLES.get(key).cacheReady;
+    }
+
+    /** Utility class to organize broadcast variables. */
+    private static class BroadcastItem {
+
+        /** whether this broadcast variable is ready to be consumed. */
+        private boolean cacheReady;
+
+        /** the cached list */
+        private List<?> cacheList;
+
+        /** the mailboxExecutor of the consumer, used to avoid the possible stuck of consumer. */
+        private MailboxExecutor mailboxExecutor;
+
+        BroadcastItem(
+                boolean cacheReady,
+                @Nullable List<?> cacheList,
+                @Nullable MailboxExecutor mailboxExecutor) {
+            this.cacheReady = cacheReady;
+            this.cacheList = cacheList;
+            this.mailboxExecutor = mailboxExecutor;
         }
-        return isFinished;
     }
 }

@@ -21,16 +21,17 @@ package org.apache.flink.ml.common.broadcast.operator;
 import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.core.memory.ManagedMemoryUseCase;
 import org.apache.flink.metrics.groups.OperatorMetricGroup;
 import org.apache.flink.ml.common.broadcast.BroadcastContext;
 import org.apache.flink.ml.iteration.config.IterationOptions;
+import org.apache.flink.ml.iteration.datacache.nonkeyed.DataCacheReader;
 import org.apache.flink.ml.iteration.datacache.nonkeyed.DataCacheSnapshot;
 import org.apache.flink.ml.iteration.datacache.nonkeyed.DataCacheWriter;
 import org.apache.flink.ml.iteration.datacache.nonkeyed.Segment;
+import org.apache.flink.ml.iteration.operator.OperatorUtils;
 import org.apache.flink.ml.iteration.proxy.state.ProxyStreamOperatorStateContext;
 import org.apache.flink.runtime.checkpoint.CheckpointOptions;
 import org.apache.flink.runtime.execution.Environment;
@@ -45,8 +46,6 @@ import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.runtime.util.NonClosingInputStreamDecorator;
 import org.apache.flink.runtime.util.NonClosingOutpusStreamDecorator;
 import org.apache.flink.streaming.api.graph.StreamConfig;
-import org.apache.flink.streaming.api.operators.BoundedMultiInput;
-import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.InternalTimeServiceManager;
 import org.apache.flink.streaming.api.operators.OperatorSnapshotFutures;
 import org.apache.flink.streaming.api.operators.Output;
@@ -62,6 +61,7 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.streaming.runtime.tasks.mailbox.TaskMailbox;
 import org.apache.flink.util.Preconditions;
+import org.apache.flink.util.function.ThrowingConsumer;
 
 import org.apache.commons.collections.IteratorUtils;
 import org.slf4j.Logger;
@@ -79,9 +79,7 @@ import java.util.UUID;
 
 /** Base class for the broadcast wrapper operators. */
 public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperator<T>>
-        implements StreamOperator<T>,
-                BoundedMultiInput,
-                StreamOperatorStateHandler.CheckpointedStreamOperator {
+        implements StreamOperator<T>, StreamOperatorStateHandler.CheckpointedStreamOperator {
 
     private static final Logger LOG =
             LoggerFactory.getLogger(AbstractBroadcastWrapperOperator.class);
@@ -96,45 +94,62 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
 
     protected final StreamOperatorFactory<T> operatorFactory;
 
-    /** Metric group for the operator. */
     protected final OperatorMetricGroup metrics;
 
     protected final S wrappedOperator;
-
-    /** variables for withBroadcast operators. */
-    protected final MailboxExecutor mailboxExecutor;
-
-    protected final String[] broadcastStreamNames;
-
-    protected final boolean[] isBlocking;
-
-    protected final TypeInformation[] inTypes;
-
-    protected boolean broadcastVariablesReady;
-
-    protected final transient int indexOfSubtask;
 
     protected transient StreamOperatorStateHandler stateHandler;
 
     protected transient InternalTimeServiceManager<?> timeServiceManager;
 
+    protected final MailboxExecutor mailboxExecutor;
+
+    /** variables specific for withBroadcast functionality. */
+    protected final String[] broadcastStreamNames;
+
+    /**
+     * whether each input is blocked. Inputs with broadcast variables can only process their input
+     * records after broadcast variables are ready. One input is non-blocked if it can consume its
+     * inputs (by caching) when broadcast variables are not ready. Otherwise it has to block the
+     * processing and wait until the broadcast variables are ready to be accessed.
+     */
+    protected final boolean[] isBlocked;
+
+    /** type information of each input. */
+    protected final TypeInformation<?>[] inTypes;
+
+    /** whether all broadcast variables of this operator are ready. */
+    protected boolean broadcastVariablesReady;
+
+    /** index of this subtask. */
+    protected final transient int indexOfSubtask;
+
+    /** number of the inputs of this operator. */
     protected final int numInputs;
 
-    /** used to stored the cached records. It could be local file system or remote file system. */
+    /**
+     * path of the file used to stored the cached records. It could be local file system or remote
+     * file system.
+     */
     private Path basePath;
+
     /** file system. */
     protected FileSystem fileSystem;
+
     /** DataCacheWriter for each input. */
+    @SuppressWarnings("rawtypes")
     protected DataCacheWriter[] dataCacheWriters;
+
     /** segment list for each input. */
     protected List<Segment>[] segmentLists;
 
-    public AbstractBroadcastWrapperOperator(
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    AbstractBroadcastWrapperOperator(
             StreamOperatorParameters<T> parameters,
             StreamOperatorFactory<T> operatorFactory,
             String[] broadcastStreamNames,
-            TypeInformation[] inTypes,
-            boolean[] isBlocking) {
+            TypeInformation<?>[] inTypes,
+            boolean[] isBlocked) {
         this.parameters = Objects.requireNonNull(parameters);
         this.streamConfig = Objects.requireNonNull(parameters.getStreamConfig());
         this.containingTask = Objects.requireNonNull(parameters.getContainingTask());
@@ -152,12 +167,18 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
                                 .f0;
         this.mailboxExecutor =
                 containingTask.getMailboxExecutorFactory().createExecutor(TaskMailbox.MIN_PRIORITY);
+        // variables specific for withBroadcast functionality.
         this.broadcastStreamNames = broadcastStreamNames;
+        this.isBlocked = isBlocked;
         this.inTypes = inTypes;
-        this.isBlocking = isBlocking;
         this.broadcastVariablesReady = false;
         this.indexOfSubtask = containingTask.getIndexInSubtaskGroup();
         this.numInputs = inTypes.length;
+
+        // puts in mailboxExecutor
+        for (String name : broadcastStreamNames) {
+            BroadcastContext.putMailBoxExecutor(name + "-" + indexOfSubtask, mailboxExecutor);
+        }
 
         basePath =
                 new Path(
@@ -196,17 +217,30 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
     }
 
     /**
-     * check whether all of broadcast variables are ready.
+     * checks whether all of broadcast variables are ready. Besides it maintains a state
+     * {broadcastVariablesReady} to avoiding invoking {@code BroadcastContext.isCacheFinished(...)}
+     * repeatedly. Finally, it sets broadcast variables for ${@link HasBroadcastVariable} if the
+     * broadcast variables are ready.
      *
-     * @return
+     * @return true if all broadcast variables are ready, false otherwise.
      */
     protected boolean areBroadcastVariablesReady() {
         if (broadcastVariablesReady) {
             return true;
         }
         for (String name : broadcastStreamNames) {
-            if (!BroadcastContext.isCacheFinished(Tuple2.of(name, indexOfSubtask))) {
+            if (!BroadcastContext.isCacheFinished(name + "-" + indexOfSubtask)) {
                 return false;
+            } else if (wrappedOperator instanceof HasBroadcastVariable) {
+                String key = name + "-" + indexOfSubtask;
+                String userKey = name.substring(name.indexOf('-') + 1);
+                OperatorUtils.processOperatorOrUdfIfSatisfy(
+                        wrappedOperator,
+                        HasBroadcastVariable.class,
+                        op -> {
+                            op.setBroadcastVariable(
+                                    userKey, BroadcastContext.getBroadcastVariable(key));
+                        });
             }
         }
         broadcastVariablesReady = true;
@@ -232,6 +266,79 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
         }
     }
 
+    /**
+     * extracts common processing logic in subclasses' processing elements.
+     *
+     * @param streamRecord the input record.
+     * @param inputIndex input id, starts from zero.
+     * @param consumer the consumer function.
+     * @throws Exception possible exception.
+     */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    protected void processElementX(
+            StreamRecord streamRecord,
+            int inputIndex,
+            ThrowingConsumer<StreamRecord, Exception> consumer)
+            throws Exception {
+        if (!isBlocked[inputIndex]) {
+            if (areBroadcastVariablesReady()) {
+                processPendingElements(inputIndex, consumer);
+                consumer.accept(streamRecord);
+
+            } else {
+                dataCacheWriters[inputIndex].addRecord(streamRecord.getValue());
+            }
+
+        } else {
+            while (!areBroadcastVariablesReady()) {
+                mailboxExecutor.yield();
+            }
+            consumer.accept(streamRecord);
+        }
+    }
+
+    /**
+     * extracts common processing logic in subclasses' endInput(...).
+     *
+     * @param inputIndex input id, starts from zero.
+     * @param consumer the consumer function.
+     * @throws Exception possible exception.
+     */
+    @SuppressWarnings("rawtypes")
+    protected void endInputX(int inputIndex, ThrowingConsumer<StreamRecord, Exception> consumer)
+            throws Exception {
+        while (!areBroadcastVariablesReady()) {
+            mailboxExecutor.yield();
+        }
+        processPendingElements(inputIndex, consumer);
+    }
+
+    /**
+     * processes the pending elements that are cached by {@link DataCacheWriter}.
+     *
+     * @param inputIndex input id, starts from zero.
+     * @param consumer the consumer function.
+     * @throws Exception possible exception.
+     */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private void processPendingElements(
+            int inputIndex, ThrowingConsumer<StreamRecord, Exception> consumer) throws Exception {
+        dataCacheWriters[inputIndex].finishCurrentSegmentAndStartNewSegment();
+        segmentLists[inputIndex].addAll(dataCacheWriters[inputIndex].getNewlyFinishedSegments());
+        if (segmentLists[inputIndex].size() != 0) {
+            DataCacheReader dataCacheReader =
+                    new DataCacheReader<>(
+                            inTypes[inputIndex].createSerializer(
+                                    containingTask.getExecutionConfig()),
+                            fileSystem,
+                            segmentLists[inputIndex]);
+            while (dataCacheReader.hasNext()) {
+                consumer.accept(new StreamRecord<>(dataCacheReader.next()));
+            }
+        }
+        segmentLists[inputIndex].clear();
+    }
+
     @Override
     public void open() throws Exception {
         wrappedOperator.open();
@@ -241,7 +348,7 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
     public void close() throws Exception {
         wrappedOperator.close();
         for (String name : broadcastStreamNames) {
-            BroadcastContext.remove(Tuple2.of(name, indexOfSubtask));
+            BroadcastContext.remove(name + "-" + indexOfSubtask);
         }
     }
 
@@ -285,7 +392,7 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
                         containingTask.getCancelables());
         stateHandler.initializeOperatorState(this);
 
-        this.timeServiceManager = streamOperatorStateContext.internalTimerServiceManager();
+        timeServiceManager = streamOperatorStateContext.internalTimerServiceManager();
 
         broadcastVariablesReady = false;
 
@@ -328,15 +435,17 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
             ((CheckpointedStreamOperator) wrappedOperator)
                     .initializeState(stateInitializationContext);
         }
+        @SuppressWarnings("unchecked")
         List<StatePartitionStreamProvider> inputs =
                 IteratorUtils.toList(
                         stateInitializationContext.getRawOperatorStateInputs().iterator());
-        Preconditions.checkState(inputs.size() < 2);
+        Preconditions.checkState(
+                inputs.size() < 2, "The input from raw operator state should be one or zero.");
         if (inputs.size() == 1) {
             InputStream inputStream = inputs.get(0).getStream();
             DataInputStream dis =
                     new DataInputStream(new NonClosingInputStreamDecorator(inputStream));
-            Preconditions.checkState(dis.readInt() == numInputs);
+            Preconditions.checkState(dis.readInt() == numInputs, "Number of input is wrong.");
             for (int i = 0; i < numInputs; i++) {
                 DataCacheSnapshot dataCacheSnapshot =
                         DataCacheSnapshot.recover(
@@ -358,6 +467,7 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public void snapshotState(StateSnapshotContext stateSnapshotContext) throws Exception {
         if (wrappedOperator instanceof StreamOperatorStateHandler.CheckpointedStreamOperator) {
@@ -418,15 +528,5 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
     @Override
     public Object getCurrentKey() {
         return wrappedOperator.getCurrentKey();
-    }
-
-    @Override
-    public void endInput(int inputId) throws Exception {
-        if (wrappedOperator instanceof BoundedOneInput) {
-            ((BoundedOneInput) wrappedOperator).endInput();
-        }
-        if (wrappedOperator instanceof BoundedMultiInput) {
-            ((BoundedMultiInput) wrappedOperator).endInput(inputId);
-        }
     }
 }
