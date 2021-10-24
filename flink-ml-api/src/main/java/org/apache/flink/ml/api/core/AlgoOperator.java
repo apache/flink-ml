@@ -19,6 +19,7 @@
 package org.apache.flink.ml.api.core;
 
 import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.api.java.DataSet;
 import org.apache.flink.table.api.Table;
 
 /**
@@ -36,4 +37,9 @@ public interface AlgoOperator<T extends AlgoOperator<T>> extends Stage<T> {
      * @return a list of tables
      */
     Table[] transform(Table... inputs);
+
+    // TODO: remote this. This is only needed when the algorithm still uses DataSet.
+    default DataSet[] transformDataSet(DataSet... inputs) {
+        return null;
+    }
 }

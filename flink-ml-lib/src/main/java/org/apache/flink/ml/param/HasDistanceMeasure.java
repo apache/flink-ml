@@ -18,14 +18,21 @@
 
 package org.apache.flink.ml.param;
 
-/** Class for the long parameter. */
-public class LongParam extends Param<Long> {
-    public LongParam(
-            String name, String description, Long defaultValue, ParamValidator<Long> validator) {
-        super(name, Long.class, description, defaultValue, validator);
+/** Interface for the shared distanceMeasure param. */
+public interface HasDistanceMeasure<T> extends WithParams<T> {
+    Param<String> DISTANCE_MEASURE =
+            new StringParam(
+                    "distanceMeasure",
+                    "The distance measure. Supported options: 'euclidean'",
+                    "euclidean",
+                    ParamValidators.inArray("euclidean"));
+
+    default String getDistanceMeasure() {
+        return get(DISTANCE_MEASURE);
     }
 
-    public LongParam(String name, String description, Long defaultValue) {
-        this(name, description, defaultValue, ParamValidators.alwaysTrue());
+    default T setDistanceMeasure(String value) {
+        set(DISTANCE_MEASURE, value);
+        return (T) this;
     }
 }

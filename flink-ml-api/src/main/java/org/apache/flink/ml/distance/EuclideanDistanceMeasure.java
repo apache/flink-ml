@@ -16,16 +16,20 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.param;
+package org.apache.flink.ml.distance;
 
-/** Class for the long parameter. */
-public class LongParam extends Param<Long> {
-    public LongParam(
-            String name, String description, Long defaultValue, ParamValidator<Long> validator) {
-        super(name, Long.class, description, defaultValue, validator);
-    }
+import org.apache.flink.ml.linalg.Vector;
 
-    public LongParam(String name, String description, Long defaultValue) {
-        this(name, description, defaultValue, ParamValidators.alwaysTrue());
+/** Interface for measuring the Euclidean distance between two vectors. */
+public class EuclideanDistanceMeasure implements DistanceMeasure {
+    @Override
+    public double distance(Vector v1, Vector v2) {
+        double squaredDistance = 0.0;
+
+        for (int i = 0; i < v1.size(); i++) {
+            double diff = v1.get(i) - v2.get(i);
+            squaredDistance += diff * diff;
+        }
+        return Math.sqrt(squaredDistance);
     }
 }

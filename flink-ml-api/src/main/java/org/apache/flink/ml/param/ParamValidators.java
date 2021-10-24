@@ -58,7 +58,7 @@ public class ParamValidators {
             double lowerBound, double upperBound, boolean lowerInclusive, boolean upperInclusive) {
         return new ParamValidator<T>() {
             @Override
-            public boolean validate(Object obj) {
+            public boolean validate(T obj) {
                 double value = ((Number) obj).doubleValue();
                 return (value >= lowerBound)
                         && (value <= upperBound)

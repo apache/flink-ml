@@ -36,6 +36,7 @@ under the License.
       <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
+
     <dependency>
       <groupId>org.apache.flink</groupId>
       <artifactId>flink-ml-iteration</artifactId>
@@ -49,24 +50,28 @@ under the License.
       <version>${flink.version}</version>
       <scope>provided</scope>
     </dependency>
+
     <dependency>
       <groupId>org.apache.flink</groupId>
       <artifactId>flink-table-api-java-bridge_${scala.binary.version}</artifactId>
       <version>${flink.version}</version>
       <scope>provided</scope>
     </dependency>
+
     <dependency>
       <groupId>org.apache.flink</groupId>
       <artifactId>flink-table-planner_${scala.binary.version}</artifactId>
       <version>${flink.version}</version>
       <scope>test</scope>
     </dependency>
+
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-clients_${scala.binary.version}</artifactId>
+      <artifactId>flink-test-utils_${scala.binary.version}</artifactId>
       <version>${flink.version}</version>
-      <scope>provided</scope>
+      <scope>compile</scope>
     </dependency>
+
     <dependency>
       <groupId>com.github.fommil.netlib</groupId>
       <artifactId>core</artifactId>
@@ -106,21 +111,4 @@ under the License.
       <scope>test</scope>
     </dependency>
   </dependencies>
-
-  <build>
-    <plugins>
-      <!-- Because PyFlink uses it in tests -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-jar-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>test-jar</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-    </plugins>
-  </build>
 </project>

@@ -18,14 +18,21 @@
 
 package org.apache.flink.ml.param;
 
-/** Class for the long parameter. */
-public class LongParam extends Param<Long> {
-    public LongParam(
-            String name, String description, Long defaultValue, ParamValidator<Long> validator) {
-        super(name, Long.class, description, defaultValue, validator);
+/** Interface for the shared tol param. */
+public interface HasTol<T> extends WithParams<T> {
+    Param<Double> TOL =
+            new DoubleParam(
+                    "tol",
+                    "The convergence tolerance for iterative algorithms.",
+                    1e-4,
+                    ParamValidators.gtEq(0));
+
+    default double getTol() {
+        return get(TOL);
     }
 
-    public LongParam(String name, String description, Long defaultValue) {
-        this(name, description, defaultValue, ParamValidators.alwaysTrue());
+    default T setTol(double value) {
+        set(TOL, value);
+        return (T) this;
     }
 }

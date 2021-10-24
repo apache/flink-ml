@@ -19,6 +19,7 @@
 package org.apache.flink.ml.api.core;
 
 import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.api.java.DataSet;
 import org.apache.flink.table.api.Table;
 
 /**
@@ -35,5 +36,10 @@ public interface Estimator<E extends Estimator<E, M>, M extends Model<M>> extend
      * @param inputs a list of tables
      * @return a Model
      */
-    M fit(Table... inputs);
+    M fit(Table... inputs) throws Exception;
+
+    // TODO: remote this. This is only needed when the algorithm still uses DataSet.
+    default M fitDataSet(DataSet... inputs) throws Exception {
+        return null;
+    }
 }

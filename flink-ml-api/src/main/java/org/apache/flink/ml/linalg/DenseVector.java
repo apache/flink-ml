@@ -16,16 +16,35 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.param;
+package org.apache.flink.ml.linalg;
 
-/** Class for the long parameter. */
-public class LongParam extends Param<Long> {
-    public LongParam(
-            String name, String description, Long defaultValue, ParamValidator<Long> validator) {
-        super(name, Long.class, description, defaultValue, validator);
+import java.util.Arrays;
+
+/** A dense vector of double values. */
+public class DenseVector implements Vector {
+    public final double[] values;
+
+    public DenseVector(double[] values) {
+        this.values = values;
     }
 
-    public LongParam(String name, String description, Long defaultValue) {
-        this(name, description, defaultValue, ParamValidators.alwaysTrue());
+    @Override
+    public int size() {
+        return values.length;
+    }
+
+    @Override
+    public double get(int i) {
+        return values[i];
+    }
+
+    @Override
+    public double[] toArray() {
+        return values;
+    }
+
+    @Override
+    public String toString() {
+        return Arrays.toString(values);
     }
 }

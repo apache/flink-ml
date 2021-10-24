@@ -18,14 +18,20 @@
 
 package org.apache.flink.ml.param;
 
-/** Class for the long parameter. */
-public class LongParam extends Param<Long> {
-    public LongParam(
-            String name, String description, Long defaultValue, ParamValidator<Long> validator) {
-        super(name, Long.class, description, defaultValue, validator);
+/** Interface for the shared seed param. */
+public interface HasSeed<T> extends WithParams<T> {
+    Param<Long> SEED = new LongParam("seed", "The random seed.", null);
+
+    default long getSeed() {
+        Long seed = get(SEED);
+        if (seed != null) {
+            return seed;
+        }
+        return getClass().getName().hashCode();
     }
 
-    public LongParam(String name, String description, Long defaultValue) {
-        this(name, description, defaultValue, ParamValidators.alwaysTrue());
+    default T setSeed(long value) {
+        set(SEED, value);
+        return (T) this;
     }
 }

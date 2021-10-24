@@ -18,14 +18,17 @@
 
 package org.apache.flink.ml.param;
 
-/** Class for the long parameter. */
-public class LongParam extends Param<Long> {
-    public LongParam(
-            String name, String description, Long defaultValue, ParamValidator<Long> validator) {
-        super(name, Long.class, description, defaultValue, validator);
+/** Interface for the shared maxIter param. */
+public interface HasMaxIter<T> extends WithParams<T> {
+    Param<Integer> MAX_ITER =
+            new IntParam("maxIter", "Maximum number of iterations.", 20, ParamValidators.gtEq(0));
+
+    default int getMaxIter() {
+        return get(MAX_ITER);
     }
 
-    public LongParam(String name, String description, Long defaultValue) {
-        this(name, description, defaultValue, ParamValidators.alwaysTrue());
+    default T setMaxIter(int value) {
+        set(MAX_ITER, value);
+        return (T) this;
     }
 }

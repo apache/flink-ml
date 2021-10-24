@@ -16,16 +16,19 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.param;
+package org.apache.flink.ml.linalg;
 
-/** Class for the long parameter. */
-public class LongParam extends Param<Long> {
-    public LongParam(
-            String name, String description, Long defaultValue, ParamValidator<Long> validator) {
-        super(name, Long.class, description, defaultValue, validator);
-    }
+import java.io.Serializable;
 
-    public LongParam(String name, String description, Long defaultValue) {
-        this(name, description, defaultValue, ParamValidators.alwaysTrue());
-    }
+/** A vector of double values. */
+public interface Vector extends Serializable {
+
+    /** Gets the size of the vector. */
+    int size();
+
+    /** Gets the value of the ith element. */
+    double get(int i);
+
+    /** Converts the instance to a double array. */
+    double[] toArray();
 }

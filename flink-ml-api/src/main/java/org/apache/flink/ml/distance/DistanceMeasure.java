@@ -16,16 +16,19 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.param;
+package org.apache.flink.ml.distance;
 
-/** Class for the long parameter. */
-public class LongParam extends Param<Long> {
-    public LongParam(
-            String name, String description, Long defaultValue, ParamValidator<Long> validator) {
-        super(name, Long.class, description, defaultValue, validator);
-    }
+import org.apache.flink.ml.linalg.Vector;
 
-    public LongParam(String name, String description, Long defaultValue) {
-        this(name, description, defaultValue, ParamValidators.alwaysTrue());
-    }
+import java.io.Serializable;
+
+/** Interface for measuring distance between two vectors. */
+public interface DistanceMeasure extends Serializable {
+
+    /**
+     * Measures the distance between two vectors.
+     *
+     * <p>Required: The two vectors should have the same dimension.
+     */
+    double distance(Vector v1, Vector v2);
 }

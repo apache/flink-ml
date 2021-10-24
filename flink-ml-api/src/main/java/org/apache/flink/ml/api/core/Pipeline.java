@@ -69,7 +69,7 @@ public final class Pipeline implements Estimator<Pipeline, PipelineModel> {
      * @return a PipelineModel
      */
     @Override
-    public PipelineModel fit(Table... inputs) {
+    public PipelineModel fit(Table... inputs) throws Exception {
         int lastEstimatorIdx = -1;
         for (int i = 0; i < stages.size(); i++) {
             if (stages.get(i) instanceof Estimator) {
