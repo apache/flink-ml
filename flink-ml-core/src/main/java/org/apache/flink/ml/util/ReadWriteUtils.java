@@ -25,12 +25,17 @@ import org.apache.flink.connector.file.sink.FileSink;
 import org.apache.flink.connector.file.src.FileSource;
 import org.apache.flink.connector.file.src.reader.SimpleStreamFormat;
 import org.apache.flink.ml.api.Stage;
+import org.apache.flink.ml.builder.Graph;
+import org.apache.flink.ml.builder.GraphData;
+import org.apache.flink.ml.builder.GraphModel;
+import org.apache.flink.ml.builder.GraphNode;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.filesystem.bucketassigners.BasePathBucketAssigner;
 import org.apache.flink.streaming.api.functions.sink.filesystem.rollingpolicies.OnCheckpointRollingPolicy;
 import org.apache.flink.util.InstantiationUtil;
+import org.apache.flink.util.Preconditions;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -45,6 +50,7 @@ import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -229,6 +235,79 @@ public class ReadWriteUtils {
             stages.add(loadStage(env, stagePath));
         }
         return stages;
+    }
+
+    /**
+     * Saves a Graph or GraphModel with the given GraphData to the given path.
+     *
+     * @param graph A Graph or GraphModel instance.
+     * @param graphData A GraphData instance.
+     * @param path The parent directory to save the graph metadata and its stages.
+     */
+    public static void saveGraph(Stage<?> graph, GraphData graphData, String path)
+            throws IOException {
+        // Creates parent directories if not already created.
+        new File(path).mkdirs();
+
+        Map<String, Object> extraMetadata = new HashMap<>();
+        extraMetadata.put("graphData", graphData.toMap());
+        saveMetadata(graph, path, extraMetadata);
+        int maxNodeId =
+                graphData.nodes.stream()
+                        .map(node -> node.nodeId)
+                        .max(Comparator.naturalOrder())
+                        .orElse(-1);
+
+        for (GraphNode node : graphData.nodes) {
+            String stagePath = getPathForPipelineStage(node.nodeId, maxNodeId + 1, path);
+            node.stage.save(stagePath);
+        }
+    }
+
+    /**
+     * Loads a Graph or GraphModel from the given path.
+     *
+     * <p>The method throws RuntimeException if the expectedClassName is not empty AND it does not
+     * match the className of the previously saved Pipeline or PipelineModel.
+     *
+     * @param env A StreamExecutionEnvironment instance.
+     * @param path The parent directory to load the pipeline metadata and its stages.
+     * @param expectedClassName The expected class name of the pipeline.
+     * @return A Graph or GraphModel instance.
+     */
+    public static Stage<?> loadGraph(
+            StreamExecutionEnvironment env, String path, String expectedClassName)
+            throws IOException {
+        Map<String, ?> metadata = loadMetadata(path, expectedClassName);
+        GraphData graphData = GraphData.fromMap((Map<String, Object>) metadata.get("graphData"));
+
+        int maxNodeId =
+                graphData.nodes.stream()
+                        .map(node -> node.nodeId)
+                        .max(Comparator.naturalOrder())
+                        .orElse(-1);
+
+        for (GraphNode node : graphData.nodes) {
+            String stagePath = getPathForPipelineStage(node.nodeId, maxNodeId + 1, path);
+            node.stage = loadStage(env, stagePath);
+        }
+
+        if (expectedClassName.equals(GraphModel.class.getName())) {
+            return new GraphModel(
+                    graphData.nodes,
+                    graphData.modelInputIds,
+                    graphData.outputIds,
+                    graphData.inputModelDataIds,
+                    graphData.outputModelDataIds);
+        }
+        Preconditions.checkState(expectedClassName.equals(Graph.class.getName()));
+        return new Graph(
+                graphData.nodes,
+                graphData.estimatorInputIds,
+                graphData.modelInputIds,
+                graphData.outputIds,
+                graphData.inputModelDataIds,
+                graphData.outputModelDataIds);
     }
 
     // A helper method that sets stage's parameter value. We can not call stage.set(param, value)

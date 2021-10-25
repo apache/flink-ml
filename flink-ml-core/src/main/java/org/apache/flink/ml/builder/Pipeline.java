@@ -28,6 +28,7 @@ import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
+import org.apache.flink.util.Preconditions;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -47,7 +48,7 @@ public final class Pipeline implements Estimator<Pipeline, PipelineModel> {
     private final Map<Param<?>, Object> paramMap = new HashMap<>();
 
     public Pipeline(List<Stage<?>> stages) {
-        this.stages = stages;
+        this.stages = Preconditions.checkNotNull(stages);
         ParamUtils.initializeMapWithDefaultValues(paramMap, this);
     }
 

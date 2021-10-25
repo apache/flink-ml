@@ -38,16 +38,9 @@ import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
 
-import org.apache.commons.collections.IteratorUtils;
 import org.junit.Assert;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -60,6 +53,7 @@ public class ExampleStages {
     public static class SumModel implements Model<SumModel> {
         private final Map<Param<?>, Object> paramMap = new HashMap<>();
         private DataStream<Integer> modelData;
+        private Table modelDataTable;
 
         // This empty constructor is necessary in order for ModelA to be loaded by
         // ReadWriteUtils.createStageWithParam
@@ -94,46 +88,29 @@ public class ExampleStages {
                     (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
 
             modelData = tEnv.toDataStream(inputs[0], Integer.class);
+            modelDataTable = inputs[0];
             return this;
         }
 
         @Override
+        public Table[] getModelData() {
+            return new Table[] {modelDataTable};
+        }
+
+        @Override
         public void save(String path) throws IOException {
+            ReadWriteUtils.saveModelData(modelData, path, new TestUtils.IntEncoder());
             ReadWriteUtils.saveMetadata(this, path);
-
-            File dataDir = new File(path, "data");
-            if (!dataDir.mkdir()) {
-                throw new IOException("Directory " + dataDir.toString() + " already exists.");
-            }
-
-            File dataFile = new File(dataDir, "delta");
-            if (!dataFile.createNewFile()) {
-                throw new IOException("File " + dataFile.toString() + " already exists.");
-            }
-
-            int delta;
-            try {
-                delta = (Integer) IteratorUtils.toList(modelData.executeAndCollect()).get(0);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-
-            try (DataOutputStream outputStream =
-                    new DataOutputStream(new FileOutputStream(dataFile))) {
-                outputStream.writeInt(delta);
-            }
         }
 
         public static SumModel load(StreamExecutionEnvironment env, String path)
                 throws IOException {
-            SumModel model = ReadWriteUtils.loadStageParam(path);
-            File dataFile = Paths.get(path, "data", "delta").toFile();
+            StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+            DataStream<Integer> modelData =
+                    ReadWriteUtils.loadModelData(env, path, new TestUtils.IntegerStreamFormat());
 
-            try (DataInputStream inputStream = new DataInputStream(new FileInputStream(dataFile))) {
-                StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
-                Table modelData = tEnv.fromDataStream(env.fromElements(inputStream.readInt()));
-                return model.setModelData(modelData);
-            }
+            SumModel model = ReadWriteUtils.loadStageParam(path);
+            return model.setModelData(tEnv.fromDataStream(modelData));
         }
     }
 
@@ -237,6 +214,45 @@ public class ExampleStages {
         @Override
         public void processElement(StreamRecord<Integer> input) throws Exception {
             sum += input.getValue();
+        }
+    }
+
+    /**
+     * A Transformer subclass that takes 2 inputs and returns the union of these two inputs as the
+     * output.
+     */
+    public static class UnionAlgoOperator implements Transformer<UnionAlgoOperator> {
+        private final Map<Param<?>, Object> paramMap = new HashMap<>();
+
+        public UnionAlgoOperator() {
+            ParamUtils.initializeMapWithDefaultValues(paramMap, this);
+        }
+
+        @Override
+        public Map<Param<?>, Object> getParamMap() {
+            return paramMap;
+        }
+
+        @Override
+        public Table[] transform(Table... inputs) {
+            Assert.assertEquals(2, inputs.length);
+            StreamTableEnvironment tEnv =
+                    (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
+
+            DataStream<Integer> inputA = tEnv.toDataStream(inputs[0], Integer.class);
+            DataStream<Integer> inputB = tEnv.toDataStream(inputs[1], Integer.class);
+
+            return new Table[] {tEnv.fromDataStream(inputA.union(inputB))};
+        }
+
+        @Override
+        public void save(String path) throws IOException {
+            ReadWriteUtils.saveMetadata(this, path);
+        }
+
+        public static UnionAlgoOperator load(StreamExecutionEnvironment env, String path)
+                throws IOException {
+            return ReadWriteUtils.loadStageParam(path);
         }
     }
 }
