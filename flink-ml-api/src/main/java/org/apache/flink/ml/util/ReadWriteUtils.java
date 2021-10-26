@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** Utility methods for reading and writing stages. */
 public class ReadWriteUtils {
@@ -105,6 +106,24 @@ public class ReadWriteUtils {
      */
     public static void saveMetadata(Stage<?> stage, String path) throws IOException {
         saveMetadata(stage, path, new HashMap<>());
+    }
+
+    /** Returns a subdirectory of the given path for saving/loading model data. */
+    public static String getDataPath(String path) {
+        return Paths.get(path, "data").toString();
+    }
+
+    /** Returns all data files under the given path as a list of paths. */
+    public static org.apache.flink.core.fs.Path[] getDataPaths(String path) {
+        String dataPath = getDataPath(path);
+        File[] files = new File(dataPath).listFiles();
+
+        org.apache.flink.core.fs.Path[] paths = new org.apache.flink.core.fs.Path[files.length];
+        for (int i = 0; i < paths.length; i++) {
+            paths[i] = org.apache.flink.core.fs.Path.fromLocalFile(files[i]);
+        }
+
+        return paths;
     }
 
     /**
@@ -205,8 +224,20 @@ public class ReadWriteUtils {
 
     // A helper method that sets stage's parameter value. We can not call stage.set(param, value)
     // directly because stage::set(...) needs the actual type of the value.
-    public static <T> void setStageParam(Stage<?> stage, Param<T> param, Object value) {
+    public static <T> void setParam(Stage<?> stage, Param<T> param, Object value) {
         stage.set(param, (T) value);
+    }
+
+    // A helper method that updates stage's param map using values from the paramOverrides. This
+    // method only
+    // updates values for parameters already defined in the stage's param map.
+    public static void updateExistingParams(Stage<?> stage, Map<Param<?>, Object> paramOverrides) {
+        Set<Param<?>> existingParams = stage.getParamMap().keySet();
+        for (Map.Entry<Param<?>, Object> entry : paramOverrides.entrySet()) {
+            if (existingParams.contains(entry.getKey())) {
+                setParam(stage, entry.getKey(), entry.getValue());
+            }
+        }
     }
 
     /**
@@ -240,7 +271,7 @@ public class ReadWriteUtils {
 
             for (Map.Entry<String, String> entry : paramMap.entrySet()) {
                 Param<?> param = nameToParam.get(entry.getKey());
-                setStageParam(instance, param, param.jsonDecode(entry.getValue()));
+                setParam(instance, param, param.jsonDecode(entry.getValue()));
             }
             return instance;
         } catch (ClassNotFoundException e) {
