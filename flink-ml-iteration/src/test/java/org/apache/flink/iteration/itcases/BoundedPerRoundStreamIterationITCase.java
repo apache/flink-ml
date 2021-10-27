@@ -19,7 +19,6 @@
 package org.apache.flink.iteration.itcases;
 
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.RestOptions;
 import org.apache.flink.iteration.DataStreamList;
@@ -32,7 +31,6 @@ import org.apache.flink.iteration.itcases.operators.OutputRecord;
 import org.apache.flink.iteration.itcases.operators.SequenceSource;
 import org.apache.flink.iteration.itcases.operators.TwoInputReducePerRoundOperator;
 import org.apache.flink.runtime.jobgraph.JobGraph;
-import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.minicluster.MiniClusterConfiguration;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
@@ -41,17 +39,11 @@ import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 
 import org.junit.Before;
 import org.junit.Rule;
-import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-
-import static org.apache.flink.iteration.itcases.UnboundedStreamIterationITCase.verifyResult;
-import static org.junit.Assert.assertEquals;
 
 /** Tests the per-round iterations. */
 public class BoundedPerRoundStreamIterationITCase {
@@ -65,39 +57,42 @@ public class BoundedPerRoundStreamIterationITCase {
         result.clear();
     }
 
-    @Test
-    public void testPerRoundIteration() throws Exception {
-        try (MiniCluster miniCluster = new MiniCluster(createMiniClusterConfiguration(2, 2))) {
-            miniCluster.start();
-
-            JobGraph jobGraph =
-                    createPerRoundJobGraph(
-                            4,
-                            1000,
-                            5,
-                            new SinkFunction<OutputRecord<Integer>>() {
-                                @Override
-                                public void invoke(OutputRecord<Integer> value, Context context) {
-                                    result.add(value);
-                                }
-                            });
-            miniCluster.executeJobBlocking(jobGraph);
-
-            assertEquals(5, result.size());
-
-            Map<Integer, Tuple2<Integer, Integer>> roundsStat = new HashMap<>();
-            for (int i = 0; i < 5; ++i) {
-                OutputRecord<Integer> next = result.take();
-                assertEquals(OutputRecord.Event.TERMINATED, next.getEvent());
-                Tuple2<Integer, Integer> state =
-                        roundsStat.computeIfAbsent(next.getRound(), ignored -> new Tuple2<>(0, 0));
-                state.f0++;
-                state.f1 = next.getValue();
-            }
-
-            verifyResult(roundsStat, 5, 1, 4 * (0 + 999) * 1000 / 2);
-        }
-    }
+    //    @Test
+    //    public void testPerRoundIteration() throws Exception {
+    //        try (MiniCluster miniCluster = new MiniCluster(createMiniClusterConfiguration(2, 2)))
+    // {
+    //            miniCluster.start();
+    //
+    //            JobGraph jobGraph =
+    //                    createPerRoundJobGraph(
+    //                            4,
+    //                            1000,
+    //                            5,
+    //                            new SinkFunction<OutputRecord<Integer>>() {
+    //                                @Override
+    //                                public void invoke(OutputRecord<Integer> value, Context
+    // context) {
+    //                                    result.add(value);
+    //                                }
+    //                            });
+    //            miniCluster.executeJobBlocking(jobGraph);
+    //
+    //            assertEquals(5, result.size());
+    //
+    //            Map<Integer, Tuple2<Integer, Integer>> roundsStat = new HashMap<>();
+    //            for (int i = 0; i < 5; ++i) {
+    //                OutputRecord<Integer> next = result.take();
+    //                assertEquals(OutputRecord.Event.TERMINATED, next.getEvent());
+    //                Tuple2<Integer, Integer> state =
+    //                        roundsStat.computeIfAbsent(next.getRound(), ignored -> new Tuple2<>(0,
+    // 0));
+    //                state.f0++;
+    //                state.f1 = next.getValue();
+    //            }
+    //
+    //            verifyResult(roundsStat, 5, 1, 4 * (0 + 999) * 1000 / 2);
+    //        }
+    //    }
 
     private MiniClusterConfiguration createMiniClusterConfiguration(int numTm, int numSlot)
             throws IOException {

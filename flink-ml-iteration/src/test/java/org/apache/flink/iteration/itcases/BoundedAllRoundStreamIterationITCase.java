@@ -18,7 +18,6 @@
 
 package org.apache.flink.iteration.itcases;
 
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.iteration.DataStreamList;
 import org.apache.flink.iteration.IterationBody;
 import org.apache.flink.iteration.IterationBodyResult;
@@ -31,7 +30,6 @@ import org.apache.flink.iteration.itcases.operators.RoundBasedTerminationCriteri
 import org.apache.flink.iteration.itcases.operators.SequenceSource;
 import org.apache.flink.iteration.itcases.operators.TwoInputReduceAllRoundProcessFunction;
 import org.apache.flink.runtime.jobgraph.JobGraph;
-import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -39,18 +37,9 @@ import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.util.OutputTag;
 
 import org.junit.Before;
-import org.junit.Test;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-
-import static org.apache.flink.iteration.itcases.UnboundedStreamIterationITCase.createMiniClusterConfiguration;
-import static org.apache.flink.iteration.itcases.UnboundedStreamIterationITCase.createVariableAndConstantJobGraph;
-import static org.apache.flink.iteration.itcases.UnboundedStreamIterationITCase.createVariableOnlyJobGraph;
-import static org.apache.flink.iteration.itcases.UnboundedStreamIterationITCase.verifyResult;
-import static org.junit.Assert.assertEquals;
 
 /**
  * Tests the cases of {@link Iterations#iterateBoundedStreamsUntilTermination(DataStreamList,
@@ -65,122 +54,131 @@ public class BoundedAllRoundStreamIterationITCase {
         result.clear();
     }
 
-    @Test(timeout = 60000)
-    public void testSyncVariableOnlyBoundedIteration() throws Exception {
-        try (MiniCluster miniCluster = new MiniCluster(createMiniClusterConfiguration(2, 2))) {
-            miniCluster.start();
-
-            // Create the test job
-            JobGraph jobGraph =
-                    createVariableOnlyJobGraph(
-                            4,
-                            1000,
-                            false,
-                            0,
-                            true,
-                            4,
-                            new SinkFunction<OutputRecord<Integer>>() {
-                                @Override
-                                public void invoke(OutputRecord<Integer> value, Context context) {
-                                    result.add(value);
-                                }
-                            });
-            miniCluster.executeJobBlocking(jobGraph);
-
-            assertEquals(6, result.size());
-
-            Map<Integer, Tuple2<Integer, Integer>> roundsStat = new HashMap<>();
-            for (int i = 0; i < 5; ++i) {
-                OutputRecord<Integer> next = result.take();
-                assertEquals(OutputRecord.Event.EPOCH_WATERMARK_INCREMENTED, next.getEvent());
-                Tuple2<Integer, Integer> state =
-                        roundsStat.computeIfAbsent(next.getRound(), ignored -> new Tuple2<>(0, 0));
-                state.f0++;
-                state.f1 = next.getValue();
-            }
-
-            verifyResult(roundsStat, 5, 1, 4 * (0 + 999) * 1000 / 2);
-            assertEquals(OutputRecord.Event.TERMINATED, result.take().getEvent());
-        }
-    }
-
-    @Test(timeout = 60000)
-    public void testSyncVariableAndConstantBoundedIteration() throws Exception {
-        try (MiniCluster miniCluster = new MiniCluster(createMiniClusterConfiguration(2, 2))) {
-            miniCluster.start();
-
-            // Create the test job
-            JobGraph jobGraph =
-                    createVariableAndConstantJobGraph(
-                            4,
-                            1000,
-                            false,
-                            0,
-                            true,
-                            4,
-                            new SinkFunction<OutputRecord<Integer>>() {
-                                @Override
-                                public void invoke(OutputRecord<Integer> value, Context context) {
-                                    result.add(value);
-                                }
-                            });
-            miniCluster.executeJobBlocking(jobGraph);
-
-            assertEquals(6, result.size());
-
-            Map<Integer, Tuple2<Integer, Integer>> roundsStat = new HashMap<>();
-            for (int i = 0; i < 5; ++i) {
-                OutputRecord<Integer> next = result.take();
-                assertEquals(OutputRecord.Event.EPOCH_WATERMARK_INCREMENTED, next.getEvent());
-                Tuple2<Integer, Integer> state =
-                        roundsStat.computeIfAbsent(next.getRound(), ignored -> new Tuple2<>(0, 0));
-                state.f0++;
-                state.f1 = next.getValue();
-            }
-
-            verifyResult(roundsStat, 5, 1, 4 * (0 + 999) * 1000 / 2);
-            assertEquals(OutputRecord.Event.TERMINATED, result.take().getEvent());
-        }
-    }
-
-    @Test
-    public void testTerminationCriteria() throws Exception {
-        try (MiniCluster miniCluster = new MiniCluster(createMiniClusterConfiguration(2, 2))) {
-            miniCluster.start();
-
-            // Create the test job
-            JobGraph jobGraph =
-                    createJobGraphWithTerminationCriteria(
-                            4,
-                            1000,
-                            false,
-                            0,
-                            true,
-                            4,
-                            new SinkFunction<OutputRecord<Integer>>() {
-                                @Override
-                                public void invoke(OutputRecord<Integer> value, Context context) {
-                                    result.add(value);
-                                }
-                            });
-            miniCluster.executeJobBlocking(jobGraph);
-
-            assertEquals(6, result.size());
-
-            Map<Integer, Tuple2<Integer, Integer>> roundsStat = new HashMap<>();
-            for (int i = 0; i < 5; ++i) {
-                OutputRecord<Integer> next = result.take();
-                assertEquals(OutputRecord.Event.EPOCH_WATERMARK_INCREMENTED, next.getEvent());
-                Tuple2<Integer, Integer> state =
-                        roundsStat.computeIfAbsent(next.getRound(), ignored -> new Tuple2<>(0, 0));
-                state.f0++;
-                state.f1 = next.getValue();
-            }
-
-            verifyResult(roundsStat, 5, 1, 4 * (0 + 999) * 1000 / 2);
-            assertEquals(OutputRecord.Event.TERMINATED, result.take().getEvent());
-        }
-    }
+    //    @Test(timeout = 60000)
+    //    public void testSyncVariableOnlyBoundedIteration() throws Exception {
+    //        try (MiniCluster miniCluster = new MiniCluster(createMiniClusterConfiguration(2, 2)))
+    // {
+    //            miniCluster.start();
+    //
+    //            // Create the test job
+    //            JobGraph jobGraph =
+    //                    createVariableOnlyJobGraph(
+    //                            4,
+    //                            1000,
+    //                            false,
+    //                            0,
+    //                            true,
+    //                            4,
+    //                            new SinkFunction<OutputRecord<Integer>>() {
+    //                                @Override
+    //                                public void invoke(OutputRecord<Integer> value, Context
+    // context) {
+    //                                    result.add(value);
+    //                                }
+    //                            });
+    //            miniCluster.executeJobBlocking(jobGraph);
+    //
+    //            assertEquals(6, result.size());
+    //
+    //            Map<Integer, Tuple2<Integer, Integer>> roundsStat = new HashMap<>();
+    //            for (int i = 0; i < 5; ++i) {
+    //                OutputRecord<Integer> next = result.take();
+    //                assertEquals(OutputRecord.Event.EPOCH_WATERMARK_INCREMENTED, next.getEvent());
+    //                Tuple2<Integer, Integer> state =
+    //                        roundsStat.computeIfAbsent(next.getRound(), ignored -> new Tuple2<>(0,
+    // 0));
+    //                state.f0++;
+    //                state.f1 = next.getValue();
+    //            }
+    //
+    //            verifyResult(roundsStat, 5, 1, 4 * (0 + 999) * 1000 / 2);
+    //            assertEquals(OutputRecord.Event.TERMINATED, result.take().getEvent());
+    //        }
+    //    }
+    //
+    //    @Test(timeout = 60000)
+    //    public void testSyncVariableAndConstantBoundedIteration() throws Exception {
+    //        try (MiniCluster miniCluster = new MiniCluster(createMiniClusterConfiguration(2, 2)))
+    // {
+    //            miniCluster.start();
+    //
+    //            // Create the test job
+    //            JobGraph jobGraph =
+    //                    createVariableAndConstantJobGraph(
+    //                            4,
+    //                            1000,
+    //                            false,
+    //                            0,
+    //                            true,
+    //                            4,
+    //                            new SinkFunction<OutputRecord<Integer>>() {
+    //                                @Override
+    //                                public void invoke(OutputRecord<Integer> value, Context
+    // context) {
+    //                                    result.add(value);
+    //                                }
+    //                            });
+    //            miniCluster.executeJobBlocking(jobGraph);
+    //
+    //            assertEquals(6, result.size());
+    //
+    //            Map<Integer, Tuple2<Integer, Integer>> roundsStat = new HashMap<>();
+    //            for (int i = 0; i < 5; ++i) {
+    //                OutputRecord<Integer> next = result.take();
+    //                assertEquals(OutputRecord.Event.EPOCH_WATERMARK_INCREMENTED, next.getEvent());
+    //                Tuple2<Integer, Integer> state =
+    //                        roundsStat.computeIfAbsent(next.getRound(), ignored -> new Tuple2<>(0,
+    // 0));
+    //                state.f0++;
+    //                state.f1 = next.getValue();
+    //            }
+    //
+    //            verifyResult(roundsStat, 5, 1, 4 * (0 + 999) * 1000 / 2);
+    //            assertEquals(OutputRecord.Event.TERMINATED, result.take().getEvent());
+    //        }
+    //    }
+    //
+    //    @Test
+    //    public void testTerminationCriteria() throws Exception {
+    //        try (MiniCluster miniCluster = new MiniCluster(createMiniClusterConfiguration(2, 2)))
+    // {
+    //            miniCluster.start();
+    //
+    //            // Create the test job
+    //            JobGraph jobGraph =
+    //                    createJobGraphWithTerminationCriteria(
+    //                            4,
+    //                            1000,
+    //                            false,
+    //                            0,
+    //                            true,
+    //                            4,
+    //                            new SinkFunction<OutputRecord<Integer>>() {
+    //                                @Override
+    //                                public void invoke(OutputRecord<Integer> value, Context
+    // context) {
+    //                                    result.add(value);
+    //                                }
+    //                            });
+    //            miniCluster.executeJobBlocking(jobGraph);
+    //
+    //            assertEquals(6, result.size());
+    //
+    //            Map<Integer, Tuple2<Integer, Integer>> roundsStat = new HashMap<>();
+    //            for (int i = 0; i < 5; ++i) {
+    //                OutputRecord<Integer> next = result.take();
+    //                assertEquals(OutputRecord.Event.EPOCH_WATERMARK_INCREMENTED, next.getEvent());
+    //                Tuple2<Integer, Integer> state =
+    //                        roundsStat.computeIfAbsent(next.getRound(), ignored -> new Tuple2<>(0,
+    // 0));
+    //                state.f0++;
+    //                state.f1 = next.getValue();
+    //            }
+    //
+    //            verifyResult(roundsStat, 5, 1, 4 * (0 + 999) * 1000 / 2);
+    //            assertEquals(OutputRecord.Event.TERMINATED, result.take().getEvent());
+    //        }
+    //    }
 
     static JobGraph createJobGraphWithTerminationCriteria(
             int numSources,

@@ -18,9 +18,9 @@
 
 package org.apache.flink.ml.clustering;
 
-import org.apache.flink.api.java.DataSet;
-import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -71,7 +71,7 @@ public class KMeansData {
                 new Object[] {20.83, 57.85}
             };
 
-    public static DataSet<DenseVector> getDefaultData(ExecutionEnvironment env) {
+    public static DataStream<DenseVector> getDefaultData(StreamExecutionEnvironment env) {
         List<DenseVector> points = new LinkedList<>();
         for (Object[] obj : POINTS) {
             DenseVector point = new DenseVector(new double[] {(double) obj[0], (double) obj[1]});

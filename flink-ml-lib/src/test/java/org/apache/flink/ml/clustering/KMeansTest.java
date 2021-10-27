@@ -18,36 +18,65 @@
 
 package org.apache.flink.ml.clustering;
 
-import org.apache.flink.api.java.DataSet;
-import org.apache.flink.api.java.ExecutionEnvironment;
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.clustering.kmeans.KMeans;
 import org.apache.flink.ml.clustering.kmeans.KMeansModel;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.api.Schema;
+import org.apache.flink.table.api.Table;
+import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.test.util.AbstractTestBase;
 
 import org.junit.Test;
-
-import java.util.List;
 
 /** Tests KMeans and KMeansModel. */
 public class KMeansTest extends AbstractTestBase {
 
     @Test
-    public void testKMeansDataset() throws Exception {
-        ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
-        DataSet<DenseVector> points = KMeansData.getDefaultData(env);
+    public void testKMeansDataStream() throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+        env.setParallelism(4);
+
+        DataStream<DenseVector> input = KMeansData.getDefaultData(env);
+
+        Table points =
+                tEnv.fromDataStream(
+                        input,
+                        Schema.newBuilder().column("f0", DataTypes.of(DenseVector.class)).build());
 
         KMeans kmeans = new KMeans().setMaxIter(1);
 
-        KMeansModel model = kmeans.fitDataSet(points);
+        KMeansModel model = kmeans.fit(points);
 
-        DataSet<Tuple2<Integer, DenseVector>> pointsWithCentroidId =
-                model.transformDataSet(points)[0];
-
-        List<Tuple2<Integer, DenseVector>> values = pointsWithCentroidId.collect();
-        for (Tuple2<Integer, DenseVector> value : values) {
-            System.out.println("Value " + value.f0 + " " + value.f1);
-        }
+        //        Table pointsWithCentroidId =
+        //                model.transform(points)[0];
+        //
+        //        DataStream<Tuple2> result = tEnv.toDataStream(pointsWithCentroidId, Tuple2.class);
+        //
+        //        List<Tuple2> values = IteratorUtils.toList(result.executeAndCollect());
+        //        for (Tuple2<Integer, DenseVector> value : values) {
+        //            System.out.println("Value " + value.f0 + " " + value.f1);
+        //        }
     }
+
+    //    @Test
+    //    public void testKMeansDataset() throws Exception {
+    //        ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
+    //        DataSet<DenseVector> points = KMeansData.getDefaultData(env);
+    //
+    //        KMeans kmeans = new KMeans().setMaxIter(1);
+    //
+    //        KMeansModel model = kmeans.fitDataSet(points);
+    //
+    //        DataSet<Tuple2<Integer, DenseVector>> pointsWithCentroidId =
+    //                model.transformDataSet(points)[0];
+    //
+    //        List<Tuple2<Integer, DenseVector>> values = pointsWithCentroidId.collect();
+    //        for (Tuple2<Integer, DenseVector> value : values) {
+    //            System.out.println("Value " + value.f0 + " " + value.f1);
+    //        }
+    //    }
 }

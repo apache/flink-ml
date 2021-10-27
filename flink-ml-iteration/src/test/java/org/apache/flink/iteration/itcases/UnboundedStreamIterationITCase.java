@@ -30,7 +30,6 @@ import org.apache.flink.iteration.itcases.operators.ReduceAllRoundProcessFunctio
 import org.apache.flink.iteration.itcases.operators.SequenceSource;
 import org.apache.flink.iteration.itcases.operators.TwoInputReduceAllRoundProcessFunction;
 import org.apache.flink.runtime.jobgraph.JobGraph;
-import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.minicluster.MiniClusterConfiguration;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
@@ -40,9 +39,7 @@ import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.util.OutputTag;
 
 import org.junit.Before;
-import org.junit.Test;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -59,157 +56,169 @@ public class UnboundedStreamIterationITCase {
         result.clear();
     }
 
-    @Test(timeout = 60000)
-    public void testVariableOnlyUnboundedIteration() throws Exception {
-        try (MiniCluster miniCluster = new MiniCluster(createMiniClusterConfiguration(2, 2))) {
-            miniCluster.start();
-
-            // Create the test job
-            JobGraph jobGraph =
-                    createVariableOnlyJobGraph(
-                            4,
-                            1000,
-                            true,
-                            0,
-                            false,
-                            1,
-                            new SinkFunction<OutputRecord<Integer>>() {
-                                @Override
-                                public void invoke(OutputRecord<Integer> value, Context context) {
-                                    result.add(value);
-                                }
-                            });
-            miniCluster.submitJob(jobGraph);
-
-            int expectedOutputs = 2 * 4000;
-            Map<Integer, Tuple2<Integer, Integer>> roundsStat = new HashMap<>();
-            for (int i = 0; i < expectedOutputs; ++i) {
-                OutputRecord<Integer> next = result.take();
-                assertEquals(OutputRecord.Event.PROCESS_ELEMENT, next.getEvent());
-                Tuple2<Integer, Integer> state =
-                        roundsStat.computeIfAbsent(next.getRound(), ignored -> new Tuple2<>(0, 0));
-                state.f0++;
-                state.f1 = next.getValue();
-            }
-
-            verifyResult(roundsStat, 2, 4000, 4 * (0 + 999) * 1000 / 2);
-        }
-    }
-
-    @Test(timeout = 60000)
-    public void testVariableOnlyBoundedIteration() throws Exception {
-        try (MiniCluster miniCluster = new MiniCluster(createMiniClusterConfiguration(2, 2))) {
-            miniCluster.start();
-
-            // Create the test job
-            JobGraph jobGraph =
-                    createVariableOnlyJobGraph(
-                            4,
-                            1000,
-                            false,
-                            0,
-                            false,
-                            1,
-                            new SinkFunction<OutputRecord<Integer>>() {
-                                @Override
-                                public void invoke(OutputRecord<Integer> value, Context context) {
-                                    result.add(value);
-                                }
-                            });
-            miniCluster.executeJobBlocking(jobGraph);
-
-            assertEquals(8001, result.size());
-
-            Map<Integer, Tuple2<Integer, Integer>> roundsStat = new HashMap<>();
-            for (int i = 0; i < 8000; ++i) {
-                OutputRecord<Integer> next = result.take();
-                assertEquals(OutputRecord.Event.PROCESS_ELEMENT, next.getEvent());
-                Tuple2<Integer, Integer> state =
-                        roundsStat.computeIfAbsent(next.getRound(), ignored -> new Tuple2<>(0, 0));
-                state.f0++;
-                state.f1 = next.getValue();
-            }
-
-            verifyResult(roundsStat, 2, 4000, 4 * (0 + 999) * 1000 / 2);
-            assertEquals(OutputRecord.Event.TERMINATED, result.take().getEvent());
-        }
-    }
-
-    @Test(timeout = 60000)
-    public void testVariableAndConstantsUnboundedIteration() throws Exception {
-        try (MiniCluster miniCluster = new MiniCluster(createMiniClusterConfiguration(2, 2))) {
-            miniCluster.start();
-
-            // Create the test job
-            JobGraph jobGraph =
-                    createVariableAndConstantJobGraph(
-                            4,
-                            1000,
-                            true,
-                            0,
-                            false,
-                            1,
-                            new SinkFunction<OutputRecord<Integer>>() {
-                                @Override
-                                public void invoke(OutputRecord<Integer> value, Context context) {
-                                    result.add(value);
-                                }
-                            });
-            miniCluster.submitJob(jobGraph);
-
-            int expectedOutputs = 2 * 4000;
-            Map<Integer, Tuple2<Integer, Integer>> roundsStat = new HashMap<>();
-            for (int i = 0; i < expectedOutputs; ++i) {
-                OutputRecord<Integer> next = result.take();
-                assertEquals(OutputRecord.Event.PROCESS_ELEMENT, next.getEvent());
-                Tuple2<Integer, Integer> state =
-                        roundsStat.computeIfAbsent(next.getRound(), ignored -> new Tuple2<>(0, 0));
-                state.f0++;
-                state.f1 = next.getValue();
-            }
-
-            verifyResult(roundsStat, 2, 4000, 4 * (0 + 999) * 1000 / 2);
-        }
-    }
-
-    @Test(timeout = 60000)
-    public void testVariableAndConstantBoundedIteration() throws Exception {
-        try (MiniCluster miniCluster = new MiniCluster(createMiniClusterConfiguration(2, 2))) {
-            miniCluster.start();
-
-            // Create the test job
-            JobGraph jobGraph =
-                    createVariableAndConstantJobGraph(
-                            4,
-                            1000,
-                            false,
-                            0,
-                            false,
-                            1,
-                            new SinkFunction<OutputRecord<Integer>>() {
-                                @Override
-                                public void invoke(OutputRecord<Integer> value, Context context) {
-                                    result.add(value);
-                                }
-                            });
-            miniCluster.executeJobBlocking(jobGraph);
-
-            assertEquals(8001, result.size());
-
-            Map<Integer, Tuple2<Integer, Integer>> roundsStat = new HashMap<>();
-            for (int i = 0; i < 8000; ++i) {
-                OutputRecord<Integer> next = result.take();
-                assertEquals(OutputRecord.Event.PROCESS_ELEMENT, next.getEvent());
-                Tuple2<Integer, Integer> state =
-                        roundsStat.computeIfAbsent(next.getRound(), ignored -> new Tuple2<>(0, 0));
-                state.f0++;
-                state.f1 = next.getValue();
-            }
-
-            verifyResult(roundsStat, 2, 4000, 4 * (0 + 999) * 1000 / 2);
-            assertEquals(OutputRecord.Event.TERMINATED, result.take().getEvent());
-        }
-    }
+    //    @Test(timeout = 60000)
+    //    public void testVariableOnlyUnboundedIteration() throws Exception {
+    //        try (MiniCluster miniCluster = new MiniCluster(createMiniClusterConfiguration(2, 2)))
+    // {
+    //            miniCluster.start();
+    //
+    //            // Create the test job
+    //            JobGraph jobGraph =
+    //                    createVariableOnlyJobGraph(
+    //                            4,
+    //                            1000,
+    //                            true,
+    //                            0,
+    //                            false,
+    //                            1,
+    //                            new SinkFunction<OutputRecord<Integer>>() {
+    //                                @Override
+    //                                public void invoke(OutputRecord<Integer> value, Context
+    // context) {
+    //                                    result.add(value);
+    //                                }
+    //                            });
+    //            miniCluster.submitJob(jobGraph);
+    //
+    //            int expectedOutputs = 2 * 4000;
+    //            Map<Integer, Tuple2<Integer, Integer>> roundsStat = new HashMap<>();
+    //            for (int i = 0; i < expectedOutputs; ++i) {
+    //                OutputRecord<Integer> next = result.take();
+    //                assertEquals(OutputRecord.Event.PROCESS_ELEMENT, next.getEvent());
+    //                Tuple2<Integer, Integer> state =
+    //                        roundsStat.computeIfAbsent(next.getRound(), ignored -> new Tuple2<>(0,
+    // 0));
+    //                state.f0++;
+    //                state.f1 = next.getValue();
+    //            }
+    //
+    //            verifyResult(roundsStat, 2, 4000, 4 * (0 + 999) * 1000 / 2);
+    //        }
+    //    }
+    //
+    //    @Test(timeout = 60000)
+    //    public void testVariableOnlyBoundedIteration() throws Exception {
+    //        try (MiniCluster miniCluster = new MiniCluster(createMiniClusterConfiguration(2, 2)))
+    // {
+    //            miniCluster.start();
+    //
+    //            // Create the test job
+    //            JobGraph jobGraph =
+    //                    createVariableOnlyJobGraph(
+    //                            4,
+    //                            1000,
+    //                            false,
+    //                            0,
+    //                            false,
+    //                            1,
+    //                            new SinkFunction<OutputRecord<Integer>>() {
+    //                                @Override
+    //                                public void invoke(OutputRecord<Integer> value, Context
+    // context) {
+    //                                    result.add(value);
+    //                                }
+    //                            });
+    //            miniCluster.executeJobBlocking(jobGraph);
+    //
+    //            assertEquals(8001, result.size());
+    //
+    //            Map<Integer, Tuple2<Integer, Integer>> roundsStat = new HashMap<>();
+    //            for (int i = 0; i < 8000; ++i) {
+    //                OutputRecord<Integer> next = result.take();
+    //                assertEquals(OutputRecord.Event.PROCESS_ELEMENT, next.getEvent());
+    //                Tuple2<Integer, Integer> state =
+    //                        roundsStat.computeIfAbsent(next.getRound(), ignored -> new Tuple2<>(0,
+    // 0));
+    //                state.f0++;
+    //                state.f1 = next.getValue();
+    //            }
+    //
+    //            verifyResult(roundsStat, 2, 4000, 4 * (0 + 999) * 1000 / 2);
+    //            assertEquals(OutputRecord.Event.TERMINATED, result.take().getEvent());
+    //        }
+    //    }
+    //
+    //    @Test(timeout = 60000)
+    //    public void testVariableAndConstantsUnboundedIteration() throws Exception {
+    //        try (MiniCluster miniCluster = new MiniCluster(createMiniClusterConfiguration(2, 2)))
+    // {
+    //            miniCluster.start();
+    //
+    //            // Create the test job
+    //            JobGraph jobGraph =
+    //                    createVariableAndConstantJobGraph(
+    //                            4,
+    //                            1000,
+    //                            true,
+    //                            0,
+    //                            false,
+    //                            1,
+    //                            new SinkFunction<OutputRecord<Integer>>() {
+    //                                @Override
+    //                                public void invoke(OutputRecord<Integer> value, Context
+    // context) {
+    //                                    result.add(value);
+    //                                }
+    //                            });
+    //            miniCluster.submitJob(jobGraph);
+    //
+    //            int expectedOutputs = 2 * 4000;
+    //            Map<Integer, Tuple2<Integer, Integer>> roundsStat = new HashMap<>();
+    //            for (int i = 0; i < expectedOutputs; ++i) {
+    //                OutputRecord<Integer> next = result.take();
+    //                assertEquals(OutputRecord.Event.PROCESS_ELEMENT, next.getEvent());
+    //                Tuple2<Integer, Integer> state =
+    //                        roundsStat.computeIfAbsent(next.getRound(), ignored -> new Tuple2<>(0,
+    // 0));
+    //                state.f0++;
+    //                state.f1 = next.getValue();
+    //            }
+    //
+    //            verifyResult(roundsStat, 2, 4000, 4 * (0 + 999) * 1000 / 2);
+    //        }
+    //    }
+    //
+    //    @Test(timeout = 60000)
+    //    public void testVariableAndConstantBoundedIteration() throws Exception {
+    //        try (MiniCluster miniCluster = new MiniCluster(createMiniClusterConfiguration(2, 2)))
+    // {
+    //            miniCluster.start();
+    //
+    //            // Create the test job
+    //            JobGraph jobGraph =
+    //                    createVariableAndConstantJobGraph(
+    //                            4,
+    //                            1000,
+    //                            false,
+    //                            0,
+    //                            false,
+    //                            1,
+    //                            new SinkFunction<OutputRecord<Integer>>() {
+    //                                @Override
+    //                                public void invoke(OutputRecord<Integer> value, Context
+    // context) {
+    //                                    result.add(value);
+    //                                }
+    //                            });
+    //            miniCluster.executeJobBlocking(jobGraph);
+    //
+    //            assertEquals(8001, result.size());
+    //
+    //            Map<Integer, Tuple2<Integer, Integer>> roundsStat = new HashMap<>();
+    //            for (int i = 0; i < 8000; ++i) {
+    //                OutputRecord<Integer> next = result.take();
+    //                assertEquals(OutputRecord.Event.PROCESS_ELEMENT, next.getEvent());
+    //                Tuple2<Integer, Integer> state =
+    //                        roundsStat.computeIfAbsent(next.getRound(), ignored -> new Tuple2<>(0,
+    // 0));
+    //                state.f0++;
+    //                state.f1 = next.getValue();
+    //            }
+    //
+    //            verifyResult(roundsStat, 2, 4000, 4 * (0 + 999) * 1000 / 2);
+    //            assertEquals(OutputRecord.Event.TERMINATED, result.take().getEvent());
+    //        }
+    //    }
 
     static MiniClusterConfiguration createMiniClusterConfiguration(int numTm, int numSlot) {
         Configuration configuration = new Configuration();
