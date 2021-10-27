@@ -45,20 +45,34 @@ public class TwoInputBroadcastWrapperOperator<IN1, IN2, OUT>
 
     @Override
     public void processElement1(StreamRecord<IN1> streamRecord) throws Exception {
-        processElementX(streamRecord, 0, wrappedOperator::processElement1);
+        processElementX(
+                streamRecord,
+                0,
+                wrappedOperator::processElement1,
+                wrappedOperator::processWatermark1);
     }
 
     @Override
     public void processElement2(StreamRecord<IN2> streamRecord) throws Exception {
-        processElementX(streamRecord, 1, wrappedOperator::processElement2);
+        processElementX(
+                streamRecord,
+                1,
+                wrappedOperator::processElement2,
+                wrappedOperator::processWatermark2);
     }
 
     @Override
     public void endInput(int inputId) throws Exception {
         if (inputId == 1) {
-            endInputX(inputId - 1, wrappedOperator::processElement1);
+            endInputX(
+                    inputId - 1,
+                    wrappedOperator::processElement1,
+                    wrappedOperator::processWatermark1);
         } else {
-            endInputX(inputId - 1, wrappedOperator::processElement2);
+            endInputX(
+                    inputId - 1,
+                    wrappedOperator::processElement2,
+                    wrappedOperator::processWatermark2);
         }
         OperatorUtils.processOperatorOrUdfIfSatisfy(
                 wrappedOperator,
@@ -68,12 +82,14 @@ public class TwoInputBroadcastWrapperOperator<IN1, IN2, OUT>
 
     @Override
     public void processWatermark1(Watermark watermark) throws Exception {
-        wrappedOperator.processWatermark1(watermark);
+        processWatermarkX(
+                watermark, 0, wrappedOperator::processElement1, wrappedOperator::processWatermark1);
     }
 
     @Override
     public void processWatermark2(Watermark watermark) throws Exception {
-        wrappedOperator.processWatermark2(watermark);
+        processWatermarkX(
+                watermark, 1, wrappedOperator::processElement2, wrappedOperator::processWatermark2);
     }
 
     @Override

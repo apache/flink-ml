@@ -62,7 +62,8 @@ public class MultipleInputBroadcastWrapperOperator<OUT>
     @Override
     @SuppressWarnings("unchecked")
     public void endInput(int inputId) throws Exception {
-        endInputX(inputId - 1, wrappedOperator.getInputs().get(inputId - 1)::processElement);
+        Input input = wrappedOperator.getInputs().get(inputId - 1);
+        endInputX(inputId - 1, input::processElement, input::processWatermark);
         OperatorUtils.processOperatorOrUdfIfSatisfy(
                 wrappedOperator,
                 BoundedMultiInput.class,
@@ -85,12 +86,13 @@ public class MultipleInputBroadcastWrapperOperator<OUT>
         @SuppressWarnings("unchecked")
         public void processElement(StreamRecord<IN> streamRecord) throws Exception {
             MultipleInputBroadcastWrapperOperator.this.processElementX(
-                    streamRecord, inputIndex, input::processElement);
+                    streamRecord, inputIndex, input::processElement, input::processWatermark);
         }
 
         @Override
         public void processWatermark(Watermark watermark) throws Exception {
-            input.processWatermark(watermark);
+            MultipleInputBroadcastWrapperOperator.this.processWatermarkX(
+                    watermark, inputIndex, input::processElement, input::processWatermark);
         }
 
         @Override
