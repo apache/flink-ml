@@ -19,7 +19,7 @@
 package org.apache.flink.ml.common.broadcast.operator;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.ml.iteration.operator.OperatorUtils;
+import org.apache.flink.iteration.operator.OperatorUtils;
 import org.apache.flink.streaming.api.operators.BoundedMultiInput;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
@@ -45,34 +45,20 @@ public class TwoInputBroadcastWrapperOperator<IN1, IN2, OUT>
 
     @Override
     public void processElement1(StreamRecord<IN1> streamRecord) throws Exception {
-        processElementX(
-                streamRecord,
-                0,
-                wrappedOperator::processElement1,
-                wrappedOperator::processWatermark1);
+        processElementX(streamRecord, 0, wrappedOperator::processElement1);
     }
 
     @Override
     public void processElement2(StreamRecord<IN2> streamRecord) throws Exception {
-        processElementX(
-                streamRecord,
-                1,
-                wrappedOperator::processElement2,
-                wrappedOperator::processWatermark2);
+        processElementX(streamRecord, 1, wrappedOperator::processElement2);
     }
 
     @Override
     public void endInput(int inputId) throws Exception {
         if (inputId == 1) {
-            endInputX(
-                    inputId - 1,
-                    wrappedOperator::processElement1,
-                    wrappedOperator::processWatermark1);
+            endInputX(inputId - 1, wrappedOperator::processElement1);
         } else {
-            endInputX(
-                    inputId - 1,
-                    wrappedOperator::processElement2,
-                    wrappedOperator::processWatermark2);
+            endInputX(inputId - 1, wrappedOperator::processElement2);
         }
         OperatorUtils.processOperatorOrUdfIfSatisfy(
                 wrappedOperator,
@@ -82,14 +68,12 @@ public class TwoInputBroadcastWrapperOperator<IN1, IN2, OUT>
 
     @Override
     public void processWatermark1(Watermark watermark) throws Exception {
-        processWatermarkX(
-                watermark, 0, wrappedOperator::processElement1, wrappedOperator::processWatermark1);
+        wrappedOperator.processWatermark1(watermark);
     }
 
     @Override
     public void processWatermark2(Watermark watermark) throws Exception {
-        processWatermarkX(
-                watermark, 1, wrappedOperator::processElement2, wrappedOperator::processWatermark2);
+        wrappedOperator.processWatermark2(watermark);
     }
 
     @Override

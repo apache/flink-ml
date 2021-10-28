@@ -20,7 +20,6 @@ package org.apache.flink.ml.param;
 
 /** Class for the long parameter. */
 public class LongParam extends Param<Long> {
-
     public LongParam(
             String name, String description, Long defaultValue, ParamValidator<Long> validator) {
         super(name, Long.class, description, defaultValue, validator);

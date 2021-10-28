@@ -21,7 +21,7 @@ package org.apache.flink.ml.common.broadcast.operator;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.functions.KeySelector;
-import org.apache.flink.ml.iteration.operator.OperatorWrapper;
+import org.apache.flink.iteration.operator.OperatorWrapper;
 import org.apache.flink.streaming.api.operators.MultipleInputStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperator;

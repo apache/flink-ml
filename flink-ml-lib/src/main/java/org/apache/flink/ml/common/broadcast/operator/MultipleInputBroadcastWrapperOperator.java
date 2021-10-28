@@ -19,7 +19,7 @@
 package org.apache.flink.ml.common.broadcast.operator;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.ml.iteration.operator.OperatorUtils;
+import org.apache.flink.iteration.operator.OperatorUtils;
 import org.apache.flink.streaming.api.operators.BoundedMultiInput;
 import org.apache.flink.streaming.api.operators.Input;
 import org.apache.flink.streaming.api.operators.MultipleInputStreamOperator;
@@ -62,8 +62,7 @@ public class MultipleInputBroadcastWrapperOperator<OUT>
     @Override
     @SuppressWarnings("unchecked")
     public void endInput(int inputId) throws Exception {
-        Input input = wrappedOperator.getInputs().get(inputId - 1);
-        endInputX(inputId - 1, input::processElement, input::processWatermark);
+        endInputX(inputId - 1, wrappedOperator.getInputs().get(inputId - 1)::processElement);
         OperatorUtils.processOperatorOrUdfIfSatisfy(
                 wrappedOperator,
                 BoundedMultiInput.class,
@@ -86,13 +85,12 @@ public class MultipleInputBroadcastWrapperOperator<OUT>
         @SuppressWarnings("unchecked")
         public void processElement(StreamRecord<IN> streamRecord) throws Exception {
             MultipleInputBroadcastWrapperOperator.this.processElementX(
-                    streamRecord, inputIndex, input::processElement, input::processWatermark);
+                    streamRecord, inputIndex, input::processElement);
         }
 
         @Override
         public void processWatermark(Watermark watermark) throws Exception {
-            MultipleInputBroadcastWrapperOperator.this.processWatermarkX(
-                    watermark, inputIndex, input::processElement, input::processWatermark);
+            input.processWatermark(watermark);
         }
 
         @Override

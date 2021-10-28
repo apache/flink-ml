@@ -95,7 +95,7 @@ public class BroadcastContext {
         /** whether this broadcast variable is ready to be consumed. */
         private boolean cacheReady;
 
-        /** the cached list */
+        /** the cached list. */
         private List<?> cacheList;
 
         /** the mailboxExecutor of the consumer, used to avoid the possible stuck of consumer. */

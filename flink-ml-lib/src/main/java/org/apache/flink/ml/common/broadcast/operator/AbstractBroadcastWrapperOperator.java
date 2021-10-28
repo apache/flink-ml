@@ -24,17 +24,15 @@ import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.core.memory.ManagedMemoryUseCase;
+import org.apache.flink.iteration.config.IterationOptions;
+import org.apache.flink.iteration.datacache.nonkeyed.DataCacheReader;
+import org.apache.flink.iteration.datacache.nonkeyed.DataCacheSnapshot;
+import org.apache.flink.iteration.datacache.nonkeyed.DataCacheWriter;
+import org.apache.flink.iteration.datacache.nonkeyed.Segment;
+import org.apache.flink.iteration.operator.OperatorUtils;
+import org.apache.flink.iteration.proxy.state.ProxyStreamOperatorStateContext;
 import org.apache.flink.metrics.groups.OperatorMetricGroup;
 import org.apache.flink.ml.common.broadcast.BroadcastContext;
-import org.apache.flink.ml.common.broadcast.typeinfo.CacheElement;
-import org.apache.flink.ml.common.broadcast.typeinfo.CacheElementTypeInfo;
-import org.apache.flink.ml.iteration.config.IterationOptions;
-import org.apache.flink.ml.iteration.datacache.nonkeyed.DataCacheReader;
-import org.apache.flink.ml.iteration.datacache.nonkeyed.DataCacheSnapshot;
-import org.apache.flink.ml.iteration.datacache.nonkeyed.DataCacheWriter;
-import org.apache.flink.ml.iteration.datacache.nonkeyed.Segment;
-import org.apache.flink.ml.iteration.operator.OperatorUtils;
-import org.apache.flink.ml.iteration.proxy.state.ProxyStreamOperatorStateContext;
 import org.apache.flink.runtime.checkpoint.CheckpointOptions;
 import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -59,7 +57,6 @@ import org.apache.flink.streaming.api.operators.StreamOperatorStateContext;
 import org.apache.flink.streaming.api.operators.StreamOperatorStateHandler;
 import org.apache.flink.streaming.api.operators.StreamOperatorStateHandler.CheckpointedStreamOperator;
 import org.apache.flink.streaming.api.operators.StreamTaskStateInitializer;
-import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.streaming.runtime.tasks.mailbox.TaskMailbox;
@@ -196,9 +193,7 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
             for (int i = 0; i < numInputs; i++) {
                 dataCacheWriters[i] =
                         new DataCacheWriter(
-                                new CacheElementTypeInfo<>(inTypes[i])
-                                        .createSerializer(containingTask.getExecutionConfig()),
-                                // inTypes[i].createSerializer(containingTask.getExecutionConfig()),
+                                inTypes[i].createSerializer(containingTask.getExecutionConfig()),
                                 fileSystem,
                                 () ->
                                         new Path(
@@ -242,9 +237,10 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
                 OperatorUtils.processOperatorOrUdfIfSatisfy(
                         wrappedOperator,
                         HasBroadcastVariable.class,
-                        op ->
-                                op.setBroadcastVariable(
-                                        userKey, BroadcastContext.getBroadcastVariable(key)));
+                        op -> {
+                            op.setBroadcastVariable(
+                                    userKey, BroadcastContext.getBroadcastVariable(key));
+                        });
             }
         }
         broadcastVariablesReady = true;
@@ -275,70 +271,29 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
      *
      * @param streamRecord the input record.
      * @param inputIndex input id, starts from zero.
-     * @param elementConsumer the consumer function of StreamRecord, i.e.,
-     *     operator.processElement(...).
-     * @param watermarkConsumer the consumer function of WaterMark, i.e.,
-     *     operator.processWatermark(...).
+     * @param consumer the consumer function.
      * @throws Exception possible exception.
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
     protected void processElementX(
             StreamRecord streamRecord,
             int inputIndex,
-            ThrowingConsumer<StreamRecord, Exception> elementConsumer,
-            ThrowingConsumer<Watermark, Exception> watermarkConsumer)
+            ThrowingConsumer<StreamRecord, Exception> consumer)
             throws Exception {
         if (!isBlocked[inputIndex]) {
             if (areBroadcastVariablesReady()) {
-                processPendingElements(inputIndex, elementConsumer, watermarkConsumer);
-                elementConsumer.accept(streamRecord);
+                processPendingElements(inputIndex, consumer);
+                consumer.accept(streamRecord);
 
             } else {
-                dataCacheWriters[inputIndex].addRecord(
-                        CacheElement.newRecord(streamRecord.getValue()));
+                dataCacheWriters[inputIndex].addRecord(streamRecord.getValue());
             }
 
         } else {
             while (!areBroadcastVariablesReady()) {
                 mailboxExecutor.yield();
             }
-            elementConsumer.accept(streamRecord);
-        }
-    }
-
-    /**
-     * extracts common processing logic in subclasses' processing watermarks.
-     *
-     * @param watermark the input watermark.
-     * @param inputIndex input id, starts from zero.
-     * @param elementConsumer the consumer function of StreamRecord, i.e.,
-     *     operator.processElement(...).
-     * @param watermarkConsumer the consumer function of WaterMark, i.e.,
-     *     operator.processWatermark(...).
-     * @throws Exception possible exception.
-     */
-    @SuppressWarnings({"rawtypes", "unchecked"})
-    protected void processWatermarkX(
-            Watermark watermark,
-            int inputIndex,
-            ThrowingConsumer<StreamRecord, Exception> elementConsumer,
-            ThrowingConsumer<Watermark, Exception> watermarkConsumer)
-            throws Exception {
-        if (!isBlocked[inputIndex]) {
-            if (areBroadcastVariablesReady()) {
-                processPendingElements(inputIndex, elementConsumer, watermarkConsumer);
-                watermarkConsumer.accept(watermark);
-
-            } else {
-                dataCacheWriters[inputIndex].addRecord(
-                        CacheElement.newWatermark(watermark.getTimestamp()));
-            }
-
-        } else {
-            while (!areBroadcastVariablesReady()) {
-                mailboxExecutor.yield();
-            }
-            watermarkConsumer.accept(watermark);
+            consumer.accept(streamRecord);
         }
     }
 
@@ -346,64 +301,39 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
      * extracts common processing logic in subclasses' endInput(...).
      *
      * @param inputIndex input id, starts from zero.
-     * @param elementConsumer the consumer function of StreamRecord, i.e.,
-     *     operator.processElement(...).
-     * @param watermarkConsumer the consumer function of WaterMark, i.e.,
-     *     operator.processWatermark(...).
+     * @param consumer the consumer function.
      * @throws Exception possible exception.
      */
     @SuppressWarnings("rawtypes")
-    protected void endInputX(
-            int inputIndex,
-            ThrowingConsumer<StreamRecord, Exception> elementConsumer,
-            ThrowingConsumer<Watermark, Exception> watermarkConsumer)
+    protected void endInputX(int inputIndex, ThrowingConsumer<StreamRecord, Exception> consumer)
             throws Exception {
         while (!areBroadcastVariablesReady()) {
             mailboxExecutor.yield();
         }
-        processPendingElements(inputIndex, elementConsumer, watermarkConsumer);
+        processPendingElements(inputIndex, consumer);
     }
 
     /**
      * processes the pending elements that are cached by {@link DataCacheWriter}.
      *
      * @param inputIndex input id, starts from zero.
-     * @param elementConsumer the consumer function of StreamRecord, i.e.,
-     *     operator.processElement(...).
-     * @param watermarkConsumer the consumer function of WaterMark, i.e.,
-     *     operator.processWatermark(...).
+     * @param consumer the consumer function.
      * @throws Exception possible exception.
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
     private void processPendingElements(
-            int inputIndex,
-            ThrowingConsumer<StreamRecord, Exception> elementConsumer,
-            ThrowingConsumer<Watermark, Exception> watermarkConsumer)
-            throws Exception {
+            int inputIndex, ThrowingConsumer<StreamRecord, Exception> consumer) throws Exception {
         dataCacheWriters[inputIndex].finishCurrentSegmentAndStartNewSegment();
         segmentLists[inputIndex].addAll(dataCacheWriters[inputIndex].getNewlyFinishedSegments());
         if (segmentLists[inputIndex].size() != 0) {
             DataCacheReader dataCacheReader =
                     new DataCacheReader<>(
-                            new CacheElementTypeInfo<>(inTypes[inputIndex])
-                                    .createSerializer(containingTask.getExecutionConfig()),
-                            // inTypes[inputIndex].createSerializer(
-                            //        containingTask.getExecutionConfig()),
+                            inTypes[inputIndex].createSerializer(
+                                    containingTask.getExecutionConfig()),
                             fileSystem,
                             segmentLists[inputIndex]);
             while (dataCacheReader.hasNext()) {
-                CacheElement cacheElement = (CacheElement) dataCacheReader.next();
-                switch (cacheElement.getType()) {
-                    case RECORD:
-                        elementConsumer.accept(new StreamRecord(cacheElement.getRecord()));
-                        break;
-                    case WATERMARK:
-                        watermarkConsumer.accept(new Watermark(cacheElement.getWatermark()));
-                        break;
-                    default:
-                        throw new RuntimeException(
-                                "Unsupported Record or Watermark type " + cacheElement.getType());
-                }
+                consumer.accept(new StreamRecord<>(dataCacheReader.next()));
             }
         }
         segmentLists[inputIndex].clear();

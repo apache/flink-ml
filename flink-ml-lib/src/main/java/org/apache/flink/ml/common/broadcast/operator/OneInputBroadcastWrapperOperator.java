@@ -19,7 +19,7 @@
 package org.apache.flink.ml.common.broadcast.operator;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.ml.iteration.operator.OperatorUtils;
+import org.apache.flink.iteration.operator.OperatorUtils;
 import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
@@ -45,24 +45,19 @@ public class OneInputBroadcastWrapperOperator<IN, OUT>
 
     @Override
     public void processElement(StreamRecord<IN> streamRecord) throws Exception {
-        processElementX(
-                streamRecord,
-                0,
-                wrappedOperator::processElement,
-                wrappedOperator::processWatermark);
+        processElementX(streamRecord, 0, wrappedOperator::processElement);
     }
 
     @Override
     public void endInput() throws Exception {
-        endInputX(0, wrappedOperator::processElement, wrappedOperator::processWatermark);
+        endInputX(0, wrappedOperator::processElement);
         OperatorUtils.processOperatorOrUdfIfSatisfy(
                 wrappedOperator, BoundedOneInput.class, BoundedOneInput::endInput);
     }
 
     @Override
     public void processWatermark(Watermark watermark) throws Exception {
-        processWatermarkX(
-                watermark, 0, wrappedOperator::processElement, wrappedOperator::processWatermark);
+        wrappedOperator.processWatermark(watermark);
     }
 
     @Override
