@@ -16,24 +16,17 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.api.misc.param;
+package org.apache.flink.ml.param;
 
-import org.apache.flink.annotation.PublicEvolving;
+/** Class for the float parameter. */
+public class FloatParam extends Param<Float> {
 
-import java.io.Serializable;
+    public FloatParam(
+            String name, String description, Float defaultValue, ParamValidator<Float> validator) {
+        super(name, Float.class, description, defaultValue, validator);
+    }
 
-/**
- * An interface used by {@link ParamInfo} to do validation when a parameter value is set.
- *
- * @param <V> the type of the value to validate
- */
-@PublicEvolving
-public interface ParamValidator<V> extends Serializable {
-    /**
-     * Validates a parameter value.
-     *
-     * @param value value to validate
-     * @return {@code true} if the value is valid, {@code false} otherwise
-     */
-    boolean validate(V value);
+    public FloatParam(String name, String description, Float defaultValue) {
+        this(name, description, defaultValue, ParamValidators.alwaysTrue());
+    }
 }
