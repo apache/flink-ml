@@ -27,6 +27,7 @@ import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.iteration.IterationRecord;
+import org.apache.flink.util.TestLogger;
 
 import org.junit.Test;
 
@@ -37,7 +38,7 @@ import java.io.IOException;
 import static org.junit.Assert.assertEquals;
 
 /** Tests the serialization and deserialization for the {@link IterationRecord}. */
-public class IterationRecordSerializerTest {
+public class IterationRecordSerializerTest extends TestLogger {
 
     @Test
     public void testRecordType() throws IOException {

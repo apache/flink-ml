@@ -18,6 +18,8 @@
 
 package org.apache.flink.iteration.utils;
 
+import org.apache.flink.util.TestLogger;
+
 import org.junit.Test;
 
 import java.lang.reflect.Field;
@@ -26,7 +28,7 @@ import java.util.Collections;
 import static org.junit.Assert.assertEquals;
 
 /** Tests the utility methods related to reflection. */
-public class ReflectionUtilsTest {
+public class ReflectionUtilsTest extends TestLogger {
 
     @Test
     public void testGetField() {
