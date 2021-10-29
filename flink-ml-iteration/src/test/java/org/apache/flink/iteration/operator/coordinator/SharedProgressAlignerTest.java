@@ -24,6 +24,7 @@ import org.apache.flink.iteration.operator.event.SubtaskAlignedEvent;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.MockOperatorCoordinatorContext;
 import org.apache.flink.runtime.testutils.DirectScheduledExecutorService;
+import org.apache.flink.util.TestLogger;
 
 import org.junit.Test;
 
@@ -39,7 +40,7 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 /** Tests the {@link SharedProgressAligner}. */
-public class SharedProgressAlignerTest {
+public class SharedProgressAlignerTest extends TestLogger {
 
     @Test
     public void testCreateAndGet() {

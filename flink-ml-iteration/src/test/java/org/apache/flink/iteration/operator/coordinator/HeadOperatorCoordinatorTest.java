@@ -25,6 +25,7 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.EventReceivingTasks;
 import org.apache.flink.runtime.operators.coordination.MockOperatorCoordinatorContext;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
+import org.apache.flink.util.TestLogger;
 
 import org.junit.Test;
 
@@ -37,7 +38,7 @@ import java.util.function.BiFunction;
 import static org.junit.Assert.assertEquals;
 
 /** Tests the behavior of {@link HeadOperatorCoordinator}. */
-public class HeadOperatorCoordinatorTest {
+public class HeadOperatorCoordinatorTest extends TestLogger {
 
     @Test(timeout = 60000L)
     public void testForwardEvents() throws InterruptedException {
