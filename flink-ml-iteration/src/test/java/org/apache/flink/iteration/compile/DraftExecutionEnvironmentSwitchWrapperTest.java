@@ -39,6 +39,7 @@ import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.OutputTag;
+import org.apache.flink.util.TestLogger;
 
 import org.junit.Test;
 
@@ -48,7 +49,7 @@ import java.util.stream.Collectors;
 import static org.junit.Assert.assertEquals;
 
 /** Tests switching the operator wrapper during creating the draft. */
-public class DraftExecutionEnvironmentSwitchWrapperTest {
+public class DraftExecutionEnvironmentSwitchWrapperTest extends TestLogger {
 
     @Test
     public void testSwitchingOperatorWrappers() {

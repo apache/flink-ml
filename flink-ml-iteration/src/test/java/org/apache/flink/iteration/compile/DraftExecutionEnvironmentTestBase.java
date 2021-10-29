@@ -37,6 +37,7 @@ import org.apache.flink.streaming.api.graph.StreamGraph;
 import org.apache.flink.streaming.api.transformations.MultipleInputTransformation;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.OutputTag;
+import org.apache.flink.util.TestLogger;
 
 import org.junit.Test;
 
@@ -45,7 +46,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /** Tests the behavior of the {@link DraftExecutionEnvironment}. */
-public abstract class DraftExecutionEnvironmentTestBase {
+public abstract class DraftExecutionEnvironmentTestBase extends TestLogger {
 
     protected abstract OperatorWrapper<?, ?> getOperatorWrapper();
 
