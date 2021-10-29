@@ -180,13 +180,14 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
             BroadcastContext.putMailBoxExecutor(name + "-" + indexOfSubtask, mailboxExecutor);
         }
 
-        basePath =
-                new Path(
-                        containingTask
-                                .getEnvironment()
-                                .getTaskManagerInfo()
-                                .getConfiguration()
-                                .get(IterationOptions.DATA_CACHE_PATH));
+        basePath = new Path(containingTask.getExecutionConfig().getGlobalJobParameters().toMap().get("iteration.data-cache.path"));
+//        basePath =
+//                new Path(
+//                        containingTask
+//                                .getEnvironment()
+//                                .getTaskManagerInfo()
+//                                .getConfiguration()
+//                                .get(IterationOptions.DATA_CACHE_PATH));
         try {
             fileSystem = basePath.getFileSystem();
             dataCacheWriters = new DataCacheWriter[numInputs];

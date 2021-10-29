@@ -68,7 +68,7 @@ public final class Graph implements Estimator<Graph, GraphModel> {
     }
 
     @Override
-    public GraphModel fit(Table... inputTables) {
+    public GraphModel fit(Table... inputTables) throws Exception {
         if (estimatorInputIds.length != inputTables.length) {
             throw new IllegalArgumentException(
                     "number of provided inputs "

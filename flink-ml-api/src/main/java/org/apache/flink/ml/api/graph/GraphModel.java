@@ -62,7 +62,7 @@ public final class GraphModel implements Model<GraphModel> {
     }
 
     @Override
-    public Table[] transform(Table... inputTables) {
+    public Table[] transform(Table... inputTables) throws Exception {
         if (inputIds.length != inputTables.length) {
             throw new IllegalArgumentException(
                     "number of provided inputs "

@@ -36,7 +36,7 @@ public interface AlgoOperator<T extends AlgoOperator<T>> extends Stage<T> {
      * @param inputs a list of tables
      * @return a list of tables
      */
-    Table[] transform(Table... inputs);
+    Table[] transform(Table... inputs) throws Exception;
 
     // TODO: remote this. This is only needed when the algorithm still uses DataSet.
     default DataSet[] transformDataSet(DataSet... inputs) {
