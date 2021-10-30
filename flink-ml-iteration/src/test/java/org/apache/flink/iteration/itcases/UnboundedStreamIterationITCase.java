@@ -82,7 +82,7 @@ public class UnboundedStreamIterationITCase extends TestLogger {
     @Test(timeout = 60000)
     public void testVariableOnlyUnboundedIteration() throws Exception {
         // Create the test job
-        JobGraph jobGraph = createVariableOnlyJobGraph(4, 1000, true, 0, false, 1, result);
+        JobGraph jobGraph = createVariableOnlyJobGraph(4, 1000, true, 0, false, 1, false, result);
         miniCluster.submitJob(jobGraph);
 
         // Expected records is round * parallelism * numRecordsPerSource
@@ -94,7 +94,7 @@ public class UnboundedStreamIterationITCase extends TestLogger {
     @Test(timeout = 60000)
     public void testVariableOnlyBoundedIteration() throws Exception {
         // Create the test job
-        JobGraph jobGraph = createVariableOnlyJobGraph(4, 1000, false, 0, false, 1, result);
+        JobGraph jobGraph = createVariableOnlyJobGraph(4, 1000, false, 0, false, 1, false, result);
         miniCluster.executeJobBlocking(jobGraph);
 
         assertEquals(8001, result.get().size());
@@ -102,6 +102,22 @@ public class UnboundedStreamIterationITCase extends TestLogger {
         // Expected records is round * parallelism * numRecordsPerSource
         Map<Integer, Tuple2<Integer, Integer>> roundsStat =
                 computeRoundStat(result.get(), 2 * 4 * 1000);
+        verifyResult(roundsStat, 2, 4000, 4 * (0 + 999) * 1000 / 2);
+        assertEquals(OutputRecord.Event.TERMINATED, result.get().take().getEvent());
+    }
+
+    @Test(timeout = 60000)
+    public void testVariableOnlyBoundedIterationWithBroadcast() throws Exception {
+        // Create the test job
+        JobGraph jobGraph = createVariableOnlyJobGraph(4, 1000, false, 0, false, 1, true, result);
+        miniCluster.executeJobBlocking(jobGraph);
+
+        assertEquals(8001, result.get().size());
+
+        // Expected records is round * parallelism * numRecordsPerSource * parallelism of reduce
+        // operators
+        Map<Integer, Tuple2<Integer, Integer>> roundsStat =
+                computeRoundStat(result.get(), 2 * 4 * 1000 * 1);
         verifyResult(roundsStat, 2, 4000, 4 * (0 + 999) * 1000 / 2);
         assertEquals(OutputRecord.Event.TERMINATED, result.get().take().getEvent());
     }
@@ -150,6 +166,7 @@ public class UnboundedStreamIterationITCase extends TestLogger {
             int period,
             boolean sync,
             int maxRound,
+            boolean doBroadcast,
             SharedReference<BlockingQueue<OutputRecord<Integer>>> result) {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
@@ -161,12 +178,14 @@ public class UnboundedStreamIterationITCase extends TestLogger {
                         DataStreamList.of(source),
                         DataStreamList.of(),
                         (variableStreams, dataStreams) -> {
+                            DataStream<EpochRecord> variable = variableStreams.get(0);
+                            if (doBroadcast) {
+                                variable = variable.broadcast();
+                            }
+
                             SingleOutputStreamOperator<EpochRecord> reducer =
-                                    variableStreams
-                                            .<EpochRecord>get(0)
-                                            .process(
-                                                    new ReduceAllRoundProcessFunction(
-                                                            sync, maxRound));
+                                    variable.process(
+                                            new ReduceAllRoundProcessFunction(sync, maxRound));
                             return new IterationBodyResult(
                                     DataStreamList.of(
                                             reducer.map(new IncrementEpochMap())
