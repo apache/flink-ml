@@ -45,6 +45,13 @@ import static org.apache.flink.util.Preconditions.checkState;
 @Internal
 public class IterationFactory {
 
+    /**
+     * We finally want to connect the head / tail of the criteria stream into the same pipeline
+     * region to avoid they do not restart simultaneously.
+     */
+    private static final OutputTag<IterationRecord<Integer>> FAKE_CRITERIA_OUTPUT_TAG =
+            new OutputTag<IterationRecord<Integer>>("fake") {};
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static DataStreamList createIteration(
             DataStreamList initVariableStreams,
@@ -148,7 +155,7 @@ public class IterationFactory {
         // It should always has the IterationRecordTypeInfo
         checkState(
                 terminationCriteria.getType().getClass().equals(IterationRecordTypeInfo.class),
-                "The termination criteria should always returns IterationRecord.");
+                "The termination criteria should always return IterationRecord.");
         TypeInformation<?> innerType =
                 ((IterationRecordTypeInfo<?>) terminationCriteria.getType()).getInnerTypeInfo();
 
@@ -179,10 +186,10 @@ public class IterationFactory {
 
         // Since co-located task must be in the same region, we will have to add a fake op.
         ((SingleOutputStreamOperator<?>) criteriaHeaders.get(0))
-                .getSideOutput(new OutputTag<IterationRecord<Integer>>("fake") {})
+                .getSideOutput(FAKE_CRITERIA_OUTPUT_TAG)
                 .union(
                         ((SingleOutputStreamOperator<?>) criteriaTails.get(0))
-                                .getSideOutput(new OutputTag<IterationRecord<Integer>>("fake") {}))
+                                .getSideOutput(FAKE_CRITERIA_OUTPUT_TAG))
                 .map(x -> x)
                 .returns(new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO))
                 .name("criteria-discard")

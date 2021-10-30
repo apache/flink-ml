@@ -87,7 +87,7 @@ public class UnboundedStreamIterationITCase extends TestLogger {
 
         // Expected records is round * parallelism * numRecordsPerSource
         Map<Integer, Tuple2<Integer, Integer>> roundsStat =
-                computeRoundStat(result.get(), 2 * 4 * 1000);
+                computeRoundStat(result.get(), OutputRecord.Event.PROCESS_ELEMENT, 2 * 4 * 1000);
         verifyResult(roundsStat, 2, 4000, 4 * (0 + 999) * 1000 / 2);
     }
 
@@ -101,7 +101,7 @@ public class UnboundedStreamIterationITCase extends TestLogger {
 
         // Expected records is round * parallelism * numRecordsPerSource
         Map<Integer, Tuple2<Integer, Integer>> roundsStat =
-                computeRoundStat(result.get(), 2 * 4 * 1000);
+                computeRoundStat(result.get(), OutputRecord.Event.PROCESS_ELEMENT, 2 * 4 * 1000);
         verifyResult(roundsStat, 2, 4000, 4 * (0 + 999) * 1000 / 2);
         assertEquals(OutputRecord.Event.TERMINATED, result.get().take().getEvent());
     }
@@ -117,7 +117,8 @@ public class UnboundedStreamIterationITCase extends TestLogger {
         // Expected records is round * parallelism * numRecordsPerSource * parallelism of reduce
         // operators
         Map<Integer, Tuple2<Integer, Integer>> roundsStat =
-                computeRoundStat(result.get(), 2 * 4 * 1000 * 1);
+                computeRoundStat(
+                        result.get(), OutputRecord.Event.PROCESS_ELEMENT, 2 * 4 * 1000 * 1);
         verifyResult(roundsStat, 2, 4000, 4 * (0 + 999) * 1000 / 2);
         assertEquals(OutputRecord.Event.TERMINATED, result.get().take().getEvent());
     }
@@ -130,7 +131,7 @@ public class UnboundedStreamIterationITCase extends TestLogger {
 
         // Expected records is round * parallelism * numRecordsPerSource
         Map<Integer, Tuple2<Integer, Integer>> roundsStat =
-                computeRoundStat(result.get(), 2 * 4 * 1000);
+                computeRoundStat(result.get(), OutputRecord.Event.PROCESS_ELEMENT, 2 * 4 * 1000);
         verifyResult(roundsStat, 2, 4000, 4 * (0 + 999) * 1000 / 2);
     }
 
@@ -144,7 +145,7 @@ public class UnboundedStreamIterationITCase extends TestLogger {
 
         // Expected records is round * parallelism * numRecordsPerSource
         Map<Integer, Tuple2<Integer, Integer>> roundsStat =
-                computeRoundStat(result.get(), 2 * 4 * 1000);
+                computeRoundStat(result.get(), OutputRecord.Event.PROCESS_ELEMENT, 2 * 4 * 1000);
         verifyResult(roundsStat, 2, 4000, 4 * (0 + 999) * 1000 / 2);
         assertEquals(OutputRecord.Event.TERMINATED, result.get().take().getEvent());
     }
@@ -159,7 +160,7 @@ public class UnboundedStreamIterationITCase extends TestLogger {
                 .build();
     }
 
-    static JobGraph createVariableOnlyJobGraph(
+    private static JobGraph createVariableOnlyJobGraph(
             int numSources,
             int numRecordsPerSource,
             boolean holdSource,
@@ -200,7 +201,7 @@ public class UnboundedStreamIterationITCase extends TestLogger {
         return env.getStreamGraph().getJobGraph();
     }
 
-    static JobGraph createVariableAndConstantJobGraph(
+    private static JobGraph createVariableAndConstantJobGraph(
             int numSources,
             int numRecordsPerSource,
             boolean holdSource,
@@ -245,12 +246,14 @@ public class UnboundedStreamIterationITCase extends TestLogger {
     }
 
     static Map<Integer, Tuple2<Integer, Integer>> computeRoundStat(
-            BlockingQueue<OutputRecord<Integer>> result, int expectedRecords)
+            BlockingQueue<OutputRecord<Integer>> result,
+            OutputRecord.Event event,
+            int expectedRecords)
             throws InterruptedException {
         Map<Integer, Tuple2<Integer, Integer>> roundsStat = new HashMap<>();
         for (int i = 0; i < expectedRecords; ++i) {
             OutputRecord<Integer> next = result.take();
-            assertEquals(OutputRecord.Event.PROCESS_ELEMENT, next.getEvent());
+            assertEquals(event, next.getEvent());
             Tuple2<Integer, Integer> state =
                     roundsStat.computeIfAbsent(next.getRound(), ignored -> new Tuple2<>(0, 0));
             state.f0++;

@@ -24,7 +24,7 @@ import org.apache.flink.util.Collector;
 
 /** An termination criteria function that asks to stop after the specialized round. */
 public class RoundBasedTerminationCriteria
-        implements FlatMapFunction<Integer, Integer>, IterationListener<Integer> {
+        implements FlatMapFunction<EpochRecord, Integer>, IterationListener<Integer> {
 
     private final int maxRound;
 
@@ -33,7 +33,7 @@ public class RoundBasedTerminationCriteria
     }
 
     @Override
-    public void flatMap(Integer integer, Collector<Integer> collector) throws Exception {}
+    public void flatMap(EpochRecord integer, Collector<Integer> collector) throws Exception {}
 
     @Override
     public void onEpochWatermarkIncremented(
