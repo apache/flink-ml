@@ -251,6 +251,7 @@ public class UnboundedStreamIterationITCase extends TestLogger {
             int expectedRecords)
             throws InterruptedException {
         Map<Integer, Tuple2<Integer, Integer>> roundsStat = new HashMap<>();
+        System.out.println(roundsStat);
         for (int i = 0; i < expectedRecords; ++i) {
             OutputRecord<Integer> next = result.take();
             assertEquals(event, next.getEvent());

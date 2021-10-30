@@ -88,7 +88,8 @@ public class BoundedAllRoundStreamIterationITCase extends TestLogger {
 
     @Test(timeout = 60000)
     public void testSyncVariableOnlyBoundedIteration() throws Exception {
-        JobGraph jobGraph = createVariableOnlyJobGraph(4, 1000, false, 0, true, 4, null, result);
+        JobGraph jobGraph =
+                createVariableOnlyJobGraph(4, 1000, false, 0, true, 4, null, false, result);
         miniCluster.executeJobBlocking(jobGraph);
 
         assertEquals(6, result.get().size());
@@ -100,15 +101,40 @@ public class BoundedAllRoundStreamIterationITCase extends TestLogger {
     }
 
     @Test
-    public void testSyncVariableOnlyBoundedIterationWithTerminationCriteria() throws Exception {
-        JobGraph jobGraph = createVariableOnlyJobGraph(4, 1000, false, 0, true, 40, 4, result);
+    public void testSyncVariableOnlyBoundedIterationWithVariableTerminationCriteria()
+            throws Exception {
+        testSyncVariableOnlyBoundedIterationWithTerminationCriteria(false);
+    }
+
+    @Test
+    public void testSyncVariableOnlyBoundedIterationWithConstantTerminationCriteria()
+            throws Exception {
+        testSyncVariableOnlyBoundedIterationWithTerminationCriteria(true);
+    }
+
+    private void testSyncVariableOnlyBoundedIterationWithTerminationCriteria(
+            boolean terminationCriteriaFollowsConstantsStreams) throws Exception {
+        JobGraph jobGraph =
+                createVariableOnlyJobGraph(
+                        4,
+                        1000,
+                        false,
+                        0,
+                        true,
+                        40,
+                        4,
+                        terminationCriteriaFollowsConstantsStreams,
+                        result);
         miniCluster.executeJobBlocking(jobGraph);
 
-        assertEquals(6, result.get().size());
+        // If termination criteria is created only with the constants streams, it would not have
+        // records after the round 1 if the input is not replayed.
+        int numOfRound = terminationCriteriaFollowsConstantsStreams ? 1 : 5;
         Map<Integer, Tuple2<Integer, Integer>> roundsStat =
-                computeRoundStat(result.get(), OutputRecord.Event.EPOCH_WATERMARK_INCREMENTED, 5);
+                computeRoundStat(
+                        result.get(), OutputRecord.Event.EPOCH_WATERMARK_INCREMENTED, numOfRound);
 
-        verifyResult(roundsStat, 5, 1, 4 * (0 + 999) * 1000 / 2);
+        verifyResult(roundsStat, numOfRound, 1, 4 * (0 + 999) * 1000 / 2);
         assertEquals(OutputRecord.Event.TERMINATED, result.get().take().getEvent());
     }
 
@@ -133,6 +159,7 @@ public class BoundedAllRoundStreamIterationITCase extends TestLogger {
             boolean sync,
             int maxRound,
             @Nullable Integer terminationCriteriaRound,
+            boolean terminationCriteriaFollowsConstantsStreams,
             SharedReference<BlockingQueue<OutputRecord<Integer>>> result) {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
@@ -167,9 +194,12 @@ public class BoundedAllRoundStreamIterationITCase extends TestLogger {
                                                             "output") {})),
                                     terminationCriteriaRound == null
                                             ? null
-                                            : reducer.flatMap(
-                                                    new RoundBasedTerminationCriteria(
-                                                            terminationCriteriaRound)));
+                                            : (terminationCriteriaFollowsConstantsStreams
+                                                            ? dataStreams.<EpochRecord>get(0)
+                                                            : reducer)
+                                                    .flatMap(
+                                                            new RoundBasedTerminationCriteria(
+                                                                    terminationCriteriaRound)));
                         });
         outputs.<OutputRecord<Integer>>get(0).addSink(new CollectSink(result));
 

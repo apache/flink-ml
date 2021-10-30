@@ -254,11 +254,11 @@ public class IterationConstructionTest extends TestLogger {
                         /* 9 */ "Feedback1",
                         /* 10 */ "tail-Feedback1",
                         /* 11 */ "Termination",
-                        /* 12 */ "tail-Termination",
-                        /* 13 */ "head-Termination",
-                        /* 14 */ "criteria-discard");
+                        /* 12 */ "head-Termination",
+                        /* 13 */ "criteria-merge",
+                        /* 14 */ "tail-criteria-merge");
         List<Integer> expectedParallelisms =
-                Arrays.asList(2, 2, 3, 5, 2, 2, 4, 2, 2, 3, 3, 5, 5, 5, 1);
+                Arrays.asList(2, 2, 3, 5, 2, 2, 4, 2, 2, 3, 3, 5, 5, 5, 5);
 
         JobGraph jobGraph = env.getStreamGraph().getJobGraph();
         List<JobVertex> vertices = jobGraph.getVerticesSortedTopologicallyFromSources();
@@ -271,9 +271,9 @@ public class IterationConstructionTest extends TestLogger {
 
         assertNotNull(vertices.get(4).getCoLocationGroup());
         assertNotNull(vertices.get(5).getCoLocationGroup());
-        assertNotNull(vertices.get(13).getCoLocationGroup());
+        assertNotNull(vertices.get(12).getCoLocationGroup());
         assertSame(vertices.get(4).getCoLocationGroup(), vertices.get(8).getCoLocationGroup());
         assertSame(vertices.get(5).getCoLocationGroup(), vertices.get(10).getCoLocationGroup());
-        assertSame(vertices.get(13).getCoLocationGroup(), vertices.get(12).getCoLocationGroup());
+        assertSame(vertices.get(12).getCoLocationGroup(), vertices.get(14).getCoLocationGroup());
     }
 }

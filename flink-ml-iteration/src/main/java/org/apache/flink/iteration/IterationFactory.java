@@ -19,7 +19,6 @@
 package org.apache.flink.iteration;
 
 import org.apache.flink.annotation.Internal;
-import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.iteration.compile.DraftExecutionEnvironment;
 import org.apache.flink.iteration.operator.HeadOperatorFactory;
@@ -27,12 +26,14 @@ import org.apache.flink.iteration.operator.InputOperator;
 import org.apache.flink.iteration.operator.OperatorWrapper;
 import org.apache.flink.iteration.operator.OutputOperator;
 import org.apache.flink.iteration.operator.TailOperator;
+import org.apache.flink.iteration.operator.allround.AllRoundOperatorWrapper;
 import org.apache.flink.iteration.typeinfo.IterationRecordTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.co.CoProcessFunction;
 import org.apache.flink.streaming.api.transformations.OneInputTransformation;
-import org.apache.flink.util.OutputTag;
+import org.apache.flink.util.Collector;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -44,13 +45,6 @@ import static org.apache.flink.util.Preconditions.checkState;
 /** Creates iteration in a job. */
 @Internal
 public class IterationFactory {
-
-    /**
-     * We finally want to connect the head / tail of the criteria stream into the same pipeline
-     * region to avoid they do not restart simultaneously.
-     */
-    private static final OutputTag<IterationRecord<Integer>> FAKE_CRITERIA_OUTPUT_TAG =
-            new OutputTag<IterationRecord<Integer>>("fake") {};
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static DataStreamList createIteration(
@@ -174,9 +168,16 @@ public class IterationFactory {
                         totalInitVariableParallelism,
                         true,
                         initVariableStreams.size());
+
+        // Merges the head and the actual criteria stream. This is required since if we have
+        // no edges from the criteria head to the criteria tail, the tail might directly received
+        // the MAX_EPOCH_WATERMARK without the synchronization of the head.
+        DataStream<?> mergedHeadAndCriteria =
+                mergeCriteriaHeadAndCriteriaStream(
+                        env, criteriaHeaders.get(0), terminationCriteria, innerType);
         DataStreamList criteriaTails =
                 addTails(
-                        DataStreamList.of(terminationCriteria),
+                        DataStreamList.of(mergedHeadAndCriteria),
                         iterationId,
                         initVariableStreams.size());
 
@@ -184,20 +185,34 @@ public class IterationFactory {
         criteriaHeaders.get(0).getTransformation().setCoLocationGroupKey(coLocationGroupKey);
         criteriaTails.get(0).getTransformation().setCoLocationGroupKey(coLocationGroupKey);
 
-        // Since co-located task must be in the same region, we will have to add a fake op.
-        ((SingleOutputStreamOperator<?>) criteriaHeaders.get(0))
-                .getSideOutput(FAKE_CRITERIA_OUTPUT_TAG)
-                .union(
-                        ((SingleOutputStreamOperator<?>) criteriaTails.get(0))
-                                .getSideOutput(FAKE_CRITERIA_OUTPUT_TAG))
-                .map(x -> x)
-                .returns(new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO))
-                .name("criteria-discard")
-                .setParallelism(1);
-
         // Now we notify all the head operators to count the criteria stream.
         setCriteriaParallelism(headStreams, terminationCriteria.getParallelism());
         setCriteriaParallelism(criteriaHeaders, terminationCriteria.getParallelism());
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static DataStream<?> mergeCriteriaHeadAndCriteriaStream(
+            StreamExecutionEnvironment env,
+            DataStream<?> head,
+            DataStream<?> criteriaStream,
+            TypeInformation<?> criteriaStreamType) {
+        DraftExecutionEnvironment criteriaDraftEnv =
+                new DraftExecutionEnvironment(env, new AllRoundOperatorWrapper<>());
+        DataStream draftHeadStream = criteriaDraftEnv.addDraftSource(head, criteriaStreamType);
+        DataStream draftTerminationCriteria =
+                criteriaDraftEnv.addDraftSource(criteriaStream, criteriaStreamType);
+        DataStream draftMergedStream =
+                draftHeadStream
+                        .connect(draftTerminationCriteria)
+                        .process(new CriteriaMergeProcessor())
+                        .returns(criteriaStreamType)
+                        .setParallelism(
+                                criteriaStream.getParallelism() > 0
+                                        ? criteriaStream.getParallelism()
+                                        : env.getConfig().getParallelism())
+                        .name("criteria-merge");
+        criteriaDraftEnv.copyToActualEnvironment();
+        return criteriaDraftEnv.getActualStream(draftMergedStream.getId());
     }
 
     private static List<TypeInformation<?>> getTypeInfos(DataStreamList dataStreams) {
@@ -330,5 +345,21 @@ public class IterationFactory {
         }
 
         return results;
+    }
+
+    private static class CriteriaMergeProcessor extends CoProcessFunction<Integer, Object, Object> {
+
+        @Override
+        public void processElement1(Integer value, Context ctx, Collector<Object> out)
+                throws Exception {
+            // Ignores all the records from the head side-output.
+        }
+
+        @Override
+        public void processElement2(Object value, Context ctx, Collector<Object> out)
+                throws Exception {
+            // Bypasses all the records from the actual criteria stream.
+            out.collect(value);
+        }
     }
 }
