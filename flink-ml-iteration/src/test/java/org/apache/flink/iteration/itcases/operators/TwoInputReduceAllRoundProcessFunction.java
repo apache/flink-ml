@@ -20,7 +20,6 @@ package org.apache.flink.iteration.itcases.operators;
 
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.iteration.IterationListener;
-import org.apache.flink.iteration.functions.EpochAwareCoProcessFunction;
 import org.apache.flink.streaming.api.functions.co.CoProcessFunction;
 import org.apache.flink.util.Collector;
 
@@ -28,54 +27,55 @@ import org.apache.flink.util.Collector;
  * A proxy of {@link ReduceAllRoundProcessFunction} to two-inputs. It assumes the input 1 is empty.
  */
 public class TwoInputReduceAllRoundProcessFunction
-        extends EpochAwareCoProcessFunction<Integer, Integer, Integer>
-        implements IterationListener<Integer> {
+        extends CoProcessFunction<EpochRecord, EpochRecord, EpochRecord>
+        implements IterationListener<EpochRecord> {
 
-    private final ReduceAllRoundProcessFunction internal;
+    private final ReduceAllRoundProcessFunction reduceAllRoundProcessFunction;
 
     public TwoInputReduceAllRoundProcessFunction(boolean sync, int maxRound) {
-        this.internal = new ReduceAllRoundProcessFunction(sync, maxRound);
+        this.reduceAllRoundProcessFunction = new ReduceAllRoundProcessFunction(sync, maxRound);
     }
 
     @Override
     public void open(Configuration parameters) throws Exception {
         super.open(parameters);
-        internal.open(parameters);
+        reduceAllRoundProcessFunction.open(parameters);
     }
 
     @Override
     public void onEpochWatermarkIncremented(
-            int epochWatermark, IterationListener.Context context, Collector<Integer> collector) {
-        this.internal.onEpochWatermarkIncremented(epochWatermark, context, collector);
+            int epochWatermark,
+            IterationListener.Context context,
+            Collector<EpochRecord> collector) {
+        reduceAllRoundProcessFunction.onEpochWatermarkIncremented(
+                epochWatermark, context, collector);
     }
 
     @Override
     public void onIterationTerminated(
-            IterationListener.Context context, Collector<Integer> collector) {
-        this.internal.onIterationTerminated(context, collector);
+            IterationListener.Context context, Collector<EpochRecord> collector) {
+        reduceAllRoundProcessFunction.onIterationTerminated(context, collector);
     }
 
     @Override
     public void processElement1(
-            Integer value,
-            int epoch,
-            CoProcessFunction<Integer, Integer, Integer>.Context ctx,
-            Collector<Integer> out)
+            EpochRecord record,
+            CoProcessFunction<EpochRecord, EpochRecord, EpochRecord>.Context ctx,
+            Collector<EpochRecord> out)
             throws Exception {
 
         // Processing the following round of messages.
-        internal.processRecord(value, epoch, ctx::output, out);
+        reduceAllRoundProcessFunction.processRecord(record, ctx::output, out);
     }
 
     @Override
     public void processElement2(
-            Integer value,
-            int epoch,
-            CoProcessFunction<Integer, Integer, Integer>.Context ctx,
-            Collector<Integer> out)
+            EpochRecord record,
+            CoProcessFunction<EpochRecord, EpochRecord, EpochRecord>.Context ctx,
+            Collector<EpochRecord> out)
             throws Exception {
 
         // Processing the first round of messages.
-        internal.processRecord(value, epoch, ctx::output, out);
+        reduceAllRoundProcessFunction.processRecord(record, ctx::output, out);
     }
 }

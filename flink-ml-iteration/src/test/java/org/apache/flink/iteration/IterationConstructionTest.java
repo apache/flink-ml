@@ -28,6 +28,7 @@ import org.apache.flink.streaming.api.functions.co.CoProcessFunction;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.OutputTag;
+import org.apache.flink.util.TestLogger;
 
 import org.junit.Test;
 
@@ -40,7 +41,42 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 
 /** Verifies the created job graph satisfy the expectation. */
-public class IterationConstructionTest {
+public class IterationConstructionTest extends TestLogger {
+
+    @Test
+    public void testEmptyIterationBody() {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(4);
+        DataStream<Integer> variableSource =
+                env.addSource(new DraftExecutionEnvironment.EmptySource<Integer>() {})
+                        .name("Variable");
+        DataStreamList result =
+                Iterations.iterateUnboundedStreams(
+                        DataStreamList.of(variableSource),
+                        DataStreamList.of(),
+                        ((variableStreams, dataStreams) ->
+                                new IterationBodyResult(variableStreams, dataStreams)));
+
+        JobGraph jobGraph = env.getStreamGraph().getJobGraph();
+
+        List<String> expectedVertexNames =
+                Arrays.asList(
+                        /* 0 */ "Source: Variable -> input-Variable",
+                        /* 1 */ "head-Variable",
+                        /* 2 */ "tail-head-Variable");
+        List<Integer> expectedParallelisms = Arrays.asList(4, 4, 4);
+
+        List<JobVertex> vertices = jobGraph.getVerticesSortedTopologicallyFromSources();
+        assertEquals(
+                expectedVertexNames,
+                vertices.stream().map(JobVertex::getName).collect(Collectors.toList()));
+        assertEquals(
+                expectedParallelisms,
+                vertices.stream().map(JobVertex::getParallelism).collect(Collectors.toList()));
+        assertNotNull(vertices.get(1).getCoLocationGroup());
+        assertNotNull(vertices.get(2).getCoLocationGroup());
+        assertSame(vertices.get(1).getCoLocationGroup(), vertices.get(2).getCoLocationGroup());
+    }
 
     @Test
     public void testUnboundedIteration() {

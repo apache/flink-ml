@@ -59,7 +59,16 @@ public class IterationFactory {
 
         // Add heads and inputs
         int totalInitVariableParallelism =
-                map(initVariableStreams, DataStream::getParallelism).stream()
+                map(
+                                initVariableStreams,
+                                dataStream ->
+                                        dataStream.getParallelism() > 0
+                                                ? dataStream.getParallelism()
+                                                : dataStream
+                                                        .getExecutionEnvironment()
+                                                        .getConfig()
+                                                        .getParallelism())
+                        .stream()
                         .mapToInt(i -> i)
                         .sum();
         DataStreamList initVariableInputs = addInputs(initVariableStreams, false);
@@ -74,7 +83,8 @@ public class IterationFactory {
 
         DataStreamList dataStreamInputs = addInputs(dataStreams, true);
 
-        // Create the iteration body.
+        // Create the iteration body. We map the inputs of iteration body into the draft sources,
+        // which serve as the start points to build the draft subgraph.
         StreamExecutionEnvironment env = initVariableStreams.get(0).getExecutionEnvironment();
         DraftExecutionEnvironment draftEnv =
                 new DraftExecutionEnvironment(env, initialOperatorWrapper);
@@ -237,7 +247,7 @@ public class IterationFactory {
 
     private static <R> List<R> map(
             DataStreamList dataStreams, BiFunction<Integer, DataStream<?>, R> mapper) {
-        List<R> results = new ArrayList<>();
+        List<R> results = new ArrayList<>(dataStreams.size());
         for (int i = 0; i < dataStreams.size(); ++i) {
             DataStream<?> dataStream = dataStreams.get(i);
             results.add(mapper.apply(i, dataStream));

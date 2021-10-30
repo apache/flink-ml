@@ -20,8 +20,8 @@ package org.apache.flink.iteration.itcases.operators;
 
 import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunction;
 
-/** Sources emitting the continuous int sequences. */
-public class SequenceSource extends RichParallelSourceFunction<Integer> {
+/** A source emitting the continuous int sequences. */
+public class SequenceSource extends RichParallelSourceFunction<EpochRecord> {
 
     private final int maxValue;
 
@@ -38,9 +38,9 @@ public class SequenceSource extends RichParallelSourceFunction<Integer> {
     }
 
     @Override
-    public void run(SourceContext<Integer> ctx) throws Exception {
+    public void run(SourceContext<EpochRecord> ctx) throws Exception {
         for (int i = 0; i < maxValue && !canceled; ++i) {
-            ctx.collect(i);
+            ctx.collect(new EpochRecord(0, i));
             if (period > 0) {
                 Thread.sleep(period);
             }

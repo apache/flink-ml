@@ -20,7 +20,6 @@ package org.apache.flink.iteration.itcases.operators;
 
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.iteration.IterationListener;
-import org.apache.flink.iteration.functions.EpochAwareAllRoundProcessFunction;
 import org.apache.flink.streaming.api.functions.ProcessFunction;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.OutputTag;
@@ -32,12 +31,11 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 
 /**
- * An operators that reduce the received numbers and emit the result into the output, and also emit
+ * An operator that reduces the received numbers and emit the result into the output, and also emit
  * the received numbers to the next operator.
  */
-public class ReduceAllRoundProcessFunction
-        extends EpochAwareAllRoundProcessFunction<Integer, Integer>
-        implements IterationListener<Integer> {
+public class ReduceAllRoundProcessFunction extends ProcessFunction<EpochRecord, EpochRecord>
+        implements IterationListener<EpochRecord> {
 
     private final boolean sync;
 
@@ -45,7 +43,7 @@ public class ReduceAllRoundProcessFunction
 
     private transient Map<Integer, Integer> sumByEpochs;
 
-    private transient List<Integer> cachedRecords;
+    private transient List<EpochRecord> cachedRecords;
 
     private transient OutputTag<OutputRecord<Integer>> outputTag;
 
@@ -57,33 +55,32 @@ public class ReduceAllRoundProcessFunction
     @Override
     public void open(Configuration parameters) throws Exception {
         super.open(parameters);
-        this.sumByEpochs = new HashMap<>();
+        sumByEpochs = new HashMap<>();
         cachedRecords = new ArrayList<>();
-        this.outputTag = new OutputTag<OutputRecord<Integer>>("output") {};
+        outputTag = new OutputTag<OutputRecord<Integer>>("output") {};
     }
 
     @Override
     public void processElement(
-            Integer value,
-            int epoch,
-            ProcessFunction<Integer, Integer>.Context ctx,
-            Collector<Integer> out)
+            EpochRecord record,
+            ProcessFunction<EpochRecord, EpochRecord>.Context ctx,
+            Collector<EpochRecord> out)
             throws Exception {
-        processRecord(value, epoch, ctx::output, out);
+        processRecord(record, ctx::output, out);
     }
 
     protected void processRecord(
-            Integer value,
-            int epoch,
+            EpochRecord record,
             BiConsumer<OutputTag<OutputRecord<Integer>>, OutputRecord<Integer>> sideOutput,
-            Collector<Integer> out) {
-        sumByEpochs.compute(epoch, (k, v) -> v == null ? value : v + value);
+            Collector<EpochRecord> out) {
+        sumByEpochs.compute(
+                record.getEpoch(), (k, v) -> v == null ? record.getValue() : v + record.getValue());
 
-        if (epoch < maxRound) {
+        if (record.getEpoch() < maxRound) {
             if (!sync) {
-                out.collect(value);
+                out.collect(record);
             } else {
-                cachedRecords.add(value);
+                cachedRecords.add(record);
             }
         }
 
@@ -91,13 +88,17 @@ public class ReduceAllRoundProcessFunction
             sideOutput.accept(
                     outputTag,
                     new OutputRecord<>(
-                            OutputRecord.Event.PROCESS_ELEMENT, epoch, sumByEpochs.get(epoch)));
+                            OutputRecord.Event.PROCESS_ELEMENT,
+                            record.getEpoch(),
+                            sumByEpochs.get(record.getEpoch())));
         }
     }
 
     @Override
     public void onEpochWatermarkIncremented(
-            int epochWatermark, IterationListener.Context context, Collector<Integer> collector) {
+            int epochWatermark,
+            IterationListener.Context context,
+            Collector<EpochRecord> collector) {
         if (sync) {
             context.output(
                     outputTag,
@@ -112,7 +113,7 @@ public class ReduceAllRoundProcessFunction
 
     @Override
     public void onIterationTerminated(
-            IterationListener.Context context, Collector<Integer> collector) {
+            IterationListener.Context context, Collector<EpochRecord> collector) {
         context.output(outputTag, new OutputRecord<>(OutputRecord.Event.TERMINATED, -1, -1));
     }
 }
