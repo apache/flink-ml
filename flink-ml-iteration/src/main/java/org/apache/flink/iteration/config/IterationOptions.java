@@ -19,6 +19,7 @@
 package org.apache.flink.iteration.config;
 
 import org.apache.flink.configuration.ConfigOption;
+import org.apache.flink.configuration.CoreOptions;
 
 import static org.apache.flink.configuration.ConfigOptions.key;
 
@@ -29,5 +30,8 @@ public class IterationOptions {
             key("iteration.data-cache.path")
                     .stringType()
                     .noDefaultValue()
-                    .withDescription("The base path of the data cached used inside the iteration.");
+                    .withDescription(
+                            "The base path of the data cached used inside the iteration. "
+                                    + "If not specified, it will use local path randomly chosen from "
+                                    + CoreOptions.TMP_DIRS.key());
 }

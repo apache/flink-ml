@@ -97,8 +97,8 @@ public class DataCacheReader<T> implements Iterator<T> {
 
         public SegmentReader(int index) throws IOException {
             this.index = index;
-            inputStream = fileSystem.open(segments.get(index).getPath());
-            inputView = new DataInputViewStreamWrapper(inputStream);
+            this.inputStream = fileSystem.open(segments.get(index).getPath());
+            this.inputView = new DataInputViewStreamWrapper(inputStream);
         }
 
         public boolean hasNext() {

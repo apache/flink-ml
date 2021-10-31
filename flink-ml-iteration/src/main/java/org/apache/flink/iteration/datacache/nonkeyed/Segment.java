@@ -28,11 +28,16 @@ public class Segment implements Serializable {
 
     private final Path path;
 
+    /** The count of the records in the file. */
     private final int count;
 
-    public Segment(Path path, int count) {
+    /** The total length of file. */
+    private final long size;
+
+    public Segment(Path path, int count, long size) {
         this.path = path;
         this.count = count;
+        this.size = size;
     }
 
     public Path getPath() {
@@ -43,25 +48,26 @@ public class Segment implements Serializable {
         return count;
     }
 
+    public long getSize() {
+        return size;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
         }
-        if (o == null || getClass() != o.getClass()) {
+
+        if (!(o instanceof Segment)) {
             return false;
         }
+
         Segment segment = (Segment) o;
-        return count == segment.count && Objects.equals(path, segment.path);
+        return count == segment.count && size == segment.size && Objects.equals(path, segment.path);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(path, count);
-    }
-
-    @Override
-    public String toString() {
-        return "Segment{" + "path=" + path + ", count=" + count + '}';
+        return Objects.hash(path, count, size);
     }
 }

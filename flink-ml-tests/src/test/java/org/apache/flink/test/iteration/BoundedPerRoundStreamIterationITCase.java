@@ -20,111 +20,87 @@ package org.apache.flink.test.iteration;
 
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.configuration.Configuration;
-import org.apache.flink.configuration.RestOptions;
 import org.apache.flink.iteration.DataStreamList;
 import org.apache.flink.iteration.IterationBodyResult;
 import org.apache.flink.iteration.IterationConfig;
 import org.apache.flink.iteration.Iterations;
 import org.apache.flink.iteration.ReplayableDataStreamList;
-import org.apache.flink.iteration.config.IterationOptions;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.minicluster.MiniCluster;
-import org.apache.flink.runtime.minicluster.MiniClusterConfiguration;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.sink.SinkFunction;
+import org.apache.flink.test.iteration.operators.CollectSink;
 import org.apache.flink.test.iteration.operators.EpochRecord;
 import org.apache.flink.test.iteration.operators.OutputRecord;
 import org.apache.flink.test.iteration.operators.SequenceSource;
 import org.apache.flink.test.iteration.operators.TwoInputReducePerRoundOperator;
+import org.apache.flink.testutils.junit.SharedObjects;
+import org.apache.flink.testutils.junit.SharedReference;
+import org.apache.flink.util.TestLogger;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
 
-import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import static org.apache.flink.test.iteration.UnboundedStreamIterationITCase.computeRoundStat;
+import static org.apache.flink.test.iteration.UnboundedStreamIterationITCase.createMiniClusterConfiguration;
 import static org.apache.flink.test.iteration.UnboundedStreamIterationITCase.verifyResult;
 import static org.junit.Assert.assertEquals;
 
 /** Tests the per-round iterations. */
-public class BoundedPerRoundStreamIterationITCase {
+public class BoundedPerRoundStreamIterationITCase extends TestLogger {
 
-    @Rule public TemporaryFolder tempFolder = new TemporaryFolder();
+    @Rule public final SharedObjects sharedObjects = SharedObjects.create();
 
-    private static BlockingQueue<OutputRecord<Integer>> result = new LinkedBlockingQueue<>();
+    private MiniCluster miniCluster;
+
+    private SharedReference<BlockingQueue<OutputRecord<Integer>>> result;
 
     @Before
-    public void setup() {
-        result.clear();
+    public void setup() throws Exception {
+        miniCluster = new MiniCluster(createMiniClusterConfiguration(2, 2));
+        miniCluster.start();
+
+        result = sharedObjects.add(new LinkedBlockingQueue<>());
+    }
+
+    @After
+    public void teardown() throws Exception {
+        if (miniCluster != null) {
+            miniCluster.close();
+        }
     }
 
     @Test
     public void testPerRoundIteration() throws Exception {
-        try (MiniCluster miniCluster = new MiniCluster(createMiniClusterConfiguration(2, 2))) {
-            miniCluster.start();
+        JobGraph jobGraph = createPerRoundJobGraph(4, 1000, 5, result);
+        miniCluster.executeJobBlocking(jobGraph);
 
-            JobGraph jobGraph =
-                    createPerRoundJobGraph(
-                            4,
-                            1000,
-                            5,
-                            new SinkFunction<OutputRecord<Integer>>() {
-                                @Override
-                                public void invoke(OutputRecord<Integer> value, Context context) {
-                                    result.add(value);
-                                }
-                            });
-            miniCluster.executeJobBlocking(jobGraph);
-
-            assertEquals(5, result.size());
-
-            Map<Integer, Tuple2<Integer, Integer>> roundsStat = new HashMap<>();
-            for (int i = 0; i < 5; ++i) {
-                OutputRecord<Integer> next = result.take();
-                assertEquals(OutputRecord.Event.TERMINATED, next.getEvent());
-                Tuple2<Integer, Integer> state =
-                        roundsStat.computeIfAbsent(next.getRound(), ignored -> new Tuple2<>(0, 0));
-                state.f0++;
-                state.f1 = next.getValue();
-            }
-
-            verifyResult(roundsStat, 5, 1, 4 * (0 + 999) * 1000 / 2);
-        }
-    }
-
-    private MiniClusterConfiguration createMiniClusterConfiguration(int numTm, int numSlot)
-            throws IOException {
-        Configuration configuration = new Configuration();
-        configuration.set(RestOptions.PORT, 18081);
-        configuration.set(
-                IterationOptions.DATA_CACHE_PATH,
-                "file://" + tempFolder.newFolder().getAbsolutePath());
-        return new MiniClusterConfiguration.Builder()
-                .setConfiguration(configuration)
-                .setNumTaskManagers(numTm)
-                .setNumSlotsPerTaskManager(numSlot)
-                .build();
+        assertEquals(5, result.get().size());
+        Map<Integer, Tuple2<Integer, Integer>> roundsStat =
+                computeRoundStat(result.get(), OutputRecord.Event.TERMINATED, 5);
+        verifyResult(roundsStat, 5, 1, 4 * (0 + 999) * 1000 / 2);
     }
 
     private static JobGraph createPerRoundJobGraph(
             int numSources,
             int numRecordsPerSource,
             int maxRound,
-            SinkFunction<OutputRecord<Integer>> sinkFunction) {
+            SharedReference<BlockingQueue<OutputRecord<Integer>>> result) {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
 
         DataStream<Integer> variableSource = env.fromElements(0);
-        DataStream<EpochRecord> constSource =
+        DataStream<Integer> constSource =
                 env.addSource(new SequenceSource(numRecordsPerSource, false, 0))
+                        .setParallelism(numSources)
+                        .map(EpochRecord::getValue)
                         .setParallelism(numSources)
                         .name("Constants");
 
@@ -153,7 +129,7 @@ public class BoundedPerRoundStreamIterationITCase {
                                                     TwoInputReducePerRoundOperator.OUTPUT_TAG)),
                                     reducer.filter(x -> x < maxRound).setParallelism(1));
                         });
-        outputs.<OutputRecord<Integer>>get(0).addSink(sinkFunction);
+        outputs.<OutputRecord<Integer>>get(0).addSink(new CollectSink(result));
 
         return env.getStreamGraph().getJobGraph();
     }

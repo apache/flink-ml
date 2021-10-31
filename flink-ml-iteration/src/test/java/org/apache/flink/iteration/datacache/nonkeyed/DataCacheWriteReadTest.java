@@ -23,6 +23,7 @@ import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.runtime.fs.hdfs.HadoopFileSystem;
 import org.apache.flink.util.OperatingSystem;
+import org.apache.flink.util.TestLogger;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
@@ -48,7 +49,7 @@ import static org.junit.Assert.assertFalse;
 
 /** Tests the behavior of {@link DataCacheWriter}. */
 @RunWith(Parameterized.class)
-public class DataCacheWriteReadTest {
+public class DataCacheWriteReadTest extends TestLogger {
 
     @ClassRule public static final TemporaryFolder CLASS_TEMPORARY_FOLDER = new TemporaryFolder();
 
@@ -103,7 +104,7 @@ public class DataCacheWriteReadTest {
                         IntSerializer.INSTANCE,
                         fileSystem,
                         () -> new Path(basePath, "test." + UUID.randomUUID()));
-        List<Segment> segments = writer.finishAddingRecords();
+        List<Segment> segments = writer.finish();
 
         assertEquals(0, segments.size());
 
@@ -125,10 +126,10 @@ public class DataCacheWriteReadTest {
             writer.addRecord(i);
         }
 
-        List<Segment> segments = writer.finishAddingRecords();
+        List<Segment> segments = writer.finish();
 
         assertEquals(1, segments.size());
-        assertEquals(numRecords, segments.get(0).getCount());
+        verifySegment(numRecords, segments.get(0));
 
         DataCacheReader<Integer> reader =
                 new DataCacheReader<>(IntSerializer.INSTANCE, fileSystem, segments);
@@ -156,14 +157,13 @@ public class DataCacheWriteReadTest {
             }
 
             writer.finishCurrentSegment();
-            writer.startNewSegment();
         }
-        writer.finishAddingRecords();
-
-        List<Segment> segments = writer.finishAddingRecords();
+        List<Segment> segments = writer.finish();
 
         assertEquals(4, segments.size());
-        segments.forEach(segment -> assertEquals(numRecordsPerSegment, segment.getCount()));
+        for (Segment segment : segments) {
+            verifySegment(numRecordsPerSegment, segment);
+        }
 
         DataCacheReader<Integer> reader =
                 new DataCacheReader<>(IntSerializer.INSTANCE, fileSystem, segments);
@@ -177,5 +177,10 @@ public class DataCacheWriteReadTest {
                         .boxed()
                         .collect(Collectors.toList()),
                 read);
+    }
+
+    private void verifySegment(int expectedCount, Segment segment) throws IOException {
+        assertEquals(expectedCount, segment.getCount());
+        assertEquals(fileSystem.getFileStatus(segment.getPath()).getLen(), segment.getSize());
     }
 }

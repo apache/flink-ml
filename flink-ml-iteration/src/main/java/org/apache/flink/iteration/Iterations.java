@@ -217,7 +217,7 @@ public class Iterations {
                             replayedDataStreamIndices);
         }
 
-        // Create the iteration body. We map the inputs of iteration body into the draft sources,
+        // Creates the iteration body. We map the inputs of iteration body into the draft sources,
         // which serve as the start points to build the draft subgraph.
         StreamExecutionEnvironment env = initVariableStreams.get(0).getExecutionEnvironment();
         DraftExecutionEnvironment draftEnv =
@@ -233,7 +233,7 @@ public class Iterations {
         ensuresTransformationAdded(iterationBodyResult.getOutputStreams(), draftEnv);
         draftEnv.copyToActualEnvironment();
 
-        // Add tails and co-locate them with the heads.
+        // Adds tails and co-locate them with the heads.
         DataStreamList feedbackStreams =
                 getActualDataStreams(iterationBodyResult.getFeedbackVariableStreams(), draftEnv);
         checkState(
@@ -242,6 +242,16 @@ public class Iterations {
                         + feedbackStreams.size()
                         + " does not match the initialized one "
                         + initVariableStreams.size());
+        for (int i = 0; i < feedbackStreams.size(); ++i) {
+            checkState(
+                    feedbackStreams.get(i).getParallelism() == headStreams.get(i).getParallelism(),
+                    String.format(
+                            "The feedback stream %d have different parallelism %d with the initial stream, which is %d",
+                            i,
+                            feedbackStreams.get(i).getParallelism(),
+                            headStreams.get(i).getParallelism()));
+        }
+
         DataStreamList tails = addTails(feedbackStreams, iterationId, 0);
         for (int i = 0; i < headStreams.size(); ++i) {
             String coLocationGroupKey = "co-" + iterationId.toHexString() + "-" + i;
@@ -280,6 +290,8 @@ public class Iterations {
                 continue;
             }
 
+            // Notes that the HeadOperator would broadcast the globally aligned events,
+            // thus the operator does not require emit to the sideoutput specially.
             DataStream<?> replayedInput =
                     ((SingleOutputStreamOperator<IterationRecord<?>>) firstHeadStream)
                             .getSideOutput(HeadOperator.ALIGN_NOTIFY_OUTPUT_TAG)
@@ -311,7 +323,7 @@ public class Iterations {
             DataStreamList initVariableStreams,
             DataStreamList headStreams,
             int totalInitVariableParallelism) {
-        // deal with the criteria streams
+        // Deals with the criteria streams
         DataStream<?> terminationCriteria = draftEnv.getActualStream(draftCriteriaStream.getId());
         // It should always has the IterationRecordTypeInfo
         checkState(

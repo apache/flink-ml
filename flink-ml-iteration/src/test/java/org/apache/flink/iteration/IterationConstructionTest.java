@@ -87,7 +87,7 @@ public class IterationConstructionTest extends TestLogger {
                         .name("Variable0");
         DataStream<Integer> variableSource2 =
                 env.addSource(new DraftExecutionEnvironment.EmptySource<Integer>() {})
-                        .setParallelism(2)
+                        .setParallelism(3)
                         .name("Variable1");
 
         DataStream<Integer> constantSource =
@@ -158,7 +158,7 @@ public class IterationConstructionTest extends TestLogger {
                         /* 7 */ "tail-Feedback0",
                         /* 8 */ "Feedback1",
                         /* 9 */ "tail-Feedback1");
-        List<Integer> expectedParallelisms = Arrays.asList(2, 2, 3, 2, 2, 4, 2, 2, 3, 3);
+        List<Integer> expectedParallelisms = Arrays.asList(2, 3, 3, 2, 3, 4, 2, 2, 3, 3);
 
         JobGraph jobGraph = env.getStreamGraph().getJobGraph();
         List<JobVertex> vertices = jobGraph.getVerticesSortedTopologicallyFromSources();
@@ -184,7 +184,7 @@ public class IterationConstructionTest extends TestLogger {
                         .name("Variable0");
         DataStream<Integer> variableSource2 =
                 env.addSource(new DraftExecutionEnvironment.EmptySource<Integer>() {})
-                        .setParallelism(2)
+                        .setParallelism(3)
                         .name("Variable1");
 
         DataStream<Integer> constantSource =
@@ -258,7 +258,7 @@ public class IterationConstructionTest extends TestLogger {
                         /* 13 */ "criteria-merge",
                         /* 14 */ "tail-criteria-merge");
         List<Integer> expectedParallelisms =
-                Arrays.asList(2, 2, 3, 5, 2, 2, 4, 2, 2, 3, 3, 5, 5, 5, 5);
+                Arrays.asList(2, 3, 3, 5, 2, 3, 4, 2, 2, 3, 3, 5, 5, 5, 5);
 
         JobGraph jobGraph = env.getStreamGraph().getJobGraph();
         List<JobVertex> vertices = jobGraph.getVerticesSortedTopologicallyFromSources();
@@ -346,10 +346,10 @@ public class IterationConstructionTest extends TestLogger {
                         /* 6 */ "Feedback",
                         /* 7 */ "tail-Feedback",
                         /* 8 */ "Termination",
-                        /* 9 */ "tail-Termination",
-                        /* 10 */ "head-Termination",
-                        /* 11 */ "criteria-discard");
-        List<Integer> expectedParallelisms = Arrays.asList(2, 3, 5, 2, 3, 4, 2, 2, 5, 5, 5, 1);
+                        /* 9 */ "head-Termination",
+                        /* 10 */ "criteria-merge",
+                        /* 11 */ "tail-criteria-merge");
+        List<Integer> expectedParallelisms = Arrays.asList(2, 3, 5, 2, 3, 4, 2, 2, 5, 5, 5, 5);
 
         JobGraph jobGraph = env.getStreamGraph().getJobGraph();
         List<JobVertex> vertices = jobGraph.getVerticesSortedTopologicallyFromSources();
@@ -359,5 +359,10 @@ public class IterationConstructionTest extends TestLogger {
         assertEquals(
                 expectedParallelisms,
                 vertices.stream().map(JobVertex::getParallelism).collect(Collectors.toList()));
+
+        assertNotNull(vertices.get(3).getCoLocationGroup());
+        assertNotNull(vertices.get(9).getCoLocationGroup());
+        assertSame(vertices.get(3).getCoLocationGroup(), vertices.get(7).getCoLocationGroup());
+        assertSame(vertices.get(9).getCoLocationGroup(), vertices.get(11).getCoLocationGroup());
     }
 }

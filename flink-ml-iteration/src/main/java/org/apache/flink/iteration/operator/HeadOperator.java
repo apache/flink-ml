@@ -182,9 +182,6 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
                         0);
                 eventBroadcastOutput.broadcastEmit((StreamRecord) reusable);
                 numFeedbackRecordsPerEpoch.remove(globallyAlignedEvent.getEpoch());
-
-                // Also notify the listener
-                output.collect(ALIGN_NOTIFY_OUTPUT_TAG, (StreamRecord) reusable);
             } catch (Exception e) {
                 ExceptionUtils.rethrow(e);
             }
