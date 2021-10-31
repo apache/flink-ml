@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.iteration.itcases;
+package org.apache.flink.test.iteration;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
@@ -25,19 +25,19 @@ import org.apache.flink.iteration.DataStreamList;
 import org.apache.flink.iteration.IterationBodyResult;
 import org.apache.flink.iteration.Iterations;
 import org.apache.flink.iteration.compile.DraftExecutionEnvironment;
-import org.apache.flink.iteration.itcases.operators.CollectSink;
-import org.apache.flink.iteration.itcases.operators.EpochRecord;
-import org.apache.flink.iteration.itcases.operators.IncrementEpochMap;
-import org.apache.flink.iteration.itcases.operators.OutputRecord;
-import org.apache.flink.iteration.itcases.operators.ReduceAllRoundProcessFunction;
-import org.apache.flink.iteration.itcases.operators.SequenceSource;
-import org.apache.flink.iteration.itcases.operators.TwoInputReduceAllRoundProcessFunction;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.minicluster.MiniClusterConfiguration;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.test.iteration.operators.CollectSink;
+import org.apache.flink.test.iteration.operators.EpochRecord;
+import org.apache.flink.test.iteration.operators.IncrementEpochMap;
+import org.apache.flink.test.iteration.operators.OutputRecord;
+import org.apache.flink.test.iteration.operators.ReduceAllRoundProcessFunction;
+import org.apache.flink.test.iteration.operators.SequenceSource;
+import org.apache.flink.test.iteration.operators.TwoInputReduceAllRoundProcessFunction;
 import org.apache.flink.testutils.junit.SharedObjects;
 import org.apache.flink.testutils.junit.SharedReference;
 import org.apache.flink.util.OutputTag;

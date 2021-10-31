@@ -16,24 +16,38 @@
  * limitations under the License.
  */
 
-package org.apache.flink.iteration.itcases.operators;
+package org.apache.flink.test.iteration.operators;
 
-import org.apache.flink.streaming.api.functions.sink.SinkFunction;
-import org.apache.flink.testutils.junit.SharedReference;
+/**
+ * A value and its epoch. This a temporary implementation before we have determined how to notify
+ * operators about the records' epoch.
+ */
+public class EpochRecord {
 
-import java.util.concurrent.BlockingQueue;
+    private int epoch;
 
-/** Collects the results into the given queue. */
-public class CollectSink implements SinkFunction<OutputRecord<Integer>> {
+    private int value;
 
-    private final SharedReference<BlockingQueue<OutputRecord<Integer>>> result;
+    public EpochRecord() {}
 
-    public CollectSink(SharedReference<BlockingQueue<OutputRecord<Integer>>> result) {
-        this.result = result;
+    public EpochRecord(int epoch, int value) {
+        this.epoch = epoch;
+        this.value = value;
     }
 
-    @Override
-    public void invoke(OutputRecord<Integer> value, Context context) throws Exception {
-        result.get().add(value);
+    public int getEpoch() {
+        return epoch;
+    }
+
+    public void setEpoch(int epoch) {
+        this.epoch = epoch;
+    }
+
+    public int getValue() {
+        return value;
+    }
+
+    public void setValue(int value) {
+        this.value = value;
     }
 }

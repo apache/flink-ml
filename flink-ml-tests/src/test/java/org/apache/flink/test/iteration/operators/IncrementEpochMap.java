@@ -16,38 +16,15 @@
  * limitations under the License.
  */
 
-package org.apache.flink.iteration.itcases.operators;
+package org.apache.flink.test.iteration.operators;
 
-/**
- * A value and its epoch. This a temporary implementation before we have determined how to notify
- * operators about the records' epoch.
- */
-public class EpochRecord {
+import org.apache.flink.api.common.functions.MapFunction;
 
-    private int epoch;
+/** Increments the epoch of the records. */
+public class IncrementEpochMap implements MapFunction<EpochRecord, EpochRecord> {
 
-    private int value;
-
-    public EpochRecord() {}
-
-    public EpochRecord(int epoch, int value) {
-        this.epoch = epoch;
-        this.value = value;
-    }
-
-    public int getEpoch() {
-        return epoch;
-    }
-
-    public void setEpoch(int epoch) {
-        this.epoch = epoch;
-    }
-
-    public int getValue() {
-        return value;
-    }
-
-    public void setValue(int value) {
-        this.value = value;
+    @Override
+    public EpochRecord map(EpochRecord record) throws Exception {
+        return new EpochRecord(record.getEpoch() + 1, record.getValue());
     }
 }
