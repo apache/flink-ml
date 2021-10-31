@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.iteration.itcases.operators;
+package org.apache.flink.test.iteration.operators;
 
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.iteration.IterationListener;

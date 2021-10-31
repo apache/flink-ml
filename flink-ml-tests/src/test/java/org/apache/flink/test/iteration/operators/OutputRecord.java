@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.iteration.itcases.operators;
+package org.apache.flink.test.iteration.operators;
 
 /** The output record type. */
 public class OutputRecord<T> {

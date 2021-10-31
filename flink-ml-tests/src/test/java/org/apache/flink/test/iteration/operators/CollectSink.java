@@ -16,15 +16,24 @@
  * limitations under the License.
  */
 
-package org.apache.flink.iteration.itcases.operators;
+package org.apache.flink.test.iteration.operators;
 
-import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.streaming.api.functions.sink.SinkFunction;
+import org.apache.flink.testutils.junit.SharedReference;
 
-/** Increments the epoch of the records. */
-public class IncrementEpochMap implements MapFunction<EpochRecord, EpochRecord> {
+import java.util.concurrent.BlockingQueue;
+
+/** Collects the results into the given queue. */
+public class CollectSink implements SinkFunction<OutputRecord<Integer>> {
+
+    private final SharedReference<BlockingQueue<OutputRecord<Integer>>> result;
+
+    public CollectSink(SharedReference<BlockingQueue<OutputRecord<Integer>>> result) {
+        this.result = result;
+    }
 
     @Override
-    public EpochRecord map(EpochRecord record) throws Exception {
-        return new EpochRecord(record.getEpoch() + 1, record.getValue());
+    public void invoke(OutputRecord<Integer> value, Context context) throws Exception {
+        result.get().add(value);
     }
 }
