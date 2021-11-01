@@ -20,6 +20,9 @@ package org.apache.flink.test.iteration.operators;
 
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.iteration.IterationListener;
+import org.apache.flink.runtime.state.FunctionInitializationContext;
+import org.apache.flink.runtime.state.FunctionSnapshotContext;
+import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
 import org.apache.flink.streaming.api.functions.co.CoProcessFunction;
 import org.apache.flink.util.Collector;
 
@@ -28,7 +31,7 @@ import org.apache.flink.util.Collector;
  */
 public class TwoInputReduceAllRoundProcessFunction
         extends CoProcessFunction<EpochRecord, EpochRecord, EpochRecord>
-        implements IterationListener<EpochRecord> {
+        implements IterationListener<EpochRecord>, CheckpointedFunction {
 
     private final ReduceAllRoundProcessFunction reduceAllRoundProcessFunction;
 
@@ -77,5 +80,16 @@ public class TwoInputReduceAllRoundProcessFunction
 
         // Processing the first round of messages.
         reduceAllRoundProcessFunction.processRecord(record, ctx::output, out);
+    }
+
+    @Override
+    public void snapshotState(FunctionSnapshotContext functionSnapshotContext) throws Exception {
+        reduceAllRoundProcessFunction.snapshotState(functionSnapshotContext);
+    }
+
+    @Override
+    public void initializeState(FunctionInitializationContext functionInitializationContext)
+            throws Exception {
+        reduceAllRoundProcessFunction.initializeState(functionInitializationContext);
     }
 }
