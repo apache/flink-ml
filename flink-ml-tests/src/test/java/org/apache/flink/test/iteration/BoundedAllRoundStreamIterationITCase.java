@@ -37,6 +37,7 @@ import org.apache.flink.test.iteration.operators.IncrementEpochMap;
 import org.apache.flink.test.iteration.operators.OutputRecord;
 import org.apache.flink.test.iteration.operators.RoundBasedTerminationCriteria;
 import org.apache.flink.test.iteration.operators.SequenceSource;
+import org.apache.flink.test.iteration.operators.StatefulProcessFunction;
 import org.apache.flink.test.iteration.operators.TwoInputReduceAllRoundProcessFunction;
 import org.apache.flink.testutils.junit.SharedObjects;
 import org.apache.flink.testutils.junit.SharedReference;
@@ -130,6 +131,8 @@ public class BoundedAllRoundStreamIterationITCase extends TestLogger {
         // If termination criteria is created only with the constants streams, it would not have
         // records after the round 1 if the input is not replayed.
         int numOfRound = terminationCriteriaFollowsConstantsStreams ? 1 : 5;
+        assertEquals(numOfRound + 1, result.get().size());
+
         Map<Integer, Tuple2<Integer, Integer>> roundsStat =
                 computeRoundStat(
                         result.get(), OutputRecord.Event.EPOCH_WATERMARK_INCREMENTED, numOfRound);
@@ -184,9 +187,19 @@ public class BoundedAllRoundStreamIterationITCase extends TestLogger {
                                             .process(
                                                     new TwoInputReduceAllRoundProcessFunction(
                                                             sync, maxRound));
+
                             return new IterationBodyResult(
                                     DataStreamList.of(
-                                            reducer.map(new IncrementEpochMap())
+                                            reducer.partitionCustom(
+                                                            (k, numPartitions) -> k % numPartitions,
+                                                            EpochRecord::getValue)
+                                                    .map(x -> x)
+                                                    .keyBy(EpochRecord::getValue)
+                                                    .process(
+                                                            new StatefulProcessFunction<
+                                                                    EpochRecord>() {})
+                                                    .setParallelism(4)
+                                                    .map(new IncrementEpochMap())
                                                     .setParallelism(numSources)),
                                     DataStreamList.of(
                                             reducer.getSideOutput(
@@ -237,10 +250,20 @@ public class BoundedAllRoundStreamIterationITCase extends TestLogger {
                                             .process(
                                                     new TwoInputReduceAllRoundProcessFunction(
                                                             sync, maxRound));
+
+                            SingleOutputStreamOperator<EpochRecord> feedbackStream =
+                                    reducer.partitionCustom(
+                                                    (k, numPartitions) -> k % numPartitions,
+                                                    EpochRecord::getValue)
+                                            .map(x -> x)
+                                            .keyBy(EpochRecord::getValue)
+                                            .process(new StatefulProcessFunction<EpochRecord>() {})
+                                            .setParallelism(4)
+                                            .map(new IncrementEpochMap())
+                                            .setParallelism(numSources);
+
                             return new IterationBodyResult(
-                                    DataStreamList.of(
-                                            reducer.map(new IncrementEpochMap())
-                                                    .setParallelism(numSources)),
+                                    DataStreamList.of(feedbackStream),
                                     DataStreamList.of(
                                             reducer.getSideOutput(
                                                     new OutputTag<OutputRecord<Integer>>(

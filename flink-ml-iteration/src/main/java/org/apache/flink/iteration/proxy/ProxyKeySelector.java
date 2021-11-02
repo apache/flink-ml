@@ -30,6 +30,10 @@ public class ProxyKeySelector<T, KEY> implements KeySelector<IterationRecord<T>,
         this.wrappedKeySelector = wrappedKeySelector;
     }
 
+    public KeySelector<T, KEY> getWrappedKeySelector() {
+        return wrappedKeySelector;
+    }
+
     @Override
     public KEY getKey(IterationRecord<T> record) throws Exception {
         return wrappedKeySelector.getKey(record.getValue());

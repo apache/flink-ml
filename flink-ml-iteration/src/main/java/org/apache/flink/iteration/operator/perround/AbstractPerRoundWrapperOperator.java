@@ -27,6 +27,7 @@ import org.apache.flink.contrib.streaming.state.RocksDBKeyedStateBackend;
 import org.apache.flink.core.memory.ManagedMemoryUseCase;
 import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.iteration.operator.AbstractWrapperOperator;
+import org.apache.flink.iteration.operator.OperatorUtils;
 import org.apache.flink.iteration.proxy.state.ProxyStateSnapshotContext;
 import org.apache.flink.iteration.proxy.state.ProxyStreamOperatorStateContext;
 import org.apache.flink.iteration.utils.ReflectionUtils;
@@ -124,7 +125,8 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
                             StreamOperatorFactoryUtil.<T, S>createOperator(
                                             clonedOperatorFactory,
                                             (StreamTask) parameters.getContainingTask(),
-                                            parameters.getStreamConfig(),
+                                            OperatorUtils.createWrappedOperatorConfig(
+                                                    parameters.getStreamConfig()),
                                             proxyOutput,
                                             parameters.getOperatorEventDispatcher())
                                     .f0;
@@ -294,7 +296,9 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
 
     private <T> void setKeyContextElement(StreamRecord<T> record, KeySelector<T, ?> selector)
             throws Exception {
-        if (selector != null) {
+        if (selector != null
+                && ((IterationRecord<?>) record.getValue()).getType()
+                        == IterationRecord.Type.RECORD) {
             Object key = selector.getKey(record.getValue());
             setCurrentKey(key);
         }
@@ -335,7 +339,7 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
             return null;
         }
 
-        return stateHandler.getKeyedStateStore().orElse(null);
+        return stateHandler.getCurrentKey();
     }
 
     protected void reportOrForwardLatencyMarker(LatencyMarker marker) {

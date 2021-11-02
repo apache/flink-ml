@@ -18,15 +18,18 @@
 
 package org.apache.flink.iteration.operator;
 
+import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.iteration.IterationID;
 import org.apache.flink.iteration.config.IterationOptions;
+import org.apache.flink.iteration.proxy.ProxyKeySelector;
 import org.apache.flink.iteration.utils.ReflectionUtils;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackChannel;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackConsumer;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackKey;
+import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.util.ExceptionUtils;
@@ -38,6 +41,8 @@ import java.util.Arrays;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+
+import static org.apache.flink.util.Preconditions.checkState;
 
 /** Utility class for operators. */
 public class OperatorUtils {
@@ -81,6 +86,24 @@ public class OperatorUtils {
         } catch (Exception e) {
             ExceptionUtils.rethrow(e);
         }
+    }
+
+    public static StreamConfig createWrappedOperatorConfig(StreamConfig wrapperConfig) {
+        StreamConfig wrappedConfig = new StreamConfig(wrapperConfig.getConfiguration().clone());
+        for (int i = 0; i < wrappedConfig.getNumberOfNetworkInputs(); ++i) {
+            KeySelector keySelector =
+                    wrapperConfig.getStatePartitioner(i, OperatorUtils.class.getClassLoader());
+            if (keySelector != null) {
+                checkState(
+                        keySelector instanceof ProxyKeySelector,
+                        "The state partitioner for the wrapper operator should always be ProxyKeySelector, but it is "
+                                + keySelector);
+                wrappedConfig.setStatePartitioner(
+                        i, ((ProxyKeySelector) keySelector).getWrappedKeySelector());
+            }
+        }
+
+        return wrappedConfig;
     }
 
     public static Path getDataCachePath(Configuration configuration, String[] localSpillPaths) {

@@ -34,6 +34,7 @@ import org.apache.flink.test.iteration.operators.CollectSink;
 import org.apache.flink.test.iteration.operators.EpochRecord;
 import org.apache.flink.test.iteration.operators.OutputRecord;
 import org.apache.flink.test.iteration.operators.SequenceSource;
+import org.apache.flink.test.iteration.operators.StatefulProcessFunction;
 import org.apache.flink.test.iteration.operators.TwoInputReducePerRoundOperator;
 import org.apache.flink.testutils.junit.SharedObjects;
 import org.apache.flink.testutils.junit.SharedReference;
@@ -123,7 +124,18 @@ public class BoundedPerRoundStreamIterationITCase extends TestLogger {
                                             .setParallelism(1);
 
                             return new IterationBodyResult(
-                                    DataStreamList.of(reducer.filter(x -> x < maxRound)),
+                                    DataStreamList.of(
+                                            reducer.partitionCustom(
+                                                            (k, numPartitions) -> k % numPartitions,
+                                                            x -> x)
+                                                    .map(x -> x)
+                                                    .keyBy(x -> x)
+                                                    .process(
+                                                            new StatefulProcessFunction<
+                                                                    Integer>() {})
+                                                    .setParallelism(4)
+                                                    .filter(x -> x < maxRound)
+                                                    .setParallelism(1)),
                                     DataStreamList.of(
                                             reducer.getSideOutput(
                                                     TwoInputReducePerRoundOperator.OUTPUT_TAG)),
