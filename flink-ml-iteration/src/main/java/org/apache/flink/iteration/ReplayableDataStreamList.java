@@ -53,7 +53,8 @@ public class ReplayableDataStreamList {
         return Collections.unmodifiableList(nonReplayedStreams);
     }
 
-    private static class ReplayedDataStreamList extends ReplayableDataStreamList {
+    /** A special {@link ReplayableDataStreamList} that all streams should be replayed. */
+    public static class ReplayedDataStreamList extends ReplayableDataStreamList {
 
         public ReplayedDataStreamList(List<DataStream<?>> replayedDataStreams) {
             super(replayedDataStreams, Collections.emptyList());
@@ -65,15 +66,11 @@ public class ReplayableDataStreamList {
         }
     }
 
-    private static class NonReplayedDataStreamList extends ReplayableDataStreamList {
+    /** A special {@link ReplayableDataStreamList} that all streams should be not replayed. */
+    public static class NonReplayedDataStreamList extends ReplayableDataStreamList {
 
         public NonReplayedDataStreamList(List<DataStream<?>> nonReplayedDataStreams) {
             super(Collections.emptyList(), nonReplayedDataStreams);
-        }
-
-        public ReplayableDataStreamList andReplay(DataStream<?>... replayedStreams) {
-            return new ReplayableDataStreamList(
-                    Arrays.asList(replayedStreams), getNonReplayedStreams());
         }
     }
 }
