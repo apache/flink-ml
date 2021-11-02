@@ -78,8 +78,10 @@ public class OneInputAllRoundWrapperOperator<IN, OUT>
 
     @Override
     public void setKeyContextElement(StreamRecord<IterationRecord<IN>> record) throws Exception {
-        reusedInput.replace(record.getValue().getValue(), record.getTimestamp());
-        wrappedOperator.setKeyContextElement(reusedInput);
+        if (record.getValue().getType() == IterationRecord.Type.RECORD) {
+            reusedInput.replace(record.getValue().getValue(), record.getTimestamp());
+            wrappedOperator.setKeyContextElement(reusedInput);
+        }
     }
 
     @Override

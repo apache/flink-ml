@@ -29,6 +29,7 @@ import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.iteration.operator.AbstractWrapperOperator;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
+import org.apache.flink.iteration.operator.OperatorUtils;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.metrics.groups.OperatorMetricGroup;
 import org.apache.flink.runtime.checkpoint.CheckpointOptions;
@@ -84,7 +85,8 @@ public abstract class AbstractAllRoundWrapperOperator<T, S extends StreamOperato
                         StreamOperatorFactoryUtil.<T, S>createOperator(
                                         operatorFactory,
                                         (StreamTask) parameters.getContainingTask(),
-                                        parameters.getStreamConfig(),
+                                        OperatorUtils.createWrappedOperatorConfig(
+                                                parameters.getStreamConfig()),
                                         proxyOutput,
                                         parameters.getOperatorEventDispatcher())
                                 .f0;

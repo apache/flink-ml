@@ -44,6 +44,12 @@ public class ProxyStreamPartitioner<T> extends StreamPartitioner<IterationRecord
     }
 
     @Override
+    public void setup(int numberOfChannels) {
+        super.setup(numberOfChannels);
+        wrappedStreamPartitioner.setup(numberOfChannels);
+    }
+
+    @Override
     public StreamPartitioner<IterationRecord<T>> copy() {
         return new ProxyStreamPartitioner<>(wrappedStreamPartitioner.copy());
     }
@@ -86,5 +92,10 @@ public class ProxyStreamPartitioner<T> extends StreamPartitioner<IterationRecord
 
             return selectChannel(record);
         }
+    }
+
+    @Override
+    public String toString() {
+        return wrappedStreamPartitioner.toString();
     }
 }
