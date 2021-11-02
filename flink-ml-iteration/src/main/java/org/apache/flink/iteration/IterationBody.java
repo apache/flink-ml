@@ -20,7 +20,14 @@ package org.apache.flink.iteration;
 
 import org.apache.flink.annotation.Experimental;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.iteration.compile.DraftExecutionEnvironment;
+import org.apache.flink.iteration.operator.OperatorWrapper;
+import org.apache.flink.iteration.operator.perround.PerRoundOperatorWrapper;
 import org.apache.flink.streaming.api.datastream.DataStream;
+
+import java.io.Serializable;
+
+import static org.apache.flink.util.Preconditions.checkArgument;
 
 /**
  * The builder of the subgraph that will be executed inside the iteration.
@@ -44,7 +51,7 @@ import org.apache.flink.streaming.api.datastream.DataStream;
  * streams returned by the IterationBody.
  */
 @Experimental
-public interface IterationBody {
+public interface IterationBody extends Serializable {
 
     /**
      * This method creates the graph for the iteration body. See {@link Iterations} for how the
@@ -64,7 +71,23 @@ public interface IterationBody {
      * @return The output of the subgraph.
      */
     static DataStreamList forEachRound(DataStreamList inputs, PerRoundSubBody perRoundSubBody) {
-        return null;
+        checkArgument(inputs.size() > 0, "At least one input is required");
+        DataStream<?> first = inputs.get(0);
+        DraftExecutionEnvironment env = (DraftExecutionEnvironment) first.getExecutionEnvironment();
+
+        for (int i = 0; i < inputs.size(); ++i) {
+            env.addOperatorIfNotExists(inputs.get(i).getTransformation());
+        }
+        OperatorWrapper<?, ?> oldWrapper = env.setCurrentWrapper(new PerRoundOperatorWrapper<>());
+
+        DataStreamList outputs = perRoundSubBody.process(inputs);
+        for (int i = 0; i < inputs.size(); ++i) {
+            env.addOperatorIfNotExists(inputs.get(i).getTransformation());
+        }
+
+        env.setCurrentWrapper(oldWrapper);
+
+        return outputs;
     }
 
     /** The sub-graph inside the iteration body that should be executed as per-round. */
