@@ -71,5 +71,11 @@ under the License.
       <artifactId>flink-shaded-jackson</artifactId>
       <scope>provided</scope>
     </dependency>
+      <dependency>
+          <groupId>com.github.fommil.netlib</groupId>
+          <artifactId>core</artifactId>
+          <version>1.1.2</version>
+          <scope>compile</scope>
+      </dependency>
   </dependencies>
 </project>

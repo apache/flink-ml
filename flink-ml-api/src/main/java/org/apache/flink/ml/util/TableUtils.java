@@ -21,11 +21,30 @@ package org.apache.flink.ml.util;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.types.AbstractDataType;
+import org.apache.flink.util.Preconditions;
 
 /**
  * Utility to operator to interact with Table contents, such as rows and columns.
  */
 public class TableUtils {
+    /**
+     * Find the index of <code>targetCol</code> in string array <code>tableCols</code>. It will
+     * ignore the case of the tableCols.
+     *
+     * @param tableCols a string array among which to find the targetCol.
+     * @param targetCol the targetCol to find.
+     * @return the index of the targetCol, if not found, returns -1.
+     */
+    public static int findColIndex(String[] tableCols, String targetCol) {
+        Preconditions.checkNotNull(targetCol, "targetCol is null!");
+        for (int i = 0; i < tableCols.length; i++) {
+            if (targetCol.equalsIgnoreCase(tableCols[i])) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     /**
      * convert {@link ResolvedSchema} to corresponding {@link Schema}.
      * @param resolvedSchema a {@link ResolvedSchema}
