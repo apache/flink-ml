@@ -19,7 +19,10 @@
 package org.apache.flink.iteration.operator.perround;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.api.common.state.ListState;
+import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.api.common.typeutils.base.IntSerializer;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.MetricOptions;
@@ -27,6 +30,7 @@ import org.apache.flink.contrib.streaming.state.RocksDBKeyedStateBackend;
 import org.apache.flink.core.memory.ManagedMemoryUseCase;
 import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.iteration.operator.AbstractWrapperOperator;
+import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.iteration.operator.OperatorUtils;
 import org.apache.flink.iteration.proxy.state.ProxyStateSnapshotContext;
 import org.apache.flink.iteration.proxy.state.ProxyStreamOperatorStateContext;
@@ -61,15 +65,21 @@ import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.InstantiationUtil;
 import org.apache.flink.util.function.BiConsumerWithException;
 
+import org.apache.commons.collections.IteratorUtils;
 import org.rocksdb.RocksDB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+
+import static org.apache.flink.util.Preconditions.checkState;
 
 /** The base class for all the per-round wrapper operators. */
 public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperator<T>>
@@ -99,6 +109,22 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
     private transient KeySelector<?, ?> stateKeySelector1;
 
     private transient KeySelector<?, ?> stateKeySelector2;
+
+    private int latestEpochWatermark = -1;
+
+    // --------------- state ---------------------------
+
+    /** Stores the parallelism of the last run so that we could check if parallelism is changed. */
+    private ListState<Integer> parallelismState;
+
+    /** Stores the latest epoch watermark received. */
+    private ListState<Integer> latestEpochWatermarkState;
+
+    /**
+     * Stores the list of epochs that are not aligned yet. After failover the wrapped operators
+     * corresponding to these epochs would be re-crated.
+     */
+    private ListState<Integer> pendingEpochState;
 
     public AbstractPerRoundWrapperOperator(
             StreamOperatorParameters<IterationRecord<T>> parameters,
@@ -159,18 +185,22 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
 
     @Override
     public void onEpochWatermarkIncrement(int epochWatermark) throws IOException {
-        try {
+        if (epochWatermark > latestEpochWatermark) {
+            latestEpochWatermark = epochWatermark;
+
             // Destroys all the operators with round < epoch watermark. Notes that
             // the onEpochWatermarkIncrement must be from 0 and increment by 1 each time.
             if (wrappedOperators.containsKey(epochWatermark)) {
-                closeStreamOperator(wrappedOperators.get(epochWatermark), epochWatermark);
+                try {
+                    closeStreamOperator(wrappedOperators.get(epochWatermark), epochWatermark);
+                } catch (Exception exception) {
+                    ExceptionUtils.rethrow(exception);
+                }
                 wrappedOperators.remove(epochWatermark);
             }
-
-            super.onEpochWatermarkIncrement(epochWatermark);
-        } catch (Exception e) {
-            ExceptionUtils.rethrow(e);
         }
+
+        super.onEpochWatermarkIncrement(epochWatermark);
     }
 
     protected void processForEachWrappedOperator(
@@ -223,7 +253,44 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
 
     @Override
     public void initializeState(StateInitializationContext context) throws Exception {
-        // Do thing for now since we do not have states.
+        parallelismState =
+                context.getOperatorStateStore()
+                        .getUnionListState(
+                                new ListStateDescriptor<>("parallelism", IntSerializer.INSTANCE));
+        OperatorStateUtils.getUniqueElement(parallelismState, "parallelism")
+                .ifPresent(
+                        oldParallelism ->
+                                checkState(
+                                        oldParallelism
+                                                == containingTask
+                                                        .getEnvironment()
+                                                        .getTaskInfo()
+                                                        .getNumberOfParallelSubtasks(),
+                                        "The all-round wrapper operator is recovered with parallelism changed from "
+                                                + oldParallelism
+                                                + " to "
+                                                + containingTask
+                                                        .getEnvironment()
+                                                        .getTaskInfo()
+                                                        .getNumberOfParallelSubtasks()));
+
+        latestEpochWatermarkState =
+                context.getOperatorStateStore()
+                        .getListState(
+                                new ListStateDescriptor<>("latestEpoch", IntSerializer.INSTANCE));
+        OperatorStateUtils.getUniqueElement(latestEpochWatermarkState, "latestEpoch")
+                .ifPresent(
+                        oldLatestEpochWatermark -> latestEpochWatermark = oldLatestEpochWatermark);
+
+        pendingEpochState =
+                context.getOperatorStateStore()
+                        .getListState(
+                                new ListStateDescriptor<>("pendingEpochs", IntSerializer.INSTANCE));
+        List<Integer> pendingEpochs = IteratorUtils.toList(pendingEpochState.get().iterator());
+        for (int epoch : pendingEpochs) {
+            // We first open these operators
+            getWrappedOperator(epoch);
+        }
     }
 
     @Internal
@@ -280,6 +347,21 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
                         .snapshotState(new ProxyStateSnapshotContext(context));
             }
         }
+
+        // Then snapshot our own states
+        // Always clear the union list state before set value.
+        parallelismState.clear();
+        if (containingTask.getEnvironment().getTaskInfo().getIndexOfThisSubtask() == 0) {
+            parallelismState.update(
+                    Collections.singletonList(
+                            containingTask
+                                    .getEnvironment()
+                                    .getTaskInfo()
+                                    .getNumberOfParallelSubtasks()));
+        }
+        latestEpochWatermarkState.update(Collections.singletonList(latestEpochWatermark));
+
+        pendingEpochState.update(new ArrayList<>(wrappedOperators.keySet()));
     }
 
     @Override
@@ -488,5 +570,13 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
 
     private String getRoundStatePrefix(int round) {
         return "r" + round + "-";
+    }
+
+    int getLatestEpochWatermark() {
+        return latestEpochWatermark;
+    }
+
+    public Map<Integer, S> getWrappedOperators() {
+        return wrappedOperators;
     }
 }

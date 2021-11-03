@@ -21,6 +21,7 @@ package org.apache.flink.iteration.operator.perround;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.iteration.operator.OperatorUtils;
+import org.apache.flink.iteration.operator.OperatorWrapper;
 import org.apache.flink.iteration.operator.WrapperOperatorFactory;
 import org.apache.flink.iteration.operator.allround.LifeCycle;
 import org.apache.flink.iteration.typeinfo.IterationRecordTypeInfo;
@@ -28,6 +29,7 @@ import org.apache.flink.runtime.checkpoint.CheckpointMetaData;
 import org.apache.flink.runtime.checkpoint.CheckpointMetricsBuilder;
 import org.apache.flink.runtime.checkpoint.CheckpointOptions;
 import org.apache.flink.runtime.checkpoint.CheckpointType;
+import org.apache.flink.runtime.checkpoint.TaskStateSnapshot;
 import org.apache.flink.runtime.io.network.api.EndOfData;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.state.CheckpointStorageLocationReference;
@@ -39,7 +41,9 @@ import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.api.operators.SimpleOperatorFactory;
+import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
+import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.OneInputStreamTask;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
@@ -54,6 +58,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 /** Tests the {@link OneInputPerRoundWrapperOperator}. */
 public class OneInputPerRoundWrapperOperatorTest extends TestLogger {
@@ -152,6 +157,81 @@ public class OneInputPerRoundWrapperOperatorTest extends TestLogger {
                             LifeCycle.FINISH,
                             LifeCycle.CLOSE),
                     LIFE_CYCLES);
+        }
+    }
+
+    @Test
+    public void testSnapshotAndRestore() throws Exception {
+        StreamOperatorFactory<IterationRecord<Integer>> wrapperFactory =
+                new RecordingOperatorFactory<>(
+                        SimpleOperatorFactory.of(new LifeCycleTrackingOneInputStreamOperator()),
+                        new PerRoundOperatorWrapper<>());
+        OperatorID operatorId = new OperatorID();
+
+        TaskStateSnapshot taskStateSnapshot = null;
+        try (StreamTaskMailboxTestHarness<IterationRecord<Integer>> harness =
+                new StreamTaskMailboxTestHarnessBuilder<>(
+                                OneInputStreamTask::new,
+                                new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO))
+                        .addInput(new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO))
+                        .setupOutputForSingletonOperatorChain(wrapperFactory, operatorId)
+                        .build()) {
+            harness.getTaskStateManager().getWaitForReportLatch().reset();
+
+            harness.processElement(new StreamRecord<>(IterationRecord.newRecord(100, 0)));
+            harness.processElement(new StreamRecord<>(IterationRecord.newRecord(101, 1)));
+            harness.processElement(new StreamRecord<>(IterationRecord.newRecord(102, 2)));
+            harness.processElement(
+                    new StreamRecord<>(IterationRecord.newEpochWatermark(0, "fake")));
+            harness.getStreamTask()
+                    .triggerCheckpointAsync(
+                            new CheckpointMetaData(2, 1000),
+                            CheckpointOptions.alignedNoTimeout(
+                                    CheckpointType.CHECKPOINT,
+                                    CheckpointStorageLocationReference.getDefault()));
+            harness.processAll();
+
+            harness.getTaskStateManager().getWaitForReportLatch().await();
+            taskStateSnapshot = harness.getTaskStateManager().getLastJobManagerTaskStateSnapshot();
+        }
+
+        assertNotNull(taskStateSnapshot);
+        try (StreamTaskMailboxTestHarness<IterationRecord<Integer>> harness =
+                new StreamTaskMailboxTestHarnessBuilder<>(
+                                OneInputStreamTask::new,
+                                new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO))
+                        .setTaskStateSnapshot(2, taskStateSnapshot)
+                        .addInput(new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO))
+                        .setupOutputForSingletonOperatorChain(wrapperFactory, operatorId)
+                        .build()) {
+            assertEquals(
+                    0,
+                    ((AbstractPerRoundWrapperOperator) RecordingOperatorFactory.latest)
+                            .getLatestEpochWatermark());
+            assertEquals(
+                    Arrays.asList(1, 2),
+                    new ArrayList<>(
+                            ((AbstractPerRoundWrapperOperator) RecordingOperatorFactory.latest)
+                                    .getWrappedOperators()
+                                    .keySet()));
+        }
+    }
+
+    private static class RecordingOperatorFactory<OUT> extends WrapperOperatorFactory<OUT> {
+
+        static StreamOperator<?> latest = null;
+
+        public RecordingOperatorFactory(
+                StreamOperatorFactory<OUT> operatorFactory,
+                OperatorWrapper<OUT, IterationRecord<OUT>> wrapper) {
+            super(operatorFactory, wrapper);
+        }
+
+        @Override
+        public <T extends StreamOperator<IterationRecord<OUT>>> T createStreamOperator(
+                StreamOperatorParameters<IterationRecord<OUT>> parameters) {
+            latest = super.createStreamOperator(parameters);
+            return (T) latest;
         }
     }
 
