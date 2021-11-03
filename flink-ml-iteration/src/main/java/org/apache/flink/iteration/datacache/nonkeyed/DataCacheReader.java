@@ -19,6 +19,7 @@
 package org.apache.flink.iteration.datacache.nonkeyed;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.memory.DataInputView;
@@ -44,13 +45,22 @@ public class DataCacheReader<T> implements Iterator<T> {
     public DataCacheReader(
             TypeSerializer<T> serializer, FileSystem fileSystem, List<Segment> segments)
             throws IOException {
+        this(serializer, fileSystem, segments, new Tuple2<>(0, 0));
+    }
+
+    public DataCacheReader(
+            TypeSerializer<T> serializer,
+            FileSystem fileSystem,
+            List<Segment> segments,
+            Tuple2<Integer, Integer> readerPosition)
+            throws IOException {
 
         this.serializer = serializer;
         this.fileSystem = fileSystem;
         this.segments = segments;
 
-        if (segments.size() > 0) {
-            this.currentSegmentReader = new SegmentReader(0);
+        if (readerPosition.f0 < segments.size()) {
+            this.currentSegmentReader = new SegmentReader(readerPosition.f0, readerPosition.f1);
         }
     }
 
@@ -67,7 +77,7 @@ public class DataCacheReader<T> implements Iterator<T> {
             if (!currentSegmentReader.hasNext()) {
                 currentSegmentReader.close();
                 if (currentSegmentReader.index < segments.size() - 1) {
-                    currentSegmentReader = new SegmentReader(currentSegmentReader.index + 1);
+                    currentSegmentReader = new SegmentReader(currentSegmentReader.index + 1, 0);
                 } else {
                     currentSegmentReader = null;
                 }
@@ -77,6 +87,14 @@ public class DataCacheReader<T> implements Iterator<T> {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public Tuple2<Integer, Integer> getPosition() {
+        if (currentSegmentReader == null) {
+            return new Tuple2<>(segments.size(), 0);
+        }
+
+        return new Tuple2<>(currentSegmentReader.getIndex(), currentSegmentReader.getOffset());
     }
 
     private class SegmentReader {
@@ -89,10 +107,11 @@ public class DataCacheReader<T> implements Iterator<T> {
 
         private int offset;
 
-        public SegmentReader(int index) throws IOException {
+        public SegmentReader(int index, int startOffset) throws IOException {
             this.index = index;
             this.inputStream = fileSystem.open(segments.get(index).getPath());
             this.inputView = new DataInputViewStreamWrapper(inputStream);
+            this.offset = startOffset;
         }
 
         public boolean hasNext() {
@@ -107,6 +126,14 @@ public class DataCacheReader<T> implements Iterator<T> {
 
         public void close() throws IOException {
             inputStream.close();
+        }
+
+        public int getIndex() {
+            return index;
+        }
+
+        public int getOffset() {
+            return offset;
         }
     }
 }

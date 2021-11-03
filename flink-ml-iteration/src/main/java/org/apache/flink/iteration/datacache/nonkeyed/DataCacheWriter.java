@@ -26,10 +26,9 @@ import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.util.function.SupplierWithException;
 
-import javax.annotation.Nullable;
-
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -51,23 +50,20 @@ public class DataCacheWriter<T> {
             FileSystem fileSystem,
             SupplierWithException<Path, IOException> pathGenerator)
             throws IOException {
-        this(serializer, fileSystem, pathGenerator, null);
+        this(serializer, fileSystem, pathGenerator, Collections.emptyList());
     }
 
     public DataCacheWriter(
             TypeSerializer<T> serializer,
             FileSystem fileSystem,
             SupplierWithException<Path, IOException> pathGenerator,
-            @Nullable List<Segment> writtenSegments)
+            List<Segment> priorFinishedSegments)
             throws IOException {
         this.serializer = serializer;
         this.fileSystem = fileSystem;
         this.pathGenerator = pathGenerator;
 
-        this.finishSegments = new ArrayList<>();
-        if (null != writtenSegments) {
-            finishSegments.addAll(writtenSegments);
-        }
+        this.finishSegments = new ArrayList<>(priorFinishedSegments);
 
         this.currentSegment = new SegmentWriter(pathGenerator.get());
     }

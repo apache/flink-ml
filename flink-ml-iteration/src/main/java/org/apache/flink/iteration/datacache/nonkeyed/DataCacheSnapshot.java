@@ -128,7 +128,7 @@ public class DataCacheSnapshot {
             if (isDistributedFS) {
                 List<Segment> segments = deserializeSegments(dis);
                 DataCacheReader<T> dataCacheReader =
-                        new DataCacheReader<T>(serializer, fileSystem, segments);
+                        new DataCacheReader<>(serializer, fileSystem, segments);
                 while (dataCacheReader.hasNext()) {
                     feedbackConsumer.processFeedback(dataCacheReader.next());
                 }
