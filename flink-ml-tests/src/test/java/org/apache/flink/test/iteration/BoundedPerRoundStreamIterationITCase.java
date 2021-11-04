@@ -103,7 +103,7 @@ public class BoundedPerRoundStreamIterationITCase extends TestLogger {
                         .setParallelism(numSources)
                         .map(EpochRecord::getValue)
                         .setParallelism(numSources)
-                        .name("Constants");
+                        .name("Constant");
 
         DataStreamList outputs =
                 Iterations.iterateBoundedStreamsUntilTermination(

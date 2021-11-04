@@ -21,7 +21,7 @@ package org.apache.flink.test.iteration.operators;
 import org.apache.flink.api.common.functions.RichMapFunction;
 
 /** Map Function triggers failover at the first task and first round. */
-public class FailingMap extends RichMapFunction<EpochRecord, EpochRecord> {
+public class FailingMap<T> extends RichMapFunction<T, T> {
 
     private final int failingCount;
 
@@ -32,7 +32,7 @@ public class FailingMap extends RichMapFunction<EpochRecord, EpochRecord> {
     }
 
     @Override
-    public EpochRecord map(EpochRecord value) throws Exception {
+    public T map(T value) throws Exception {
         count++;
         if (getRuntimeContext().getIndexOfThisSubtask() == 0
                 && getRuntimeContext().getAttemptNumber() == 0

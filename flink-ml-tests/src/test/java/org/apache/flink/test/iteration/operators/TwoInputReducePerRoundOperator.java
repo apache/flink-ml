@@ -18,13 +18,21 @@
 
 package org.apache.flink.test.iteration.operators;
 
+import org.apache.flink.api.common.state.ListState;
+import org.apache.flink.api.common.state.ListStateDescriptor;
+import org.apache.flink.api.common.typeutils.base.IntSerializer;
+import org.apache.flink.iteration.operator.OperatorStateUtils;
+import org.apache.flink.runtime.state.StateInitializationContext;
+import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.util.OutputTag;
 
+import java.util.Collections;
+
 /**
- * An operators that reduce the received numbers and emit the result into the output, and also emit
+ * An operator that reduce the received numbers and emit the result into the output, and also emit
  * the received numbers to the next operator.
  */
 public class TwoInputReducePerRoundOperator extends AbstractStreamOperator<Integer>
@@ -36,6 +44,31 @@ public class TwoInputReducePerRoundOperator extends AbstractStreamOperator<Integ
     private int round;
 
     private int sum;
+
+    private ListState<Integer> roundState;
+
+    private ListState<Integer> sumState;
+
+    @Override
+    public void initializeState(StateInitializationContext context) throws Exception {
+        super.initializeState(context);
+        roundState =
+                context.getOperatorStateStore()
+                        .getListState(new ListStateDescriptor<>("round", IntSerializer.INSTANCE));
+        OperatorStateUtils.getUniqueElement(roundState, "round").ifPresent(r -> round = r);
+
+        sumState =
+                context.getOperatorStateStore()
+                        .getListState(new ListStateDescriptor<>("sum", IntSerializer.INSTANCE));
+        OperatorStateUtils.getUniqueElement(sumState, "sum").ifPresent(s -> sum = s);
+    }
+
+    @Override
+    public void snapshotState(StateSnapshotContext context) throws Exception {
+        super.snapshotState(context);
+        roundState.update(Collections.singletonList(round));
+        sumState.update(Collections.singletonList(sum));
+    }
 
     @Override
     public void processElement1(StreamRecord<Integer> element) throws Exception {
