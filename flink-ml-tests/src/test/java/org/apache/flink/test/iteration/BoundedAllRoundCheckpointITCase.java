@@ -60,7 +60,7 @@ import static org.junit.Assert.assertEquals;
 
 /** Tests checkpoints. */
 @RunWith(Parameterized.class)
-public class BoundedAllRoundCheckpointTest extends TestLogger {
+public class BoundedAllRoundCheckpointITCase extends TestLogger {
 
     @Rule public final SharedObjects sharedObjects = SharedObjects.create();
 
