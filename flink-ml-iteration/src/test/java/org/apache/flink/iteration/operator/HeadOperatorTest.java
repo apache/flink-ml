@@ -24,6 +24,7 @@ import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.iteration.operator.event.CoordinatorCheckpointEvent;
 import org.apache.flink.iteration.operator.event.GloballyAlignedEvent;
 import org.apache.flink.iteration.operator.event.SubtaskAlignedEvent;
+import org.apache.flink.iteration.operator.event.TerminatingOnInitializeEvent;
 import org.apache.flink.iteration.operator.headprocessor.RegularHeadOperatorRecordProcessor;
 import org.apache.flink.iteration.typeinfo.IterationRecordTypeInfo;
 import org.apache.flink.runtime.checkpoint.CheckpointMetaData;
@@ -693,7 +694,7 @@ public class HeadOperatorTest extends TestLogger {
                             harness,
                             HeadOperator.HeadOperatorStatus.TERMINATING,
                             Collections.emptyList(),
-                            Collections.emptyList(),
+                            Collections.singletonList(TerminatingOnInitializeEvent.INSTANCE),
                             Collections.emptyMap(),
                             -1,
                             -1);

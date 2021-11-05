@@ -107,8 +107,6 @@ public class BoundedPerRoundCheckpointITCase extends TestLogger {
                 state.f1 = output.getValue();
             }
 
-            System.out.println("Round state: " + roundsStat);
-
             // 0 ~ 4 round and termination information
             assertEquals(4, roundsStat.size());
             for (int i = 0; i < 4; ++i) {

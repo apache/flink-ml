@@ -59,5 +59,7 @@ public interface HeadOperatorRecordProcessor {
         void broadcastOutput(StreamRecord<IterationRecord<?>> record);
 
         void updateEpochToCoordinator(int epoch, long numFeedbackRecords);
+
+        void notifyTerminatingOnInitialize();
     }
 }

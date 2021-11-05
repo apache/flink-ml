@@ -18,10 +18,14 @@
 
 package org.apache.flink.iteration.operator.headprocessor;
 
+import java.util.Collections;
 import java.util.Map;
 
 /** The state entry for the head operator. */
 public class HeadOperatorState {
+
+    public static final HeadOperatorState FINISHED_STATE =
+            new HeadOperatorState(Collections.emptyMap(), 0, 0);
 
     private Map<Integer, Long> numFeedbackRecordsEachRound;
 

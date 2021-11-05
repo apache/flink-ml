@@ -37,6 +37,7 @@ import org.apache.flink.iteration.datacache.nonkeyed.DataCacheSnapshot;
 import org.apache.flink.iteration.operator.event.CoordinatorCheckpointEvent;
 import org.apache.flink.iteration.operator.event.GloballyAlignedEvent;
 import org.apache.flink.iteration.operator.event.SubtaskAlignedEvent;
+import org.apache.flink.iteration.operator.event.TerminatingOnInitializeEvent;
 import org.apache.flink.iteration.operator.headprocessor.HeadOperatorRecordProcessor;
 import org.apache.flink.iteration.operator.headprocessor.HeadOperatorState;
 import org.apache.flink.iteration.operator.headprocessor.RegularHeadOperatorRecordProcessor;
@@ -210,7 +211,7 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
         if (status == HeadOperatorStatus.RUNNING) {
             recordProcessor = new RegularHeadOperatorRecordProcessor(processorContext);
         } else {
-            recordProcessor = new TerminatingHeadOperatorRecordProcessor();
+            recordProcessor = new TerminatingHeadOperatorRecordProcessor(processorContext);
         }
 
         // Recover the process state if exists.
@@ -276,7 +277,7 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
     public void prepareSnapshotPreBarrier(long checkpointId) throws Exception {
         super.prepareSnapshotPreBarrier(checkpointId);
 
-        checkpointAligner.waitTillCoordinatorNotified(checkpointId, mailboxExecutor::yield);
+        checkpointAligner.waitTillCoordinatorNotified(status, checkpointId, mailboxExecutor::yield);
     }
 
     @Override
@@ -292,11 +293,7 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
         statusState.update(Collections.singletonList(status.ordinal()));
 
         HeadOperatorState currentProcessorState = recordProcessor.snapshotState();
-        if (currentProcessorState != null) {
-            processorState.update(Collections.singletonList(currentProcessorState));
-        } else {
-            processorState.clear();
-        }
+        processorState.update(Collections.singletonList(currentProcessorState));
 
         if (status == HeadOperatorStatus.RUNNING) {
             checkpoints.startLogging(
@@ -354,7 +351,7 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
         boolean shouldTerminate = recordProcessor.onGloballyAligned(globallyAlignedEvent);
         if (shouldTerminate) {
             status = HeadOperatorStatus.TERMINATING;
-            recordProcessor = new TerminatingHeadOperatorRecordProcessor();
+            recordProcessor = new TerminatingHeadOperatorRecordProcessor(processorContext);
         }
     }
 
@@ -497,8 +494,15 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
     enum HeadOperatorStatus {
         RUNNING,
 
+        /**
+         * The head operator has received the termination {@link GloballyAlignedEvent} and is still
+         * waiting for the feedback {@link Integer#MIN_VALUE} epoch watermark.
+         */
         TERMINATING,
 
+        /**
+         * The head operator has received the feedback {@link Integer#MIN_VALUE} epoch watermark.
+         */
         TERMINATED
     }
 
@@ -538,6 +542,11 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
         public void updateEpochToCoordinator(int epoch, long numFeedbackRecords) {
             operatorEventGateway.sendEventToCoordinator(
                     new SubtaskAlignedEvent(epoch, numFeedbackRecords, isCriteriaStream));
+        }
+
+        @Override
+        public void notifyTerminatingOnInitialize() {
+            operatorEventGateway.sendEventToCoordinator(TerminatingOnInitializeEvent.INSTANCE);
         }
     }
 }

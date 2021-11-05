@@ -34,6 +34,9 @@ import static org.apache.flink.util.Preconditions.checkState;
  * Aligns the checkpoint barrier from the task inputs and the checkpoint event from the coordinator.
  * Besides, it needs to hold the other operator events after the checkpoint event till the state is
  * snapshot.
+ *
+ * <p>Notes that the alignment only required if its state is RUNNING. otherwise there would be no
+ * more events from the coordinator.
  */
 class HeadOperatorCheckpointAligner {
 
@@ -47,11 +50,20 @@ class HeadOperatorCheckpointAligner {
         this.checkpointAlignmments = new TreeMap<>();
     }
 
-    void waitTillCoordinatorNotified(long checkpointId, RunnableWithException defaultAction)
+    void waitTillCoordinatorNotified(
+            HeadOperator.HeadOperatorStatus status,
+            long checkpointId,
+            RunnableWithException defaultAction)
             throws Exception {
         CheckpointAlignment checkpointAlignment =
                 checkpointAlignmments.computeIfAbsent(
-                        checkpointId, ignored -> new CheckpointAlignment(true, false));
+                        checkpointId,
+                        ignored ->
+                                new CheckpointAlignment(
+                                        true,
+                                        status == HeadOperator.HeadOperatorStatus.RUNNING
+                                                ? false
+                                                : true));
         while (!checkpointAlignment.notifiedFromCoordinator) {
             defaultAction.run();
         }

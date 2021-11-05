@@ -23,6 +23,7 @@ import org.apache.flink.iteration.operator.HeadOperator;
 import org.apache.flink.iteration.operator.event.CoordinatorCheckpointEvent;
 import org.apache.flink.iteration.operator.event.GloballyAlignedEvent;
 import org.apache.flink.iteration.operator.event.SubtaskAlignedEvent;
+import org.apache.flink.iteration.operator.event.TerminatingOnInitializeEvent;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
@@ -79,6 +80,8 @@ public class HeadOperatorCoordinator implements OperatorCoordinator, SharedProgr
         if (operatorEvent instanceof SubtaskAlignedEvent) {
             sharedProgressAligner.reportSubtaskProgress(
                     context.getOperatorId(), subtaskIndex, (SubtaskAlignedEvent) operatorEvent);
+        } else if (operatorEvent instanceof TerminatingOnInitializeEvent) {
+            sharedProgressAligner.notifyGloballyTerminating();
         } else {
             throw new UnsupportedOperationException("Not supported event: " + operatorEvent);
         }
