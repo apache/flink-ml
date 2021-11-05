@@ -106,6 +106,24 @@ public class ReadWriteUtils {
         saveMetadata(stage, path, new HashMap<>());
     }
 
+    /** Returns a subdirectory of the given path for saving/loading model data. */
+    public static String getDataPath(String path) {
+        return Paths.get(path, "data").toString();
+    }
+
+    /** Returns all data files under the given path as a list of paths. */
+    public static org.apache.flink.core.fs.Path[] getDataPaths(String path) {
+        String dataPath = getDataPath(path);
+        File[] files = new File(dataPath).listFiles();
+
+        org.apache.flink.core.fs.Path[] paths = new org.apache.flink.core.fs.Path[files.length];
+        for (int i = 0; i < paths.length; i++) {
+            paths[i] = org.apache.flink.core.fs.Path.fromLocalFile(files[i]);
+        }
+
+        return paths;
+    }
+
     /**
      * Loads the metadata from the metadata file under the given path.
      *
@@ -204,6 +222,12 @@ public class ReadWriteUtils {
     // directly because stage::set(...) needs the actual type of the value.
     public static <T> void setStageParam(Stage<?> stage, Param<T> param, Object value) {
         stage.set(param, (T) value);
+    }
+
+    public static void setStageParams(Stage<?> stage, Map<Param<?>, Object> paramMap) {
+        for (Map.Entry<Param<?>, Object> entry : paramMap.entrySet()) {
+            setStageParam(stage, entry.getKey(), entry.getValue());
+        }
     }
 
     /**

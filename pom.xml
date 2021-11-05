@@ -53,6 +53,7 @@ under the License.
 
   <modules>
     <module>flink-ml-api</module>
+    <module>flink-ml-lib</module>
     <module>flink-ml-iteration</module>
     <module>flink-ml-tests</module>
   </modules>
@@ -488,7 +489,6 @@ under the License.
               <rules>
                 <bannedDependencies>
                   <excludes>
-                    <exclude>com.fasterxml.jackson*:*:(,2.12.0]</exclude>
                   </excludes>
                 </bannedDependencies>
               </rules>
