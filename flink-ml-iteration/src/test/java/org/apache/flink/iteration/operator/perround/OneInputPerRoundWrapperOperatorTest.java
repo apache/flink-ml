@@ -18,7 +18,10 @@
 
 package org.apache.flink.iteration.operator.perround;
 
+import org.apache.flink.api.common.state.ListState;
+import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
+import org.apache.flink.api.common.typeutils.base.IntSerializer;
 import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.iteration.operator.OperatorUtils;
 import org.apache.flink.iteration.operator.OperatorWrapper;
@@ -33,7 +36,9 @@ import org.apache.flink.runtime.checkpoint.TaskStateSnapshot;
 import org.apache.flink.runtime.io.network.api.EndOfData;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.state.CheckpointStorageLocationReference;
+import org.apache.flink.runtime.state.OperatorStateCheckpointOutputStream;
 import org.apache.flink.runtime.state.StateInitializationContext;
+import org.apache.flink.runtime.state.StatePartitionStreamProvider;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
@@ -51,14 +56,22 @@ import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarness;
 import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarnessBuilder;
 import org.apache.flink.util.TestLogger;
 
+import org.apache.commons.collections.IteratorUtils;
+import org.apache.commons.io.output.CloseShieldOutputStream;
 import org.junit.Test;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 /** Tests the {@link OneInputPerRoundWrapperOperator}. */
 public class OneInputPerRoundWrapperOperatorTest extends TestLogger {
@@ -164,11 +177,11 @@ public class OneInputPerRoundWrapperOperatorTest extends TestLogger {
     public void testSnapshotAndRestore() throws Exception {
         StreamOperatorFactory<IterationRecord<Integer>> wrapperFactory =
                 new RecordingOperatorFactory<>(
-                        SimpleOperatorFactory.of(new LifeCycleTrackingOneInputStreamOperator()),
+                        SimpleOperatorFactory.of(new StatefulOperator()),
                         new PerRoundOperatorWrapper<>());
         OperatorID operatorId = new OperatorID();
 
-        TaskStateSnapshot taskStateSnapshot = null;
+        TaskStateSnapshot taskStateSnapshot;
         try (StreamTaskMailboxTestHarness<IterationRecord<Integer>> harness =
                 new StreamTaskMailboxTestHarnessBuilder<>(
                                 OneInputStreamTask::new,
@@ -181,6 +194,8 @@ public class OneInputPerRoundWrapperOperatorTest extends TestLogger {
             harness.processElement(new StreamRecord<>(IterationRecord.newRecord(100, 0)));
             harness.processElement(new StreamRecord<>(IterationRecord.newRecord(101, 1)));
             harness.processElement(new StreamRecord<>(IterationRecord.newRecord(102, 2)));
+            harness.processElement(new StreamRecord<>(IterationRecord.newRecord(103, 3)));
+            harness.processElement(new StreamRecord<>(IterationRecord.newRecord(103, 4)));
             harness.processElement(
                     new StreamRecord<>(IterationRecord.newEpochWatermark(0, "fake")));
             harness.getStreamTask()
@@ -204,16 +219,28 @@ public class OneInputPerRoundWrapperOperatorTest extends TestLogger {
                         .addInput(new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO))
                         .setupOutputForSingletonOperatorChain(wrapperFactory, operatorId)
                         .build()) {
+            AbstractPerRoundWrapperOperator<Integer, OneInputStreamOperator<Integer, Integer>>
+                    wrapperOperator =
+                            ((AbstractPerRoundWrapperOperator) RecordingOperatorFactory.latest);
+            assertEquals(0, wrapperOperator.getLatestEpochWatermark());
             assertEquals(
-                    0,
-                    ((AbstractPerRoundWrapperOperator) RecordingOperatorFactory.latest)
-                            .getLatestEpochWatermark());
-            assertEquals(
-                    Arrays.asList(1, 2),
-                    new ArrayList<>(
-                            ((AbstractPerRoundWrapperOperator) RecordingOperatorFactory.latest)
-                                    .getWrappedOperators()
-                                    .keySet()));
+                    Arrays.asList(1, 2, 3, 4),
+                    new ArrayList<>(wrapperOperator.getWrappedOperators().keySet()));
+
+            for (OneInputStreamOperator<Integer, Integer> o :
+                    wrapperOperator.getWrappedOperators().values()) {
+                StatefulOperator statefulOperator = (StatefulOperator) o;
+                assertTrue(statefulOperator.hasState);
+                if (statefulOperator.index % 2 == 0) {
+                    assertEquals(Collections.emptyList(), statefulOperator.values);
+                } else {
+                    assertEquals(
+                            IntStream.range(0, statefulOperator.index)
+                                    .boxed()
+                                    .collect(Collectors.toList()),
+                            statefulOperator.values);
+                }
+            }
         }
     }
 
@@ -306,5 +333,70 @@ public class OneInputPerRoundWrapperOperatorTest extends TestLogger {
         public void endInput() throws Exception {
             LIFE_CYCLES.add(LifeCycle.END_INPUT);
         }
+    }
+
+    private static class StatefulOperator extends AbstractStreamOperator<Integer>
+            implements OneInputStreamOperator<Integer, Integer> {
+
+        private static int nextIndex = 0;
+
+        private ListState<Integer> indexState;
+
+        private boolean hasState;
+
+        private int index;
+
+        private List<Integer> values;
+
+        @Override
+        public void initializeState(StateInitializationContext context) throws Exception {
+            super.initializeState(context);
+
+            indexState =
+                    context.getOperatorStateStore()
+                            .getListState(
+                                    new ListStateDescriptor<>("index", IntSerializer.INSTANCE));
+            List<Integer> indexStateValues = IteratorUtils.toList(indexState.get().iterator());
+            if (indexStateValues.size() == 0) {
+                hasState = false;
+                index = nextIndex++;
+
+                if (index % 2 == 0) {
+                    values = new ArrayList<>();
+                } else {
+                    values = IntStream.range(0, index).boxed().collect(Collectors.toList());
+                }
+
+            } else {
+                hasState = true;
+                index = indexStateValues.get(0);
+                values = new ArrayList<>();
+                for (StatePartitionStreamProvider provider : context.getRawOperatorStateInputs()) {
+                    try (DataInputStream dis = new DataInputStream(provider.getStream())) {
+                        values.add(dis.readInt());
+                    }
+                }
+            }
+        }
+
+        @Override
+        public void snapshotState(StateSnapshotContext context) throws Exception {
+            super.snapshotState(context);
+
+            indexState.update(Collections.singletonList(index));
+
+            OperatorStateCheckpointOutputStream rawOutput = context.getRawOperatorStateOutput();
+            for (int value : values) {
+                rawOutput.startNewPartition();
+                try (DataOutputStream dos =
+                        new DataOutputStream(new CloseShieldOutputStream(rawOutput))) {
+                    dos.writeInt(value);
+                    dos.flush();
+                }
+            }
+        }
+
+        @Override
+        public void processElement(StreamRecord<Integer> element) throws Exception {}
     }
 }

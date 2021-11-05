@@ -26,6 +26,8 @@ import org.apache.flink.streaming.api.operators.InternalTimeServiceManager;
 import org.apache.flink.streaming.api.operators.StreamOperatorStateContext;
 import org.apache.flink.util.CloseableIterable;
 
+import java.io.IOException;
+import java.util.Iterator;
 import java.util.Objects;
 import java.util.OptionalLong;
 
@@ -36,10 +38,19 @@ public class ProxyStreamOperatorStateContext implements StreamOperatorStateConte
 
     private final StateNamePrefix stateNamePrefix;
 
+    private final Iterator<StatePartitionStreamProvider> rawOperatorStates;
+
+    private final int numberOfRawOperatorStateEntries;
+
     public ProxyStreamOperatorStateContext(
-            StreamOperatorStateContext wrapped, String stateNamePrefix) {
+            StreamOperatorStateContext wrapped,
+            String stateNamePrefix,
+            Iterator<StatePartitionStreamProvider> rawOperatorStates,
+            int numberOfRawOperatorStateEntries) {
         this.wrapped = Objects.requireNonNull(wrapped);
         this.stateNamePrefix = new StateNamePrefix(stateNamePrefix);
+        this.rawOperatorStates = Objects.requireNonNull(rawOperatorStates);
+        this.numberOfRawOperatorStateEntries = numberOfRawOperatorStateEntries;
     }
 
     @Override
@@ -76,11 +87,43 @@ public class ProxyStreamOperatorStateContext implements StreamOperatorStateConte
 
     @Override
     public CloseableIterable<StatePartitionStreamProvider> rawOperatorStateInputs() {
-        return CloseableIterable.empty();
+        return new RawOperatorStateIterable();
     }
 
     @Override
     public CloseableIterable<KeyGroupStatePartitionStreamProvider> rawKeyedStateInputs() {
         return CloseableIterable.empty();
+    }
+
+    private class RawOperatorStateIterable
+            implements CloseableIterable<StatePartitionStreamProvider> {
+
+        private int remaining;
+
+        public RawOperatorStateIterable() {
+            this.remaining = numberOfRawOperatorStateEntries;
+        }
+
+        @Override
+        public Iterator<StatePartitionStreamProvider> iterator() {
+
+            return new Iterator<StatePartitionStreamProvider>() {
+                @Override
+                public boolean hasNext() {
+                    return remaining > 0;
+                }
+
+                @Override
+                public StatePartitionStreamProvider next() {
+                    remaining--;
+                    return rawOperatorStates.next();
+                }
+            };
+        }
+
+        @Override
+        public void close() throws IOException {
+            // We does not allow the operator to close it.
+        }
     }
 }

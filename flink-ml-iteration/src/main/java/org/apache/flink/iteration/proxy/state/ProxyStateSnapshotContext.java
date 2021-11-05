@@ -39,8 +39,7 @@ public class ProxyStateSnapshotContext implements StateSnapshotContext {
 
     @Override
     public OperatorStateCheckpointOutputStream getRawOperatorStateOutput() throws Exception {
-        throw new UnsupportedOperationException(
-                "Currently we do not support the raw keyed state inside the iteration.");
+        return wrappedContext.getRawOperatorStateOutput();
     }
 
     @Override

@@ -45,7 +45,9 @@ import org.apache.flink.runtime.state.CheckpointStreamFactory;
 import org.apache.flink.runtime.state.DefaultOperatorStateBackend;
 import org.apache.flink.runtime.state.KeyedStateBackend;
 import org.apache.flink.runtime.state.OperatorStateBackend;
+import org.apache.flink.runtime.state.OperatorStateCheckpointOutputStream;
 import org.apache.flink.runtime.state.StateInitializationContext;
+import org.apache.flink.runtime.state.StatePartitionStreamProvider;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.runtime.state.heap.HeapKeyedStateBackend;
 import org.apache.flink.streaming.api.operators.InternalTimeServiceManager;
@@ -61,6 +63,7 @@ import org.apache.flink.streaming.runtime.streamrecord.LatencyMarker;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.streaming.util.LatencyStats;
+import org.apache.flink.util.CloseableIterable;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.InstantiationUtil;
 import org.apache.flink.util.function.BiConsumerWithException;
@@ -74,6 +77,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -126,6 +130,8 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
      */
     private ListState<Integer> pendingEpochState;
 
+    private ListState<Integer> rawStateEpochState;
+
     public AbstractPerRoundWrapperOperator(
             StreamOperatorParameters<IterationRecord<T>> parameters,
             StreamOperatorFactory<T> operatorFactory) {
@@ -135,8 +141,14 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
         this.latencyStats = initializeLatencyStats();
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
     protected S getWrappedOperator(int round) {
+        return getWrappedOperator(
+                round, CloseableIterable.<StatePartitionStreamProvider>empty().iterator(), 0);
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private S getWrappedOperator(
+            int round, Iterator<StatePartitionStreamProvider> rawOperatorStates, int count) {
         S wrappedOperator = wrappedOperators.get(round);
         if (wrappedOperator != null) {
             return wrappedOperator;
@@ -156,7 +168,7 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
                                             proxyOutput,
                                             parameters.getOperatorEventDispatcher())
                                     .f0;
-            initializeStreamOperator(wrappedOperator, round);
+            initializeStreamOperator(wrappedOperator, round, rawOperatorStates, count);
             wrappedOperators.put(round, wrappedOperator);
             return wrappedOperator;
         } catch (Exception e) {
@@ -282,14 +294,42 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
                 .ifPresent(
                         oldLatestEpochWatermark -> latestEpochWatermark = oldLatestEpochWatermark);
 
+        // Notes that the list must be sorted.
+        rawStateEpochState =
+                context.getOperatorStateStore()
+                        .getListState(new ListStateDescriptor<>("rawStateEpoch", Integer.class));
+        List<Integer> rawStateEpochs = IteratorUtils.toList(rawStateEpochState.get().iterator());
+
+        // Notes that the list must be sorted.
         pendingEpochState =
                 context.getOperatorStateStore()
                         .getListState(
                                 new ListStateDescriptor<>("pendingEpochs", IntSerializer.INSTANCE));
         List<Integer> pendingEpochs = IteratorUtils.toList(pendingEpochState.get().iterator());
+
+        // Unfortunately, for the raw state we could not call get input stream unless the previous
+        // records are consumed. We would have to do a "merge" of the two lists.
+        Iterator<StatePartitionStreamProvider> rawStates =
+                context.getRawOperatorStateInputs().iterator();
+
+        int nextRawStateEntryIndex = 0;
         for (int epoch : pendingEpochs) {
+            checkState(
+                    nextRawStateEntryIndex == rawStateEpochs.size()
+                            || rawStateEpochs.get(nextRawStateEntryIndex) >= epoch,
+                    String.format(
+                            "Unexpected raw state indices %s and epochs %s",
+                            rawStateEpochs.toString(), pendingEpochs.toString()));
+            // Let's find how much entries this epoch has.
+            int numberOfStateEntries = 0;
+            while (nextRawStateEntryIndex < rawStateEpochs.size()
+                    && rawStateEpochs.get(nextRawStateEntryIndex) == epoch) {
+                numberOfStateEntries++;
+                nextRawStateEntryIndex++;
+            }
+
             // We first open these operators
-            getWrappedOperator(epoch);
+            getWrappedOperator(epoch, rawStates, numberOfStateEntries);
         }
     }
 
@@ -340,11 +380,25 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
 
     @Override
     public void snapshotState(StateSnapshotContext context) throws Exception {
-        for (Map.Entry<Integer, S> entry : wrappedOperators.entrySet()) {
+        OperatorStateCheckpointOutputStream rawOperatorStateOutputStream =
+                context.getRawOperatorStateOutput();
+        List<Integer> operatorStateEpoch = new ArrayList<>();
+
+        List<Integer> sortedEpochs = new ArrayList<>(wrappedOperators.keySet());
+        Collections.sort(sortedEpochs);
+
+        for (int epoch : sortedEpochs) {
+            S wrappedOperator = wrappedOperators.get(epoch);
             if (StreamOperatorStateHandler.CheckpointedStreamOperator.class.isAssignableFrom(
-                    entry.getValue().getClass())) {
-                ((StreamOperatorStateHandler.CheckpointedStreamOperator) entry.getValue())
+                    wrappedOperator.getClass())) {
+                ((StreamOperatorStateHandler.CheckpointedStreamOperator) wrappedOperator)
                         .snapshotState(new ProxyStateSnapshotContext(context));
+
+                // Gets the count of the raw operator state.
+                int numberOfPartitions = rawOperatorStateOutputStream.getNumberOfPartitions();
+                while (operatorStateEpoch.size() < numberOfPartitions) {
+                    operatorStateEpoch.add(epoch);
+                }
             }
         }
 
@@ -361,7 +415,11 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
         }
         latestEpochWatermarkState.update(Collections.singletonList(latestEpochWatermark));
 
-        pendingEpochState.update(new ArrayList<>(wrappedOperators.keySet()));
+        // The list must be sorted
+        rawStateEpochState.update(operatorStateEpoch);
+
+        // The list must be sorted
+        pendingEpochState.update(sortedEpochs);
     }
 
     @Override
@@ -479,7 +537,12 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
         }
     }
 
-    private void initializeStreamOperator(S operator, int round) throws Exception {
+    private void initializeStreamOperator(
+            S operator,
+            int round,
+            Iterator<StatePartitionStreamProvider> rawOperatorStates,
+            int count)
+            throws Exception {
         operator.initializeState(
                 (operatorID,
                         operatorClassName,
@@ -491,7 +554,10 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
                         managedMemoryFraction,
                         isUsingCustomRawKeyedState) ->
                         new ProxyStreamOperatorStateContext(
-                                streamOperatorStateContext, getRoundStatePrefix(round)));
+                                streamOperatorStateContext,
+                                getRoundStatePrefix(round),
+                                rawOperatorStates,
+                                count));
         operator.open();
     }
 
