@@ -30,10 +30,17 @@ import org.apache.flink.util.FlinkRuntimeException;
  */
 public class TerminatingHeadOperatorRecordProcessor implements HeadOperatorRecordProcessor {
 
+    private Context headOperatorContext;
+
+    public TerminatingHeadOperatorRecordProcessor(Context headOperatorContext) {
+        this.headOperatorContext = headOperatorContext;
+    }
+
     @Override
     public void initializeState(
-            HeadOperatorState headOperatorState,
-            Iterable<StatePartitionStreamProvider> rawStates) {}
+            HeadOperatorState headOperatorState, Iterable<StatePartitionStreamProvider> rawStates) {
+        headOperatorContext.notifyTerminatingOnInitialize();
+    }
 
     @Override
     public void processElement(StreamRecord<IterationRecord<?>> record) {
@@ -58,6 +65,6 @@ public class TerminatingHeadOperatorRecordProcessor implements HeadOperatorRecor
 
     @Override
     public HeadOperatorState snapshotState() {
-        return null;
+        return HeadOperatorState.FINISHED_STATE;
     }
 }

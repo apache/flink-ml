@@ -24,6 +24,7 @@ import org.apache.flink.iteration.operator.event.GloballyAlignedEvent;
 import org.apache.flink.iteration.operator.event.SubtaskAlignedEvent;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.MockOperatorCoordinatorContext;
+import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.runtime.testutils.DirectScheduledExecutorService;
 import org.apache.flink.util.TestLogger;
 
@@ -101,8 +102,7 @@ public class SharedProgressAlignerTest extends TestLogger {
             }
         }
 
-        this.checkGloballyAlignedEvents(
-                Collections.singletonList(new GloballyAlignedEvent(2, false)), listeners);
+        checkEvents(Collections.singletonList(new GloballyAlignedEvent(2, false)), listeners);
     }
 
     @Test
@@ -122,8 +122,7 @@ public class SharedProgressAlignerTest extends TestLogger {
             }
         }
 
-        this.checkGloballyAlignedEvents(
-                Collections.singletonList(new GloballyAlignedEvent(2, true)), listeners);
+        checkEvents(Collections.singletonList(new GloballyAlignedEvent(2, true)), listeners);
     }
 
     @Test
@@ -143,8 +142,7 @@ public class SharedProgressAlignerTest extends TestLogger {
             }
         }
 
-        this.checkGloballyAlignedEvents(
-                Collections.singletonList(new GloballyAlignedEvent(0, false)), listeners);
+        checkEvents(Collections.singletonList(new GloballyAlignedEvent(0, false)), listeners);
     }
 
     @Test
@@ -165,8 +163,7 @@ public class SharedProgressAlignerTest extends TestLogger {
             }
         }
 
-        this.checkGloballyAlignedEvents(
-                Collections.singletonList(new GloballyAlignedEvent(2, true)), listeners);
+        checkEvents(Collections.singletonList(new GloballyAlignedEvent(2, true)), listeners);
     }
 
     @Test
@@ -195,9 +192,37 @@ public class SharedProgressAlignerTest extends TestLogger {
 
         firstCheckpointStateFutures.forEach(future -> assertTrue(future.isDone()));
         secondCheckpointStateFutures.forEach(future -> assertTrue(future.isDone()));
-        checkCoordinatorCheckpointEvents(
+        checkEvents(
                 Arrays.asList(new CoordinatorCheckpointEvent(1), new CoordinatorCheckpointEvent(2)),
                 listeners);
+    }
+
+    @Test
+    public void testNotSendCheckpointEventIfTerminating() {
+        IterationID iterationId = new IterationID();
+        List<OperatorID> operatorIds = Arrays.asList(new OperatorID(), new OperatorID());
+        List<Integer> parallelisms = Arrays.asList(2, 3);
+        List<RecordingListener> listeners =
+                Arrays.asList(new RecordingListener(), new RecordingListener());
+        SharedProgressAligner aligner =
+                initializeAligner(iterationId, operatorIds, parallelisms, listeners);
+
+        for (int i = 0; i < operatorIds.size(); ++i) {
+            for (int j = 0; j < parallelisms.get(i); ++j) {
+                aligner.reportSubtaskProgress(
+                        operatorIds.get(i), j, new SubtaskAlignedEvent(1, 0, false));
+            }
+        }
+
+        List<CompletableFuture<byte[]>> secondCheckpointStateFutures =
+                Arrays.asList(new CompletableFuture<>(), new CompletableFuture<>());
+        for (int i = 0; i < operatorIds.size(); ++i) {
+            // Operator 0 is the criteria stream
+            aligner.requestCheckpoint(2, parallelisms.get(i), secondCheckpointStateFutures.get(i));
+        }
+
+        secondCheckpointStateFutures.forEach(future -> assertTrue(future.isDone()));
+        checkEvents(Collections.singletonList(new GloballyAlignedEvent(1, true)), listeners);
     }
 
     private SharedProgressAligner initializeAligner(
@@ -220,36 +245,25 @@ public class SharedProgressAlignerTest extends TestLogger {
         return aligner;
     }
 
-    private void checkGloballyAlignedEvents(
-            List<GloballyAlignedEvent> expectedGloballyAlignedEvents,
-            List<RecordingListener> listeners) {
+    private void checkEvents(
+            List<OperatorEvent> expectedEvents, List<RecordingListener> listeners) {
         for (RecordingListener consumer : listeners) {
-            assertEquals(expectedGloballyAlignedEvents, consumer.globallyAlignedEvents);
-        }
-    }
-
-    private void checkCoordinatorCheckpointEvents(
-            List<CoordinatorCheckpointEvent> expectedGloballyAlignedEvents,
-            List<RecordingListener> listeners) {
-        for (RecordingListener consumer : listeners) {
-            assertEquals(expectedGloballyAlignedEvents, consumer.checkpointEvents);
+            assertEquals(expectedEvents, consumer.events);
         }
     }
 
     private static class RecordingListener implements SharedProgressAlignerListener {
 
-        final List<GloballyAlignedEvent> globallyAlignedEvents = new ArrayList<>();
-
-        final List<CoordinatorCheckpointEvent> checkpointEvents = new ArrayList<>();
+        final List<OperatorEvent> events = new ArrayList<>();
 
         @Override
         public void onAligned(GloballyAlignedEvent globallyAlignedEvent) {
-            globallyAlignedEvents.add(globallyAlignedEvent);
+            events.add(globallyAlignedEvent);
         }
 
         @Override
         public void onCheckpointAligned(CoordinatorCheckpointEvent coordinatorCheckpointEvent) {
-            checkpointEvents.add(coordinatorCheckpointEvent);
+            events.add(coordinatorCheckpointEvent);
         }
     }
 }

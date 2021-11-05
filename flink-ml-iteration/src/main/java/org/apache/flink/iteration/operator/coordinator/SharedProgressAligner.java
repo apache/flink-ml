@@ -66,6 +66,8 @@ public class SharedProgressAligner {
 
     private final Map<Integer, EpochStatus> statusByEpoch;
 
+    private boolean globallyTerminating;
+
     private final Map<OperatorID, SharedProgressAlignerListener> listeners;
 
     private final Map<Long, CheckpointStatus> checkpointStatuses;
@@ -144,6 +146,10 @@ public class SharedProgressAligner {
                         for (SharedProgressAlignerListener listeners : listeners.values()) {
                             listeners.onAligned(globallyAlignedEvent);
                         }
+
+                        if (roundStatus.isTerminated()) {
+                            globallyTerminating = true;
+                        }
                     }
                 },
                 "Report subtask %s-%d",
@@ -164,10 +170,12 @@ public class SharedProgressAligner {
                     boolean aligned =
                             checkpointStatus.notify(operatorParallelism, snapshotStateFuture);
                     if (aligned) {
-                        CoordinatorCheckpointEvent checkpointEvent =
-                                new CoordinatorCheckpointEvent(checkpointId);
-                        for (SharedProgressAlignerListener listener : listeners.values()) {
-                            listener.onCheckpointAligned(checkpointEvent);
+                        if (!globallyTerminating) {
+                            CoordinatorCheckpointEvent checkpointEvent =
+                                    new CoordinatorCheckpointEvent(checkpointId);
+                            for (SharedProgressAlignerListener listener : listeners.values()) {
+                                listener.onCheckpointAligned(checkpointEvent);
+                            }
                         }
 
                         for (CompletableFuture<byte[]> stateFuture :
@@ -180,6 +188,10 @@ public class SharedProgressAligner {
                 },
                 "Coordinator report checkpoint %d",
                 checkpointId);
+    }
+
+    public void notifyGloballyTerminating() {
+        runInEventLoop(() -> this.globallyTerminating = true, "Report globally terminating");
     }
 
     public void removeProgressInfo(OperatorID operatorId) {
