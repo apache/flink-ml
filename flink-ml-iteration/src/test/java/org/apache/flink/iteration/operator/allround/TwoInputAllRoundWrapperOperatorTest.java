@@ -19,6 +19,7 @@
 package org.apache.flink.iteration.operator.allround;
 
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
+import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.iteration.operator.OperatorUtils;
 import org.apache.flink.iteration.operator.WrapperOperatorFactory;
@@ -44,6 +45,7 @@ import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarness;
 import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarnessBuilder;
 import org.apache.flink.streaming.runtime.tasks.TwoInputStreamTask;
+import org.apache.flink.util.Collector;
 import org.apache.flink.util.TestLogger;
 
 import org.junit.Test;
@@ -81,6 +83,14 @@ public class TwoInputAllRoundWrapperOperatorTest extends TestLogger {
                     new StreamRecord<>(IterationRecord.newEpochWatermark(5, "only-one-0")), 0);
             harness.processElement(
                     new StreamRecord<>(IterationRecord.newEpochWatermark(5, "only-one-1")), 1);
+            harness.processElement(
+                    new StreamRecord<>(
+                            IterationRecord.newEpochWatermark(Integer.MAX_VALUE, "only-one-0")),
+                    0);
+            harness.processElement(
+                    new StreamRecord<>(
+                            IterationRecord.newEpochWatermark(Integer.MAX_VALUE, "only-one-1")),
+                    1);
 
             // Checks the output
             assertEquals(
@@ -89,7 +99,11 @@ public class TwoInputAllRoundWrapperOperatorTest extends TestLogger {
                             new StreamRecord<>(IterationRecord.newRecord(6, 2), 3),
                             new StreamRecord<>(
                                     IterationRecord.newEpochWatermark(
-                                            5, OperatorUtils.getUniqueSenderId(operatorId, 0)))),
+                                            5, OperatorUtils.getUniqueSenderId(operatorId, 0))),
+                            new StreamRecord<>(
+                                    IterationRecord.newEpochWatermark(
+                                            Integer.MAX_VALUE,
+                                            OperatorUtils.getUniqueSenderId(operatorId, 0)))),
                     new ArrayList<>(harness.getOutput()));
 
             // Checks the other lifecycles.
@@ -122,6 +136,8 @@ public class TwoInputAllRoundWrapperOperatorTest extends TestLogger {
                             LifeCycle.OPEN,
                             LifeCycle.PROCESS_ELEMENT_1,
                             LifeCycle.PROCESS_ELEMENT_2,
+                            LifeCycle.EPOCH_WATERMARK_INCREMENTED,
+                            LifeCycle.ITERATION_TERMINATION,
                             LifeCycle.PREPARE_SNAPSHOT_PRE_BARRIER,
                             LifeCycle.SNAPSHOT_STATE,
                             LifeCycle.NOTIFY_CHECKPOINT_COMPLETE,
@@ -138,7 +154,9 @@ public class TwoInputAllRoundWrapperOperatorTest extends TestLogger {
 
     private static class LifeCycleTrackingTwoInputStreamOperator
             extends AbstractStreamOperator<Integer>
-            implements TwoInputStreamOperator<Integer, Integer, Integer>, BoundedMultiInput {
+            implements TwoInputStreamOperator<Integer, Integer, Integer>,
+                    BoundedMultiInput,
+                    IterationListener<Integer> {
 
         @Override
         public void setup(
@@ -212,6 +230,17 @@ public class TwoInputAllRoundWrapperOperatorTest extends TestLogger {
         @Override
         public void endInput(int inputId) throws Exception {
             LIFE_CYCLES.add(LifeCycle.END_INPUT);
+        }
+
+        @Override
+        public void onEpochWatermarkIncremented(
+                int epochWatermark, Context context, Collector<Integer> collector) {
+            LIFE_CYCLES.add(LifeCycle.EPOCH_WATERMARK_INCREMENTED);
+        }
+
+        @Override
+        public void onIterationTerminated(Context context, Collector<Integer> collector) {
+            LIFE_CYCLES.add(LifeCycle.ITERATION_TERMINATION);
         }
     }
 }

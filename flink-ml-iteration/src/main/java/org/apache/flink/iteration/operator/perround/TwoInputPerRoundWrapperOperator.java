@@ -52,7 +52,8 @@ public class TwoInputPerRoundWrapperOperator<IN1, IN2, OUT>
 
     @Override
     protected void endInputAndEmitMaxWatermark(
-            TwoInputStreamOperator<IN1, IN2, OUT> operator, int round) throws Exception {
+            TwoInputStreamOperator<IN1, IN2, OUT> operator, int epoch, int epochWatermark)
+            throws Exception {
         OperatorUtils.processOperatorOrUdfIfSatisfy(
                 operator,
                 BoundedMultiInput.class,

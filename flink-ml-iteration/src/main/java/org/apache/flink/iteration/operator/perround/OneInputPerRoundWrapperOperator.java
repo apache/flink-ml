@@ -51,7 +51,8 @@ public class OneInputPerRoundWrapperOperator<IN, OUT>
     }
 
     @Override
-    protected void endInputAndEmitMaxWatermark(OneInputStreamOperator<IN, OUT> operator, int round)
+    protected void endInputAndEmitMaxWatermark(
+            OneInputStreamOperator<IN, OUT> operator, int epoch, int epochWatermark)
             throws Exception {
         OperatorUtils.processOperatorOrUdfIfSatisfy(
                 operator, BoundedOneInput.class, BoundedOneInput::endInput);

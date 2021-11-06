@@ -66,7 +66,15 @@ public class MultipleInputPerRoundWrapperOperator<OUT>
     }
 
     @Override
-    protected void endInputAndEmitMaxWatermark(MultipleInputStreamOperator<OUT> operator, int round)
+    protected MultipleInputStreamOperator<OUT> getWrappedOperator(int epoch) {
+        MultipleInputStreamOperator<OUT> operator = super.getWrappedOperator(epoch);
+        operatorInputsByEpoch.put(epoch, operator.getInputs());
+        return operator;
+    }
+
+    @Override
+    protected void endInputAndEmitMaxWatermark(
+            MultipleInputStreamOperator<OUT> operator, int epoch, int epochWatermark)
             throws Exception {
         OperatorUtils.processOperatorOrUdfIfSatisfy(
                 operator,
@@ -78,29 +86,16 @@ public class MultipleInputPerRoundWrapperOperator<OUT>
                 });
 
         for (int i = 0; i < numberOfInputs; ++i) {
-            operatorInputsByEpoch.get(round).get(i).processWatermark(new Watermark(Long.MAX_VALUE));
+            operatorInputsByEpoch.get(epoch).get(i).processWatermark(new Watermark(Long.MAX_VALUE));
         }
     }
 
-    private <IN> void processElement(
-            int inputIndex,
-            Input<IN> input,
-            StreamRecord<IN> reusedInput,
-            StreamRecord<IterationRecord<IN>> element)
+    @Override
+    protected void closeStreamOperator(
+            MultipleInputStreamOperator<OUT> operator, int epoch, int epochWatermark)
             throws Exception {
-        switch (element.getValue().getType()) {
-            case RECORD:
-                reusedInput.replace(element.getValue().getValue(), element.getTimestamp());
-                setIterationContextRound(element.getValue().getEpoch());
-                input.processElement(reusedInput);
-                clearIterationContextRound();
-                break;
-            case EPOCH_WATERMARK:
-                onEpochWatermarkEvent(inputIndex, element.getValue());
-                break;
-            default:
-                throw new FlinkRuntimeException("Not supported iteration record type: " + element);
-        }
+        super.closeStreamOperator(operator, epoch, epochWatermark);
+        operatorInputsByEpoch.remove(epoch);
     }
 
     @Override
@@ -130,17 +125,25 @@ public class MultipleInputPerRoundWrapperOperator<OUT>
 
         @Override
         public void processElement(StreamRecord<IterationRecord<IN>> element) throws Exception {
-            if (!operatorInputsByEpoch.containsKey(element.getValue().getEpoch())) {
-                MultipleInputStreamOperator<OUT> operator =
-                        getWrappedOperator(element.getValue().getEpoch());
-                operatorInputsByEpoch.put(element.getValue().getEpoch(), operator.getInputs());
+            switch (element.getValue().getType()) {
+                case RECORD:
+                    // Ensures the operators are created.
+                    getWrappedOperator(element.getValue().getEpoch());
+                    reusedInput.replace(element.getValue().getValue(), element.getTimestamp());
+                    setIterationContextRound(element.getValue().getEpoch());
+                    operatorInputsByEpoch
+                            .get(element.getValue().getEpoch())
+                            .get(inputIndex)
+                            .processElement(reusedInput);
+                    clearIterationContextRound();
+                    break;
+                case EPOCH_WATERMARK:
+                    onEpochWatermarkEvent(inputIndex, element.getValue());
+                    break;
+                default:
+                    throw new FlinkRuntimeException(
+                            "Not supported iteration record type: " + element);
             }
-
-            MultipleInputPerRoundWrapperOperator.this.processElement(
-                    inputIndex,
-                    operatorInputsByEpoch.get(element.getValue().getEpoch()).get(inputIndex),
-                    reusedInput,
-                    element);
         }
 
         @Override
@@ -168,13 +171,18 @@ public class MultipleInputPerRoundWrapperOperator<OUT>
         }
 
         @Override
-        public void setKeyContextElement(StreamRecord<IterationRecord<IN>> record)
+        public void setKeyContextElement(StreamRecord<IterationRecord<IN>> element)
                 throws Exception {
-            MultipleInputStreamOperator<OUT> operator =
-                    getWrappedOperator(record.getValue().getEpoch());
 
-            reusedInput.replace(record.getValue(), record.getTimestamp());
-            operator.getInputs().get(inputIndex).setKeyContextElement(reusedInput);
+            if (element.getValue().getType() == IterationRecord.Type.RECORD) {
+                // Ensures the operators are created.
+                getWrappedOperator(element.getValue().getEpoch());
+                reusedInput.replace(element.getValue(), element.getTimestamp());
+                operatorInputsByEpoch
+                        .get(element.getValue().getEpoch())
+                        .get(inputIndex)
+                        .setKeyContextElement(reusedInput);
+            }
         }
     }
 }

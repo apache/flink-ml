@@ -18,6 +18,7 @@
 
 package org.apache.flink.iteration.operator;
 
+import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.iteration.broadcast.BroadcastOutput;
 import org.apache.flink.iteration.broadcast.BroadcastOutputFactory;
@@ -34,8 +35,10 @@ import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
+import org.apache.flink.streaming.api.operators.TimestampedCollector;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
+import org.apache.flink.util.OutputTag;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,6 +66,8 @@ public abstract class AbstractWrapperOperator<T>
     protected final Output<StreamRecord<IterationRecord<T>>> output;
 
     protected final StreamOperatorFactory<T> operatorFactory;
+
+    protected final IterationContext iterationContext;
 
     // --------------- proxy ---------------------------
 
@@ -105,6 +110,7 @@ public abstract class AbstractWrapperOperator<T>
         this.eventBroadcastOutput =
                 BroadcastOutputFactory.createBroadcastOutput(
                         output, metrics.getIOMetricGroup().getNumRecordsOutCounter());
+        this.iterationContext = new IterationContext();
     }
 
     protected void onEpochWatermarkEvent(int inputIndex, IterationRecord<?> iterationRecord)
@@ -114,6 +120,20 @@ public abstract class AbstractWrapperOperator<T>
                 "The record " + iterationRecord + " is not epoch watermark.");
         epochWatermarkTracker.onEpochWatermark(
                 inputIndex, iterationRecord.getSender(), iterationRecord.getEpoch());
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    protected void notifyEpochWatermarkIncrement(
+            IterationListener<?> listener, int epochWatermark) {
+        if (epochWatermark != Integer.MAX_VALUE) {
+            listener.onEpochWatermarkIncremented(
+                    epochWatermark,
+                    iterationContext,
+                    new TimestampedCollector<>((Output) proxyOutput));
+        } else {
+            listener.onIterationTerminated(
+                    iterationContext, new TimestampedCollector<>((Output) proxyOutput));
+        }
     }
 
     @Override
@@ -153,6 +173,14 @@ public abstract class AbstractWrapperOperator<T>
         } catch (Exception e) {
             LOG.warn("An error occurred while instantiating task metrics.", e);
             return UnregisteredMetricGroups.createUnregisteredOperatorMetricGroup();
+        }
+    }
+
+    private class IterationContext implements IterationListener.Context {
+
+        @Override
+        public <X> void output(OutputTag<X> outputTag, X value) {
+            proxyOutput.collect(outputTag, new StreamRecord<>(value));
         }
     }
 

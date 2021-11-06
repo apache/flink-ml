@@ -37,18 +37,15 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.state.CheckpointStreamFactory;
 import org.apache.flink.streaming.api.operators.KeyContext;
 import org.apache.flink.streaming.api.operators.OperatorSnapshotFutures;
-import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactoryUtil;
 import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 import org.apache.flink.streaming.api.operators.StreamOperatorStateContext;
 import org.apache.flink.streaming.api.operators.StreamTaskStateInitializer;
-import org.apache.flink.streaming.api.operators.TimestampedCollector;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.ProcessingTimeService;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
-import org.apache.flink.util.OutputTag;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -64,8 +61,6 @@ public abstract class AbstractAllRoundWrapperOperator<T, S extends StreamOperato
         extends AbstractWrapperOperator<T> {
 
     protected final S wrappedOperator;
-
-    private final IterationContext iterationContext;
 
     // --------------- state ---------------------------
     private int latestEpochWatermark = -1;
@@ -96,7 +91,6 @@ public abstract class AbstractAllRoundWrapperOperator<T, S extends StreamOperato
                 EpochAware.class,
                 epochWatermarkAware ->
                         epochWatermarkAware.setEpochSupplier(epochWatermarkSupplier));
-        this.iterationContext = new IterationContext();
     }
 
     @Override
@@ -114,19 +108,6 @@ public abstract class AbstractAllRoundWrapperOperator<T, S extends StreamOperato
 
         // Always broadcasts the events.
         super.onEpochWatermarkIncrement(epochWatermark);
-    }
-
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private void notifyEpochWatermarkIncrement(IterationListener<?> listener, int epochWatermark) {
-        if (epochWatermark != Integer.MAX_VALUE) {
-            listener.onEpochWatermarkIncremented(
-                    epochWatermark,
-                    iterationContext,
-                    new TimestampedCollector<>((Output) proxyOutput));
-        } else {
-            listener.onIterationTerminated(
-                    iterationContext, new TimestampedCollector<>((Output) proxyOutput));
-        }
     }
 
     @Override
@@ -255,14 +236,6 @@ public abstract class AbstractAllRoundWrapperOperator<T, S extends StreamOperato
     @VisibleForTesting
     int getLatestEpochWatermark() {
         return latestEpochWatermark;
-    }
-
-    private class IterationContext implements IterationListener.Context {
-
-        @Override
-        public <X> void output(OutputTag<X> outputTag, X value) {
-            proxyOutput.collect(outputTag, new StreamRecord<>(value));
-        }
     }
 
     private static class RecordingStreamTaskStateInitializer implements StreamTaskStateInitializer {

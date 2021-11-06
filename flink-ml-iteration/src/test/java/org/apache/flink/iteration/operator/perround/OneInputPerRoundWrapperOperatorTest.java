@@ -22,6 +22,7 @@ import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeutils.base.IntSerializer;
+import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.iteration.operator.OperatorUtils;
 import org.apache.flink.iteration.operator.OperatorWrapper;
@@ -54,6 +55,7 @@ import org.apache.flink.streaming.runtime.tasks.OneInputStreamTask;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarness;
 import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarnessBuilder;
+import org.apache.flink.util.Collector;
 import org.apache.flink.util.TestLogger;
 
 import org.apache.commons.collections.IteratorUtils;
@@ -125,7 +127,8 @@ public class OneInputPerRoundWrapperOperatorTest extends TestLogger {
             harness.processElement(
                     new StreamRecord<>(IterationRecord.newEpochWatermark(1, "only-one")));
             harness.processElement(
-                    new StreamRecord<>(IterationRecord.newEpochWatermark(2, "only-one")));
+                    new StreamRecord<>(
+                            IterationRecord.newEpochWatermark(Integer.MAX_VALUE, "only-one")));
 
             // Checks the output
             assertEquals(
@@ -135,7 +138,8 @@ public class OneInputPerRoundWrapperOperatorTest extends TestLogger {
                                             1, OperatorUtils.getUniqueSenderId(operatorId, 0))),
                             new StreamRecord<>(
                                     IterationRecord.newEpochWatermark(
-                                            2, OperatorUtils.getUniqueSenderId(operatorId, 0)))),
+                                            Integer.MAX_VALUE,
+                                            OperatorUtils.getUniqueSenderId(operatorId, 0)))),
                     new ArrayList<>(harness.getOutput()));
 
             harness.processEvent(EndOfData.INSTANCE, 0);
@@ -163,9 +167,11 @@ public class OneInputPerRoundWrapperOperatorTest extends TestLogger {
                             LifeCycle.NOTIFY_CHECKPOINT_COMPLETE,
                             LifeCycle.NOTIFY_CHECKPOINT_ABORT,
                             LifeCycle.NOTIFY_CHECKPOINT_ABORT,
+                            LifeCycle.EPOCH_WATERMARK_INCREMENTED,
                             LifeCycle.END_INPUT,
                             LifeCycle.FINISH,
                             LifeCycle.CLOSE,
+                            LifeCycle.ITERATION_TERMINATION,
                             LifeCycle.END_INPUT,
                             LifeCycle.FINISH,
                             LifeCycle.CLOSE),
@@ -264,7 +270,9 @@ public class OneInputPerRoundWrapperOperatorTest extends TestLogger {
 
     private static class LifeCycleTrackingOneInputStreamOperator
             extends AbstractStreamOperator<Integer>
-            implements OneInputStreamOperator<Integer, Integer>, BoundedOneInput {
+            implements OneInputStreamOperator<Integer, Integer>,
+                    BoundedOneInput,
+                    IterationListener<Integer> {
 
         @Override
         public void setup(
@@ -332,6 +340,17 @@ public class OneInputPerRoundWrapperOperatorTest extends TestLogger {
         @Override
         public void endInput() throws Exception {
             LIFE_CYCLES.add(LifeCycle.END_INPUT);
+        }
+
+        @Override
+        public void onEpochWatermarkIncremented(
+                int epochWatermark, Context context, Collector<Integer> collector) {
+            LIFE_CYCLES.add(LifeCycle.EPOCH_WATERMARK_INCREMENTED);
+        }
+
+        @Override
+        public void onIterationTerminated(Context context, Collector<Integer> collector) {
+            LIFE_CYCLES.add(LifeCycle.ITERATION_TERMINATION);
         }
     }
 
