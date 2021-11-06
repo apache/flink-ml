@@ -19,6 +19,7 @@
 package org.apache.flink.iteration.operator.allround;
 
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
+import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.iteration.operator.OperatorUtils;
 import org.apache.flink.iteration.operator.WrapperOperatorFactory;
@@ -45,6 +46,7 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.MultipleInputStreamTask;
 import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarness;
 import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarnessBuilder;
+import org.apache.flink.util.Collector;
 import org.apache.flink.util.TestLogger;
 
 import org.junit.Test;
@@ -86,6 +88,18 @@ public class MultipleInputAllRoundWrapperOperatorTest extends TestLogger {
                     new StreamRecord<>(IterationRecord.newEpochWatermark(5, "only-one-1")), 1);
             harness.processElement(
                     new StreamRecord<>(IterationRecord.newEpochWatermark(5, "only-one-2")), 2);
+            harness.processElement(
+                    new StreamRecord<>(
+                            IterationRecord.newEpochWatermark(Integer.MAX_VALUE, "only-one-0")),
+                    0);
+            harness.processElement(
+                    new StreamRecord<>(
+                            IterationRecord.newEpochWatermark(Integer.MAX_VALUE, "only-one-1")),
+                    1);
+            harness.processElement(
+                    new StreamRecord<>(
+                            IterationRecord.newEpochWatermark(Integer.MAX_VALUE, "only-one-2")),
+                    2);
 
             // Checks the output
             assertEquals(
@@ -95,7 +109,11 @@ public class MultipleInputAllRoundWrapperOperatorTest extends TestLogger {
                             new StreamRecord<>(IterationRecord.newRecord(7, 3), 4),
                             new StreamRecord<>(
                                     IterationRecord.newEpochWatermark(
-                                            5, OperatorUtils.getUniqueSenderId(operatorId, 0)))),
+                                            5, OperatorUtils.getUniqueSenderId(operatorId, 0))),
+                            new StreamRecord<>(
+                                    IterationRecord.newEpochWatermark(
+                                            Integer.MAX_VALUE,
+                                            OperatorUtils.getUniqueSenderId(operatorId, 0)))),
                     new ArrayList<>(harness.getOutput()));
 
             // Checks the other lifecycles.
@@ -129,6 +147,8 @@ public class MultipleInputAllRoundWrapperOperatorTest extends TestLogger {
                             LifeCycle.PROCESS_ELEMENT,
                             LifeCycle.PROCESS_ELEMENT,
                             LifeCycle.PROCESS_ELEMENT,
+                            LifeCycle.EPOCH_WATERMARK_INCREMENTED,
+                            LifeCycle.ITERATION_TERMINATION,
                             LifeCycle.PREPARE_SNAPSHOT_PRE_BARRIER,
                             LifeCycle.SNAPSHOT_STATE,
                             LifeCycle.NOTIFY_CHECKPOINT_COMPLETE,
@@ -147,7 +167,9 @@ public class MultipleInputAllRoundWrapperOperatorTest extends TestLogger {
 
     private static class LifeCycleTrackingTwoInputStreamOperator
             extends AbstractStreamOperatorV2<Integer>
-            implements MultipleInputStreamOperator<Integer>, BoundedMultiInput {
+            implements MultipleInputStreamOperator<Integer>,
+                    BoundedMultiInput,
+                    IterationListener<Integer> {
 
         private final int numberOfInputs;
 
@@ -225,6 +247,17 @@ public class MultipleInputAllRoundWrapperOperatorTest extends TestLogger {
         @Override
         public void endInput(int inputId) throws Exception {
             LIFE_CYCLES.add(LifeCycle.END_INPUT);
+        }
+
+        @Override
+        public void onEpochWatermarkIncremented(
+                int epochWatermark, Context context, Collector<Integer> collector) {
+            LIFE_CYCLES.add(LifeCycle.EPOCH_WATERMARK_INCREMENTED);
+        }
+
+        @Override
+        public void onIterationTerminated(Context context, Collector<Integer> collector) {
+            LIFE_CYCLES.add(LifeCycle.ITERATION_TERMINATION);
         }
     }
 

@@ -19,6 +19,7 @@
 package org.apache.flink.iteration.operator.perround;
 
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
+import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.iteration.operator.OperatorUtils;
 import org.apache.flink.iteration.operator.WrapperOperatorFactory;
@@ -47,6 +48,7 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.MultipleInputStreamTask;
 import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarness;
 import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarnessBuilder;
+import org.apache.flink.util.Collector;
 import org.apache.flink.util.TestLogger;
 
 import org.junit.Test;
@@ -115,11 +117,17 @@ public class MultipleInputPerRoundWrapperOperatorTest extends TestLogger {
             harness.processElement(
                     new StreamRecord<>(IterationRecord.newEpochWatermark(1, "only-one-2")), 2);
             harness.processElement(
-                    new StreamRecord<>(IterationRecord.newEpochWatermark(2, "only-one-0")), 0);
+                    new StreamRecord<>(
+                            IterationRecord.newEpochWatermark(Integer.MAX_VALUE, "only-one-0")),
+                    0);
             harness.processElement(
-                    new StreamRecord<>(IterationRecord.newEpochWatermark(2, "only-one-1")), 1);
+                    new StreamRecord<>(
+                            IterationRecord.newEpochWatermark(Integer.MAX_VALUE, "only-one-1")),
+                    1);
             harness.processElement(
-                    new StreamRecord<>(IterationRecord.newEpochWatermark(2, "only-one-2")), 2);
+                    new StreamRecord<>(
+                            IterationRecord.newEpochWatermark(Integer.MAX_VALUE, "only-one-2")),
+                    2);
 
             // Checks the output
             assertEquals(
@@ -129,7 +137,8 @@ public class MultipleInputPerRoundWrapperOperatorTest extends TestLogger {
                                             1, OperatorUtils.getUniqueSenderId(operatorId, 0))),
                             new StreamRecord<>(
                                     IterationRecord.newEpochWatermark(
-                                            2, OperatorUtils.getUniqueSenderId(operatorId, 0)))),
+                                            Integer.MAX_VALUE,
+                                            OperatorUtils.getUniqueSenderId(operatorId, 0)))),
                     new ArrayList<>(harness.getOutput()));
 
             harness.processEvent(EndOfData.INSTANCE, 0);
@@ -157,6 +166,7 @@ public class MultipleInputPerRoundWrapperOperatorTest extends TestLogger {
                             LifeCycle.NOTIFY_CHECKPOINT_COMPLETE,
                             LifeCycle.NOTIFY_CHECKPOINT_ABORT,
                             LifeCycle.NOTIFY_CHECKPOINT_ABORT,
+                            LifeCycle.EPOCH_WATERMARK_INCREMENTED,
                             // The first input
                             LifeCycle.END_INPUT,
                             // The second input
@@ -165,6 +175,7 @@ public class MultipleInputPerRoundWrapperOperatorTest extends TestLogger {
                             LifeCycle.END_INPUT,
                             LifeCycle.FINISH,
                             LifeCycle.CLOSE,
+                            LifeCycle.ITERATION_TERMINATION,
                             // The first input
                             LifeCycle.END_INPUT,
                             // The second input
@@ -179,7 +190,9 @@ public class MultipleInputPerRoundWrapperOperatorTest extends TestLogger {
 
     private static class LifeCycleTrackingMultiInputStreamOperator
             extends AbstractStreamOperatorV2<Integer>
-            implements MultipleInputStreamOperator<Integer>, BoundedMultiInput {
+            implements MultipleInputStreamOperator<Integer>,
+                    BoundedMultiInput,
+                    IterationListener<Integer> {
 
         private final int numberOfInputs;
 
@@ -257,6 +270,17 @@ public class MultipleInputPerRoundWrapperOperatorTest extends TestLogger {
         @Override
         public void endInput(int inputId) throws Exception {
             LIFE_CYCLES.add(LifeCycle.END_INPUT);
+        }
+
+        @Override
+        public void onEpochWatermarkIncremented(
+                int epochWatermark, Context context, Collector<Integer> collector) {
+            LIFE_CYCLES.add(LifeCycle.EPOCH_WATERMARK_INCREMENTED);
+        }
+
+        @Override
+        public void onIterationTerminated(Context context, Collector<Integer> collector) {
+            LIFE_CYCLES.add(LifeCycle.ITERATION_TERMINATION);
         }
     }
 

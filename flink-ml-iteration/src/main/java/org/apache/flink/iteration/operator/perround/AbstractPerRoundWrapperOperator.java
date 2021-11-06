@@ -28,6 +28,7 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.MetricOptions;
 import org.apache.flink.contrib.streaming.state.RocksDBKeyedStateBackend;
 import org.apache.flink.core.memory.ManagedMemoryUseCase;
+import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.iteration.operator.AbstractWrapperOperator;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
@@ -178,37 +179,52 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
         return wrappedOperator;
     }
 
-    protected abstract void endInputAndEmitMaxWatermark(S operator, int round) throws Exception;
+    protected abstract void endInputAndEmitMaxWatermark(S operator, int epoch, int epochWatermark)
+            throws Exception;
 
-    private void closeStreamOperator(S operator, int round) throws Exception {
-        setIterationContextRound(round);
-        endInputAndEmitMaxWatermark(operator, round);
+    protected void closeStreamOperator(S operator, int epoch, int epochWatermark) throws Exception {
+        setIterationContextRound(epoch);
+        OperatorUtils.processOperatorOrUdfIfSatisfy(
+                operator,
+                IterationListener.class,
+                listener -> notifyEpochWatermarkIncrement(listener, epochWatermark));
+        endInputAndEmitMaxWatermark(operator, epoch, epochWatermark);
         operator.finish();
         operator.close();
         setIterationContextRound(null);
 
         // Cleanup the states used by this operator.
-        cleanupOperatorStates(round);
+        cleanupOperatorStates(epoch);
 
         if (stateHandler.getKeyedStateBackend() != null) {
-            cleanupKeyedStates(round);
+            cleanupKeyedStates(epoch);
         }
     }
 
     @Override
     public void onEpochWatermarkIncrement(int epochWatermark) throws IOException {
+        checkState(epochWatermark >= 0, "The epoch watermark should be non-negative.");
         if (epochWatermark > latestEpochWatermark) {
             latestEpochWatermark = epochWatermark;
 
             // Destroys all the operators with round < epoch watermark. Notes that
-            // the onEpochWatermarkIncrement must be from 0 and increment by 1 each time.
-            if (wrappedOperators.containsKey(epochWatermark)) {
-                try {
-                    closeStreamOperator(wrappedOperators.get(epochWatermark), epochWatermark);
-                } catch (Exception exception) {
-                    ExceptionUtils.rethrow(exception);
+            // the onEpochWatermarkIncrement must be from 0 and increment by 1 each time, except
+            // for the last round.
+            try {
+                if (epochWatermark < Integer.MAX_VALUE) {
+                    S wrappedOperator = wrappedOperators.remove(epochWatermark);
+                    if (wrappedOperator != null) {
+                        closeStreamOperator(wrappedOperator, epochWatermark, epochWatermark);
+                    }
+                } else {
+                    List<Integer> sortedEpochs = new ArrayList<>(wrappedOperators.keySet());
+                    Collections.sort(sortedEpochs);
+                    for (Integer epoch : sortedEpochs) {
+                        closeStreamOperator(wrappedOperators.remove(epoch), epoch, epochWatermark);
+                    }
                 }
-                wrappedOperators.remove(epochWatermark);
+            } catch (Exception exception) {
+                ExceptionUtils.rethrow(exception);
             }
         }
 
@@ -340,10 +356,9 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
 
     @Override
     public void finish() throws Exception {
-        for (Map.Entry<Integer, S> entry : wrappedOperators.entrySet()) {
-            closeStreamOperator(entry.getValue(), entry.getKey());
-        }
-        wrappedOperators.clear();
+        checkState(
+                wrappedOperators.size() == 0,
+                "Some wrapped operators are still not closed yet: " + wrappedOperators.keySet());
     }
 
     @Override
