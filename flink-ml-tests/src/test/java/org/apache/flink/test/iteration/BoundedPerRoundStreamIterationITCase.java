@@ -139,7 +139,9 @@ public class BoundedPerRoundStreamIterationITCase extends TestLogger {
                                     DataStreamList.of(
                                             reducer.getSideOutput(
                                                     TwoInputReducePerRoundOperator.OUTPUT_TAG)),
-                                    reducer.filter(x -> x < maxRound).setParallelism(1));
+                                    reducer.filter(x -> x < maxRound)
+                                            .map(x -> (double) x)
+                                            .setParallelism(1));
                         });
         outputs.<OutputRecord<Integer>>get(0).addSink(new CollectSink(result));
 

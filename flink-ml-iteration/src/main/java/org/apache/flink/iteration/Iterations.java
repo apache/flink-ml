@@ -525,10 +525,10 @@ public class Iterations {
         return results;
     }
 
-    private static class CriteriaMergeProcessor extends CoProcessFunction<Integer, Object, Object> {
+    private static class CriteriaMergeProcessor extends CoProcessFunction<Object, Object, Object> {
 
         @Override
-        public void processElement1(Integer value, Context ctx, Collector<Object> out)
+        public void processElement1(Object value, Context ctx, Collector<Object> out)
                 throws Exception {
             // Ignores all the records from the head side-output.
         }
