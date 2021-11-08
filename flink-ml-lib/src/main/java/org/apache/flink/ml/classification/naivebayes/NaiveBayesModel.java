@@ -18,15 +18,15 @@
 
 package org.apache.flink.ml.classification.naivebayes;
 
+import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.core.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
-import org.apache.flink.ml.common.broadcast.operator.HasBroadcastVariable;
 import org.apache.flink.ml.linalg.BLAS;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
+import org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.table.api.DataTypes;
@@ -37,7 +37,12 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.Preconditions;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -74,7 +79,7 @@ public class NaiveBayesModel implements Model<NaiveBayesModel>, NaiveBayesParams
             return stream.transform(
                     this.getClass().getSimpleName(),
                     new RowTypeInfo(colTypes.toArray(new TypeInformation[0]), colNames.toArray(new String[0])),
-                    new NaiveBayesPredictOp()
+                    new NaiveBayesPredictOp(new NaiveBayesPredictFunc())
             );
         };
         DataStream<Row> output = BroadcastUtils.withBroadcastStream(Collections.singletonList(input), broadcastMap, function);
@@ -100,66 +105,69 @@ public class NaiveBayesModel implements Model<NaiveBayesModel>, NaiveBayesParams
         modelStream = tEnv.toDataStream(inputs[0], DataTypes.RAW(NaiveBayesModelData.class));
     }
 
-    private static class NaiveBayesPredictOp extends AbstractStreamOperator<Row>
-            implements OneInputStreamOperator<Row, Row>, HasBroadcastVariable {
-        private NaiveBayesModelData modelData = null;
-
-        @Override
-        public void setBroadcastVariable(String name, List<?> broadcastVariable) {
-            if (name.equals(broadcastModelKey)) {
-                modelData = (NaiveBayesModelData) broadcastVariable.get(0);
-            }
+    private static class NaiveBayesPredictOp
+            extends AbstractUdfStreamOperator<Row, NaiveBayesPredictFunc>
+            implements OneInputStreamOperator<Row, Row> {
+        public NaiveBayesPredictOp(NaiveBayesPredictFunc userFunction) {
+            super(userFunction);
         }
 
         @Override
         public void processElement(StreamRecord<Row> streamRecord) {
-            Row row = streamRecord.getValue();
+            output.collect(new StreamRecord<>(userFunction.map(streamRecord.getValue())));
+        }
+    }
+
+    private static class NaiveBayesPredictFunc extends RichMapFunction<Row, Row> {
+        @Override
+        public Row map(Row row) {
+            NaiveBayesModelData modelData = (NaiveBayesModelData) getRuntimeContext().getBroadcastVariable(broadcastModelKey).get(0);
             Object label = findMaxProbLabel(calculateProb(modelData, row), modelData.label);
-            output.collect(new StreamRecord<>(Row.join(row, Row.of(label))));
+            return Row.join(row, Row.of(label));
+        }
+    }
+
+    private static Object findMaxProbLabel(double[] prob, Object[] label) {
+        Object result = null;
+        int probSize = prob.length;
+        double maxVal = Double.NEGATIVE_INFINITY;
+        for (int i = 0; i < probSize; ++i) {
+            if (maxVal < prob[i]) {
+                maxVal = prob[i];
+                result = label[i];
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Calculate probability of the input data.
+     */
+    private static double[] calculateProb(NaiveBayesModelData modelData, Row rowData) {
+        int labelSize = modelData.label.length;
+        double[] probs = new double[labelSize];
+        int featureSize = modelData.featureNames.length;
+        boolean allZero = true;
+        for (String featureName: modelData.featureNames) {
+            if (rowData.getField(featureName) != null) {
+                allZero = false;
+                break;
+            }
         }
 
-        private static Object findMaxProbLabel(double[] prob, Object[] label) {
-            Object result = null;
-            int probSize = prob.length;
-            double maxVal = Double.NEGATIVE_INFINITY;
-            for (int i = 0; i < probSize; ++i) {
-                if (maxVal < prob[i]) {
-                    maxVal = prob[i];
-                    result = label[i];
-                }
-            }
-            return result;
-        }
-
-        /**
-         * Calculate probability of the input data.
-         */
-        private static double[] calculateProb(NaiveBayesModelData modelData, Row rowData) {
-            int labelSize = modelData.label.length;
-            double[] probs = new double[labelSize];
-            int featureSize = modelData.featureNames.length;
-            boolean allZero = true;
-            for (String featureName: modelData.featureNames) {
-                if (rowData.getField(featureName) != null) {
-                    allZero = false;
-                    break;
-                }
-            }
-
-            if (allZero) {
-                double prob = 1. / labelSize;
-                Arrays.fill(probs, prob);
-                return probs;
-            }
-            for (int i = 0; i < labelSize; i++) {
-                Map<Object, Double>[] labelData = modelData.theta[i];
-                for (int j = 0; j < featureSize; j++) {
-                    Object indexObj = rowData.getField(modelData.featureNames[j]);
-                    probs[i] += labelData[j].getOrDefault(indexObj, 0.);
-                }
-            }
-            BLAS.axpy(1, modelData.piArray, probs);
+        if (allZero) {
+            double prob = 1. / labelSize;
+            Arrays.fill(probs, prob);
             return probs;
         }
+        for (int i = 0; i < labelSize; i++) {
+            Map<Object, Double>[] labelData = modelData.theta[i];
+            for (int j = 0; j < featureSize; j++) {
+                Object indexObj = rowData.getField(modelData.featureNames[j]);
+                probs[i] += labelData[j].getOrDefault(indexObj, 0.);
+            }
+        }
+        BLAS.axpy(1, modelData.piArray, probs);
+        return probs;
     }
 }
