@@ -18,11 +18,7 @@
 
 package org.apache.flink.ml.classification.naivebayes;
 
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.flink.api.java.tuple.Tuple3;
-
 import java.io.Serializable;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -30,20 +26,15 @@ import java.util.Map;
  */
 public class NaiveBayesModelData implements Serializable {
     private static final long serialVersionUID = 3919917903722286395L;
-    public String[] featureNames;
-    public Number[][][] theta;
-    public double[] piArray;
-    public double[] labelWeights;
-    public Object[] label;
-    public boolean[] isCate;
-    public double[][] weightSum;
+    public final String[] featureNames;
+    public final Map<Object, Double>[][] theta;
+    public final double[] piArray;
+    public final Object[] label;
 
-    public void generateWeightAndNumbers(List <Tuple3 <Object, Double[], Map <Integer, Double>[]>> arrayData) {
-        int arrayLength = arrayData.size();
-        int featureNumber = arrayData.get(0).f1.length;
-        weightSum = new double[arrayLength][featureNumber];
-        for (int i = 0; i < arrayLength; i++) {
-            weightSum[i] = ArrayUtils.toPrimitive(arrayData.get(i).f1);
-        }
+    public NaiveBayesModelData(String[] featureNames, Map<Object, Double>[][] theta, double[] piArray, Object[] label) {
+        this.featureNames = featureNames;
+        this.theta = theta;
+        this.piArray = piArray;
+        this.label = label;
     }
 }

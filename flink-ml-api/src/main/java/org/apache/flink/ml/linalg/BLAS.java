@@ -31,8 +31,8 @@ public class BLAS {
      * important to turn of their multi-thread support. Otherwise, it will conflict with Flink's
      * executor and leads to performance loss.
      */
-    private static final com.github.fommil.netlib.BLAS F2J_BLAS =
-            com.github.fommil.netlib.F2jBLAS.getInstance();
+    private static final dev.ludovic.netlib.BLAS F2J_BLAS =
+            dev.ludovic.netlib.JavaBLAS.getInstance();
 
     /** y += a * x . */
     public static void axpy(double a, double[] x, double[] y) {

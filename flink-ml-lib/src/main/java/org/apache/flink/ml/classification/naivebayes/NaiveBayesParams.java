@@ -21,23 +21,17 @@ package org.apache.flink.ml.classification.naivebayes;
 import org.apache.flink.ml.param.DoubleParam;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.param.ParamValidators;
-import org.apache.flink.ml.param.shared.colname.HasCategoricalCols;
 import org.apache.flink.ml.param.shared.colname.HasFeatureCols;
 import org.apache.flink.ml.param.shared.colname.HasLabelCol;
 import org.apache.flink.ml.param.shared.colname.HasPredictionCol;
-import org.apache.flink.ml.param.shared.colname.HasReservedColsDefaultAsNull;
-import org.apache.flink.ml.param.shared.colname.HasWeightColDefaultAsNull;
 
 /**
  * Parameters of naive bayes training process.
  */
 public interface NaiveBayesParams<T> extends
-        HasCategoricalCols<T>,
         HasFeatureCols<T>,
         HasLabelCol<T>,
-        HasPredictionCol<T>,
-        HasReservedColsDefaultAsNull<T>,
-        HasWeightColDefaultAsNull<T> {
+        HasPredictionCol<T> {
     Param<Double> SMOOTHING =
             new DoubleParam(
                     "smoothing",
