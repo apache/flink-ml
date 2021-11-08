@@ -34,12 +34,12 @@ public class ProxyStreamOperatorStateContext implements StreamOperatorStateConte
 
     private final StreamOperatorStateContext wrapped;
 
-    private final String stateNamePrefix;
+    private final StateNamePrefix stateNamePrefix;
 
     public ProxyStreamOperatorStateContext(
             StreamOperatorStateContext wrapped, String stateNamePrefix) {
         this.wrapped = Objects.requireNonNull(wrapped);
-        this.stateNamePrefix = stateNamePrefix;
+        this.stateNamePrefix = new StateNamePrefix(stateNamePrefix);
     }
 
     @Override

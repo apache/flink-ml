@@ -28,6 +28,7 @@ import org.apache.flink.streaming.api.functions.co.CoProcessFunction;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.OutputTag;
+import org.apache.flink.util.TestLogger;
 
 import org.junit.Test;
 
@@ -40,7 +41,80 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 
 /** Verifies the created job graph satisfy the expectation. */
-public class IterationConstructionTest {
+public class IterationConstructionTest extends TestLogger {
+
+    @Test
+    public void testEmptyIterationBody() {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(4);
+        DataStream<Integer> variableSource =
+                env.addSource(new DraftExecutionEnvironment.EmptySource<Integer>() {})
+                        .name("Variable");
+        DataStreamList result =
+                Iterations.iterateUnboundedStreams(
+                        DataStreamList.of(variableSource),
+                        DataStreamList.of(),
+                        ((variableStreams, dataStreams) ->
+                                new IterationBodyResult(variableStreams, dataStreams)));
+
+        JobGraph jobGraph = env.getStreamGraph().getJobGraph();
+
+        List<String> expectedVertexNames =
+                Arrays.asList(
+                        /* 0 */ "Source: Variable -> input-Variable",
+                        /* 1 */ "head-Variable",
+                        /* 2 */ "tail-head-Variable");
+        List<Integer> expectedParallelisms = Arrays.asList(4, 4, 4);
+
+        List<JobVertex> vertices = jobGraph.getVerticesSortedTopologicallyFromSources();
+        assertEquals(
+                expectedVertexNames,
+                vertices.stream().map(JobVertex::getName).collect(Collectors.toList()));
+        assertEquals(
+                expectedParallelisms,
+                vertices.stream().map(JobVertex::getParallelism).collect(Collectors.toList()));
+        assertNotNull(vertices.get(1).getCoLocationGroup());
+        assertNotNull(vertices.get(2).getCoLocationGroup());
+        assertSame(vertices.get(1).getCoLocationGroup(), vertices.get(2).getCoLocationGroup());
+    }
+
+    @Test
+    public void testNotChainingHeadOperator() {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(4);
+        DataStream<Integer> variableSource =
+                env.addSource(new DraftExecutionEnvironment.EmptySource<Integer>() {})
+                        .name("Variable")
+                        .map(x -> x)
+                        .name("map")
+                        .setParallelism(2);
+        DataStreamList result =
+                Iterations.iterateUnboundedStreams(
+                        DataStreamList.of(variableSource),
+                        DataStreamList.of(),
+                        ((variableStreams, dataStreams) ->
+                                new IterationBodyResult(variableStreams, dataStreams)));
+
+        JobGraph jobGraph = env.getStreamGraph().getJobGraph();
+
+        List<String> expectedVertexNames =
+                Arrays.asList(
+                        /* 0 */ "Source: Variable",
+                        /* 1 */ "map -> input-map",
+                        /* 2 */ "head-map",
+                        /* 3 */ "tail-head-map");
+        List<Integer> expectedParallelisms = Arrays.asList(4, 2, 2, 2);
+
+        List<JobVertex> vertices = jobGraph.getVerticesSortedTopologicallyFromSources();
+        assertEquals(
+                expectedVertexNames,
+                vertices.stream().map(JobVertex::getName).collect(Collectors.toList()));
+        assertEquals(
+                expectedParallelisms,
+                vertices.stream().map(JobVertex::getParallelism).collect(Collectors.toList()));
+        assertNotNull(vertices.get(2).getCoLocationGroup());
+        assertSame(vertices.get(2).getCoLocationGroup(), vertices.get(3).getCoLocationGroup());
+    }
 
     @Test
     public void testUnboundedIteration() {
@@ -51,7 +125,7 @@ public class IterationConstructionTest {
                         .name("Variable0");
         DataStream<Integer> variableSource2 =
                 env.addSource(new DraftExecutionEnvironment.EmptySource<Integer>() {})
-                        .setParallelism(2)
+                        .setParallelism(3)
                         .name("Variable1");
 
         DataStream<Integer> constantSource =
@@ -122,7 +196,7 @@ public class IterationConstructionTest {
                         /* 7 */ "tail-Feedback0",
                         /* 8 */ "Feedback1",
                         /* 9 */ "tail-Feedback1");
-        List<Integer> expectedParallelisms = Arrays.asList(2, 2, 3, 2, 2, 4, 2, 2, 3, 3);
+        List<Integer> expectedParallelisms = Arrays.asList(2, 3, 3, 2, 3, 4, 2, 2, 3, 3);
 
         JobGraph jobGraph = env.getStreamGraph().getJobGraph();
         List<JobVertex> vertices = jobGraph.getVerticesSortedTopologicallyFromSources();
@@ -148,7 +222,7 @@ public class IterationConstructionTest {
                         .name("Variable0");
         DataStream<Integer> variableSource2 =
                 env.addSource(new DraftExecutionEnvironment.EmptySource<Integer>() {})
-                        .setParallelism(2)
+                        .setParallelism(3)
                         .name("Variable1");
 
         DataStream<Integer> constantSource =
@@ -218,11 +292,11 @@ public class IterationConstructionTest {
                         /* 9 */ "Feedback1",
                         /* 10 */ "tail-Feedback1",
                         /* 11 */ "Termination",
-                        /* 12 */ "tail-Termination",
-                        /* 13 */ "head-Termination",
-                        /* 14 */ "criteria-discard");
+                        /* 12 */ "head-Termination",
+                        /* 13 */ "criteria-merge",
+                        /* 14 */ "tail-criteria-merge");
         List<Integer> expectedParallelisms =
-                Arrays.asList(2, 2, 3, 5, 2, 2, 4, 2, 2, 3, 3, 5, 5, 5, 1);
+                Arrays.asList(2, 3, 3, 5, 2, 3, 4, 2, 2, 3, 3, 5, 5, 5, 5);
 
         JobGraph jobGraph = env.getStreamGraph().getJobGraph();
         List<JobVertex> vertices = jobGraph.getVerticesSortedTopologicallyFromSources();
@@ -235,10 +309,10 @@ public class IterationConstructionTest {
 
         assertNotNull(vertices.get(4).getCoLocationGroup());
         assertNotNull(vertices.get(5).getCoLocationGroup());
-        assertNotNull(vertices.get(13).getCoLocationGroup());
+        assertNotNull(vertices.get(12).getCoLocationGroup());
         assertSame(vertices.get(4).getCoLocationGroup(), vertices.get(8).getCoLocationGroup());
         assertSame(vertices.get(5).getCoLocationGroup(), vertices.get(10).getCoLocationGroup());
-        assertSame(vertices.get(13).getCoLocationGroup(), vertices.get(12).getCoLocationGroup());
+        assertSame(vertices.get(12).getCoLocationGroup(), vertices.get(14).getCoLocationGroup());
     }
 
     @Test
@@ -310,10 +384,10 @@ public class IterationConstructionTest {
                         /* 6 */ "Feedback",
                         /* 7 */ "tail-Feedback",
                         /* 8 */ "Termination",
-                        /* 9 */ "tail-Termination",
-                        /* 10 */ "head-Termination",
-                        /* 11 */ "criteria-discard");
-        List<Integer> expectedParallelisms = Arrays.asList(2, 3, 5, 2, 3, 4, 2, 2, 5, 5, 5, 1);
+                        /* 9 */ "head-Termination",
+                        /* 10 */ "criteria-merge",
+                        /* 11 */ "tail-criteria-merge");
+        List<Integer> expectedParallelisms = Arrays.asList(2, 3, 5, 2, 3, 4, 2, 2, 5, 5, 5, 5);
 
         JobGraph jobGraph = env.getStreamGraph().getJobGraph();
         List<JobVertex> vertices = jobGraph.getVerticesSortedTopologicallyFromSources();
@@ -323,5 +397,10 @@ public class IterationConstructionTest {
         assertEquals(
                 expectedParallelisms,
                 vertices.stream().map(JobVertex::getParallelism).collect(Collectors.toList()));
+
+        assertNotNull(vertices.get(3).getCoLocationGroup());
+        assertNotNull(vertices.get(9).getCoLocationGroup());
+        assertSame(vertices.get(3).getCoLocationGroup(), vertices.get(7).getCoLocationGroup());
+        assertSame(vertices.get(9).getCoLocationGroup(), vertices.get(11).getCoLocationGroup());
     }
 }

@@ -19,6 +19,8 @@
 package org.apache.flink.iteration.operator.perround;
 
 import org.apache.flink.iteration.IterationRecord;
+import org.apache.flink.iteration.operator.OperatorUtils;
+import org.apache.flink.streaming.api.operators.BoundedMultiInput;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
@@ -46,6 +48,20 @@ public class TwoInputPerRoundWrapperOperator<IN1, IN2, OUT>
 
         this.reusedInput1 = new StreamRecord<>(null, 0);
         this.reusedInput2 = new StreamRecord<>(null, 0);
+    }
+
+    @Override
+    protected void endInputAndEmitMaxWatermark(
+            TwoInputStreamOperator<IN1, IN2, OUT> operator, int round) throws Exception {
+        OperatorUtils.processOperatorOrUdfIfSatisfy(
+                operator,
+                BoundedMultiInput.class,
+                boundedMultiInput -> {
+                    boundedMultiInput.endInput(1);
+                    boundedMultiInput.endInput(2);
+                });
+        operator.processWatermark1(new Watermark(Long.MAX_VALUE));
+        operator.processWatermark2(new Watermark(Long.MAX_VALUE));
     }
 
     @Override

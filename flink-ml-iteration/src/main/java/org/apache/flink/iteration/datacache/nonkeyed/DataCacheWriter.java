@@ -18,7 +18,6 @@
 
 package org.apache.flink.iteration.datacache.nonkeyed;
 
-import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.core.fs.FSDataOutputStream;
 import org.apache.flink.core.fs.FileSystem;
@@ -27,9 +26,12 @@ import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.util.function.SupplierWithException;
 
+import javax.annotation.Nullable;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /** Records the data received and replayed them on required. */
 public class DataCacheWriter<T> {
@@ -42,41 +44,44 @@ public class DataCacheWriter<T> {
 
     private final List<Segment> finishSegments;
 
-    /**
-     * The segments that are newly added that has not been retrieved by getNewlyFinishedSegments().
-     */
-    private final List<Segment> newlyFinishedSegments;
-
-    private Path currentPath;
-
-    private FSDataOutputStream outputStream;
-
-    private DataOutputView outputView;
-
-    private int currentSegmentCount;
+    private SegmentWriter currentSegment;
 
     public DataCacheWriter(
             TypeSerializer<T> serializer,
             FileSystem fileSystem,
             SupplierWithException<Path, IOException> pathGenerator)
             throws IOException {
+        this(serializer, fileSystem, pathGenerator, null);
+    }
+
+    public DataCacheWriter(
+            TypeSerializer<T> serializer,
+            FileSystem fileSystem,
+            SupplierWithException<Path, IOException> pathGenerator,
+            @Nullable List<Segment> writtenSegments)
+            throws IOException {
         this.serializer = serializer;
         this.fileSystem = fileSystem;
         this.pathGenerator = pathGenerator;
 
         this.finishSegments = new ArrayList<>();
-        this.newlyFinishedSegments = new ArrayList<>();
+        if (null != writtenSegments) {
+            finishSegments.addAll(writtenSegments);
+        }
 
-        startNewSegment();
+        this.currentSegment = new SegmentWriter(pathGenerator.get());
     }
 
     public void addRecord(T record) throws IOException {
-        serializer.serialize(record, outputView);
-        currentSegmentCount += 1;
+        currentSegment.addRecord(record);
     }
 
-    public List<Segment> finishAddingRecords() throws IOException {
-        finishCurrentSegment();
+    public void finishCurrentSegment() throws IOException {
+        finishCurrentSegment(true);
+    }
+
+    public List<Segment> finish() throws IOException {
+        finishCurrentSegment(false);
         return finishSegments;
     }
 
@@ -88,35 +93,51 @@ public class DataCacheWriter<T> {
         return finishSegments;
     }
 
-    @VisibleForTesting
-    void startNewSegment() throws IOException {
-        this.currentPath = pathGenerator.get();
-        this.outputStream = fileSystem.create(currentPath, FileSystem.WriteMode.NO_OVERWRITE);
-        this.outputView = new DataOutputViewStreamWrapper(outputStream);
-        this.currentSegmentCount = 0;
-    }
-
-    @VisibleForTesting
-    void finishCurrentSegment() throws IOException {
-        if (outputStream != null) {
-            outputStream.flush();
-            long size = outputStream.getPos();
-            this.outputStream.close();
-            if (currentSegmentCount > 0) {
-                finishSegments.add(new Segment(currentPath, currentSegmentCount, size));
-                newlyFinishedSegments.add(new Segment(currentPath, currentSegmentCount, size));
-            }
+    private void finishCurrentSegment(boolean newSegment) throws IOException {
+        if (currentSegment != null) {
+            currentSegment.finish().ifPresent(finishSegments::add);
+            currentSegment = null;
         }
 
-        currentPath = null;
-        outputStream = null;
-        outputView = null;
-        currentSegmentCount = 0;
+        if (newSegment) {
+            currentSegment = new SegmentWriter(pathGenerator.get());
+        }
     }
 
-    public void finishCurrentSegmentAndStartNewSegment() throws IOException {
-        finishCurrentSegment();
-        startNewSegment();
+    private class SegmentWriter {
+
+        private final Path path;
+
+        private final FSDataOutputStream outputStream;
+
+        private final DataOutputView outputView;
+
+        private int currentSegmentCount;
+
+        public SegmentWriter(Path path) throws IOException {
+            this.path = path;
+            this.outputStream = fileSystem.create(path, FileSystem.WriteMode.NO_OVERWRITE);
+            this.outputView = new DataOutputViewStreamWrapper(outputStream);
+        }
+
+        public void addRecord(T record) throws IOException {
+            serializer.serialize(record, outputView);
+            currentSegmentCount += 1;
+        }
+
+        public Optional<Segment> finish() throws IOException {
+            this.outputStream.flush();
+            long size = outputStream.getPos();
+            this.outputStream.close();
+
+            if (currentSegmentCount > 0) {
+                return Optional.of(new Segment(path, currentSegmentCount, size));
+            } else {
+                // If there are no records, we tend to directly delete this file
+                fileSystem.delete(path, false);
+                return Optional.empty();
+            }
+        }
     }
 
     public void cleanup() throws IOException {
@@ -124,11 +145,5 @@ public class DataCacheWriter<T> {
         for (Segment segment : finishSegments) {
             fileSystem.delete(segment.getPath(), false);
         }
-    }
-
-    public List<Segment> getNewlyFinishedSegments() {
-        List<Segment> res = new ArrayList<>(newlyFinishedSegments);
-        newlyFinishedSegments.clear();
-        return res;
     }
 }

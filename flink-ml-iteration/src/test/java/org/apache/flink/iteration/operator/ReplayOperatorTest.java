@@ -24,11 +24,10 @@ import org.apache.flink.iteration.config.IterationOptions;
 import org.apache.flink.iteration.typeinfo.IterationRecordTypeInfo;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
-import org.apache.flink.streaming.runtime.tasks.OneInputStreamTask;
 import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarness;
 import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarnessBuilder;
+import org.apache.flink.streaming.runtime.tasks.TwoInputStreamTask;
 
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -46,7 +45,6 @@ public class ReplayOperatorTest {
 
     @Rule public TemporaryFolder tempFolder = new TemporaryFolder();
 
-    @Ignore
     @Test(timeout = 60000)
     public void testReplaying() throws Exception {
         final int numRecords = 10;
@@ -54,9 +52,10 @@ public class ReplayOperatorTest {
 
         try (StreamTaskMailboxTestHarness<IterationRecord<Integer>> harness =
                 new StreamTaskMailboxTestHarnessBuilder<>(
-                                OneInputStreamTask::new,
+                                TwoInputStreamTask::new,
                                 new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO))
-                        .addInput(new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO), 2)
+                        .addInput(new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO), 1)
+                        .addInput(new IterationRecordTypeInfo<>(BasicTypeInfo.VOID_TYPE_INFO), 1)
                         .setupOutputForSingletonOperatorChain(new ReplayOperator<>(), operatorId)
                         .buildUnrestored()) {
             harness.getStreamTask()
@@ -72,19 +71,16 @@ public class ReplayOperatorTest {
             for (int i = 0; i < numRecords; ++i) {
                 harness.processElement(new StreamRecord<>(IterationRecord.newRecord(i, 0)), 0, 0);
             }
+            harness.endInput(0, true);
             harness.processElement(
-                    new StreamRecord<>(
-                            IterationRecord.newEpochWatermark(Integer.MAX_VALUE, "sender0")),
-                    0,
-                    0);
-            harness.processElement(
-                    new StreamRecord<>(IterationRecord.newEpochWatermark(0, "sender1")), 0, 1);
+                    new StreamRecord<>(IterationRecord.newEpochWatermark(0, "sender1")), 1, 0);
             assertOutputAllRecordsAndEpochWatermark(harness.getOutput(), numRecords, operatorId, 0);
             harness.getOutput().clear();
 
             // The round 1
             harness.processElement(
-                    new StreamRecord<>(IterationRecord.newEpochWatermark(1, "sender1")), 0, 1);
+                    new StreamRecord<>(IterationRecord.newEpochWatermark(1, "sender1")), 1, 0);
+            // The output would be done asynchronously inside the ReplayerOperator.
             while (harness.getOutput().size() < numRecords + 1) {
                 Thread.sleep(500);
             }
@@ -93,7 +89,8 @@ public class ReplayOperatorTest {
 
             // The round 2
             harness.processElement(
-                    new StreamRecord<>(IterationRecord.newEpochWatermark(2, "sender1")), 0, 1);
+                    new StreamRecord<>(IterationRecord.newEpochWatermark(2, "sender1")), 1, 0);
+            // The output would be done asynchronously inside the ReplayerOperator.
             while (harness.getOutput().size() < numRecords + 1) {
                 Thread.sleep(500);
             }

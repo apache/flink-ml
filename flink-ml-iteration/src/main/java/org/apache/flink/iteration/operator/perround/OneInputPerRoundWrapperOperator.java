@@ -19,6 +19,8 @@
 package org.apache.flink.iteration.operator.perround;
 
 import org.apache.flink.iteration.IterationRecord;
+import org.apache.flink.iteration.operator.OperatorUtils;
+import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
@@ -46,6 +48,14 @@ public class OneInputPerRoundWrapperOperator<IN, OUT>
             StreamOperatorFactory<OUT> operatorFactory) {
         super(parameters, operatorFactory);
         this.reusedInput = new StreamRecord<>(null, 0);
+    }
+
+    @Override
+    protected void endInputAndEmitMaxWatermark(OneInputStreamOperator<IN, OUT> operator, int round)
+            throws Exception {
+        OperatorUtils.processOperatorOrUdfIfSatisfy(
+                operator, BoundedOneInput.class, BoundedOneInput::endInput);
+        operator.processWatermark(new Watermark(Long.MAX_VALUE));
     }
 
     @Override

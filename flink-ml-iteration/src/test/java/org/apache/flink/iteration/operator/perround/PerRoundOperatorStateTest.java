@@ -50,6 +50,7 @@ import org.apache.flink.streaming.runtime.tasks.OneInputStreamTask;
 import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarness;
 import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarnessBuilder;
 import org.apache.flink.util.Collector;
+import org.apache.flink.util.TestLogger;
 
 import org.junit.Test;
 
@@ -62,7 +63,7 @@ import java.util.stream.Collectors;
 import static org.junit.Assert.assertEquals;
 
 /** Tests the state isolation and cleanup for the per-round operators. */
-public class PerRoundOperatorStateTest {
+public class PerRoundOperatorStateTest extends TestLogger {
 
     @Test
     public void testStateIsolationWithoutKeyedStateBackend() throws Exception {

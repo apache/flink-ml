@@ -18,41 +18,36 @@
 
 package org.apache.flink.ml.common.broadcast.operator;
 
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
+import org.apache.flink.api.common.functions.RichFunction;
+import org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-
-import static org.junit.Assert.assertEquals;
 
 /** Utility class used for testing {@link OneInputBroadcastWrapperOperator}. */
-public class TestOneInputOp extends AbstractStreamOperator<Integer>
-        implements OneInputStreamOperator<Integer, Integer>, HasBroadcastVariable {
+public class TestOneInputOp extends AbstractUdfStreamOperator<Integer, RichFunction>
+        implements OneInputStreamOperator<Integer, Integer> {
 
     private final String[] broadcastNames;
 
-    private final int[] expectedSizes;
+    private final List<List<Integer>> expectedBroadcastInputs;
 
-    Map<String, List<?>> broadcastVariables = new HashMap<>();
-
-    public TestOneInputOp(String[] broadcastNames, int[] expectedSizes) {
+    public TestOneInputOp(
+            RichFunction func,
+            String[] broadcastNames,
+            List<List<Integer>> expectedBroadcastInputs) {
+        super(func);
         this.broadcastNames = broadcastNames;
-        this.expectedSizes = expectedSizes;
-    }
-
-    @Override
-    public void setBroadcastVariable(String name, List<?> broadcastVariable) {
-        broadcastVariables.put(name, broadcastVariable);
+        this.expectedBroadcastInputs = expectedBroadcastInputs;
     }
 
     @Override
     public void processElement(StreamRecord<Integer> streamRecord) {
         for (int i = 0; i < broadcastNames.length; i++) {
-            List<?> source = broadcastVariables.get(broadcastNames[i]);
-            assertEquals(expectedSizes[i], source.size());
+            BroadcastVariableReceiverOperatorTest.compareLists(
+                    expectedBroadcastInputs.get(i),
+                    userFunction.getRuntimeContext().getBroadcastVariable(broadcastNames[i]));
         }
         output.collect(streamRecord);
     }

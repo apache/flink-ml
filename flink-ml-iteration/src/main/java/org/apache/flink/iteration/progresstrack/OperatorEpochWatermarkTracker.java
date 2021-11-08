@@ -134,11 +134,16 @@ public class OperatorEpochWatermarkTracker {
             return lowerBound;
         }
 
-        public long getValue(int channel) {
+        public int getValue(int channel) {
             return values[channel];
         }
 
         public void updateValue(int channel, int value) {
+            checkState(
+                    value >= values[channel],
+                    String.format(
+                            "The channel %d received an outdated value %d, which currently is %d",
+                            channel, value, values[channel]));
             if (value > values[channel]) {
                 long oldValue = values[channel];
                 values[channel] = value;

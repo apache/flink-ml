@@ -31,6 +31,7 @@ import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
+import org.apache.flink.streaming.runtime.partitioner.BroadcastPartitioner;
 import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
 import org.apache.flink.util.OutputTag;
 
@@ -64,6 +65,10 @@ public class PerRoundOperatorWrapper<T> implements OperatorWrapper<T, IterationR
     @Override
     public StreamPartitioner<IterationRecord<T>> wrapStreamPartitioner(
             StreamPartitioner<T> streamPartitioner) {
+        if (streamPartitioner instanceof BroadcastPartitioner) {
+            return new BroadcastPartitioner<>();
+        }
+
         return new ProxyStreamPartitioner<>(streamPartitioner);
     }
 

@@ -18,6 +18,7 @@
 
 package org.apache.flink.ml.common.broadcast.operator;
 
+import org.apache.flink.api.common.functions.AbstractRichFunction;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.tuple.Tuple2;
@@ -49,17 +50,20 @@ public class TwoInputBroadcastWrapperOperatorTest {
 
     private static final String[] BROADCAST_NAMES = new String[] {"source1", "source2"};
 
-    private static final TypeInformation[] TYPE_INFORMATIONS =
+    private static final TypeInformation<?>[] TYPE_INFORMATIONS =
             new TypeInformation[] {BasicTypeInfo.INT_TYPE_INFO, BasicTypeInfo.INT_TYPE_INFO};
 
     private static final List<Integer> SOURCE_1 = Collections.singletonList(1);
 
     private static final List<Integer> SOURCE_2 = Arrays.asList(1, 2, 3);
 
+    private static class MyRichFunction extends AbstractRichFunction {}
+
     @Test
     public void testProcessElements() throws Exception {
         TwoInputStreamOperator<Integer, Integer, Integer> inputOp =
-                new TestTwoInputOp(BROADCAST_NAMES, new int[] {1, 3});
+                new TestTwoInputOp(
+                        new MyRichFunction(), BROADCAST_NAMES, Arrays.asList(SOURCE_1, SOURCE_2));
         BroadcastWrapper<Integer> broadcastWrapper =
                 new BroadcastWrapper<>(BROADCAST_NAMES, TYPE_INFORMATIONS);
         BroadcastWrapperOperatorFactory<Integer> wrapperFactory =

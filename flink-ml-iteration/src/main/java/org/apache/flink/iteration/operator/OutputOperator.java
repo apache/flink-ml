@@ -25,7 +25,7 @@ import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 /**
- * Output operator that unwrap {@link IterationRecord} into user record, and desert all the event
+ * Output operator that unwraps {@link IterationRecord} into user record, and desert all the event
  * records.
  */
 public class OutputOperator<T> extends AbstractStreamOperator<T>

@@ -29,7 +29,7 @@ import java.util.Map;
 import java.util.TreeSet;
 
 /**
- * The factory of {@link OperatorEpochWatermarkTracker}. It analyze the inputs of an operator and
+ * The factory of {@link OperatorEpochWatermarkTracker}. It analyzes the inputs of an operator and
  * create the corresponding progress tracker.
  */
 public class OperatorEpochWatermarkTrackerFactory {
@@ -48,6 +48,9 @@ public class OperatorEpochWatermarkTrackerFactory {
                     streamConfig.getInPhysicalEdges(containingTask.getUserCodeClassLoader());
 
             // Mapping the edge type (input number) into a continuous sequence start from 0.
+            // Currently for one-input operator, the type number is 0; for two-inputs and
+            // multiple-inputs, the type number is from 1 to N. We want to map them to [0, N - 1]
+            // uniformly.
             TreeSet<Integer> edgeTypes = new TreeSet<>();
             inEdges.forEach(edge -> edgeTypes.add(edge.getTypeNumber()));
 

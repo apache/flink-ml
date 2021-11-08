@@ -173,15 +173,16 @@ public class CacheElementSerializer<T> extends TypeSerializer<CacheElement<T>> {
 
     @Override
     public TypeSerializerSnapshot<CacheElement<T>> snapshotConfiguration() {
-        return new RecordOrWatermarkTypeSerializerSnapshot<>();
+        return new CacheElementSerializerSnapshot<>();
     }
 
-    public static final class RecordOrWatermarkTypeSerializerSnapshot<T>
+    /** The serializer snapshot class for {@link CacheElementSerializer}. */
+    private static final class CacheElementSerializerSnapshot<T>
             extends CompositeTypeSerializerSnapshot<CacheElement<T>, CacheElementSerializer<T>> {
 
         private static final int CURRENT_VERSION = 1;
 
-        public RecordOrWatermarkTypeSerializerSnapshot() {
+        public CacheElementSerializerSnapshot() {
             super(CacheElementSerializer.class);
         }
 
@@ -197,6 +198,7 @@ public class CacheElementSerializer<T> extends TypeSerializer<CacheElement<T>> {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         protected CacheElementSerializer<T> createOuterSerializerWithNestedSerializers(
                 TypeSerializer<?>[] typeSerializers) {
             TypeSerializer<T> elementSerializer = (TypeSerializer<T>) typeSerializers[0];

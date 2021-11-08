@@ -24,6 +24,7 @@ import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.runtime.fs.hdfs.HadoopFileSystem;
 import org.apache.flink.util.OperatingSystem;
+import org.apache.flink.util.TestLogger;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
@@ -39,6 +40,7 @@ import org.junit.runners.Parameterized;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,7 +52,7 @@ import static org.junit.Assert.assertEquals;
 
 /** Tests the behavior of the {@link DataCacheSnapshot}. */
 @RunWith(Parameterized.class)
-public class DataCacheSnapshotTest {
+public class DataCacheSnapshotTest extends TestLogger {
 
     @ClassRule public static final TemporaryFolder CLASS_TEMPORARY_FOLDER = new TemporaryFolder();
 
@@ -104,7 +106,7 @@ public class DataCacheSnapshotTest {
         DataCacheWriter<Integer> writer = createWriterAndAddRecords(numRecordsPerSegment);
         DataCacheSnapshot dataCacheSnapshot =
                 new DataCacheSnapshot(fileSystem, null, writer.getFinishSegments());
-        checkWriteAndRecoverAndReplay(dataCacheSnapshot, numRecordsPerSegment);
+        checkWriteAndRecoverAndReplay(numRecordsPerSegment, dataCacheSnapshot);
     }
 
     @Test
@@ -113,7 +115,19 @@ public class DataCacheSnapshotTest {
         DataCacheWriter<Integer> writer = createWriterAndAddRecords(numRecordsPerSegment);
         DataCacheSnapshot dataCacheSnapshot =
                 new DataCacheSnapshot(fileSystem, new Tuple2<>(0, 50), writer.getFinishSegments());
-        checkWriteAndRecoverAndReplay(dataCacheSnapshot, numRecordsPerSegment);
+        checkWriteAndRecoverAndReplay(numRecordsPerSegment, dataCacheSnapshot);
+    }
+
+    @Test
+    public void testSnapshotMultipleWritersIntoSingleStream() throws Exception {
+        int[] numRecordsPerSegment = {100, 200, 300};
+        DataCacheWriter<Integer> writer1 = createWriterAndAddRecords(numRecordsPerSegment);
+        DataCacheWriter<Integer> writer2 = createWriterAndAddRecords(numRecordsPerSegment);
+
+        checkWriteAndRecoverAndReplay(
+                numRecordsPerSegment,
+                new DataCacheSnapshot(fileSystem, null, writer1.getFinishSegments()),
+                new DataCacheSnapshot(fileSystem, null, writer2.getFinishSegments()));
     }
 
     private DataCacheWriter<Integer> createWriterAndAddRecords(int[] numRecordsPerSegment)
@@ -129,28 +143,36 @@ public class DataCacheSnapshotTest {
                 writer.addRecord(nextNumber++);
             }
             writer.finishCurrentSegment();
-            writer.startNewSegment();
         }
-        writer.finishAddingRecords();
+        writer.finish();
         return writer;
     }
 
     private void checkWriteAndRecoverAndReplay(
-            DataCacheSnapshot dataCacheSnapshot, int[] numRecordsPerSegment) throws Exception {
+            int[] numRecordsPerSegment, DataCacheSnapshot... dataCacheSnapshots) throws Exception {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        dataCacheSnapshot.writeTo(bos);
+        for (DataCacheSnapshot dataCacheSnapshot : dataCacheSnapshots) {
+            dataCacheSnapshot.writeTo(bos);
+        }
+
         byte[] data = bos.toByteArray();
 
-        checkRecover(dataCacheSnapshot, data);
-        checkReplay(dataCacheSnapshot, data, numRecordsPerSegment);
+        ByteArrayInputStream recoverInputStream = new ByteArrayInputStream(data);
+        for (DataCacheSnapshot dataCacheSnapshot : dataCacheSnapshots) {
+            checkRecover(dataCacheSnapshot, recoverInputStream);
+        }
+
+        ByteArrayInputStream replayInputStream = new ByteArrayInputStream(data);
+        for (DataCacheSnapshot dataCacheSnapshot : dataCacheSnapshots) {
+            checkReplay(dataCacheSnapshot, replayInputStream, numRecordsPerSegment);
+        }
     }
 
-    private void checkRecover(DataCacheSnapshot dataCacheSnapshot, byte[] serializedData)
+    private void checkRecover(DataCacheSnapshot dataCacheSnapshot, InputStream inputStream)
             throws IOException {
-        ByteArrayInputStream bis = new ByteArrayInputStream(serializedData);
         DataCacheSnapshot copied =
                 DataCacheSnapshot.recover(
-                        bis,
+                        inputStream,
                         dataCacheSnapshot.getFileSystem(),
                         () -> new Path(basePath, "writer." + UUID.randomUUID().toString()));
         if (dataCacheSnapshot.getFileSystem().isDistributedFS()) {
@@ -163,11 +185,12 @@ public class DataCacheSnapshotTest {
     }
 
     private void checkReplay(
-            DataCacheSnapshot dataCacheSnapshot, byte[] serializedData, int[] numRecordsPerSegment)
+            DataCacheSnapshot dataCacheSnapshot,
+            InputStream inputStream,
+            int[] numRecordsPerSegment)
             throws Exception {
-        ByteArrayInputStream bis = new ByteArrayInputStream(serializedData);
         List<Integer> elements = new ArrayList<>();
-        DataCacheSnapshot.replay(bis, IntSerializer.INSTANCE, fileSystem, elements::add);
+        DataCacheSnapshot.replay(inputStream, IntSerializer.INSTANCE, fileSystem, elements::add);
 
         int totalRecords = IntStream.of(numRecordsPerSegment).sum();
         assertEquals(

@@ -25,6 +25,7 @@ import org.apache.flink.iteration.operator.event.SubtaskAlignedEvent;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.MockOperatorCoordinatorContext;
 import org.apache.flink.runtime.testutils.DirectScheduledExecutorService;
+import org.apache.flink.util.TestLogger;
 
 import org.junit.Test;
 
@@ -40,7 +41,7 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 /** Tests the {@link SharedProgressAligner}. */
-public class SharedProgressAlignerTest {
+public class SharedProgressAlignerTest extends TestLogger {
 
     @Test
     public void testCreateAndGet() {
@@ -74,11 +75,11 @@ public class SharedProgressAlignerTest {
 
         assertEquals(2, aligner.getNumberListeners());
 
-        aligner.unregisterConsumer(operatorIds.get(0));
+        aligner.unregisterListener(operatorIds.get(0));
         assertEquals(1, aligner.getNumberListeners());
         assertTrue(SharedProgressAligner.getInstances().containsKey(iterationId));
 
-        aligner.unregisterConsumer(operatorIds.get(1));
+        aligner.unregisterListener(operatorIds.get(1));
         assertEquals(0, aligner.getNumberListeners());
         assertFalse(SharedProgressAligner.getInstances().containsKey(iterationId));
     }
@@ -213,7 +214,7 @@ public class SharedProgressAlignerTest {
                         DirectScheduledExecutorService::new);
 
         for (int i = 0; i < listeners.size(); ++i) {
-            aligner.registerAlignedConsumer(operatorIds.get(i), listeners.get(i));
+            aligner.registerAlignedListener(operatorIds.get(i), listeners.get(i));
         }
 
         return aligner;

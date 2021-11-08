@@ -22,13 +22,14 @@ import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.util.OneInputStreamOperatorTestHarness;
 import org.apache.flink.streaming.util.TestHarnessUtil;
+import org.apache.flink.util.TestLogger;
 
 import org.junit.Test;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /** Tests the {@link OutputOperator}. */
-public class OutputOperatorTest {
+public class OutputOperatorTest extends TestLogger {
 
     @Test
     public void testUnwrapUserRecordsAndDropEvents() throws Exception {

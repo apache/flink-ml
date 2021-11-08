@@ -44,13 +44,13 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.OneInputStreamTask;
 import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarness;
 import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarnessBuilder;
+import org.apache.flink.streaming.util.OneInputStreamOperatorTestHarness;
 import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.SerializedValue;
+import org.apache.flink.util.TestLogger;
 import org.apache.flink.util.function.FunctionWithException;
 
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
@@ -72,9 +72,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
 /** Tests the {@link HeadOperator}. */
-public class HeadOperatorTest {
-
-    private static final Logger LOG = LoggerFactory.getLogger(HeadOperatorTest.class);
+public class HeadOperatorTest extends TestLogger {
 
     @Test
     public void testForwardRecords() throws Exception {
@@ -106,7 +104,7 @@ public class HeadOperatorTest {
                                     RecordingHeadOperatorFactory.latestHeadOperator
                                             .getRecordProcessor();
 
-                    assertEquals(2, (long) recordProcessor.getNumFeedbackRecordsPerRound().get(1));
+                    assertEquals(2, (long) recordProcessor.getNumFeedbackRecordsPerEpoch().get(1));
 
                     return null;
                 });
@@ -554,7 +552,6 @@ public class HeadOperatorTest {
                                     .getLastJobManagerTaskStateSnapshot();
                         });
         assertNotNull(taskStateSnapshot);
-        System.out.println(taskStateSnapshot);
         cleanupFeedbackChannel(iterationId);
         createHarnessAndRun(
                 iterationId,
@@ -712,6 +709,63 @@ public class HeadOperatorTest {
                 });
     }
 
+    @Test(timeout = 20000)
+    public void testTailAbortPendingCheckpointIfHeadBlocked() throws Exception {
+        IterationID iterationId = new IterationID();
+        OperatorID operatorId = new OperatorID();
+
+        createHarnessAndRun(
+                iterationId,
+                operatorId,
+                null,
+                harness -> {
+                    harness.processElement(new StreamRecord<>(IterationRecord.newRecord(100, 0)));
+                    dispatchOperatorEvent(harness, operatorId, new CoordinatorCheckpointEvent(2));
+                    harness.getStreamTask()
+                            .triggerCheckpointAsync(
+                                    new CheckpointMetaData(2, 1000),
+                                    CheckpointOptions.alignedNoTimeout(
+                                            CheckpointType.CHECKPOINT,
+                                            CheckpointStorageLocationReference.getDefault()));
+                    harness.processAll();
+
+                    putFeedbackRecords(iterationId, IterationRecord.newRecord(100, 1), null);
+                    harness.processAll();
+
+                    // Simulates the tail operators help to abort the checkpoint
+                    CompletableFuture<Void> supplier =
+                            CompletableFuture.supplyAsync(
+                                    () -> {
+                                        try {
+                                            // Slightly postpone the execution till the head
+                                            // operator get blocked.
+                                            Thread.sleep(2000);
+
+                                            OneInputStreamOperatorTestHarness<
+                                                            IterationRecord<?>, Void>
+                                                    testHarness =
+                                                            new OneInputStreamOperatorTestHarness<>(
+                                                                    new TailOperator(
+                                                                            iterationId, 0));
+                                            testHarness.open();
+
+                                            testHarness.getOperator().notifyCheckpointAborted(2);
+                                        } catch (Exception e) {
+                                            throw new CompletionException(e);
+                                        }
+
+                                        return null;
+                                    });
+
+                    harness.getStreamTask().notifyCheckpointAbortAsync(2, 0);
+                    harness.processAll();
+
+                    supplier.get();
+
+                    return null;
+                });
+    }
+
     private <T> T createHarnessAndRun(
             IterationID iterationId,
             OperatorID operatorId,
@@ -790,7 +844,7 @@ public class HeadOperatorTest {
             RegularHeadOperatorRecordProcessor recordProcessor =
                     (RegularHeadOperatorRecordProcessor) headOperator.getRecordProcessor();
             assertEquals(
-                    expectedNumFeedbackRecords, recordProcessor.getNumFeedbackRecordsPerRound());
+                    expectedNumFeedbackRecords, recordProcessor.getNumFeedbackRecordsPerEpoch());
             assertEquals(expectedLastAligned, recordProcessor.getLatestRoundAligned());
             assertEquals(
                     expectedLastGloballyAligned, recordProcessor.getLatestRoundGloballyAligned());

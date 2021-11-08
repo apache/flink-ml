@@ -51,27 +51,27 @@ public class HeadOperatorCoordinator implements OperatorCoordinator, SharedProgr
         this.sharedProgressAligner = Objects.requireNonNull(sharedProgressAligner);
         this.subtaskGateways = new SubtaskGateway[context.currentParallelism()];
 
-        sharedProgressAligner.registerAlignedConsumer(context.getOperatorId(), this);
+        sharedProgressAligner.registerAlignedListener(context.getOperatorId(), this);
     }
 
     @Override
     public void start() {}
 
     @Override
-    public void subtaskReady(int i, SubtaskGateway subtaskGateway) {
-        this.subtaskGateways[i] = subtaskGateway;
+    public void subtaskReady(int subtaskIndex, SubtaskGateway subtaskGateway) {
+        this.subtaskGateways[subtaskIndex] = subtaskGateway;
     }
 
     @Override
-    public void resetToCheckpoint(long l, @Nullable byte[] bytes) {
+    public void resetToCheckpoint(long checkpointId, @Nullable byte[] bytes) {
         for (int i = 0; i < context.currentParallelism(); ++i) {
             sharedProgressAligner.removeProgressInfo(context.getOperatorId());
         }
     }
 
     @Override
-    public void subtaskFailed(int i, @Nullable Throwable throwable) {
-        sharedProgressAligner.removeProgressInfo(context.getOperatorId(), i);
+    public void subtaskFailed(int subtaskIndex, @Nullable Throwable throwable) {
+        sharedProgressAligner.removeProgressInfo(context.getOperatorId(), subtaskIndex);
     }
 
     @Override
@@ -104,7 +104,7 @@ public class HeadOperatorCoordinator implements OperatorCoordinator, SharedProgr
 
     @Override
     public void close() {
-        sharedProgressAligner.unregisterConsumer(context.getOperatorId());
+        sharedProgressAligner.unregisterListener(context.getOperatorId());
     }
 
     @Override

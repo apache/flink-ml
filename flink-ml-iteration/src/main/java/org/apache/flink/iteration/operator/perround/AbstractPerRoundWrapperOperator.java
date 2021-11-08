@@ -27,7 +27,6 @@ import org.apache.flink.contrib.streaming.state.RocksDBKeyedStateBackend;
 import org.apache.flink.core.memory.ManagedMemoryUseCase;
 import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.iteration.operator.AbstractWrapperOperator;
-import org.apache.flink.iteration.operator.OperatorUtils;
 import org.apache.flink.iteration.proxy.state.ProxyStateSnapshotContext;
 import org.apache.flink.iteration.proxy.state.ProxyStreamOperatorStateContext;
 import org.apache.flink.iteration.utils.ReflectionUtils;
@@ -44,7 +43,6 @@ import org.apache.flink.runtime.state.OperatorStateBackend;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.runtime.state.heap.HeapKeyedStateBackend;
-import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.InternalTimeServiceManager;
 import org.apache.flink.streaming.api.operators.OperatorSnapshotFutures;
 import org.apache.flink.streaming.api.operators.StreamOperator;
@@ -63,7 +61,6 @@ import org.apache.flink.util.InstantiationUtil;
 import org.apache.flink.util.function.BiConsumerWithException;
 
 import org.rocksdb.RocksDB;
-import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,6 +77,12 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
 
     private static final Logger LOG =
             LoggerFactory.getLogger(AbstractPerRoundWrapperOperator.class);
+
+    private static final String HEAP_KEYED_STATE_NAME =
+            "org.apache.flink.runtime.state.heap.HeapKeyedStateBackend";
+
+    private static final String ROCKSDB_KEYED_STATE_NAME =
+            "org.apache.flink.contrib.streaming.state.RocksDBKeyedStateBackend";
 
     /** The wrapped operators for each round. */
     private final Map<Integer, S> wrappedOperators;
@@ -112,7 +115,7 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
             return wrappedOperator;
         }
 
-        // We needs to clone the operator factory to also support SimpleOperatorFactory.
+        // We need to clone the operator factory to also support SimpleOperatorFactory.
         try {
             StreamOperatorFactory<T> clonedOperatorFactory =
                     InstantiationUtil.clone(operatorFactory);
@@ -135,10 +138,27 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
         return wrappedOperator;
     }
 
+    protected abstract void endInputAndEmitMaxWatermark(S operator, int round) throws Exception;
+
+    private void closeStreamOperator(S operator, int round) throws Exception {
+        setIterationContextRound(round);
+        endInputAndEmitMaxWatermark(operator, round);
+        operator.finish();
+        operator.close();
+        setIterationContextRound(null);
+
+        // Cleanup the states used by this operator.
+        cleanupOperatorStates(round);
+
+        if (stateHandler.getKeyedStateBackend() != null) {
+            cleanupKeyedStates(round);
+        }
+    }
+
     @Override
     public void onEpochWatermarkIncrement(int epochWatermark) throws IOException {
         try {
-            // Deserts all the operators with round < epoch watermark. Notes that
+            // Destroys all the operators with round < epoch watermark. Notes that
             // the onEpochWatermarkIncrement must be from 0 and increment by 1 each time.
             if (wrappedOperators.containsKey(epochWatermark)) {
                 closeStreamOperator(wrappedOperators.get(epochWatermark), epochWatermark);
@@ -389,22 +409,6 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
         operator.open();
     }
 
-    private void closeStreamOperator(S operator, int round) throws Exception {
-        setIterationContextRound(round);
-        OperatorUtils.processOperatorOrUdfIfSatisfy(
-                operator, BoundedOneInput.class, BoundedOneInput::endInput);
-        operator.finish();
-        operator.close();
-        setIterationContextRound(null);
-
-        // Cleanup the states used by this operator.
-        cleanupOperatorStates(round);
-
-        if (stateHandler.getKeyedStateBackend() != null) {
-            cleanupKeyedStates(round);
-        }
-    }
-
     private void cleanupOperatorStates(int round) {
         String roundPrefix = getRoundStatePrefix(round);
         OperatorStateBackend operatorStateBackend = stateHandler.getOperatorStateBackend();
@@ -432,7 +436,7 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
     private void cleanupKeyedStates(int round) {
         String roundPrefix = getRoundStatePrefix(round);
         KeyedStateBackend<?> keyedStateBackend = stateHandler.getKeyedStateBackend();
-        if (keyedStateBackend instanceof HeapKeyedStateBackend) {
+        if (keyedStateBackend.getClass().getName().equals(HEAP_KEYED_STATE_NAME)) {
             ReflectionUtils.<Map<String, ?>>getFieldValue(
                             keyedStateBackend, HeapKeyedStateBackend.class, "registeredKVStates")
                     .entrySet()
@@ -443,7 +447,7 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
                             "keyValueStatesByName")
                     .entrySet()
                     .removeIf(entry -> entry.getKey().startsWith(roundPrefix));
-        } else if (keyedStateBackend instanceof RocksDBKeyedStateBackend) {
+        } else if (keyedStateBackend.getClass().getName().equals(ROCKSDB_KEYED_STATE_NAME)) {
             RocksDB db =
                     ReflectionUtils.getFieldValue(
                             keyedStateBackend, RocksDBKeyedStateBackend.class, "db");
@@ -458,7 +462,7 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
                             entry -> {
                                 try {
                                     db.dropColumnFamily(entry.getValue().columnFamilyHandle);
-                                } catch (RocksDBException e) {
+                                } catch (Exception e) {
                                     LOG.error(
                                             "Failed to drop state {} for round {}",
                                             entry.getKey(),

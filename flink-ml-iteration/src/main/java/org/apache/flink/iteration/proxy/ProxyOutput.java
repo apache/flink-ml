@@ -53,7 +53,7 @@ public class ProxyOutput<T> implements Output<StreamRecord<T>> {
 
     @Override
     public void emitWatermark(Watermark mark) {
-        output.emitWatermark(mark);
+        // For now, we only supports the MAX_WATERMARK separately for each operator.
     }
 
     @Override

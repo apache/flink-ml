@@ -28,9 +28,10 @@ public class Segment implements Serializable {
 
     private final Path path;
 
+    /** The count of the records in the file. */
     private final int count;
 
-    /** number of bytes in this segment. */
+    /** The total length of file. */
     private final long size;
 
     public Segment(Path path, int count, long size) {
@@ -48,7 +49,7 @@ public class Segment implements Serializable {
     }
 
     public long getSize() {
-        return this.size;
+        return size;
     }
 
     @Override
@@ -56,11 +57,13 @@ public class Segment implements Serializable {
         if (this == o) {
             return true;
         }
-        if (o == null || getClass() != o.getClass()) {
+
+        if (!(o instanceof Segment)) {
             return false;
         }
+
         Segment segment = (Segment) o;
-        return count == segment.count && Objects.equals(path, segment.path) && size == segment.size;
+        return count == segment.count && size == segment.size && Objects.equals(path, segment.path);
     }
 
     @Override

@@ -18,6 +18,8 @@
 
 package org.apache.flink.iteration.progresstrack;
 
+import org.apache.flink.util.TestLogger;
+
 import org.junit.Test;
 
 import java.io.IOException;
@@ -28,7 +30,7 @@ import java.util.List;
 import static org.junit.Assert.assertEquals;
 
 /** Tests the logic of {@link OperatorEpochWatermarkTracker}. */
-public class OperatorEpochWatermarkTrackerTest {
+public class OperatorEpochWatermarkTrackerTest extends TestLogger {
 
     @Test
     public void testEpochWatermarkAlignment() throws IOException {

@@ -22,7 +22,6 @@ import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.iteration.IterationRecord;
-import org.apache.flink.iteration.config.IterationOptions;
 import org.apache.flink.iteration.datacache.nonkeyed.DataCacheReader;
 import org.apache.flink.iteration.datacache.nonkeyed.DataCacheWriter;
 import org.apache.flink.iteration.progresstrack.OperatorEpochWatermarkTracker;
@@ -40,7 +39,6 @@ import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.util.ExceptionUtils;
 
 import java.io.IOException;
-import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
@@ -78,12 +76,12 @@ public class ReplayOperator<T> extends AbstractStreamOperator<IterationRecord<T>
 
         try {
             basePath =
-                    new Path(
+                    OperatorUtils.getDataCachePath(
+                            containingTask.getEnvironment().getTaskManagerInfo().getConfiguration(),
                             containingTask
                                     .getEnvironment()
-                                    .getTaskManagerInfo()
-                                    .getConfiguration()
-                                    .get(IterationOptions.DATA_CACHE_PATH));
+                                    .getIOManager()
+                                    .getSpillingDirectoriesPaths());
             fileSystem = basePath.getFileSystem();
 
             IterationRecordSerializer<T> iterationRecordSerializer =
@@ -105,14 +103,8 @@ public class ReplayOperator<T> extends AbstractStreamOperator<IterationRecord<T>
                     new DataCacheWriter<>(
                             typeSerializer,
                             fileSystem,
-                            () ->
-                                    new Path(
-                                            basePath.toString()
-                                                    + "/"
-                                                    + "replay-"
-                                                    + config.getOperatorID().toHexString()
-                                                    + "-"
-                                                    + UUID.randomUUID().toString()));
+                            OperatorUtils.createDataCacheFileGenerator(
+                                    basePath, "replay", config.getOperatorID()));
 
             currentDataCacheReader = new AtomicReference<>();
         } catch (Exception e) {
@@ -155,6 +147,7 @@ public class ReplayOperator<T> extends AbstractStreamOperator<IterationRecord<T>
 
     @Override
     public void endInput(int i) throws Exception {
+        // The notification ranges from 1 to N while the track uses 0 to N -1.
         progressTracker.finish(i - 1);
     }
 
@@ -162,7 +155,7 @@ public class ReplayOperator<T> extends AbstractStreamOperator<IterationRecord<T>
     public void onEpochWatermarkIncrement(int epochWatermark) throws IOException {
         if (epochWatermark == 0) {
             // No need to replay for the round 0, it is output directly.
-            dataCacheWriter.finishAddingRecords();
+            dataCacheWriter.finish();
             output.collect(
                     new StreamRecord<>(
                             IterationRecord.newEpochWatermark(

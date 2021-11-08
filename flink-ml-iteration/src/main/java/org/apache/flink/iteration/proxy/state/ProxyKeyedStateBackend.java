@@ -53,10 +53,10 @@ public class ProxyKeyedStateBackend<K> implements CheckpointableKeyedStateBacken
 
     private final CheckpointableKeyedStateBackend<K> wrappedBackend;
 
-    private final String stateNamePrefix;
+    private final StateNamePrefix stateNamePrefix;
 
     public ProxyKeyedStateBackend(
-            CheckpointableKeyedStateBackend<K> wrappedBackend, String stateNamePrefix) {
+            CheckpointableKeyedStateBackend<K> wrappedBackend, StateNamePrefix stateNamePrefix) {
         this.wrappedBackend = wrappedBackend;
         this.stateNamePrefix = stateNamePrefix;
     }
@@ -89,12 +89,12 @@ public class ProxyKeyedStateBackend<K> implements CheckpointableKeyedStateBacken
 
     @Override
     public <N> Stream<K> getKeys(String state, N namespace) {
-        return wrappedBackend.getKeys(stateNamePrefix + state, namespace);
+        return wrappedBackend.getKeys(stateNamePrefix.prefix(state), namespace);
     }
 
     @Override
     public <N> Stream<Tuple2<K, N>> getKeysAndNamespaces(String state) {
-        return wrappedBackend.getKeysAndNamespaces(stateNamePrefix + state);
+        return wrappedBackend.getKeysAndNamespaces(stateNamePrefix.prefix(state));
     }
 
     @Override
@@ -147,7 +147,7 @@ public class ProxyKeyedStateBackend<K> implements CheckpointableKeyedStateBacken
                 {
                     return (StateDescriptor<S, T>)
                             new ValueStateDescriptor<>(
-                                    stateNamePrefix + descriptor.getName(),
+                                    stateNamePrefix.prefix(descriptor.getName()),
                                     descriptor.getSerializer());
                 }
             case LIST:
@@ -156,7 +156,7 @@ public class ProxyKeyedStateBackend<K> implements CheckpointableKeyedStateBacken
                             (ListStateDescriptor<T>) descriptor;
                     return (StateDescriptor<S, T>)
                             new ListStateDescriptor<>(
-                                    stateNamePrefix + listStateDescriptor.getName(),
+                                    stateNamePrefix.prefix(listStateDescriptor.getName()),
                                     listStateDescriptor.getElementSerializer());
                 }
             case REDUCING:
@@ -165,7 +165,7 @@ public class ProxyKeyedStateBackend<K> implements CheckpointableKeyedStateBacken
                             (ReducingStateDescriptor<T>) descriptor;
                     return (StateDescriptor<S, T>)
                             new ReducingStateDescriptor<>(
-                                    stateNamePrefix + reducingStateDescriptor.getName(),
+                                    stateNamePrefix.prefix(reducingStateDescriptor.getName()),
                                     reducingStateDescriptor.getReduceFunction(),
                                     reducingStateDescriptor.getSerializer());
                 }
@@ -174,7 +174,7 @@ public class ProxyKeyedStateBackend<K> implements CheckpointableKeyedStateBacken
                     AggregatingStateDescriptor<?, ?, T> aggregatingStateDescriptor =
                             (AggregatingStateDescriptor<?, ?, T>) descriptor;
                     return new AggregatingStateDescriptor(
-                            stateNamePrefix + aggregatingStateDescriptor.getName(),
+                            stateNamePrefix.prefix(aggregatingStateDescriptor.getName()),
                             aggregatingStateDescriptor.getAggregateFunction(),
                             aggregatingStateDescriptor.getSerializer());
                 }
@@ -183,7 +183,7 @@ public class ProxyKeyedStateBackend<K> implements CheckpointableKeyedStateBacken
                     MapStateDescriptor<?, Map<?, ?>> mapStateDescriptor =
                             (MapStateDescriptor<?, Map<?, ?>>) descriptor;
                     return new MapStateDescriptor(
-                            stateNamePrefix + mapStateDescriptor.getName(),
+                            stateNamePrefix.prefix(mapStateDescriptor.getName()),
                             mapStateDescriptor.getKeySerializer(),
                             mapStateDescriptor.getValueSerializer());
                 }
@@ -219,7 +219,8 @@ public class ProxyKeyedStateBackend<K> implements CheckpointableKeyedStateBacken
             KeyGroupedInternalPriorityQueue<T> create(
                     @Nonnull String stateName,
                     @Nonnull TypeSerializer<T> byteOrderedElementSerializer) {
-        return wrappedBackend.create(stateNamePrefix + stateName, byteOrderedElementSerializer);
+        return wrappedBackend.create(
+                stateNamePrefix.prefix(stateName), byteOrderedElementSerializer);
     }
 
     @Nonnull

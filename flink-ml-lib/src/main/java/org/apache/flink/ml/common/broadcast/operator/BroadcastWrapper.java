@@ -22,7 +22,6 @@ import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.iteration.operator.OperatorWrapper;
-import org.apache.flink.streaming.api.operators.MultipleInputStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
@@ -68,9 +67,6 @@ public class BroadcastWrapper<T> implements OperatorWrapper<T, T> {
                     operatorParameters, operatorFactory, broadcastStreamNames, inTypes, isBlocked);
         } else if (TwoInputStreamOperator.class.isAssignableFrom(operatorClass)) {
             return new TwoInputBroadcastWrapperOperator<>(
-                    operatorParameters, operatorFactory, broadcastStreamNames, inTypes, isBlocked);
-        } else if (MultipleInputStreamOperator.class.isAssignableFrom(operatorClass)) {
-            return new MultipleInputBroadcastWrapperOperator<>(
                     operatorParameters, operatorFactory, broadcastStreamNames, inTypes, isBlocked);
         } else {
             throw new UnsupportedOperationException(

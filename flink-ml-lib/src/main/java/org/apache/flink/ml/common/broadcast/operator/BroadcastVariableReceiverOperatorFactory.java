@@ -18,35 +18,37 @@
 
 package org.apache.flink.ml.common.broadcast.operator;
 
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 
-/** Factory class for {@link TestMultiInputOp}. */
-public class TestMultiInputOpFactory extends AbstractStreamOperatorFactory<Integer> {
+import java.io.Serializable;
 
-    private int numInputs;
+/** Factory class for {@link BroadcastVariableReceiverOperator}. */
+public class BroadcastVariableReceiverOperatorFactory<OUT>
+        extends AbstractStreamOperatorFactory<OUT> implements Serializable {
 
-    private String[] broadcastNames;
+    /** names of the broadcast data streams. */
+    private final String[] broadcastNames;
 
-    private int[] expectedSizes;
+    /** types of the broadcast data streams. */
+    private final TypeInformation<?>[] inTypes;
 
-    public TestMultiInputOpFactory(int numInputs, String[] broadcastNames, int[] expectedSizes) {
-        this.numInputs = numInputs;
+    public BroadcastVariableReceiverOperatorFactory(
+            String[] broadcastNames, TypeInformation<?>[] inTypes) {
         this.broadcastNames = broadcastNames;
-        this.expectedSizes = expectedSizes;
+        this.inTypes = inTypes;
     }
 
     @Override
-    public <T extends StreamOperator<Integer>> T createStreamOperator(
-            StreamOperatorParameters<Integer> streamOperatorParameters) {
-        return (T)
-                new TestMultiInputOp(
-                        streamOperatorParameters, numInputs, broadcastNames, expectedSizes);
+    public <T extends StreamOperator<OUT>> T createStreamOperator(
+            StreamOperatorParameters<OUT> parameters) {
+        return (T) new BroadcastVariableReceiverOperator(parameters, broadcastNames, inTypes);
     }
 
     @Override
     public Class<? extends StreamOperator> getStreamOperatorClass(ClassLoader classLoader) {
-        return TestMultiInputOp.class;
+        return BroadcastVariableReceiverOperator.class;
     }
 }

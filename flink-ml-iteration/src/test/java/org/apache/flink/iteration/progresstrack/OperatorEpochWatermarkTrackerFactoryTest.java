@@ -38,6 +38,7 @@ import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
 import org.apache.flink.streaming.api.transformations.MultipleInputTransformation;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
+import org.apache.flink.util.TestLogger;
 
 import org.junit.Test;
 
@@ -50,7 +51,7 @@ import static org.junit.Assert.assertNotNull;
 /**
  * Test the {@link OperatorEpochWatermarkTracker} is created correctly according to the topology.
  */
-public class OperatorEpochWatermarkTrackerFactoryTest {
+public class OperatorEpochWatermarkTrackerFactoryTest extends TestLogger {
 
     private static OperatorEpochWatermarkTracker lastProgressTracker;
 

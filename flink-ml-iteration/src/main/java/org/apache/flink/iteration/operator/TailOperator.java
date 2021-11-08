@@ -102,6 +102,10 @@ public class TailOperator extends AbstractStreamOperator<Void>
     public void notifyCheckpointAborted(long checkpointId) throws Exception {
         super.notifyCheckpointAborted(checkpointId);
 
+        // TODO: Unfortunately, we have to rely on the tail operator to help
+        // abort the checkpoint since the task thread of the head operator
+        // might get blocked due to not be able to close the raw state files.
+        // We would try to fix it in the Flink side in the future.
         SubtaskFeedbackKey<?> key =
                 OperatorUtils.createFeedbackKey(iterationId, feedbackIndex)
                         .withSubTaskIndex(

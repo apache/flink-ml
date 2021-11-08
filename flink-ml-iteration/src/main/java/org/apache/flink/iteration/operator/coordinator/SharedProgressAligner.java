@@ -47,7 +47,7 @@ import static org.apache.flink.util.Preconditions.checkState;
 /**
  * The progress aligner shared between multiple {@link HeadOperatorCoordinator}. It maintains the
  * information for each round, once one round is aligned, it would notify all the register
- * listenerss.
+ * listeners.
  */
 public class SharedProgressAligner {
 
@@ -102,7 +102,7 @@ public class SharedProgressAligner {
         this.checkpointStatuses = new HashMap<>();
     }
 
-    public void registerAlignedConsumer(
+    public void registerAlignedListener(
             OperatorID operatorID, SharedProgressAlignerListener alignedConsumer) {
         runInEventLoop(
                 () -> this.listeners.put(operatorID, alignedConsumer),
@@ -110,18 +110,16 @@ public class SharedProgressAligner {
                 operatorID.toHexString());
     }
 
-    public void unregisterConsumer(OperatorID operatorID) {
-        synchronized (this) {
-            runInEventLoop(
-                    () -> {
-                        this.listeners.remove(operatorID);
-                        if (listeners.isEmpty()) {
-                            instances.remove(iterationId);
-                        }
-                    },
-                    "Unregister listeners %s",
-                    operatorID.toHexString());
-        }
+    public void unregisterListener(OperatorID operatorID) {
+        runInEventLoop(
+                () -> {
+                    this.listeners.remove(operatorID);
+                    if (listeners.isEmpty()) {
+                        instances.remove(iterationId);
+                    }
+                },
+                "Unregister listeners %s",
+                operatorID.toHexString());
     }
 
     public void reportSubtaskProgress(

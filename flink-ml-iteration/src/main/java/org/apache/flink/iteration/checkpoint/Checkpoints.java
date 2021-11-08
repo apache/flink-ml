@@ -110,6 +110,7 @@ public class Checkpoints<T> implements AutoCloseable {
                     if (v == null) {
                         return new Tuple2<>(null, true);
                     } else {
+                        v.f0.snapshotLease.close();
                         return new Tuple2<>(v.f0, true);
                     }
                 });
@@ -129,7 +130,7 @@ public class Checkpoints<T> implements AutoCloseable {
                 .forEach(
                         pendingCheckpoint -> {
                             try {
-                                pendingCheckpoint.dataCacheWriter.finishAddingRecords();
+                                pendingCheckpoint.dataCacheWriter.finish();
                                 DataCacheSnapshot snapshot =
                                         new DataCacheSnapshot(
                                                 fileSystem,

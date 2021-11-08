@@ -32,6 +32,7 @@ import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.util.OutputTag;
+import org.apache.flink.util.TestLogger;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -46,7 +47,7 @@ import static org.junit.Assert.assertEquals;
 
 /** Tests the broadcastable operators. */
 @RunWith(Parameterized.class)
-public class BroadcastOutputTest {
+public class BroadcastOutputTest extends TestLogger {
 
     private static final int NUM_RECORDS = 100;
 

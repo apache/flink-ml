@@ -29,7 +29,14 @@ import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunctio
 
 import java.util.Iterator;
 
-/** Tmp doc. */
+/**
+ * Utility class that generates int stream and also throws exceptions to test the fail over. In
+ * detail, given ${numElementsPerPartition}, this class generate a number sequence with elements
+ * range in [0, StreamExecutionEnvironment.getParallelism() * numElementsPerPartition).
+ *
+ * <p>For example, when the parallelism is 2 and the ${numElementsPerPartition} is 5, this class
+ * generates {0,1,2,3,4,5,6,7,8,9}.
+ */
 public class TestSource extends RichParallelSourceFunction<Integer>
         implements CheckpointedFunction {
 
@@ -39,12 +46,12 @@ public class TestSource extends RichParallelSourceFunction<Integer>
 
     private Integer currentIdx;
 
-    private Integer mod, numPartitions, numPerPartition;
+    private Integer mod, numPartitions, numElementsPerPartition;
 
     private transient volatile boolean running = true;
 
-    public TestSource(int numPerPartition) {
-        this.numPerPartition = numPerPartition;
+    public TestSource(int numElementsPerPartition) {
+        this.numElementsPerPartition = numElementsPerPartition;
     }
 
     @Override
@@ -78,13 +85,13 @@ public class TestSource extends RichParallelSourceFunction<Integer>
 
     @Override
     public void run(SourceContext<Integer> sourceContext) throws Exception {
-        while (running && currentIdx < numPerPartition) {
+        while (running && currentIdx < numElementsPerPartition) {
             synchronized (sourceContext.getCheckpointLock()) {
                 sourceContext.collect(currentIdx * numPartitions + mod);
                 currentIdx++;
             }
             Thread.sleep(1);
-            if (currentIdx == numPerPartition / 2 && (!hasThrown)) {
+            if (currentIdx == numElementsPerPartition / 2 && (!hasThrown)) {
                 hasThrown = true;
                 throw new RuntimeException("Failing source");
             }

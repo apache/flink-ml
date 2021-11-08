@@ -39,9 +39,10 @@ public class ProxyOperatorStateBackend implements OperatorStateBackend {
 
     private final OperatorStateBackend wrappedBackend;
 
-    private final String stateNamePrefix;
+    private final StateNamePrefix stateNamePrefix;
 
-    public ProxyOperatorStateBackend(OperatorStateBackend wrappedBackend, String stateNamePrefix) {
+    public ProxyOperatorStateBackend(
+            OperatorStateBackend wrappedBackend, StateNamePrefix stateNamePrefix) {
         this.wrappedBackend = wrappedBackend;
         this.stateNamePrefix = stateNamePrefix;
     }
@@ -51,7 +52,7 @@ public class ProxyOperatorStateBackend implements OperatorStateBackend {
             throws Exception {
         MapStateDescriptor<K, V> newDescriptor =
                 new MapStateDescriptor<>(
-                        stateNamePrefix + stateDescriptor.getName(),
+                        stateNamePrefix.prefix(stateDescriptor.getName()),
                         stateDescriptor.getKeySerializer(),
                         stateDescriptor.getValueSerializer());
         return wrappedBackend.getBroadcastState(newDescriptor);
@@ -61,7 +62,7 @@ public class ProxyOperatorStateBackend implements OperatorStateBackend {
     public <S> ListState<S> getListState(ListStateDescriptor<S> stateDescriptor) throws Exception {
         ListStateDescriptor<S> newDescriptor =
                 new ListStateDescriptor<>(
-                        stateNamePrefix + stateDescriptor.getName(),
+                        stateNamePrefix.prefix(stateDescriptor.getName()),
                         stateDescriptor.getElementSerializer());
         return wrappedBackend.getListState(newDescriptor);
     }
@@ -71,7 +72,7 @@ public class ProxyOperatorStateBackend implements OperatorStateBackend {
             throws Exception {
         ListStateDescriptor<S> newDescriptor =
                 new ListStateDescriptor<S>(
-                        stateNamePrefix + stateDescriptor.getName(),
+                        stateNamePrefix.prefix(stateDescriptor.getName()),
                         stateDescriptor.getElementSerializer());
         return wrappedBackend.getUnionListState(newDescriptor);
     }
@@ -82,8 +83,8 @@ public class ProxyOperatorStateBackend implements OperatorStateBackend {
         Set<String> names = wrappedBackend.getRegisteredStateNames();
 
         for (String name : names) {
-            if (name.startsWith(stateNamePrefix)) {
-                filteredNames.add(name.substring(stateNamePrefix.length()));
+            if (name.startsWith(stateNamePrefix.getNamePrefix())) {
+                filteredNames.add(name.substring(stateNamePrefix.getNamePrefix().length()));
             }
         }
 
@@ -96,8 +97,8 @@ public class ProxyOperatorStateBackend implements OperatorStateBackend {
         Set<String> names = wrappedBackend.getRegisteredBroadcastStateNames();
 
         for (String name : names) {
-            if (name.startsWith(stateNamePrefix)) {
-                filteredNames.add(name.substring(stateNamePrefix.length()));
+            if (name.startsWith(stateNamePrefix.getNamePrefix())) {
+                filteredNames.add(name.substring(stateNamePrefix.getNamePrefix().length()));
             }
         }
 

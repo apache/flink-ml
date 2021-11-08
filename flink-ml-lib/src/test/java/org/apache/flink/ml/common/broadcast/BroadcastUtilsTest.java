@@ -18,11 +18,11 @@
 
 package org.apache.flink.ml.common.broadcast;
 
+import org.apache.flink.api.common.functions.AbstractRichFunction;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.RestOptions;
 import org.apache.flink.iteration.config.IterationOptions;
-import org.apache.flink.ml.common.broadcast.operator.TestMultiInputOpFactory;
 import org.apache.flink.ml.common.broadcast.operator.TestOneInputOp;
 import org.apache.flink.ml.common.broadcast.operator.TestTwoInputOp;
 import org.apache.flink.runtime.jobgraph.JobGraph;
@@ -30,10 +30,8 @@ import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.minicluster.MiniClusterConfiguration;
 import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.datastream.MultipleConnectedStreams;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.transformations.MultipleInputTransformation;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -41,24 +39,30 @@ import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /** Tests the {@link BroadcastUtils}. */
 public class BroadcastUtilsTest {
 
     @Rule public TemporaryFolder tempFolder = new TemporaryFolder();
 
-    private static final int NUM_RECORDS_PER_PARTITION = 1000;
+    private static final int NUM_RECORDS_PER_PARTITION = 10;
 
     private static final int NUM_TM = 2;
 
     private static final int NUM_SLOT = 2;
 
-    private static final int PARALLELISM = NUM_TM * NUM_SLOT;
-
     private static final String[] BROADCAST_NAMES = new String[] {"source1", "source2"};
+
+    private static final List<Integer> BROADCAST_INPUT =
+            IntStream.range(0, NUM_TM * NUM_SLOT * NUM_RECORDS_PER_PARTITION)
+                    .boxed()
+                    .collect(Collectors.toList());
 
     private MiniClusterConfiguration createMiniClusterConfiguration() throws IOException {
         Configuration configuration = new Configuration();
@@ -89,15 +93,6 @@ public class BroadcastUtilsTest {
         try (MiniCluster miniCluster = new MiniCluster(createMiniClusterConfiguration())) {
             miniCluster.start();
             JobGraph jobGraph = getJobGraph(2);
-            miniCluster.executeJobBlocking(jobGraph);
-        }
-    }
-
-    @Test
-    public void testMultiInputGraph() throws Exception {
-        try (MiniCluster miniCluster = new MiniCluster(createMiniClusterConfiguration())) {
-            miniCluster.start();
-            JobGraph jobGraph = getJobGraph(3);
             miniCluster.executeJobBlocking(jobGraph);
         }
     }
@@ -134,10 +129,15 @@ public class BroadcastUtilsTest {
         DataStream<Integer> result =
                 BroadcastUtils.withBroadcastStream(inputList, bcStreamsMap, func);
 
-        result.addSink(
-                        new TestSink(
-                                NUM_RECORDS_PER_PARTITION * PARALLELISM * numNonBroadcastInputs))
-                .setParallelism(1);
+        List<Integer> expectedNumSequence =
+                new ArrayList<>(
+                        NUM_TM * NUM_SLOT * NUM_RECORDS_PER_PARTITION * numNonBroadcastInputs);
+        for (int i = 0; i < NUM_TM * NUM_SLOT * NUM_RECORDS_PER_PARTITION; i++) {
+            for (int j = 0; j < numNonBroadcastInputs; j++) {
+                expectedNumSequence.add(i);
+            }
+        }
+        result.addSink(new TestSink(expectedNumSequence)).setParallelism(1);
 
         return env.getStreamGraph().getJobGraph();
     }
@@ -148,14 +148,12 @@ public class BroadcastUtilsTest {
             return dataStreams -> {
                 DataStream input = dataStreams.get(0);
                 return input.transform(
-                                "func",
+                                "one-input",
                                 BasicTypeInfo.INT_TYPE_INFO,
                                 new TestOneInputOp(
+                                        new AbstractRichFunction() {},
                                         BROADCAST_NAMES,
-                                        new int[] {
-                                            NUM_RECORDS_PER_PARTITION * PARALLELISM,
-                                            NUM_RECORDS_PER_PARTITION * PARALLELISM
-                                        }))
+                                        Arrays.asList(BROADCAST_INPUT, BROADCAST_INPUT)))
                         .name("broadcast");
             };
         } else if (numInputs == 2) {
@@ -164,36 +162,15 @@ public class BroadcastUtilsTest {
                 DataStream input2 = dataStreams.get(1);
                 return input1.connect(input2)
                         .transform(
-                                "co-func",
+                                "two-input",
                                 BasicTypeInfo.INT_TYPE_INFO,
                                 new TestTwoInputOp(
+                                        new AbstractRichFunction() {},
                                         BROADCAST_NAMES,
-                                        new int[] {
-                                            NUM_RECORDS_PER_PARTITION * PARALLELISM,
-                                            NUM_RECORDS_PER_PARTITION * PARALLELISM
-                                        }));
-            };
-        } else {
-            return dataStreams -> {
-                StreamExecutionEnvironment env = dataStreams.get(0).getExecutionEnvironment();
-                MultipleInputTransformation<Integer> multipleInputTransformation =
-                        new MultipleInputTransformation<>(
-                                "multi-input",
-                                new TestMultiInputOpFactory(
-                                        numInputs,
-                                        BROADCAST_NAMES,
-                                        new int[] {
-                                            NUM_RECORDS_PER_PARTITION * PARALLELISM,
-                                            NUM_RECORDS_PER_PARTITION * PARALLELISM
-                                        }),
-                                BasicTypeInfo.INT_TYPE_INFO,
-                                env.getParallelism());
-                for (DataStream dataStream : dataStreams) {
-                    multipleInputTransformation.addInput(dataStream.getTransformation());
-                }
-                env.addOperator(multipleInputTransformation);
-                return new MultipleConnectedStreams(env).transform(multipleInputTransformation);
+                                        Arrays.asList(BROADCAST_INPUT, BROADCAST_INPUT)))
+                        .name("broadcast");
             };
         }
+        return null;
     }
 }

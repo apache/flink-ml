@@ -22,28 +22,30 @@ import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.iteration.operator.OperatorStateUtils;
+import org.apache.flink.ml.common.broadcast.operator.BroadcastVariableReceiverOperatorTest;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
 import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
 
-import static org.junit.Assert.assertEquals;
+import org.apache.commons.collections.IteratorUtils;
+
+import java.util.List;
 
 /**
- * Utility class to check size of the sink. It throws an exception if the number of records received
- * is not as expected.
+ * Utility class to check the result of a sink. It throws an exception if the records received are
+ * not as expected.
  */
 public class TestSink extends RichSinkFunction<Integer> implements CheckpointedFunction {
 
-    private final int expectRecordsCnt;
+    private final List<Integer> expectReceivedRecords;
 
-    private int recordsReceivedCnt;
+    private List<Integer> receivedRecords;
 
-    private ListState<Integer> recordsReceivedCntState;
+    private ListState<Integer> receivedRecordsState;
 
-    public TestSink(int expectRecordsCnt) {
-        this.expectRecordsCnt = expectRecordsCnt;
+    public TestSink(List<Integer> expectReceivedRecords) {
+        this.expectReceivedRecords = expectReceivedRecords;
     }
 
     @Override
@@ -53,15 +55,12 @@ public class TestSink extends RichSinkFunction<Integer> implements CheckpointedF
 
     @Override
     public void invoke(Integer value, Context context) {
-        recordsReceivedCnt++;
+        receivedRecords.add(value);
     }
 
     @Override
     public void finish() {
-        assertEquals(
-                "Number of received records does not consistent",
-                expectRecordsCnt,
-                recordsReceivedCnt);
+        BroadcastVariableReceiverOperatorTest.compareLists(expectReceivedRecords, receivedRecords);
     }
 
     @Override
@@ -69,21 +68,19 @@ public class TestSink extends RichSinkFunction<Integer> implements CheckpointedF
 
     @Override
     public void snapshotState(FunctionSnapshotContext functionSnapshotContext) throws Exception {
-        this.recordsReceivedCntState.clear();
-        this.recordsReceivedCntState.add(recordsReceivedCnt);
+        this.receivedRecordsState.clear();
+        this.receivedRecordsState.addAll(receivedRecords);
     }
 
     @Override
     public void initializeState(FunctionInitializationContext functionInitializationContext)
             throws Exception {
-        recordsReceivedCntState =
+        receivedRecordsState =
                 functionInitializationContext
                         .getOperatorStateStore()
                         .getListState(
                                 new ListStateDescriptor<>(
-                                        "recordsReceivedCnt", BasicTypeInfo.INT_TYPE_INFO));
-        recordsReceivedCnt =
-                OperatorStateUtils.getUniqueElement(recordsReceivedCntState, "recordsReceivedCnt")
-                        .orElse(0);
+                                        "receivedRecords", BasicTypeInfo.INT_TYPE_INFO));
+        receivedRecords = IteratorUtils.toList(receivedRecordsState.get().iterator());
     }
 }

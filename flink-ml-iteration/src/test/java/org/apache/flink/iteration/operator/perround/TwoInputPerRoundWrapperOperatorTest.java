@@ -35,6 +35,7 @@ import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
+import org.apache.flink.streaming.api.operators.BoundedMultiInput;
 import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.api.operators.SimpleOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
@@ -44,6 +45,7 @@ import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarness;
 import org.apache.flink.streaming.runtime.tasks.StreamTaskMailboxTestHarnessBuilder;
 import org.apache.flink.streaming.runtime.tasks.TwoInputStreamTask;
+import org.apache.flink.util.TestLogger;
 
 import org.junit.Test;
 
@@ -54,9 +56,9 @@ import java.util.List;
 import static org.junit.Assert.assertEquals;
 
 /** Tests the {@link OneInputPerRoundWrapperOperator}. */
-public class TwoInputPerRoundWrapperOperatorTest {
+public class TwoInputPerRoundWrapperOperatorTest extends TestLogger {
 
-    private static List<LifeCycle> lifeCycles = new ArrayList<>();
+    private static final List<LifeCycle> LIFE_CYCLES = new ArrayList<>();
 
     @Test
     public void testProcessElementsAndEpochWatermarks() throws Exception {
@@ -77,14 +79,14 @@ public class TwoInputPerRoundWrapperOperatorTest {
             harness.processElement(new StreamRecord<>(IterationRecord.newRecord(5, 1), 2), 0);
             harness.processElement(new StreamRecord<>(IterationRecord.newRecord(6, 2), 3), 1);
 
-            // Check the output
+            // Checks the output
             assertEquals(
                     Arrays.asList(
                             new StreamRecord<>(IterationRecord.newRecord(5, 1), 2),
                             new StreamRecord<>(IterationRecord.newRecord(6, 2), 3)),
                     new ArrayList<>(harness.getOutput()));
 
-            // Check the other lifecycles.
+            // Checks the other lifecycles.
             harness.getStreamTask()
                     .triggerCheckpointOnBarrier(
                             new CheckpointMetaData(5, 2),
@@ -112,7 +114,7 @@ public class TwoInputPerRoundWrapperOperatorTest {
             harness.processElement(
                     new StreamRecord<>(IterationRecord.newEpochWatermark(2, "only-one")), 1);
 
-            // Check the output
+            // Checks the output
             assertEquals(
                     Arrays.asList(
                             new StreamRecord<>(
@@ -149,17 +151,25 @@ public class TwoInputPerRoundWrapperOperatorTest {
                             LifeCycle.NOTIFY_CHECKPOINT_COMPLETE,
                             LifeCycle.NOTIFY_CHECKPOINT_ABORT,
                             LifeCycle.NOTIFY_CHECKPOINT_ABORT,
+                            // The first input
+                            LifeCycle.END_INPUT,
+                            // The second input
+                            LifeCycle.END_INPUT,
                             LifeCycle.FINISH,
                             LifeCycle.CLOSE,
+                            // The first input
+                            LifeCycle.END_INPUT,
+                            // The second input
+                            LifeCycle.END_INPUT,
                             LifeCycle.FINISH,
                             LifeCycle.CLOSE),
-                    lifeCycles);
+                    LIFE_CYCLES);
         }
     }
 
     private static class LifeCycleTrackingTwoInputStreamOperator
             extends AbstractStreamOperator<Integer>
-            implements TwoInputStreamOperator<Integer, Integer, Integer> {
+            implements TwoInputStreamOperator<Integer, Integer, Integer>, BoundedMultiInput {
 
         @Override
         public void setup(
@@ -167,67 +177,72 @@ public class TwoInputPerRoundWrapperOperatorTest {
                 StreamConfig config,
                 Output<StreamRecord<Integer>> output) {
             super.setup(containingTask, config, output);
-            lifeCycles.add(LifeCycle.SETUP);
+            LIFE_CYCLES.add(LifeCycle.SETUP);
         }
 
         @Override
         public void open() throws Exception {
             super.open();
-            lifeCycles.add(LifeCycle.OPEN);
+            LIFE_CYCLES.add(LifeCycle.OPEN);
         }
 
         @Override
         public void initializeState(StateInitializationContext context) throws Exception {
             super.initializeState(context);
-            lifeCycles.add(LifeCycle.INITIALIZE_STATE);
+            LIFE_CYCLES.add(LifeCycle.INITIALIZE_STATE);
         }
 
         @Override
         public void finish() throws Exception {
             super.finish();
-            lifeCycles.add(LifeCycle.FINISH);
+            LIFE_CYCLES.add(LifeCycle.FINISH);
         }
 
         @Override
         public void close() throws Exception {
             super.close();
-            lifeCycles.add(LifeCycle.CLOSE);
+            LIFE_CYCLES.add(LifeCycle.CLOSE);
         }
 
         @Override
         public void prepareSnapshotPreBarrier(long checkpointId) throws Exception {
             super.prepareSnapshotPreBarrier(checkpointId);
-            lifeCycles.add(LifeCycle.PREPARE_SNAPSHOT_PRE_BARRIER);
+            LIFE_CYCLES.add(LifeCycle.PREPARE_SNAPSHOT_PRE_BARRIER);
         }
 
         @Override
         public void snapshotState(StateSnapshotContext context) throws Exception {
             super.snapshotState(context);
-            lifeCycles.add(LifeCycle.SNAPSHOT_STATE);
+            LIFE_CYCLES.add(LifeCycle.SNAPSHOT_STATE);
         }
 
         @Override
         public void notifyCheckpointComplete(long checkpointId) throws Exception {
             super.notifyCheckpointComplete(checkpointId);
-            lifeCycles.add(LifeCycle.NOTIFY_CHECKPOINT_COMPLETE);
+            LIFE_CYCLES.add(LifeCycle.NOTIFY_CHECKPOINT_COMPLETE);
         }
 
         @Override
         public void notifyCheckpointAborted(long checkpointId) throws Exception {
             super.notifyCheckpointAborted(checkpointId);
-            lifeCycles.add(LifeCycle.NOTIFY_CHECKPOINT_ABORT);
+            LIFE_CYCLES.add(LifeCycle.NOTIFY_CHECKPOINT_ABORT);
         }
 
         @Override
         public void processElement1(StreamRecord<Integer> element) throws Exception {
             output.collect(element);
-            lifeCycles.add(LifeCycle.PROCESS_ELEMENT_1);
+            LIFE_CYCLES.add(LifeCycle.PROCESS_ELEMENT_1);
         }
 
         @Override
         public void processElement2(StreamRecord<Integer> element) throws Exception {
             output.collect(element);
-            lifeCycles.add(LifeCycle.PROCESS_ELEMENT_2);
+            LIFE_CYCLES.add(LifeCycle.PROCESS_ELEMENT_2);
+        }
+
+        @Override
+        public void endInput(int inputId) throws Exception {
+            LIFE_CYCLES.add(LifeCycle.END_INPUT);
         }
     }
 }

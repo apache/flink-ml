@@ -18,6 +18,7 @@
 
 package org.apache.flink.iteration.functions;
 
+import org.apache.flink.annotation.Internal;
 import org.apache.flink.iteration.operator.allround.EpochAware;
 import org.apache.flink.streaming.api.functions.ProcessFunction;
 import org.apache.flink.util.Collector;
@@ -28,6 +29,7 @@ import java.util.function.Supplier;
  * A specialized {@link ProcessFunction} that also provide the attach epoch with each record. It is
  * executed as all-round inside the iteration.
  */
+@Internal
 public abstract class EpochAwareAllRoundProcessFunction<I, O> extends ProcessFunction<I, O>
         implements EpochAware {
 

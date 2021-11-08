@@ -69,6 +69,7 @@ public class CacheElement<T> {
         this.type = type;
     }
 
+    /** The type of cached elements. */
     public enum Type {
         /** record type. */
         RECORD,

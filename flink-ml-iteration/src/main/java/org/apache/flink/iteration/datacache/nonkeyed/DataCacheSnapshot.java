@@ -31,6 +31,8 @@ import org.apache.flink.statefun.flink.core.feedback.FeedbackConsumer;
 import org.apache.flink.util.IOUtils;
 import org.apache.flink.util.function.SupplierWithException;
 
+import org.apache.commons.io.input.BoundedInputStream;
+
 import javax.annotation.Nullable;
 
 import java.io.DataInputStream;
@@ -90,23 +92,15 @@ public class DataCacheSnapshot {
             dos.writeBoolean(fileSystem.isDistributedFS());
             if (fileSystem.isDistributedFS()) {
                 // We only need to record the segments itself
-                dos.writeInt(segments.size());
-                for (Segment segment : segments) {
-                    dos.writeUTF(segment.getPath().toString());
-                    dos.writeInt(segment.getCount());
-                    dos.writeLong(segment.getSize());
-                }
+                serializeSegments(segments, dos);
             } else {
                 // We have to copy the whole streams.
                 int totalRecords = segments.stream().mapToInt(Segment::getCount).sum();
+                long totalSize = segments.stream().mapToLong(Segment::getSize).sum();
                 checkState(totalRecords >= 0, "overflowed: " + totalRecords);
                 dos.writeInt(totalRecords);
+                dos.writeLong(totalSize);
 
-                long totalBytes = 0L;
-                for (Segment segment : segments) {
-                    totalBytes += segment.getSize();
-                }
-                dos.writeLong(totalBytes);
                 for (Segment segment : segments) {
                     try (FSDataInputStream inputStream = fileSystem.open(segment.getPath())) {
                         IOUtils.copyBytes(inputStream, checkpointOutputStream, false);
@@ -132,7 +126,7 @@ public class DataCacheSnapshot {
 
             boolean isDistributedFS = dis.readBoolean();
             if (isDistributedFS) {
-                List<Segment> segments = parseSegments(dis);
+                List<Segment> segments = deserializeSegments(dis);
                 DataCacheReader<T> dataCacheReader =
                         new DataCacheReader<T>(serializer, fileSystem, segments);
                 while (dataCacheReader.hasNext()) {
@@ -141,6 +135,7 @@ public class DataCacheSnapshot {
             } else {
                 DataInputViewStreamWrapper dataInputView = new DataInputViewStreamWrapper(dis);
                 int totalRecords = dis.readInt();
+                // Ignore the total size.
                 dis.readLong();
                 for (int i = 0; i < totalRecords; ++i) {
                     feedbackConsumer.processFeedback(serializer.deserialize(dataInputView));
@@ -170,37 +165,25 @@ public class DataCacheSnapshot {
 
             List<Segment> segments;
             if (isDistributedFS) {
-                segments = parseSegments(dis);
+                segments = deserializeSegments(dis);
             } else {
                 int totalRecords = dis.readInt();
-                long totalBytes = dis.readLong();
+                long totalSize = dis.readLong();
+
                 Path path = pathGenerator.get();
                 try (FSDataOutputStream outputStream =
                         fileSystem.create(path, FileSystem.WriteMode.NO_OVERWRITE)) {
-                    copyBytes(checkpointInputStream, outputStream, totalBytes);
+
+                    BoundedInputStream inputStream =
+                            new BoundedInputStream(checkpointInputStream, totalSize);
+                    inputStream.setPropagateClose(false);
+                    IOUtils.copyBytes(inputStream, outputStream, false);
+                    inputStream.close();
                 }
-                segments = Collections.singletonList(new Segment(path, totalRecords, totalBytes));
+                segments = Collections.singletonList(new Segment(path, totalRecords, totalSize));
             }
 
             return new DataCacheSnapshot(fileSystem, readerPosition, segments);
-        }
-    }
-
-    private static void copyBytes(final InputStream in, final OutputStream out, long len)
-            throws IOException {
-        final int bufferSize = 4096;
-        final byte[] buf = new byte[bufferSize];
-        try {
-            int byteToRead = (int) Math.min(buf.length, len);
-            int bytesRead = in.read(buf, 0, byteToRead);
-            while (len > 0 && bytesRead >= 0) {
-                len -= bytesRead;
-                out.write(buf, 0, bytesRead);
-                byteToRead = (int) Math.min(buf.length, len);
-                bytesRead = in.read(buf, 0, byteToRead);
-            }
-            assert len == 0L;
-        } finally {
         }
     }
 
@@ -215,7 +198,18 @@ public class DataCacheSnapshot {
         return readerPosition;
     }
 
-    private static List<Segment> parseSegments(DataInputStream dataInputStream) throws IOException {
+    private static void serializeSegments(List<Segment> segments, DataOutputStream dataOutputStream)
+            throws IOException {
+        dataOutputStream.writeInt(segments.size());
+        for (int i = 0; i < segments.size(); ++i) {
+            dataOutputStream.writeUTF(segments.get(i).getPath().toString());
+            dataOutputStream.writeInt(segments.get(i).getCount());
+            dataOutputStream.writeLong(segments.get(i).getSize());
+        }
+    }
+
+    private static List<Segment> deserializeSegments(DataInputStream dataInputStream)
+            throws IOException {
         List<Segment> segments = new ArrayList<>();
         int numberOfSegments = dataInputStream.readInt();
         for (int i = 0; i < numberOfSegments; ++i) {

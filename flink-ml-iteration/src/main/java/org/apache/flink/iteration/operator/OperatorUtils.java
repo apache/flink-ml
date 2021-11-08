@@ -18,7 +18,10 @@
 
 package org.apache.flink.iteration.operator;
 
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.core.fs.Path;
 import org.apache.flink.iteration.IterationID;
+import org.apache.flink.iteration.config.IterationOptions;
 import org.apache.flink.iteration.utils.ReflectionUtils;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackChannel;
@@ -27,9 +30,13 @@ import org.apache.flink.statefun.flink.core.feedback.FeedbackKey;
 import org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.util.ExceptionUtils;
+import org.apache.flink.util.function.SupplierWithException;
 import org.apache.flink.util.function.ThrowingConsumer;
 
+import java.io.IOException;
 import java.util.Arrays;
+import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.Executor;
 
 /** Utility class for operators. */
@@ -74,5 +81,27 @@ public class OperatorUtils {
         } catch (Exception e) {
             ExceptionUtils.rethrow(e);
         }
+    }
+
+    public static Path getDataCachePath(Configuration configuration, String[] localSpillPaths) {
+        String pathStr = configuration.get(IterationOptions.DATA_CACHE_PATH);
+        if (pathStr == null) {
+            Random random = new Random();
+            pathStr = "file://" + localSpillPaths[random.nextInt(localSpillPaths.length)];
+        }
+
+        return new Path(pathStr);
+    }
+
+    public static SupplierWithException<Path, IOException> createDataCacheFileGenerator(
+            Path basePath, String fileTypeName, OperatorID operatorId) {
+        return () ->
+                new Path(
+                        String.format(
+                                "%s/%s-%s-%s",
+                                basePath.toString(),
+                                fileTypeName,
+                                operatorId,
+                                UUID.randomUUID().toString()));
     }
 }

@@ -22,7 +22,7 @@ import java.util.Objects;
 /** The wrapper for the records in iterative stream. */
 public class IterationRecord<T> implements Cloneable {
 
-    /** The type of mini-batch stream records. */
+    /** The type of iteration records. */
     public enum Type {
         RECORD,
 
@@ -51,12 +51,12 @@ public class IterationRecord<T> implements Cloneable {
     // -------------------------- Fields for barrier -----------------
     private long checkpointId;
 
-    public static <T> IterationRecord<T> newRecord(T value, int round) {
-        return new IterationRecord<>(Type.RECORD, round, value, null, 0);
+    public static <T> IterationRecord<T> newRecord(T value, int epoch) {
+        return new IterationRecord<>(Type.RECORD, epoch, value, null, 0);
     }
 
-    public static <T> IterationRecord<T> newEpochWatermark(int round, String sender) {
-        return new IterationRecord<>(Type.EPOCH_WATERMARK, round, null, sender, 0);
+    public static <T> IterationRecord<T> newEpochWatermark(int epoch, String sender) {
+        return new IterationRecord<>(Type.EPOCH_WATERMARK, epoch, null, sender, 0);
     }
 
     public static <T> IterationRecord<T> newBarrier(long checkpointId) {
@@ -155,7 +155,7 @@ public class IterationRecord<T> implements Cloneable {
         return "IterationRecord{"
                 + "type="
                 + type
-                + ", round="
+                + ", epoch="
                 + epoch
                 + ", value="
                 + value

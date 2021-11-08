@@ -20,12 +20,10 @@ package org.apache.flink.iteration.operator.headprocessor;
 
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.iteration.IterationRecord;
-import org.apache.flink.iteration.operator.HeadOperator;
 import org.apache.flink.iteration.operator.OperatorUtils;
 import org.apache.flink.iteration.operator.event.GloballyAlignedEvent;
 import org.apache.flink.runtime.state.StatePartitionStreamProvider;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
-import org.apache.flink.util.OutputTag;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,7 +44,7 @@ public class RegularHeadOperatorRecordProcessor implements HeadOperatorRecordPro
 
     private final Context headOperatorContext;
 
-    private final Map<Integer, Long> numFeedbackRecordsPerRound;
+    private final Map<Integer, Long> numFeedbackRecordsPerEpoch;
 
     private final String senderId;
 
@@ -57,7 +55,7 @@ public class RegularHeadOperatorRecordProcessor implements HeadOperatorRecordPro
     public RegularHeadOperatorRecordProcessor(Context headOperatorContext) {
         this.headOperatorContext = headOperatorContext;
 
-        this.numFeedbackRecordsPerRound = new HashMap<>();
+        this.numFeedbackRecordsPerEpoch = new HashMap<>();
 
         this.senderId =
                 OperatorUtils.getUniqueSenderId(
@@ -73,7 +71,7 @@ public class RegularHeadOperatorRecordProcessor implements HeadOperatorRecordPro
             HeadOperatorState headOperatorState, Iterable<StatePartitionStreamProvider> rawStates) {
         checkArgument(headOperatorState != null, "The initialized state should not be null");
 
-        numFeedbackRecordsPerRound.putAll(headOperatorState.getNumFeedbackRecordsEachRound());
+        numFeedbackRecordsPerEpoch.putAll(headOperatorState.getNumFeedbackRecordsEachRound());
         latestRoundAligned = headOperatorState.getLatestRoundAligned();
         latestRoundGloballyAligned = headOperatorState.getLatestRoundGloballyAligned();
 
@@ -82,7 +80,7 @@ public class RegularHeadOperatorRecordProcessor implements HeadOperatorRecordPro
         if (!(latestRoundAligned == 0 && latestRoundGloballyAligned == -1)) {
             for (int i = latestRoundGloballyAligned + 1; i <= latestRoundAligned; ++i) {
                 headOperatorContext.updateEpochToCoordinator(
-                        i, numFeedbackRecordsPerRound.getOrDefault(i, 0L));
+                        i, numFeedbackRecordsPerEpoch.getOrDefault(i, 0L));
             }
         }
     }
@@ -95,8 +93,8 @@ public class RegularHeadOperatorRecordProcessor implements HeadOperatorRecordPro
     @Override
     public boolean processFeedbackElement(StreamRecord<IterationRecord<?>> element) {
         if (element.getValue().getType() == IterationRecord.Type.RECORD) {
-            numFeedbackRecordsPerRound.compute(
-                    element.getValue().getEpoch(), (round, count) -> count == null ? 1 : count + 1);
+            numFeedbackRecordsPerEpoch.compute(
+                    element.getValue().getEpoch(), (epoch, count) -> count == null ? 1 : count + 1);
         }
 
         processRecord(element);
@@ -124,9 +122,6 @@ public class RegularHeadOperatorRecordProcessor implements HeadOperatorRecordPro
                         0);
         headOperatorContext.broadcastOutput(record);
 
-        // Also notify the listener
-        headOperatorContext.output((OutputTag) HeadOperator.ALIGN_NOTIFY_OUTPUT_TAG, record);
-
         latestRoundGloballyAligned =
                 Math.max(globallyAlignedEvent.getEpoch(), latestRoundGloballyAligned);
         return globallyAlignedEvent.isTerminated();
@@ -135,14 +130,14 @@ public class RegularHeadOperatorRecordProcessor implements HeadOperatorRecordPro
     @Override
     public HeadOperatorState snapshotState() {
         return new HeadOperatorState(
-                new HashMap<>(numFeedbackRecordsPerRound),
+                new HashMap<>(numFeedbackRecordsPerEpoch),
                 latestRoundAligned,
                 latestRoundGloballyAligned);
     }
 
     @VisibleForTesting
-    public Map<Integer, Long> getNumFeedbackRecordsPerRound() {
-        return numFeedbackRecordsPerRound;
+    public Map<Integer, Long> getNumFeedbackRecordsPerEpoch() {
+        return numFeedbackRecordsPerEpoch;
     }
 
     @VisibleForTesting
@@ -176,14 +171,14 @@ public class RegularHeadOperatorRecordProcessor implements HeadOperatorRecordPro
                                     latestRoundAligned, iterationRecord.getValue().getEpoch()));
                     headOperatorContext.updateEpochToCoordinator(
                             iterationRecord.getValue().getEpoch(),
-                            numFeedbackRecordsPerRound.getOrDefault(
+                            numFeedbackRecordsPerEpoch.getOrDefault(
                                     iterationRecord.getValue().getEpoch(), 0L));
                 }
 
                 if (needNotifyCoordinator) {
                     headOperatorContext.updateEpochToCoordinator(
                             iterationRecord.getValue().getEpoch(),
-                            numFeedbackRecordsPerRound.getOrDefault(
+                            numFeedbackRecordsPerEpoch.getOrDefault(
                                     iterationRecord.getValue().getEpoch(), 0L));
                 }
 

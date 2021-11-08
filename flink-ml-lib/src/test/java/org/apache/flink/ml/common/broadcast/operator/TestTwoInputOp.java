@@ -18,41 +18,34 @@
 
 package org.apache.flink.ml.common.broadcast.operator;
 
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
+import org.apache.flink.api.common.functions.RichFunction;
+import org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator;
 import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-
-import static org.junit.Assert.assertEquals;
 
 /** Utility class used for testing {@link TwoInputBroadcastWrapperOperator}. */
-public class TestTwoInputOp extends AbstractStreamOperator<Integer>
-        implements TwoInputStreamOperator<Integer, Integer, Integer>, HasBroadcastVariable {
+public class TestTwoInputOp extends AbstractUdfStreamOperator<Integer, RichFunction>
+        implements TwoInputStreamOperator<Integer, Integer, Integer> {
 
     private final String[] broadcastNames;
 
-    private final int[] expectedSizes;
+    private final List<List<Integer>> expectedBroadcastInputs;
 
-    Map<String, List<?>> broadcastVariables = new HashMap<>();
-
-    public TestTwoInputOp(String[] broadcastNames, int[] expectedSizes) {
+    public TestTwoInputOp(
+            RichFunction func, String[] broadcastNames, List<List<Integer>> expectedSizes) {
+        super(func);
         this.broadcastNames = broadcastNames;
-        this.expectedSizes = expectedSizes;
-    }
-
-    @Override
-    public void setBroadcastVariable(String name, List<?> broadcastVariable) {
-        broadcastVariables.put(name, broadcastVariable);
+        this.expectedBroadcastInputs = expectedSizes;
     }
 
     @Override
     public void processElement1(StreamRecord<Integer> streamRecord) {
         for (int i = 0; i < broadcastNames.length; i++) {
-            List<?> source = broadcastVariables.get(broadcastNames[i]);
-            assertEquals(expectedSizes[i], source.size());
+            BroadcastVariableReceiverOperatorTest.compareLists(
+                    expectedBroadcastInputs.get(i),
+                    userFunction.getRuntimeContext().getBroadcastVariable(broadcastNames[i]));
         }
         output.collect(streamRecord);
     }
@@ -60,8 +53,9 @@ public class TestTwoInputOp extends AbstractStreamOperator<Integer>
     @Override
     public void processElement2(StreamRecord<Integer> streamRecord) {
         for (int i = 0; i < broadcastNames.length; i++) {
-            List<?> source = broadcastVariables.get(broadcastNames[i]);
-            assertEquals(expectedSizes[i], source.size());
+            BroadcastVariableReceiverOperatorTest.compareLists(
+                    expectedBroadcastInputs.get(i),
+                    userFunction.getRuntimeContext().getBroadcastVariable(broadcastNames[i]));
         }
         output.collect(streamRecord);
     }

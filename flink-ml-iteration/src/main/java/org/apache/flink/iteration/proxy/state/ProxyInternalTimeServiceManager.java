@@ -30,10 +30,10 @@ public class ProxyInternalTimeServiceManager<K> implements InternalTimeServiceMa
 
     private final InternalTimeServiceManager<K> wrappedManager;
 
-    private final String stateNamePrefix;
+    private final StateNamePrefix stateNamePrefix;
 
     public ProxyInternalTimeServiceManager(
-            InternalTimeServiceManager<K> wrappedManager, String stateNamePrefix) {
+            InternalTimeServiceManager<K> wrappedManager, StateNamePrefix stateNamePrefix) {
         this.wrappedManager = wrappedManager;
         this.stateNamePrefix = stateNamePrefix;
     }
@@ -45,7 +45,7 @@ public class ProxyInternalTimeServiceManager<K> implements InternalTimeServiceMa
             TypeSerializer<N> namespaceSerializer,
             Triggerable<K, N> triggerable) {
         return wrappedManager.getInternalTimerService(
-                stateNamePrefix + name, keySerializer, namespaceSerializer, triggerable);
+                stateNamePrefix.prefix(name), keySerializer, namespaceSerializer, triggerable);
     }
 
     @Override

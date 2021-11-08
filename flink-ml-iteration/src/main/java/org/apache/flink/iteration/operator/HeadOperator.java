@@ -25,9 +25,9 @@ import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeutils.base.IntSerializer;
-import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.iteration.IterationID;
+import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.iteration.broadcast.BroadcastOutput;
 import org.apache.flink.iteration.broadcast.BroadcastOutputFactory;
@@ -75,6 +75,7 @@ import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.ProcessingTimeService;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
+import org.apache.flink.util.Collector;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.OutputTag;
 
@@ -83,15 +84,28 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.Random;
-import java.util.UUID;
 import java.util.concurrent.Executor;
 
 import static org.apache.flink.util.Preconditions.checkState;
 
 /**
- * The head operators unions the initialized variable stream and the feedback stream, and
- * synchronize the epoch watermark (round).
+ * The head operator unions the initialized variable stream and the feedback stream, synchronize the
+ * epoch watermark (round) and taking care of the checkpoints.
+ *
+ * <p>Specially for checkpoint, the head operator would like to
+ *
+ * <ul>
+ *   <li>Ensures the exactly-once for processing elements.
+ *   <li>Ensures the exactly-once for {@link IterationListener#onEpochWatermarkIncremented(int,
+ *       IterationListener.Context, Collector)}.
+ * </ul>
+ *
+ * <p>To implement the first target, the head operator also need to include the records between
+ * alignment and received barrier from the feed-back edge into the snapshot. To implement the second
+ * target, the head operator would also wait for the notification from the OperatorCoordinator in
+ * additional to the task inputs. This ensures the {@link GloballyAlignedEvent} would not interleave
+ * with the epoch watermarks and all the tasks inside the iteration would be notified with the same
+ * epochs, which facility the rescaling in the future.
  */
 public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
         implements OneInputStreamOperator<IterationRecord<?>, IterationRecord<?>>,
@@ -214,21 +228,19 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
         checkpointAligner = new HeadOperatorCheckpointAligner();
 
         // Initialize the checkpoints
+        Path dataCachePath =
+                OperatorUtils.getDataCachePath(
+                        getRuntimeContext().getTaskManagerRuntimeInfo().getConfiguration(),
+                        getContainingTask()
+                                .getEnvironment()
+                                .getIOManager()
+                                .getSpillingDirectoriesPaths());
         this.checkpoints =
                 new Checkpoints<>(
                         config.getTypeSerializerOut(getClass().getClassLoader()),
-                        FileSystem.getLocalFileSystem(),
-                        () -> {
-                            String[] spillPaths =
-                                    getContainingTask()
-                                            .getEnvironment()
-                                            .getIOManager()
-                                            .getSpillingDirectoriesPaths();
-                            Random random = new Random();
-                            return new Path(
-                                    "file://" + spillPaths[random.nextInt(spillPaths.length)],
-                                    "checkpoint." + UUID.randomUUID().toString());
-                        });
+                        dataCachePath.getFileSystem(),
+                        OperatorUtils.createDataCacheFileGenerator(
+                                dataCachePath, "header-cp", getOperatorConfig().getOperatorID()));
         CheckpointsBroker.get()
                 .setCheckpoints(
                         OperatorUtils.<IterationRecord<?>>createFeedbackKey(
@@ -251,7 +263,7 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
             throw new FlinkRuntimeException("Failed to replay the records", e);
         }
 
-        // Here we register a record
+        // Here we register a mail
         registerFeedbackConsumer(
                 (Runnable runnable) -> {
                     if (status != HeadOperatorStatus.TERMINATED) {
@@ -271,6 +283,8 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
     public void snapshotState(StateSnapshotContext context) throws Exception {
         super.snapshotState(context);
 
+        // Always clear the union list state before set value.
+        parallelismState.clear();
         if (getRuntimeContext().getIndexOfThisSubtask() == 0) {
             parallelismState.update(
                     Collections.singletonList(getRuntimeContext().getNumberOfParallelSubtasks()));
@@ -291,6 +305,15 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
 
         checkpointAligner
                 .onStateSnapshot(context.getCheckpointId())
+                .forEach(this::processGloballyAlignedEvent);
+    }
+
+    @Override
+    public void notifyCheckpointAborted(long checkpointId) throws Exception {
+        super.notifyCheckpointAborted(checkpointId);
+
+        checkpointAligner
+                .onCheckpointAborted(checkpointId)
                 .forEach(this::processGloballyAlignedEvent);
     }
 
@@ -322,6 +345,8 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
                     .ifPresent(this::processGloballyAlignedEvent);
         } else if (operatorEvent instanceof CoordinatorCheckpointEvent) {
             checkpointAligner.coordinatorNotify((CoordinatorCheckpointEvent) operatorEvent);
+        } else {
+            throw new FlinkRuntimeException("Unsupported operator event: " + operatorEvent);
         }
     }
 

@@ -21,9 +21,8 @@ package org.apache.flink.ml.common.broadcast;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.iteration.compile.DraftExecutionEnvironment;
+import org.apache.flink.ml.common.broadcast.operator.BroadcastVariableReceiverOperatorFactory;
 import org.apache.flink.ml.common.broadcast.operator.BroadcastWrapper;
-import org.apache.flink.ml.common.broadcast.operator.CacheStreamOperatorFactory;
-import org.apache.flink.ml.common.broadcast.operator.HasBroadcastVariable;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.MultipleConnectedStreams;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -44,12 +43,16 @@ import java.util.function.Function;
 public class BroadcastUtils {
     /**
      * supports withBroadcastStream in DataStream API. Broadcast data streams are available at all
-     * parallel instances of an operator that implements ${@link HasBroadcastVariable}. An operator
-     * that wants to access broadcast variables must implement ${@link HasBroadcastVariable}.
+     * parallel instances of an operator that extends {@code
+     * org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator<OUT, ? extends
+     * org.apache.flink.api.common.functions.RichFunction>}. Users can access the broadcast
+     * variables by {@code RichFunction.getRuntimeContext().getBroadcastVariable(...)} or {@code
+     * RichFunction.getRuntimeContext().hasBroadcastVariable(...)} or {@code
+     * RichFunction.getRuntimeContext().getBroadcastVariableWithInitializer(...)}.
      *
-     * <p>In detail, the broadcast input data streams will be consumed first and further set by
-     * {@code HasBroadcastVariable.setBroadcastVariable(...)}. For now the non-broadcast input are
-     * cached by default to avoid the possible deadlocks.
+     * <p>In detail, the broadcast input data streams will be consumed first and further consumed by
+     * non-broadcast inputs. For now the non-broadcast input are cached by default to avoid the
+     * possible deadlocks.
      *
      * @param inputList non-broadcast input list.
      * @param bcStreams map of the broadcast data streams, where the key is the name and the value
@@ -139,7 +142,8 @@ public class BroadcastUtils {
         MultipleInputTransformation<OUT> transformation =
                 new MultipleInputTransformation<>(
                         "broadcastInputs",
-                        new CacheStreamOperatorFactory<>(broadcastInputNames, broadcastInTypes),
+                        new BroadcastVariableReceiverOperatorFactory<>(
+                                broadcastInputNames, broadcastInTypes),
                         outType,
                         parallelism);
         for (DataStream<?> dataStream : broadcastInputs) {

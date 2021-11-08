@@ -25,6 +25,7 @@ import org.apache.flink.statefun.flink.core.feedback.FeedbackChannel;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackChannelBroker;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.util.OneInputStreamOperatorTestHarness;
+import org.apache.flink.util.TestLogger;
 
 import org.junit.Test;
 
@@ -35,7 +36,7 @@ import java.util.List;
 import static org.junit.Assert.assertEquals;
 
 /** Tests the {@link TailOperator}. */
-public class TailOperatorTest {
+public class TailOperatorTest extends TestLogger {
 
     @Test
     public void testIncrementRoundWithoutObjectReuse() throws Exception {

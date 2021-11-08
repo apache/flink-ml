@@ -110,7 +110,7 @@ public abstract class AbstractAllRoundWrapperOperator<T, S extends StreamOperato
             clearIterationContextRound();
         }
 
-        // Always broadcast the events.
+        // Always broadcasts the events.
         super.onEpochWatermarkIncrement(epochWatermark);
     }
 
@@ -174,7 +174,8 @@ public abstract class AbstractAllRoundWrapperOperator<T, S extends StreamOperato
             CheckpointStreamFactory storageLocation)
             throws Exception {
 
-        // Just update our state...
+        // Always clear the union list state before set value.
+        parallelismState.clear();
         if (containingTask.getEnvironment().getTaskInfo().getIndexOfThisSubtask() == 0) {
             parallelismState.update(
                     Collections.singletonList(

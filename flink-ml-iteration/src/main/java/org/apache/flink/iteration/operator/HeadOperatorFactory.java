@@ -27,6 +27,7 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 import org.apache.flink.runtime.operators.coordination.OperatorEventGateway;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperatorFactory;
+import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.CoordinatedOperatorFactory;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperator;
@@ -131,5 +132,12 @@ public class HeadOperatorFactory extends AbstractStreamOperatorFactory<Iteration
     public void setMailboxExecutor(MailboxExecutor mailboxExecutor) {
         // We need it to be yielding operator factory to disable chaining,
         // but we cannot use the given mailbox here since it has bugs.
+    }
+
+    @Override
+    public ChainingStrategy getChainingStrategy() {
+        // We could not allow the head operator chaining with the previous operator since
+        // the special treatment in endInput.
+        return ChainingStrategy.HEAD;
     }
 }
