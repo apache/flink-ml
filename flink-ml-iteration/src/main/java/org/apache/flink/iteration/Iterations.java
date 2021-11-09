@@ -252,29 +252,41 @@ public class Iterations {
                             headStreams.get(i).getParallelism()));
         }
 
+        List<DataStream> allTails = new ArrayList<>();
         DataStreamList tails = addTails(feedbackStreams, iterationId, 0);
         for (int i = 0; i < headStreams.size(); ++i) {
             String coLocationGroupKey = "co-" + iterationId.toHexString() + "-" + i;
             headStreams.get(i).getTransformation().setCoLocationGroupKey(coLocationGroupKey);
             tails.get(i).getTransformation().setCoLocationGroupKey(coLocationGroupKey);
         }
+        allTails.addAll(tails.getDataStreams());
 
         checkState(
                 mayHaveCriteria || iterationBodyResult.getTerminationCriteria() == null,
                 "The current iteration type does not support the termination criteria.");
 
         if (iterationBodyResult.getTerminationCriteria() != null) {
-            addCriteriaStream(
-                    iterationBodyResult.getTerminationCriteria(),
-                    iterationId,
-                    env,
-                    draftEnv,
-                    initVariableStreams,
-                    headStreams,
-                    totalInitVariableParallelism);
+            DataStreamList criteriaTails =
+                    addCriteriaStream(
+                            iterationBodyResult.getTerminationCriteria(),
+                            iterationId,
+                            env,
+                            draftEnv,
+                            initVariableStreams,
+                            headStreams,
+                            totalInitVariableParallelism);
+            allTails.addAll(criteriaTails.getDataStreams());
         }
 
-        return addOutputs(getActualDataStreams(iterationBodyResult.getOutputStreams(), draftEnv));
+        DataStream<Object> unionAllTails = allTails.get(0).filter(x -> false).returns(Object.class);
+        for (int i = 1; i < allTails.size(); ++i) {
+            unionAllTails =
+                    unionAllTails.union(allTails.get(i).filter(x -> false).returns(Object.class));
+        }
+
+        return addOutputs(
+                getActualDataStreams(iterationBodyResult.getOutputStreams(), draftEnv),
+                unionAllTails);
     }
 
     private static DataStreamList addReplayer(
@@ -315,7 +327,7 @@ public class Iterations {
         return new DataStreamList(result);
     }
 
-    private static void addCriteriaStream(
+    private static DataStreamList addCriteriaStream(
             DataStream<?> draftCriteriaStream,
             IterationID iterationId,
             StreamExecutionEnvironment env,
@@ -367,6 +379,8 @@ public class Iterations {
         // Now we notify all the head operators to count the criteria stream.
         setCriteriaParallelism(headStreams, terminationCriteria.getParallelism());
         setCriteriaParallelism(criteriaHeaders, terminationCriteria.getParallelism());
+
+        return criteriaTails;
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -453,7 +467,7 @@ public class Iterations {
                                         .setParallelism(dataStream.getParallelism())));
     }
 
-    private static DataStreamList addOutputs(DataStreamList dataStreams) {
+    private static DataStreamList addOutputs(DataStreamList dataStreams, DataStream unionAllTails) {
         return new DataStreamList(
                 map(
                         dataStreams,
@@ -461,6 +475,7 @@ public class Iterations {
                             IterationRecordTypeInfo<?> inputType =
                                     (IterationRecordTypeInfo<?>) dataStream.getType();
                             return dataStream
+                                    .union(unionAllTails.map(x -> x).returns(inputType))
                                     .transform(
                                             "output-" + dataStream.getTransformation().getName(),
                                             inputType.getInnerTypeInfo(),
