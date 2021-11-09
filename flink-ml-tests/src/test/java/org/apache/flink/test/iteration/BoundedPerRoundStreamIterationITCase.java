@@ -125,7 +125,11 @@ public class BoundedPerRoundStreamIterationITCase extends TestLogger {
 
                             return new IterationBodyResult(
                                     DataStreamList.of(
-                                            reducer.keyBy(x -> x)
+                                            reducer.partitionCustom(
+                                                            (k, numPartitions) -> k % numPartitions,
+                                                            x -> x)
+                                                    .map(x -> x)
+                                                    .keyBy(x -> x)
                                                     .process(
                                                             new StatefulProcessFunction<
                                                                     Integer>() {})

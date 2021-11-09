@@ -190,7 +190,11 @@ public class BoundedAllRoundStreamIterationITCase extends TestLogger {
 
                             return new IterationBodyResult(
                                     DataStreamList.of(
-                                            reducer.keyBy(EpochRecord::getValue)
+                                            reducer.partitionCustom(
+                                                            (k, numPartitions) -> k % numPartitions,
+                                                            EpochRecord::getValue)
+                                                    .map(x -> x)
+                                                    .keyBy(EpochRecord::getValue)
                                                     .process(
                                                             new StatefulProcessFunction<
                                                                     EpochRecord>() {})
@@ -248,7 +252,11 @@ public class BoundedAllRoundStreamIterationITCase extends TestLogger {
                                                             sync, maxRound));
 
                             SingleOutputStreamOperator<EpochRecord> feedbackStream =
-                                    reducer.keyBy(EpochRecord::getValue)
+                                    reducer.partitionCustom(
+                                                    (k, numPartitions) -> k % numPartitions,
+                                                    EpochRecord::getValue)
+                                            .map(x -> x)
+                                            .keyBy(EpochRecord::getValue)
                                             .process(new StatefulProcessFunction<EpochRecord>() {})
                                             .setParallelism(4)
                                             .map(new IncrementEpochMap())
