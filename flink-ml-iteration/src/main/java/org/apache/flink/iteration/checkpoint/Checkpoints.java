@@ -53,6 +53,8 @@ public class Checkpoints<T> implements AutoCloseable {
 
     private final TreeMap<Long, PendingCheckpoint> sortedUncompletedCheckpoints = new TreeMap<>();
 
+    private long latestCompletedCheckpointId = -1;
+
     public Checkpoints(
             TypeSerializer<T> typeSerializer,
             FileSystem fileSystem,
@@ -77,6 +79,10 @@ public class Checkpoints<T> implements AutoCloseable {
 
     public void startLogging(long checkpointId, OperatorStateCheckpointOutputStream outputStream)
             throws IOException {
+        if (checkpointId <= latestCompletedCheckpointId) {
+            return;
+        }
+
         Tuple2<PendingCheckpoint, Boolean> possibleCheckpoint =
                 uncompletedCheckpoints.computeIfAbsent(
                         checkpointId,
@@ -123,6 +129,10 @@ public class Checkpoints<T> implements AutoCloseable {
     }
 
     public void commitCheckpointsUntil(long checkpointId) {
+        if (latestCompletedCheckpointId < checkpointId) {
+            latestCompletedCheckpointId = checkpointId;
+        }
+
         SortedMap<Long, PendingCheckpoint> completedCheckpoints =
                 sortedUncompletedCheckpoints.headMap(checkpointId, true);
         completedCheckpoints
