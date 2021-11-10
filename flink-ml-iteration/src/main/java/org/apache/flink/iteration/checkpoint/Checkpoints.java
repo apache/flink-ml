@@ -48,10 +48,24 @@ public class Checkpoints<T> implements AutoCloseable {
     private final FileSystem fileSystem;
     private final SupplierWithException<Path, IOException> pathSupplier;
 
+    /**
+     * Stores the pending checkpoints and whether they are canceled. This field would be shared
+     * between the head and tail operators for aborting the checkpoints.
+     */
     private final ConcurrentHashMap<Long, Tuple2<PendingCheckpoint, Boolean>>
             uncompletedCheckpoints = new ConcurrentHashMap<>();
 
+    /**
+     * Stores the list of pending checkpoints ordered by the checkpoint id. This field is only
+     * accessed by the head operator.
+     */
     private final TreeMap<Long, PendingCheckpoint> sortedUncompletedCheckpoints = new TreeMap<>();
+
+    /**
+     * Stores the checkpoint id of the latest completed one. It is to avoid the feedback barrier get
+     * processed before the head operator actually snapshots the state.
+     */
+    private long latestCompletedCheckpointId;
 
     public Checkpoints(
             TypeSerializer<T> typeSerializer,
@@ -77,6 +91,10 @@ public class Checkpoints<T> implements AutoCloseable {
 
     public void startLogging(long checkpointId, OperatorStateCheckpointOutputStream outputStream)
             throws IOException {
+        if (checkpointId <= latestCompletedCheckpointId) {
+            return;
+        }
+
         Tuple2<PendingCheckpoint, Boolean> possibleCheckpoint =
                 uncompletedCheckpoints.computeIfAbsent(
                         checkpointId,
@@ -123,6 +141,10 @@ public class Checkpoints<T> implements AutoCloseable {
     }
 
     public void commitCheckpointsUntil(long checkpointId) {
+        if (latestCompletedCheckpointId < checkpointId) {
+            latestCompletedCheckpointId = checkpointId;
+        }
+
         SortedMap<Long, PendingCheckpoint> completedCheckpoints =
                 sortedUncompletedCheckpoints.headMap(checkpointId, true);
         completedCheckpoints
