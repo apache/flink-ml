@@ -55,6 +55,7 @@ under the License.
     <module>flink-ml-api</module>
     <module>flink-ml-iteration</module>
     <module>flink-ml-tests</module>
+    <module>flink-ml-lib</module>
   </modules>
 
   <properties>
