@@ -767,6 +767,38 @@ public class HeadOperatorTest extends TestLogger {
                 });
     }
 
+    @Test(timeout = 20000)
+    public void testCheckpointsWithBarrierFeedbackFirst() throws Exception {
+        IterationID iterationId = new IterationID();
+        OperatorID operatorId = new OperatorID();
+
+        createHarnessAndRun(
+                iterationId,
+                operatorId,
+                null,
+                harness -> {
+                    harness.getTaskStateManager().getWaitForReportLatch().reset();
+                    harness.processElement(new StreamRecord<>(IterationRecord.newRecord(100, 0)));
+                    harness.processAll();
+
+                    harness.getStreamTask()
+                            .triggerCheckpointAsync(
+                                    new CheckpointMetaData(2, 1000),
+                                    CheckpointOptions.alignedNoTimeout(
+                                            CheckpointType.CHECKPOINT,
+                                            CheckpointStorageLocationReference.getDefault()));
+
+                    // Simulates that the barrier get feed back before the
+                    // CoordinatorCheckpointEvent is dispatched. If we not handle this case,
+                    // there would be deadlock.
+                    putFeedbackRecords(iterationId, IterationRecord.newBarrier(2), null);
+                    dispatchOperatorEvent(harness, operatorId, new CoordinatorCheckpointEvent(2));
+                    harness.processAll();
+                    harness.getTaskStateManager().getWaitForReportLatch().await();
+                    return null;
+                });
+    }
+
     private <T> T createHarnessAndRun(
             IterationID iterationId,
             OperatorID operatorId,
