@@ -48,7 +48,7 @@ import static org.apache.flink.util.Preconditions.checkArgument;
  *
  * <p>The iteration body also requires that the parallelism of any stream in the initial variable
  * streams must equal to the parallelism of the stream at the same index of the feedback variable
- * streams returned by the IterationBody.
+ * streams returned by the iteration body.
  */
 @Experimental
 public interface IterationBody extends Serializable {
