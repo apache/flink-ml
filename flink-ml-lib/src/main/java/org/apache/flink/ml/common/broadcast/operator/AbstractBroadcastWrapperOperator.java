@@ -64,6 +64,7 @@ import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.streaming.runtime.tasks.mailbox.TaskMailbox;
+import org.apache.flink.util.CloseableIterator;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.function.ThrowingConsumer;
 
@@ -482,7 +483,10 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
                         managedMemoryFraction,
                         isUsingCustomRawKeyedState) ->
                         new ProxyStreamOperatorStateContext(
-                                streamOperatorStateContext, "wrapped-"));
+                                streamOperatorStateContext,
+                                "wrapped-",
+                                CloseableIterator.empty(),
+                                0));
     }
 
     @Override
