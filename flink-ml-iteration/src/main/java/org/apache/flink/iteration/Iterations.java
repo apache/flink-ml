@@ -20,6 +20,7 @@ package org.apache.flink.iteration;
 
 import org.apache.flink.annotation.Experimental;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.java.typeutils.GenericTypeInfo;
 import org.apache.flink.iteration.compile.DraftExecutionEnvironment;
 import org.apache.flink.iteration.operator.HeadOperator;
 import org.apache.flink.iteration.operator.HeadOperatorFactory;
@@ -252,29 +253,38 @@ public class Iterations {
                             headStreams.get(i).getParallelism()));
         }
 
+        List<DataStream<?>> tailsAndCriteriaTails = new ArrayList<>();
+
         DataStreamList tails = addTails(feedbackStreams, iterationId, 0);
         for (int i = 0; i < headStreams.size(); ++i) {
             String coLocationGroupKey = "co-" + iterationId.toHexString() + "-" + i;
             headStreams.get(i).getTransformation().setCoLocationGroupKey(coLocationGroupKey);
             tails.get(i).getTransformation().setCoLocationGroupKey(coLocationGroupKey);
         }
+        tailsAndCriteriaTails.addAll(tails.getDataStreams());
 
         checkState(
                 mayHaveCriteria || iterationBodyResult.getTerminationCriteria() == null,
                 "The current iteration type does not support the termination criteria.");
 
         if (iterationBodyResult.getTerminationCriteria() != null) {
-            addCriteriaStream(
-                    iterationBodyResult.getTerminationCriteria(),
-                    iterationId,
-                    env,
-                    draftEnv,
-                    initVariableStreams,
-                    headStreams,
-                    totalInitVariableParallelism);
+            DataStreamList criteriaTails =
+                    addCriteriaStream(
+                            iterationBodyResult.getTerminationCriteria(),
+                            iterationId,
+                            env,
+                            draftEnv,
+                            initVariableStreams,
+                            headStreams,
+                            totalInitVariableParallelism);
+            tailsAndCriteriaTails.addAll(criteriaTails.getDataStreams());
         }
 
-        return addOutputs(getActualDataStreams(iterationBodyResult.getOutputStreams(), draftEnv));
+        DataStream<Object> tailsUnion =
+                unionAllTails(env, new DataStreamList(tailsAndCriteriaTails));
+
+        return addOutputs(
+                getActualDataStreams(iterationBodyResult.getOutputStreams(), draftEnv), tailsUnion);
     }
 
     private static DataStreamList addReplayer(
@@ -315,7 +325,7 @@ public class Iterations {
         return new DataStreamList(result);
     }
 
-    private static void addCriteriaStream(
+    private static DataStreamList addCriteriaStream(
             DataStream<?> draftCriteriaStream,
             IterationID iterationId,
             StreamExecutionEnvironment env,
@@ -367,6 +377,8 @@ public class Iterations {
         // Now we notify all the head operators to count the criteria stream.
         setCriteriaParallelism(headStreams, terminationCriteria.getParallelism());
         setCriteriaParallelism(criteriaHeaders, terminationCriteria.getParallelism());
+
+        return criteriaTails;
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -392,6 +404,24 @@ public class Iterations {
                         .name("criteria-merge");
         criteriaDraftEnv.copyToActualEnvironment();
         return criteriaDraftEnv.getActualStream(draftMergedStream.getId());
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static DataStream<Object> unionAllTails(
+            StreamExecutionEnvironment env, DataStreamList tailsAndCriteriaTails) {
+        return Iterations.<DataStream>map(
+                        tailsAndCriteriaTails,
+                        tail ->
+                                tail.filter(r -> false)
+                                        .name("filter-tail")
+                                        .returns(new GenericTypeInfo(Object.class))
+                                        .setParallelism(
+                                                tail.getParallelism() > 0
+                                                        ? tail.getParallelism()
+                                                        : env.getConfig().getParallelism()))
+                .stream()
+                .reduce(DataStream::union)
+                .get();
     }
 
     private static List<TypeInformation<?>> getTypeInfos(DataStreamList dataStreams) {
@@ -453,7 +483,8 @@ public class Iterations {
                                         .setParallelism(dataStream.getParallelism())));
     }
 
-    private static DataStreamList addOutputs(DataStreamList dataStreams) {
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static DataStreamList addOutputs(DataStreamList dataStreams, DataStream tailsUnion) {
         return new DataStreamList(
                 map(
                         dataStreams,
@@ -461,6 +492,16 @@ public class Iterations {
                             IterationRecordTypeInfo<?> inputType =
                                     (IterationRecordTypeInfo<?>) dataStream.getType();
                             return dataStream
+                                    .union(
+                                            tailsUnion
+                                                    .map(x -> x)
+                                                    .name(
+                                                            "tail-map-"
+                                                                    + dataStream
+                                                                            .getTransformation()
+                                                                            .getName())
+                                                    .returns(inputType)
+                                                    .setParallelism(1))
                                     .transform(
                                             "output-" + dataStream.getTransformation().getName(),
                                             inputType.getInnerTypeInfo(),

@@ -63,7 +63,7 @@ public class IterationConstructionTest extends TestLogger {
                 Arrays.asList(
                         /* 0 */ "Source: Variable -> input-Variable",
                         /* 1 */ "head-Variable",
-                        /* 2 */ "tail-head-Variable");
+                        /* 2 */ "tail-head-Variable -> filter-tail");
         List<Integer> expectedParallelisms = Arrays.asList(4, 4, 4);
 
         List<JobVertex> vertices = jobGraph.getVerticesSortedTopologicallyFromSources();
@@ -102,7 +102,7 @@ public class IterationConstructionTest extends TestLogger {
                         /* 0 */ "Source: Variable",
                         /* 1 */ "map -> input-map",
                         /* 2 */ "head-map",
-                        /* 3 */ "tail-head-map");
+                        /* 3 */ "tail-head-map -> filter-tail");
         List<Integer> expectedParallelisms = Arrays.asList(4, 2, 2, 2);
 
         List<JobVertex> vertices = jobGraph.getVerticesSortedTopologicallyFromSources();
@@ -191,12 +191,14 @@ public class IterationConstructionTest extends TestLogger {
                         /* 2 */ "Source: Constant -> input-Constant",
                         /* 3 */ "head-Variable0",
                         /* 4 */ "head-Variable1",
-                        /* 5 */ "Processor -> output-SideOutput -> Sink: Sink",
+                        /* 5 */ "Processor",
                         /* 6 */ "Feedback0",
-                        /* 7 */ "tail-Feedback0",
+                        /* 7 */ "tail-Feedback0 -> filter-tail",
                         /* 8 */ "Feedback1",
-                        /* 9 */ "tail-Feedback1");
-        List<Integer> expectedParallelisms = Arrays.asList(2, 3, 3, 2, 3, 4, 2, 2, 3, 3);
+                        /* 9 */ "tail-Feedback1 -> filter-tail",
+                        /* 10 */ "tail-map-SideOutput",
+                        /* 11 */ "output-SideOutput -> Sink: Sink");
+        List<Integer> expectedParallelisms = Arrays.asList(2, 3, 3, 2, 3, 4, 2, 2, 3, 3, 1, 4);
 
         JobGraph jobGraph = env.getStreamGraph().getJobGraph();
         List<JobVertex> vertices = jobGraph.getVerticesSortedTopologicallyFromSources();
@@ -286,17 +288,19 @@ public class IterationConstructionTest extends TestLogger {
                         /* 3 */ "Source: Termination -> input-Termination",
                         /* 4 */ "head-Variable0",
                         /* 5 */ "head-Variable1",
-                        /* 6 */ "Processor -> output-SideOutput -> Sink: Sink",
+                        /* 6 */ "Processor",
                         /* 7 */ "Feedback0",
-                        /* 8 */ "tail-Feedback0",
+                        /* 8 */ "tail-Feedback0 -> filter-tail",
                         /* 9 */ "Feedback1",
-                        /* 10 */ "tail-Feedback1",
+                        /* 10 */ "tail-Feedback1 -> filter-tail",
                         /* 11 */ "Termination",
                         /* 12 */ "head-Termination",
                         /* 13 */ "criteria-merge",
-                        /* 14 */ "tail-criteria-merge");
+                        /* 14 */ "tail-criteria-merge -> filter-tail",
+                        /* 15 */ "tail-map-SideOutput",
+                        /* 16 */ "output-SideOutput -> Sink: Sink");
         List<Integer> expectedParallelisms =
-                Arrays.asList(2, 3, 3, 5, 2, 3, 4, 2, 2, 3, 3, 5, 5, 5, 5);
+                Arrays.asList(2, 3, 3, 5, 2, 3, 4, 2, 2, 3, 3, 5, 5, 5, 5, 1, 4);
 
         JobGraph jobGraph = env.getStreamGraph().getJobGraph();
         List<JobVertex> vertices = jobGraph.getVerticesSortedTopologicallyFromSources();
@@ -380,14 +384,17 @@ public class IterationConstructionTest extends TestLogger {
                         /* 2 */ "Source: Termination -> input-Termination",
                         /* 3 */ "head-Variable",
                         /* 4 */ "Replayer-Constant",
-                        /* 5 */ "Processor -> output-SideOutput -> Sink: Sink",
+                        /* 5 */ "Processor",
                         /* 6 */ "Feedback",
-                        /* 7 */ "tail-Feedback",
+                        /* 7 */ "tail-Feedback -> filter-tail",
                         /* 8 */ "Termination",
                         /* 9 */ "head-Termination",
                         /* 10 */ "criteria-merge",
-                        /* 11 */ "tail-criteria-merge");
-        List<Integer> expectedParallelisms = Arrays.asList(2, 3, 5, 2, 3, 4, 2, 2, 5, 5, 5, 5);
+                        /* 11 */ "tail-criteria-merge -> filter-tail",
+                        /* 12 */ "tail-map-SideOutput",
+                        /* 13 */ "output-SideOutput -> Sink: Sink");
+        List<Integer> expectedParallelisms =
+                Arrays.asList(2, 3, 5, 2, 3, 4, 2, 2, 5, 5, 5, 5, 1, 4);
 
         JobGraph jobGraph = env.getStreamGraph().getJobGraph();
         List<JobVertex> vertices = jobGraph.getVerticesSortedTopologicallyFromSources();
