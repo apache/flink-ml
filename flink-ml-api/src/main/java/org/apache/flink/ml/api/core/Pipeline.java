@@ -21,6 +21,7 @@ package org.apache.flink.ml.api.core;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.ml.param.Param;
+import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.table.api.Table;
 
@@ -43,6 +44,7 @@ public final class Pipeline implements Estimator<Pipeline, PipelineModel> {
 
     public Pipeline(List<Stage<?>> stages) {
         this.stages = stages;
+        ParamUtils.initializeMapWithDefaultValues(paramMap, this);
     }
 
     /**
@@ -100,7 +102,7 @@ public final class Pipeline implements Estimator<Pipeline, PipelineModel> {
     }
 
     @Override
-    public Map<Param<?>, Object> getUserDefinedParamMap() {
+    public Map<Param<?>, Object> getParamMap() {
         return paramMap;
     }
 

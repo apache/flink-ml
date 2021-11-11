@@ -30,22 +30,22 @@ public class ParamValidators {
 
     // Check if the parameter value is greater than lowerBound.
     public static <T> ParamValidator<T> gt(double lowerBound) {
-        return (value) -> ((Number) value).doubleValue() > lowerBound;
+        return (value) -> value != null && ((Number) value).doubleValue() > lowerBound;
     }
 
     // Check if the parameter value is greater than or equal to lowerBound.
     public static <T> ParamValidator<T> gtEq(double lowerBound) {
-        return (value) -> ((Number) value).doubleValue() >= lowerBound;
+        return (value) -> value != null && ((Number) value).doubleValue() >= lowerBound;
     }
 
     // Check if the parameter value is less than upperBound.
     public static <T> ParamValidator<T> lt(double upperBound) {
-        return (value) -> ((Number) value).doubleValue() < upperBound;
+        return (value) -> value != null && ((Number) value).doubleValue() < upperBound;
     }
 
     // Check if the parameter value is less than or equal to upperBound.
     public static <T> ParamValidator<T> ltEq(double upperBound) {
-        return (value) -> ((Number) value).doubleValue() <= upperBound;
+        return (value) -> value != null && ((Number) value).doubleValue() <= upperBound;
     }
 
     /**
@@ -59,6 +59,9 @@ public class ParamValidators {
         return new ParamValidator<T>() {
             @Override
             public boolean validate(T obj) {
+                if (obj == null) {
+                    return false;
+                }
                 double value = ((Number) obj).doubleValue();
                 return (value >= lowerBound)
                         && (value <= upperBound)
@@ -78,7 +81,17 @@ public class ParamValidators {
         return new ParamValidator<T>() {
             @Override
             public boolean validate(T value) {
-                return ArrayUtils.contains(allowed, value);
+                return value != null && ArrayUtils.contains(allowed, value);
+            }
+        };
+    }
+
+    // Check if the parameter value is not null.
+    public static <T> ParamValidator<T> notNull() {
+        return new ParamValidator<T>() {
+            @Override
+            public boolean validate(T value) {
+                return value != null;
             }
         };
     }

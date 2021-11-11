@@ -60,7 +60,7 @@ public class KMeansModel implements Model<KMeansModel> {
     }
 
     @Override
-    public Map<Param<?>, Object> getUserDefinedParamMap() {
+    public Map<Param<?>, Object> getParamMap() {
         return paramMap;
     }
 

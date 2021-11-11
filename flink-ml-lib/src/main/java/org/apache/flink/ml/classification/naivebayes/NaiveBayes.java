@@ -28,6 +28,7 @@ import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.ml.api.core.Estimator;
 import org.apache.flink.ml.common.EndOfStreamWindows;
 import org.apache.flink.ml.param.Param;
+import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.functions.windowing.AllWindowFunction;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
@@ -38,6 +39,7 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -99,12 +101,16 @@ public class NaiveBayes implements Estimator<NaiveBayes, NaiveBayesModel>,
     }
 
     @Override
-    public void save(String path) {
-        throw new UnsupportedOperationException();
+    public void save(String path) throws IOException {
+        ReadWriteUtils.saveMetadata(this, path);
+    }
+
+    public static NaiveBayes load(String path) throws IOException {
+        return ReadWriteUtils.loadStageParam(path);
     }
 
     @Override
-    public Map<Param<?>, Object> getUserDefinedParamMap() {
+    public Map<Param<?>, Object> getParamMap() {
         return paramMap;
     }
 

@@ -20,6 +20,7 @@ package org.apache.flink.ml.util;
 
 import org.apache.flink.ml.api.core.Stage;
 import org.apache.flink.ml.param.Param;
+import org.apache.flink.util.InstantiationUtil;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -29,8 +30,6 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.file.Path;
@@ -105,6 +104,24 @@ public class ReadWriteUtils {
      */
     public static void saveMetadata(Stage<?> stage, String path) throws IOException {
         saveMetadata(stage, path, new HashMap<>());
+    }
+
+    /** Returns a subdirectory of the given path for saving/loading model data. */
+    public static String getDataPath(String path) {
+        return Paths.get(path, "data").toString();
+    }
+
+    /** Returns all data files under the given path as a list of paths. */
+    public static org.apache.flink.core.fs.Path[] getDataPaths(String path) {
+        String dataPath = getDataPath(path);
+        File[] files = new File(dataPath).listFiles();
+
+        org.apache.flink.core.fs.Path[] paths = new org.apache.flink.core.fs.Path[files.length];
+        for (int i = 0; i < paths.length; i++) {
+            paths[i] = org.apache.flink.core.fs.Path.fromLocalFile(files[i]);
+        }
+
+        return paths;
     }
 
     /**
@@ -207,6 +224,12 @@ public class ReadWriteUtils {
         stage.set(param, (T) value);
     }
 
+    public static void setStageParams(Stage<?> stage, Map<Param<?>, Object> paramMap) {
+        for (Map.Entry<Param<?>, Object> entry : paramMap.entrySet()) {
+            setStageParam(stage, entry.getKey(), entry.getValue());
+        }
+    }
+
     /**
      * Loads the stage with the saved parameters from the given path. This method reads the metadata
      * file under the given path, instantiates the stage using its no-argument constructor, and
@@ -228,13 +251,11 @@ public class ReadWriteUtils {
         Map<String, String> paramMap = (Map<String, String>) metadata.get("paramMap");
 
         try {
-            Class<?> clazz = Class.forName(className);
-            Constructor<T> constructor = (Constructor<T>) clazz.getConstructor();
-            constructor.setAccessible(true);
-            T instance = constructor.newInstance();
+            Class<T> clazz = (Class<T>) Class.forName(className);
+            T instance = InstantiationUtil.instantiate(clazz);
 
             Map<String, Param<?>> nameToParam = new HashMap<>();
-            for (Param<?> param : ReadWriteUtils.getParamFields(instance)) {
+            for (Param<?> param : ParamUtils.getPublicFinalParamFields(instance)) {
                 nameToParam.put(param.name, param);
             }
 
@@ -243,11 +264,7 @@ public class ReadWriteUtils {
                 setStageParam(instance, param, param.jsonDecode(entry.getValue()));
             }
             return instance;
-        } catch (ClassNotFoundException
-                | NoSuchMethodException
-                | IllegalAccessException
-                | InvocationTargetException
-                | InstantiationException e) {
+        } catch (ClassNotFoundException e) {
             throw new RuntimeException("Failed to load stage.", e);
         }
     }
@@ -282,44 +299,5 @@ public class ReadWriteUtils {
         } catch (ClassNotFoundException | IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException("Failed to load stage.", e);
         }
-    }
-
-    /**
-     * Finds all fields of the Param class type of the given object and returns those Param
-     * instances as a list.
-     *
-     * <p>All public, protected and private fields of this object, including those fields inherited
-     * from its interfaces and super-classes, will be checked.
-     *
-     * @param object the object whose Param-typed fields will be returned.
-     * @return a list of Param instances.
-     */
-    public static List<Param<?>> getParamFields(Object object) {
-        return getParamFields(object, object.getClass());
-    }
-
-    // A helper method that finds all fields of the Param class type of the given object and returns
-    // those Param instances as a list. The clazz specifies the object class.
-    private static List<Param<?>> getParamFields(Object object, Class<?> clazz) {
-        List<Param<?>> result = new ArrayList<>();
-        for (Field field : clazz.getDeclaredFields()) {
-            field.setAccessible(true);
-            if (Param.class.isAssignableFrom(field.getType())) {
-                try {
-                    result.add((Param<?>) field.get(object));
-                } catch (IllegalAccessException e) {
-                    throw new RuntimeException(
-                            "Failed to extract param from field " + field.getName(), e);
-                }
-            }
-        }
-
-        if (clazz.getSuperclass() != null) {
-            result.addAll(getParamFields(object, clazz.getSuperclass()));
-        }
-        for (Class<?> cls : clazz.getInterfaces()) {
-            result.addAll(getParamFields(object, cls));
-        }
-        return result;
     }
 }

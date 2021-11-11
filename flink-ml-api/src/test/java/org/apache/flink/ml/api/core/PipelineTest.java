@@ -31,7 +31,6 @@ import org.junit.Test;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -66,12 +65,18 @@ public class PipelineTest extends AbstractTestBase {
 
     @Test
     public void testPipelineModel() throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
         // Builds a PipelineModel that increments input value by 60. This PipelineModel consists of
         // three stages where each stage increments input value by 10, 20, and 30 respectively.
-        List<Stage<?>> stages = new ArrayList<>();
-        stages.add(new SumModel(10));
-        stages.add(new SumModel(20));
-        stages.add(new SumModel(30));
+        SumModel modelA = new SumModel();
+        modelA.setModelData(tEnv.fromValues(10));
+        SumModel modelB = new SumModel();
+        modelB.setModelData(tEnv.fromValues(20));
+        SumModel modelC = new SumModel();
+        modelC.setModelData(tEnv.fromValues(30));
+
+        List<Stage<?>> stages = Arrays.asList(modelA, modelB, modelC);
         Model<?> model = new PipelineModel(stages);
 
         // Executes the original PipelineModel and verifies that it produces the expected output.
@@ -89,11 +94,15 @@ public class PipelineTest extends AbstractTestBase {
 
     @Test
     public void testPipeline() throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
         // Builds a Pipeline that consists of a Model, an Estimator, and a model.
-        List<Stage<?>> stages = new ArrayList<>();
-        stages.add(new SumModel(10));
-        stages.add(new SumEstimator());
-        stages.add(new SumModel(30));
+        SumModel modelA = new SumModel();
+        modelA.setModelData(tEnv.fromValues(10));
+        SumModel modelB = new SumModel();
+        modelB.setModelData(tEnv.fromValues(30));
+
+        List<Stage<?>> stages = Arrays.asList(modelA, new SumEstimator(), modelB);
         Estimator<?, ?> estimator = new Pipeline(stages);
 
         // Executes the original Pipeline and verifies that it produces the expected output.

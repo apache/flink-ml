@@ -18,14 +18,23 @@
 
 package org.apache.flink.ml.classification.naivebayes;
 
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.connector.source.Source;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
+import org.apache.flink.connector.file.sink.FileSink;
+import org.apache.flink.connector.file.src.FileSource;
+import org.apache.flink.core.fs.Path;
 import org.apache.flink.ml.api.core.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.linalg.BLAS;
 import org.apache.flink.ml.param.Param;
+import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.sink.filesystem.bucketassigners.BasePathBucketAssigner;
+import org.apache.flink.streaming.api.functions.sink.filesystem.rollingpolicies.OnCheckpointRollingPolicy;
 import org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -37,12 +46,8 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.Preconditions;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.io.IOException;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -52,6 +57,7 @@ import java.util.stream.Collectors;
 public class NaiveBayesModel implements Model<NaiveBayesModel>, NaiveBayesParams<NaiveBayesModel> {
     private static final long serialVersionUID = -4673084154965905629L;
     private final Map<Param<?>, Object> paramMap = new HashMap<>();
+    private Table modelTable;
     private DataStream<NaiveBayesModelData> modelStream;
     private static final String broadcastModelKey = "NaiveBayesModelStream";
 
@@ -68,7 +74,8 @@ public class NaiveBayesModel implements Model<NaiveBayesModel>, NaiveBayesParams
                 .collect(Collectors.toList());
         colTypes.add(TypeInformation.of(Object.class));
 
-        StreamTableEnvironment tEnv = (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
+        StreamTableEnvironment tEnv = (StreamTableEnvironment) ((TableImpl) modelTable).getTableEnvironment();
+        modelStream = tEnv.toDataStream(modelTable, DataTypes.RAW(NaiveBayesModelData.class));
         DataStream<Row> input = tEnv.toDataStream(inputs[0]);
 
         Map<String, DataStream<?>> broadcastMap = new HashMap<>();
@@ -91,18 +98,45 @@ public class NaiveBayesModel implements Model<NaiveBayesModel>, NaiveBayesParams
 
     @Override
     public void save(String path) {
-        throw new UnsupportedOperationException();
+        StreamTableEnvironment tEnv =
+                (StreamTableEnvironment) ((TableImpl) modelTable).getTableEnvironment();
+
+        String dataPath = ReadWriteUtils.getDataPath(path);
+        FileSink<NaiveBayesModelData> sink =
+                FileSink.forRowFormat(new Path(dataPath), new NaiveBayesModelData.ModelDataEncoder())
+                        .withRollingPolicy(OnCheckpointRollingPolicy.build())
+                        .withBucketAssigner(new BasePathBucketAssigner<>())
+                        .build();
+        tEnv.toDataStream(modelTable)
+                .map(row -> (NaiveBayesModelData) row.getField("f0"))
+                .sinkTo(sink);
+    }
+
+    public static NaiveBayesModel load(String path) throws IOException {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+
+        Source<NaiveBayesModelData, ?, ?> source =
+                FileSource.forRecordStreamFormat(
+                        new NaiveBayesModelData.ModelDataStreamFormat(),
+                        ReadWriteUtils.getDataPaths(path))
+                        .build();
+        NaiveBayesModel model = ReadWriteUtils.loadStageParam(path);
+        DataStream<NaiveBayesModelData> modelData =
+                env.fromSource(source, WatermarkStrategy.noWatermarks(), "modelData");
+        model.setModelData(tEnv.fromDataStream(modelData, NaiveBayesModelData.SCHEMA));
+
+        return model;
     }
 
     @Override
-    public Map<Param<?>, Object> getUserDefinedParamMap() {
+    public Map<Param<?>, Object> getParamMap() {
         return paramMap;
     }
 
     @Override
     public void setModelData(Table... inputs) {
-        StreamTableEnvironment tEnv = (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
-        modelStream = tEnv.toDataStream(inputs[0], DataTypes.RAW(NaiveBayesModelData.class));
+        modelTable = inputs[0];
     }
 
     private static class NaiveBayesPredictOp

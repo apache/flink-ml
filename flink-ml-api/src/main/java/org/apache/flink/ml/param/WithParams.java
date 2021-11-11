@@ -37,11 +37,8 @@
 package org.apache.flink.ml.param;
 
 import org.apache.flink.annotation.PublicEvolving;
-import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.ParamUtils;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -54,11 +51,11 @@ import java.util.Optional;
 public interface WithParams<T> {
 
     /**
-     * Gets the value of the parameter identified by the given name.
+     * Gets the parameter by its name.
      *
      * @param name The parameter name.
-     * @param <V> The class type of the parameter.
-     * @return A Param instance.
+     * @param <V> The class type of the parameter value.
+     * @return The parameter.
      */
     default <V> Param<V> getParam(String name) {
         Optional<Param<?>> result =
@@ -67,9 +64,9 @@ public interface WithParams<T> {
     }
 
     /**
-     * Sets the value of the given parameter in the user-defined map.
+     * Sets the value of the parameter.
      *
-     * @param param The parameter definition.
+     * @param param The parameter.
      * @param value The parameter value.
      * @return The WithParams instance itself.
      */
@@ -83,69 +80,56 @@ public interface WithParams<T> {
                             + value.getClass().getName());
         }
 
-        if (value != null && !param.validator.validate((V) value)) {
-            throw new IllegalArgumentException(
-                    "Parameter " + param.name + " is given an invalid value " + value.toString());
+        if (!param.validator.validate(value)) {
+            if (value == null) {
+                throw new IllegalArgumentException(
+                        "Parameter " + param.name + "'s value should not be null");
+            } else {
+                throw new IllegalArgumentException(
+                        "Parameter "
+                                + param.name
+                                + " is given an invalid value "
+                                + value.toString());
+            }
         }
-        getUserDefinedParamMap().put(param, value);
+        getParamMap().put(param, value);
         return (T) this;
     }
 
     /**
-     * Gets the value of the given parameter. Returns the value from the user-defined map if
-     * set(...) has been explicitly called to set value for this parameter. Otherwise, returns the
-     * default value from the definition of this parameter.
+     * Gets the value of the parameter.
      *
      * @param param The parameter.
-     * @param <V> The class type of the parameter.
-     * @return The value of the parameter.
+     * @param <V> The class type of the parameter value.
+     * @return The parameter value.
      */
     @SuppressWarnings("unchecked")
     default <V> V get(Param<V> param) {
-        Map<Param<?>, Object> paramMap = getUserDefinedParamMap();
-        if (paramMap != null && paramMap.containsKey(param)) {
-            return (V) paramMap.get(param);
+        Map<Param<?>, Object> paramMap = getParamMap();
+        V value = (V) paramMap.get(param);
+
+        if (value == null && !param.validator.validate(value)) {
+            throw new IllegalArgumentException(
+                    "Parameter " + param.name + "'s value should not be null");
         }
 
-        return param.defaultValue;
+        return value;
     }
 
     /**
-     * Returns an immutable map that contains value for every parameter that meets one of the
-     * following conditions:
+     * Returns a map which should contain value for every parameter that meets one of the following
+     * conditions.
      *
      * <p>1) set(...) has been called to set value for this parameter.
      *
-     * <p>2) The parameter is a field of this WithParams instance. This includes public, protected
-     * and private fields. And this also includes fields inherited from its interfaces and
-     * super-classes.
+     * <p>2) The parameter is a public final field of this WithParams instance. This includes fields
+     * inherited from its interfaces and super-classes.
      *
-     * @return An immutable map which maps parameter definition to parameter value.
-     */
-    default Map<Param<?>, Object> getParamMap() {
-        Map<Param<?>, Object> paramMap = getUserDefinedParamMap();
-        if (paramMap == null) {
-            paramMap = new HashMap<>();
-        }
-
-        List<Param<?>> defaultParams = ReadWriteUtils.getParamFields(this);
-        for (Param<?> param : defaultParams) {
-            if (!paramMap.containsKey(param)) {
-                paramMap.put(param, param.defaultValue);
-            }
-        }
-
-        return Collections.unmodifiableMap(paramMap);
-    }
-
-    /**
-     * Returns a mutable map that can be used to set values for parameters. A subclass of this
-     * interface should override this method if it wants to support users to set non-default
-     * parameter values.
+     * <p>The subclass which implements this interface could meet this requirement by returning a
+     * member field of the given map type, after having initialized this member field using the
+     * {@link ParamUtils#initializeMapWithDefaultValues(Map, WithParams)} method.
      *
-     * @return a mutable map of parameters and value overrides.
+     * @return A map which maps parameter definition to parameter value.
      */
-    default Map<Param<?>, Object> getUserDefinedParamMap() {
-        return null;
-    }
+    Map<Param<?>, Object> getParamMap();
 }

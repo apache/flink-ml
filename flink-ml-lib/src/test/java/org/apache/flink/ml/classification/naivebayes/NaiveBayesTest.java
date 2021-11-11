@@ -36,6 +36,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -47,13 +48,15 @@ public class NaiveBayesTest {
 
     private StreamExecutionEnvironment env;
     private StreamTableEnvironment tEnv;
-    DataTypes.Field[] fields;
-    Row[] inputData;
+    DataTypes.Field[] inputType;
+    Row[] trainData;
+    Row[] predictData;
     Row[] expectedOutput;
-    String[] feature;
-    String label;
+    String[] featureCols;
+    String labelCol;
     String predictCol;
     double smoothing;
+    boolean isSaveLoad;
     String errorMessage;
 
     @Before
@@ -70,7 +73,7 @@ public class NaiveBayesTest {
                 ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
         env.getConfig().setGlobalJobParameters(configuration);
 
-        fields = new DataTypes.Field[]{
+        inputType = new DataTypes.Field[]{
                 DataTypes.FIELD("weight", DataTypes.DOUBLE()),
                 DataTypes.FIELD("f0", DataTypes.INT()),
                 DataTypes.FIELD("f1", DataTypes.DOUBLE()),
@@ -80,7 +83,7 @@ public class NaiveBayesTest {
                 DataTypes.FIELD("label", DataTypes.STRING())
         };
         
-        inputData = new Row[] {
+        trainData = new Row[] {
                 Row.of(1., 1, 1., 1., 1., 2., "l1"),
                 Row.of(1., 1, 1., 0., 1., 2., "l1"),
                 Row.of(1., 2, 0., 1., 1., 3., "l1"),
@@ -89,6 +92,8 @@ public class NaiveBayesTest {
                 Row.of(1., 1, 1., 1.5, 0., 1., "l0"),
                 Row.of(2., 4, 1., 1., 0., 1., "l0")
         };
+
+        predictData = trainData;
 
         expectedOutput = new Row[] {
                 Row.of(1., 1, 1., 1., 1., 2., "l1", "l1"),
@@ -100,57 +105,58 @@ public class NaiveBayesTest {
                 Row.of(2., 4, 1., 1., 0., 1., "l0", "l0")
         };
 
-        feature = new String[] {"f0", "f4"};
-        label = "label";
+        featureCols = new String[] {"f0", "f4"};
+        labelCol = "label";
         predictCol = "predict";
         smoothing = 1.0;
+        isSaveLoad = false;
     }
 
     @Test
-    public void testNaiveBayes() {
+    public void testNaiveBayes() throws Exception {
         errorMessage = "normal test for Naive Bayes";
-        runAndCheck(tEnv, fields, inputData, expectedOutput, feature, label, predictCol, smoothing, errorMessage);
+        runAndCheck();
     }
 
     @Test (expected = Exception.class)
-    public void testEmptyFeature() {
+    public void testEmptyFeature() throws Exception {
         errorMessage = "Naive Bayes should throw exception if feature columns is empty";
-        feature = new String[0];
-        runAndCheck(tEnv, fields, inputData, expectedOutput, feature, label, predictCol, smoothing, errorMessage);
+        featureCols = new String[0];
+        runAndCheck();
     }
 
     @Test (expected = Exception.class)
-    public void testDuplicateFeature() {
+    public void testDuplicateFeature() throws Exception {
         errorMessage = "Naive Bayes should throw exception if feature columns duplicate.";
-        feature = new String[]{"f0", "f0"};
-        runAndCheck(tEnv, fields, inputData, expectedOutput, feature, label, predictCol, smoothing, errorMessage);
+        featureCols = new String[]{"f0", "f0"};
+        runAndCheck();
     }
 
     @Test (expected = Exception.class)
-    public void testNullFeature() {
+    public void testNullFeature() throws Exception {
         errorMessage = "Naive Bayes should throw exception if feature columns is not set";
-        feature = null;
-        runAndCheck(tEnv, fields, inputData, expectedOutput, feature, label, predictCol, smoothing, errorMessage);
+        featureCols = null;
+        runAndCheck();
     }
 
     @Test (expected = Exception.class)
-    public void testInputNotContainFeature() {
+    public void testInputNotContainFeature() throws Exception {
         errorMessage = "Naive Bayes should throw exception if some feature columns are missing from train data";
-        feature = new String[]{"fa", "fb", "f0"};
-        runAndCheck(tEnv, fields, inputData, expectedOutput, feature, label, predictCol, smoothing, errorMessage);
+        featureCols = new String[]{"fa", "fb", "f0"};
+        runAndCheck();
     }
 
     @Test (expected = Exception.class)
-    public void testInputNotContainAllFeature() {
+    public void testInputNotContainAllFeature() throws Exception {
         errorMessage = "Naive Bayes should throw exception if all feature columns are missing from train data";
-        feature = new String[]{"fa", "fb", "fc"};
-        runAndCheck(tEnv, fields, inputData, expectedOutput, feature, label, predictCol, smoothing, errorMessage);
+        featureCols = new String[]{"fa", "fb", "fc"};
+        runAndCheck();
     }
 
     @Test
-    public void testPredictUnseenFeature() {
+    public void testPredictUnseenFeature() throws Exception {
         errorMessage = "Naive Bayes should run without throwing exception if unseen feature values are met in prediction";
-        Row[] predictData = new Row[] {
+        predictData = new Row[] {
                 Row.of(1., 5, 1., 1., 1., 2., "l1"),
                 Row.of(1., 5, 1., 0., 1., 2., "l1"),
                 Row.of(1., 2, 0., 1., 1., 3., "l1"),
@@ -168,27 +174,27 @@ public class NaiveBayesTest {
                 Row.of(1., 1, 1., 1.5, 0., 1., "l0", "l0"),
                 Row.of(2., 4, 1., 1., 0., 1., "l0", "l0")
         };
-        runAndCheck(tEnv, fields, inputData, predictData, expectedOutput, feature, label, predictCol, smoothing, errorMessage);
+        runAndCheck();
     }
 
     @Test (expected = Exception.class)
-    public void testEmptyLabel() {
+    public void testEmptyLabel() throws Exception {
         errorMessage = "Naive Bayes should throw exception if label is empty";
-        feature = new String[0];
-        runAndCheck(tEnv, fields, inputData, expectedOutput, feature, label, predictCol, smoothing, errorMessage);
+        featureCols = new String[0];
+        runAndCheck();
     }
 
     @Test (expected = Exception.class)
-    public void testNullLabel() {
+    public void testNullLabel() throws Exception {
         errorMessage = "Naive Bayes should throw exception if label is empty";
-        feature = null;
-        runAndCheck(tEnv, fields, inputData, expectedOutput, feature, label, predictCol, smoothing, errorMessage);
+        featureCols = null;
+        runAndCheck();
     }
 
     @Test
-    public void testNullLabelValue() {
+    public void testNullLabelValue() throws Exception {
         errorMessage = "Naive Bayes should ignore input rows that does not contain label";
-        inputData = new Row[] {
+        trainData = new Row[] {
                 Row.of(1., 1., 1., 1., 1., 2., null),
                 Row.of(1., 1., 1., 0., 1., 2., null),
                 Row.of(1., 2., 0., 1., 1., 3., null),
@@ -197,6 +203,8 @@ public class NaiveBayesTest {
                 Row.of(1., 1., 1., 1.5, 0., 1., "l0"),
                 Row.of(2., 4., 1., 1., 0., 1., "l0")
         };
+
+        predictData = trainData;
 
         expectedOutput = new Row[] {
                 Row.of(1., 1, 1., 1., 1., 2., null, "l0"),
@@ -207,60 +215,51 @@ public class NaiveBayesTest {
                 Row.of(1., 1, 1., 1.5, 0., 1., "l0", "l0"),
                 Row.of(2., 4, 1., 1., 0., 1., "l0", "l0")
         };
-        runAndCheck(tEnv, fields, inputData, expectedOutput, feature, label, predictCol, smoothing, errorMessage);
+        runAndCheck();
     }
 
     @Test (expected = Exception.class)
-    public void testInputNotContainLabel() {
+    public void testInputNotContainLabel() throws Exception {
         errorMessage = "Naive Bayes should throw exception if input table schema does not contain label column.";
-        label = "non-label";
-        runAndCheck(tEnv, fields, inputData, expectedOutput, feature, label, predictCol, smoothing, errorMessage);
+        labelCol = "non-label";
+        runAndCheck();
     }
 
     @Test (expected = Exception.class)
-    public void testNullPredict() {
+    public void testNullPredict() throws Exception {
         errorMessage = "Naive Bayes should throw exception if predict col is not set.";
         predictCol = null;
-        runAndCheck(tEnv, fields, inputData, expectedOutput, feature, label, predictCol, smoothing, errorMessage);
+        runAndCheck();
     }
 
-    private static void runAndCheck(
-            StreamTableEnvironment tEnv,
-            DataTypes.Field[] inputType,
-            Row[] inputData,
-            Row[] expected,
-            String[] featureCols,
-            String label,
-            String predictCol,
-            double smoothing,
-            String errorMessage
-    ) {
-        runAndCheck(tEnv, inputType, inputData, inputData, expected, featureCols, label, predictCol, smoothing, errorMessage);
+    @Test (expected = Exception.class)
+    public void testSaveLoad() throws Exception {
+        errorMessage = "Naive Bayes should be able to save Model to filesystem and load correctly.";
+        isSaveLoad = true;
+        runAndCheck();
     }
 
-    private static void runAndCheck(
-            StreamTableEnvironment tEnv,
-            DataTypes.Field[] inputType,
-            Row[] trainData,
-            Row[] predictData,
-            Row[] expected,
-            String[] featureCols,
-            String label,
-            String predictCol,
-            double smoothing,
-            String errorMessage
-    ) {
-        
+    private void runAndCheck() throws Exception {
         Table trainTable = tEnv.fromValues(DataTypes.ROW(inputType), (Object[]) trainData);
         Table predictTable = tEnv.fromValues(DataTypes.ROW(inputType), (Object[]) predictData);
 
-        NaiveBayes trainer = new NaiveBayes();
-        trainer.setSmoothing(smoothing);
-        if (featureCols != null)        trainer.setFeatureCols(featureCols);
-        if (label != null)              trainer.setLabelCol(label);
-        if (predictCol != null)         trainer.setPredictionCol(predictCol);
+        NaiveBayes estimator = new NaiveBayes();
+        estimator.setSmoothing(smoothing);
+        if (featureCols != null)        estimator.setFeatureCols(featureCols);
+        if (labelCol != null)              estimator.setLabelCol(labelCol);
+        if (predictCol != null)         estimator.setPredictionCol(predictCol);
 
-        Table output = trainer.fit(trainTable).transform(predictTable)[0];
+        NaiveBayesModel model = estimator.fit(trainTable);
+
+        if (isSaveLoad) {
+            String tempDir = Files.createTempDirectory("").toString();
+            model.save(tempDir);
+            env.execute();
+
+            model = NaiveBayesModel.load(tempDir);
+        }
+
+        Table output = model.transform(predictTable)[0];
 
         Object[] actualObjects = IteratorUtils.toArray(output.execute().collect());
         Row[] actual = new Row[actualObjects.length];
@@ -268,7 +267,7 @@ public class NaiveBayesTest {
             actual[i] = (Row) actualObjects[i];
         }
         
-        Assert.assertEquals(errorMessage, getFrequencyMap(expected), getFrequencyMap(actual));
+        Assert.assertEquals(errorMessage, getFrequencyMap(expectedOutput), getFrequencyMap(actual));
     }
 
     private static Map<Object, Integer> getFrequencyMap(Row[] rows) {

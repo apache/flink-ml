@@ -199,7 +199,7 @@ public class KMeans implements Estimator<KMeans, KMeansModel>, KMeansParams<KMea
     }
 
     @Override
-    public Map<Param<?>, Object> getUserDefinedParamMap() {
+    public Map<Param<?>, Object> getParamMap() {
         return paramMap;
     }
 

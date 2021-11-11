@@ -33,6 +33,7 @@ import org.apache.flink.ml.param.ParamValidators;
 import org.apache.flink.ml.param.StringArrayParam;
 import org.apache.flink.ml.param.StringParam;
 import org.apache.flink.ml.param.WithParams;
+import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
 
 import org.junit.Assert;
@@ -90,17 +91,28 @@ public class StageTest {
                 new StringArrayParam("stringArrayParam", "Description", new String[] {"14", "15"});
     }
 
-    // A Stage subclass which inherits all parameters from MyParams and defines an extra parameter.
-    private static class MyStage implements Stage<MyStage>, MyParams<MyStage> {
+    /**
+     * A Stage subclass which inherits all parameters from MyParams and defines an extra parameter.
+     */
+    public static class MyStage implements Stage<MyStage>, MyParams<MyStage> {
         private final Map<Param<?>, Object> paramMap = new HashMap<>();
 
-        Param<Integer> extraIntParam =
+        public final Param<Integer> extraIntParam =
                 new IntParam("extraIntParam", "Description", 20, ParamValidators.alwaysTrue());
 
-        public MyStage() {}
+        public final Param<Integer> paramWithNullDefault =
+                new IntParam(
+                        "paramWithNullDefault",
+                        "Must be explicitly set with a non-null value",
+                        null,
+                        ParamValidators.notNull());
+
+        public MyStage() {
+            ParamUtils.initializeMapWithDefaultValues(paramMap, this);
+        }
 
         @Override
-        public Map<Param<?>, Object> getUserDefinedParamMap() {
+        public Map<Param<?>, Object> getParamMap() {
             return paramMap;
         }
 
@@ -114,11 +126,22 @@ public class StageTest {
         }
     }
 
-    // A Stage subclass without the static load() method.
-    private static class MyStageWithoutLoad implements Stage<MyStage>, MyParams<MyStage> {
+    /** A Stage subclass without the static load() method. */
+    public static class MyStageWithoutLoad implements Stage<MyStage>, MyParams<MyStage> {
+        private final Map<Param<?>, Object> paramMap = new HashMap<>();
+
+        public MyStageWithoutLoad() {
+            ParamUtils.initializeMapWithDefaultValues(paramMap, this);
+        }
+
         @Override
         public void save(String path) throws IOException {
             ReadWriteUtils.saveMetadata(this, path);
+        }
+
+        @Override
+        public Map<Param<?>, Object> getParamMap() {
+            return paramMap;
         }
     }
 
@@ -131,7 +154,9 @@ public class StageTest {
             Assert.assertTrue(m2.containsKey(entry.getKey()));
             Object v1 = entry.getValue();
             Object v2 = m2.get(entry.getKey());
-            if (v1.getClass().isArray() && v2.getClass().isArray()) {
+            if (v1 == null || v2 == null) {
+                Assert.assertTrue(v1 == null && v2 == null);
+            } else if (v1.getClass().isArray() && v2.getClass().isArray()) {
                 Assert.assertArrayEquals((Object[]) v1, (Object[]) v2);
             } else {
                 Assert.assertEquals(v1, v2);
@@ -141,7 +166,7 @@ public class StageTest {
 
     // Saves and loads the given stage. And verifies that the loaded stage has same parameter values
     // as the original stage.
-    private static Stage<?> validateStageReadWrite(
+    private static Stage<?> validateStageSaveLoad(
             Stage<?> stage, Map<String, Object> paramOverrides) throws IOException {
         for (Map.Entry<String, Object> entry : paramOverrides.entrySet()) {
             Param<?> param = stage.getParam(entry.getKey());
@@ -182,6 +207,20 @@ public class StageTest {
         Param<Integer> paramC = stage.getParam("extraIntParam");
         stage.set(paramC, 50);
         Assert.assertEquals(50, (int) stage.get(paramC));
+    }
+
+    @Test
+    public void testParamWithNullDefault() {
+        MyStage stage = new MyStage();
+        try {
+            stage.get(stage.paramWithNullDefault);
+            Assert.fail("Expected IllegalArgumentException");
+        } catch (IllegalArgumentException e) {
+            Assert.assertTrue(e.getMessage().contains("should not be null"));
+        }
+
+        stage.set(stage.paramWithNullDefault, 3);
+        Assert.assertEquals(3, (int) stage.get(stage.paramWithNullDefault));
     }
 
     private static <T> void assertInvalidValue(Stage<?> stage, Param<T> param, T value) {
@@ -252,24 +291,22 @@ public class StageTest {
 
         stage.set(MyParams.STRING_ARRAY_PARAM, new String[] {"50", "51"});
         Assert.assertArrayEquals(new String[] {"50", "51"}, stage.get(MyParams.STRING_ARRAY_PARAM));
-
-        // Verifies that we can set null value for a parameter.
-        stage.set(MyParams.LONG_PARAM, null);
-        Assert.assertNull(stage.get(MyParams.LONG_PARAM));
     }
 
     @Test
     public void testStageSaveLoad() throws IOException {
         MyStage stage = new MyStage();
-        Stage<?> loadedStage = validateStageReadWrite(stage, Collections.emptyMap());
+        stage.set(stage.paramWithNullDefault, 1);
+        Stage<?> loadedStage = validateStageSaveLoad(stage, Collections.emptyMap());
         Assert.assertEquals(1, (int) loadedStage.get(MyParams.INT_PARAM));
     }
 
     @Test
     public void testStageSaveLoadWithParamOverrides() throws IOException {
         MyStage stage = new MyStage();
+        stage.set(stage.paramWithNullDefault, 1);
         Stage<?> loadedStage =
-                validateStageReadWrite(stage, Collections.singletonMap("intParam", 10));
+                validateStageSaveLoad(stage, Collections.singletonMap("intParam", 10));
         Assert.assertEquals(10, (int) loadedStage.get(MyParams.INT_PARAM));
     }
 
@@ -277,7 +314,7 @@ public class StageTest {
     public void testStageLoadWithoutLoadMethod() throws IOException {
         MyStageWithoutLoad stage = new MyStageWithoutLoad();
         try {
-            validateStageReadWrite(stage, Collections.emptyMap());
+            validateStageSaveLoad(stage, Collections.emptyMap());
             Assert.fail("Expected RuntimeException");
         } catch (RuntimeException e) {
             Assert.assertTrue(e.getMessage().contains("not implemented"));
@@ -287,26 +324,31 @@ public class StageTest {
     @Test
     public void testValidators() {
         ParamValidator<Integer> gt = ParamValidators.gt(10);
+        Assert.assertFalse(gt.validate(null));
         Assert.assertFalse(gt.validate(5));
         Assert.assertFalse(gt.validate(10));
         Assert.assertTrue(gt.validate(15));
 
         ParamValidator<Integer> gtEq = ParamValidators.gtEq(10);
+        Assert.assertFalse(gtEq.validate(null));
         Assert.assertFalse(gtEq.validate(5));
         Assert.assertTrue(gtEq.validate(10));
         Assert.assertTrue(gtEq.validate(15));
 
         ParamValidator<Integer> lt = ParamValidators.lt(10);
+        Assert.assertFalse(lt.validate(null));
         Assert.assertTrue(lt.validate(5));
         Assert.assertFalse(lt.validate(10));
         Assert.assertFalse(lt.validate(15));
 
         ParamValidator<Integer> ltEq = ParamValidators.ltEq(10);
+        Assert.assertFalse(ltEq.validate(null));
         Assert.assertTrue(ltEq.validate(5));
         Assert.assertTrue(ltEq.validate(10));
         Assert.assertFalse(ltEq.validate(15));
 
         ParamValidator<Integer> inRangeInclusive = ParamValidators.inRange(5, 15);
+        Assert.assertFalse(inRangeInclusive.validate(null));
         Assert.assertFalse(inRangeInclusive.validate(0));
         Assert.assertTrue(inRangeInclusive.validate(5));
         Assert.assertTrue(inRangeInclusive.validate(10));
@@ -314,10 +356,20 @@ public class StageTest {
         Assert.assertFalse(inRangeInclusive.validate(20));
 
         ParamValidator<Integer> inRangeExclusive = ParamValidators.inRange(5, 15, false, false);
+        Assert.assertFalse(inRangeExclusive.validate(null));
         Assert.assertFalse(inRangeExclusive.validate(0));
         Assert.assertFalse(inRangeExclusive.validate(5));
         Assert.assertTrue(inRangeExclusive.validate(10));
         Assert.assertFalse(inRangeExclusive.validate(15));
         Assert.assertFalse(inRangeExclusive.validate(20));
+
+        ParamValidator<Integer> inArray = ParamValidators.inArray(1, 2, 3);
+        Assert.assertFalse(inArray.validate(null));
+        Assert.assertTrue(inArray.validate(1));
+        Assert.assertFalse(inArray.validate(0));
+
+        ParamValidator<Integer> notNull = ParamValidators.notNull();
+        Assert.assertTrue(notNull.validate(5));
+        Assert.assertFalse(notNull.validate(null));
     }
 }
