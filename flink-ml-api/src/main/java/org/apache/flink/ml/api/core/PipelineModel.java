@@ -23,6 +23,7 @@ import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
 
 import java.io.IOException;
@@ -72,8 +73,10 @@ public final class PipelineModel implements Model<PipelineModel> {
         ReadWriteUtils.savePipeline(this, stages, path);
     }
 
-    public static PipelineModel load(String path) throws IOException {
-        return new PipelineModel(ReadWriteUtils.loadPipeline(path, PipelineModel.class.getName()));
+    public static PipelineModel load(StreamExecutionEnvironment env, String path)
+            throws IOException {
+        return new PipelineModel(
+                ReadWriteUtils.loadPipeline(env, path, PipelineModel.class.getName()));
     }
 
     /**

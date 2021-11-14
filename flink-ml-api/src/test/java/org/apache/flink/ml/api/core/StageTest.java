@@ -35,6 +35,7 @@ import org.apache.flink.ml.param.StringParam;
 import org.apache.flink.ml.param.WithParams;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -121,7 +122,7 @@ public class StageTest {
             ReadWriteUtils.saveMetadata(this, path);
         }
 
-        public static MyStage load(String path) throws IOException {
+        public static MyStage load(StreamExecutionEnvironment env, String path) throws IOException {
             return ReadWriteUtils.loadStageParam(path);
         }
     }
@@ -167,7 +168,8 @@ public class StageTest {
     // Saves and loads the given stage. And verifies that the loaded stage has same parameter values
     // as the original stage.
     private static Stage<?> validateStageSaveLoad(
-            Stage<?> stage, Map<String, Object> paramOverrides) throws IOException {
+            StreamExecutionEnvironment env, Stage<?> stage, Map<String, Object> paramOverrides)
+            throws IOException {
         for (Map.Entry<String, Object> entry : paramOverrides.entrySet()) {
             Param<?> param = stage.getParam(entry.getKey());
             ReadWriteUtils.setStageParam(stage, param, entry.getValue());
@@ -183,7 +185,7 @@ public class StageTest {
             // This is expected.
         }
 
-        Stage<?> loadedStage = ReadWriteUtils.loadStage(path);
+        Stage<?> loadedStage = ReadWriteUtils.loadStage(env, path);
         for (Map.Entry<String, Object> entry : paramOverrides.entrySet()) {
             Param<?> param = loadedStage.getParam(entry.getKey());
             Assert.assertEquals(entry.getValue(), loadedStage.get(param));
@@ -295,26 +297,29 @@ public class StageTest {
 
     @Test
     public void testStageSaveLoad() throws IOException {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         MyStage stage = new MyStage();
         stage.set(stage.paramWithNullDefault, 1);
-        Stage<?> loadedStage = validateStageSaveLoad(stage, Collections.emptyMap());
+        Stage<?> loadedStage = validateStageSaveLoad(env, stage, Collections.emptyMap());
         Assert.assertEquals(1, (int) loadedStage.get(MyParams.INT_PARAM));
     }
 
     @Test
     public void testStageSaveLoadWithParamOverrides() throws IOException {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         MyStage stage = new MyStage();
         stage.set(stage.paramWithNullDefault, 1);
         Stage<?> loadedStage =
-                validateStageSaveLoad(stage, Collections.singletonMap("intParam", 10));
+                validateStageSaveLoad(env, stage, Collections.singletonMap("intParam", 10));
         Assert.assertEquals(10, (int) loadedStage.get(MyParams.INT_PARAM));
     }
 
     @Test
     public void testStageLoadWithoutLoadMethod() throws IOException {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         MyStageWithoutLoad stage = new MyStageWithoutLoad();
         try {
-            validateStageSaveLoad(stage, Collections.emptyMap());
+            validateStageSaveLoad(env, stage, Collections.emptyMap());
             Assert.fail("Expected RuntimeException");
         } catch (RuntimeException e) {
             Assert.assertTrue(e.getMessage().contains("not implemented"));

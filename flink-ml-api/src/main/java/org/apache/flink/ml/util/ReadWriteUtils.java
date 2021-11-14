@@ -20,6 +20,7 @@ package org.apache.flink.ml.util;
 
 import org.apache.flink.ml.api.core.Stage;
 import org.apache.flink.ml.param.Param;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.util.InstantiationUtil;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
@@ -183,11 +184,13 @@ public class ReadWriteUtils {
      * <p>The method throws RuntimeException if the expectedClassName is not empty AND it does not
      * match the className of the previously saved Pipeline or PipelineModel.
      *
+     * @param env A StreamExecutionEnvironment instance.
      * @param path The parent directory to load the pipeline metadata and its stages.
      * @param expectedClassName The expected class name of the pipeline.
      * @return A list of stages.
      */
-    public static List<Stage<?>> loadPipeline(String path, String expectedClassName)
+    public static List<Stage<?>> loadPipeline(
+            StreamExecutionEnvironment env, String path, String expectedClassName)
             throws IOException {
         Map<String, ?> metadata = loadMetadata(path, expectedClassName);
         int numStages = (Integer) metadata.get("numStages");
@@ -195,7 +198,7 @@ public class ReadWriteUtils {
 
         for (int i = 0; i < numStages; i++) {
             String stagePath = getPathForPipelineStage(i, numStages, path);
-            stages.add(loadStage(stagePath));
+            stages.add(loadStage(env, stagePath));
         }
         return stages;
     }
@@ -253,18 +256,20 @@ public class ReadWriteUtils {
      *
      * <p>Required: the stage class must have a static load() method.
      *
+     * @param env A StreamExecutionEnvironment instance.
      * @param path The parent directory of the stage metadata file.
      * @return An instance of Stage.
      */
-    public static Stage<?> loadStage(String path) throws IOException {
+    public static Stage<?> loadStage(StreamExecutionEnvironment env, String path)
+            throws IOException {
         Map<String, ?> metadata = loadMetadata(path, "");
         String className = (String) metadata.get("className");
 
         try {
             Class<?> clazz = Class.forName(className);
-            Method method = clazz.getMethod("load", String.class);
+            Method method = clazz.getMethod("load", StreamExecutionEnvironment.class, String.class);
             method.setAccessible(true);
-            return (Stage<?>) method.invoke(null, path);
+            return (Stage<?>) method.invoke(null, env, path);
         } catch (NoSuchMethodException e) {
             String methodName = String.format("%s::load(String)", className);
             throw new RuntimeException(
