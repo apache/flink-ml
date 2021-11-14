@@ -83,7 +83,7 @@ public class PipelineTest extends AbstractTestBase {
         Path tempDir = Files.createTempDirectory("PipelineTest");
         String path = Paths.get(tempDir.toString(), "testPipelineModelSaveLoad").toString();
         model.save(path);
-        Model<?> loadedModel = PipelineModel.load(path);
+        Model<?> loadedModel = PipelineModel.load(env, path);
 
         // Executes the loaded PipelineModel and verifies that it produces the expected output.
         executeAndCheckOutput(loadedModel, Arrays.asList(1, 2, 3), Arrays.asList(61, 62, 63));
@@ -107,7 +107,7 @@ public class PipelineTest extends AbstractTestBase {
         Path tempDir = Files.createTempDirectory("PipelineTest");
         String path = Paths.get(tempDir.toString(), "testPipeline").toString();
         estimator.save(path);
-        Estimator<?, ?> loadedEstimator = Pipeline.load(path);
+        Estimator<?, ?> loadedEstimator = Pipeline.load(env, path);
 
         // Executes the loaded Pipeline and verifies that it produces the expected output.
         executeAndCheckOutput(loadedEstimator, Arrays.asList(1, 2, 3), Arrays.asList(77, 78, 79));

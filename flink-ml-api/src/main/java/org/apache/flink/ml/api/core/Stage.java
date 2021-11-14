@@ -31,14 +31,15 @@ import java.io.Serializable;
  *
  * <p>Each stage is with parameters, and requires a public empty constructor for restoration.
  *
+ * <p>NOTE: every Stage subclass should implement a static method with signature {@code static T
+ * load(StreamExecutionEnvironment env, String path)}, where {@code T} refers to the concrete
+ * subclass. This static method should instantiate a new stage instance based on the data read from
+ * the given path.
+ *
  * @param <T> The class type of the Stage implementation itself.
  */
 @PublicEvolving
 public interface Stage<T extends Stage<T>> extends WithParams<T>, Serializable {
     /** Saves this stage to the given path. */
     void save(String path) throws IOException;
-
-    // NOTE: every Stage subclass should implement a static method with signature "static T
-    // load(String path)", where T refers to the concrete subclass. This static method should
-    // instantiate a new stage instance based on the data from the given path.
 }

@@ -124,13 +124,12 @@ public class ExampleStages {
             }
         }
 
-        public static SumModel load(String path) throws IOException {
+        public static SumModel load(StreamExecutionEnvironment env, String path)
+                throws IOException {
             SumModel model = ReadWriteUtils.loadStageParam(path);
             File dataFile = Paths.get(path, "data", "delta").toFile();
 
             try (DataInputStream inputStream = new DataInputStream(new FileInputStream(dataFile))) {
-                StreamExecutionEnvironment env =
-                        StreamExecutionEnvironment.getExecutionEnvironment();
                 StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
                 Table modelData = tEnv.fromDataStream(env.fromElements(inputStream.readInt()));
                 return model.setModelData(modelData);
@@ -220,7 +219,8 @@ public class ExampleStages {
             ReadWriteUtils.saveMetadata(this, path);
         }
 
-        public static SumEstimator load(String path) throws IOException {
+        public static SumEstimator load(StreamExecutionEnvironment env, String path)
+                throws IOException {
             return ReadWriteUtils.loadStageParam(path);
         }
     }

@@ -23,6 +23,7 @@ import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
 
 import java.io.IOException;
@@ -111,8 +112,8 @@ public final class Pipeline implements Estimator<Pipeline, PipelineModel> {
         ReadWriteUtils.savePipeline(this, stages, path);
     }
 
-    public static Pipeline load(String path) throws IOException {
-        return new Pipeline(ReadWriteUtils.loadPipeline(path, Pipeline.class.getName()));
+    public static Pipeline load(StreamExecutionEnvironment env, String path) throws IOException {
+        return new Pipeline(ReadWriteUtils.loadPipeline(env, path, Pipeline.class.getName()));
     }
 
     /**
