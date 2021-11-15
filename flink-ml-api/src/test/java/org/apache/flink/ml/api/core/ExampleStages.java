@@ -89,11 +89,12 @@ public class ExampleStages {
         }
 
         @Override
-        public void setModelData(Table... inputs) {
+        public SumModel setModelData(Table... inputs) {
             StreamTableEnvironment tEnv =
                     (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
 
             modelData = tEnv.toDataStream(inputs[0], Integer.class);
+            return this;
         }
 
         @Override
@@ -131,8 +132,7 @@ public class ExampleStages {
             try (DataInputStream inputStream = new DataInputStream(new FileInputStream(dataFile))) {
                 StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
                 Table modelData = tEnv.fromDataStream(env.fromElements(inputStream.readInt()));
-                model.setModelData(modelData);
-                return model;
+                return model.setModelData(modelData);
             }
         }
     }
@@ -208,9 +208,7 @@ public class ExampleStages {
                             .setParallelism(1);
             try {
                 SumModel model = new SumModel();
-                model.setModelData(tEnv.fromDataStream(modelData));
-
-                return model;
+                return model.setModelData(tEnv.fromDataStream(modelData));
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
