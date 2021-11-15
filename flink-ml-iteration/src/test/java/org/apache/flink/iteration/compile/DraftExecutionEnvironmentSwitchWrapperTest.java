@@ -113,6 +113,12 @@ public class DraftExecutionEnvironmentSwitchWrapperTest extends TestLogger {
         }
 
         @Override
+        public Class<? extends StreamOperator> getStreamOperatorClass(
+                ClassLoader classLoader, StreamOperatorFactory<T> operatorFactory) {
+            return StreamMap.class;
+        }
+
+        @Override
         public <KEY> KeySelector<T, KEY> wrapKeySelector(KeySelector<T, KEY> keySelector) {
             return keySelector;
         }
@@ -139,6 +145,12 @@ public class DraftExecutionEnvironmentSwitchWrapperTest extends TestLogger {
                 StreamOperatorParameters<T> operatorParameters,
                 StreamOperatorFactory<T> operatorFactory) {
             return new StreamFilter<>((FilterFunction<T>) value -> true);
+        }
+
+        @Override
+        public Class<? extends StreamOperator> getStreamOperatorClass(
+                ClassLoader classLoader, StreamOperatorFactory<T> operatorFactory) {
+            return StreamFilter.class;
         }
 
         @Override
