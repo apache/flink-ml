@@ -57,6 +57,23 @@ public class PerRoundOperatorWrapper<T> implements OperatorWrapper<T, IterationR
     }
 
     @Override
+    public Class<? extends StreamOperator> getStreamOperatorClass(
+            ClassLoader classLoader, StreamOperatorFactory<T> operatorFactory) {
+        Class<? extends StreamOperator> operatorClass =
+                operatorFactory.getStreamOperatorClass(getClass().getClassLoader());
+        if (OneInputStreamOperator.class.isAssignableFrom(operatorClass)) {
+            return OneInputPerRoundWrapperOperator.class;
+        } else if (TwoInputStreamOperator.class.isAssignableFrom(operatorClass)) {
+            return TwoInputPerRoundWrapperOperator.class;
+        } else if (MultipleInputStreamOperator.class.isAssignableFrom(operatorClass)) {
+            return MultipleInputPerRoundWrapperOperator.class;
+        } else {
+            throw new UnsupportedOperationException(
+                    "Unsupported operator class for all-round wrapper: " + operatorClass);
+        }
+    }
+
+    @Override
     public <KEY> KeySelector<IterationRecord<T>, KEY> wrapKeySelector(
             KeySelector<T, KEY> keySelector) {
         return new ProxyKeySelector<>(keySelector);

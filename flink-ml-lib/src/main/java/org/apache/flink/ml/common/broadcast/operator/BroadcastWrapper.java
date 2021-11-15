@@ -75,6 +75,21 @@ public class BroadcastWrapper<T> implements OperatorWrapper<T, T> {
     }
 
     @Override
+    public Class<? extends StreamOperator> getStreamOperatorClass(
+            ClassLoader classLoader, StreamOperatorFactory<T> operatorFactory) {
+        Class<? extends StreamOperator> operatorClass =
+                operatorFactory.getStreamOperatorClass(getClass().getClassLoader());
+        if (OneInputStreamOperator.class.isAssignableFrom(operatorClass)) {
+            return OneInputBroadcastWrapperOperator.class;
+        } else if (TwoInputStreamOperator.class.isAssignableFrom(operatorClass)) {
+            return TwoInputBroadcastWrapperOperator.class;
+        } else {
+            throw new UnsupportedOperationException(
+                    "Unsupported operator class for with-broadcast wrapper: " + operatorClass);
+        }
+    }
+
+    @Override
     public <KEY> KeySelector<T, KEY> wrapKeySelector(KeySelector<T, KEY> keySelector) {
         return keySelector;
     }

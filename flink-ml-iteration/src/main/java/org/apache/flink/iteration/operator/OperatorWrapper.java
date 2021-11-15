@@ -35,6 +35,9 @@ public interface OperatorWrapper<T, R> extends Serializable {
             StreamOperatorParameters<R> operatorParameters,
             StreamOperatorFactory<T> operatorFactory);
 
+    Class<? extends StreamOperator> getStreamOperatorClass(
+            ClassLoader classLoader, StreamOperatorFactory<T> operatorFactory);
+
     <KEY> KeySelector<R, KEY> wrapKeySelector(KeySelector<T, KEY> keySelector);
 
     StreamPartitioner<R> wrapStreamPartitioner(StreamPartitioner<T> streamPartitioner);
