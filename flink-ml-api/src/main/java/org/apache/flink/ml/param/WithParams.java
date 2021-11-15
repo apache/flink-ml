@@ -72,6 +72,14 @@ public interface WithParams<T> {
      */
     @SuppressWarnings("unchecked")
     default <V> T set(Param<V> param, V value) {
+        if (!getParamMap().containsKey(param)) {
+            throw new IllegalArgumentException(
+                    "Parameter "
+                            + param.name
+                            + " is not defined on the class "
+                            + getClass().getName());
+        }
+
         if (value != null && !param.clazz.isAssignableFrom(value.getClass())) {
             throw new ClassCastException(
                     "Parameter "

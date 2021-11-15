@@ -242,6 +242,18 @@ public class StageTest {
     }
 
     @Test
+    public void testSetUndefinedParam() {
+        MyStage stage = new MyStage();
+        Param<Integer> param = new IntParam("anotherIntParam", "Not defined on MyStage", 1);
+        try {
+            stage.set(param, 2);
+            Assert.fail("Expected IllegalArgumentException");
+        } catch (IllegalArgumentException e) {
+            Assert.assertTrue(e.getMessage().contains(MyStage.class.getName()));
+        }
+    }
+
+    @Test
     public void testParamSetInvalidValue() {
         MyStage stage = new MyStage();
         assertInvalidValue(stage, MyParams.INT_PARAM, 100);
