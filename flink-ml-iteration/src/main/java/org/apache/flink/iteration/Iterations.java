@@ -253,16 +253,14 @@ public class Iterations {
                             headStreams.get(i).getParallelism()));
         }
 
-        List<DataStream<?>> tailsAndCriteriaTails = new ArrayList<>();
-
         DataStreamList tails = addTails(feedbackStreams, iterationId, 0);
         for (int i = 0; i < headStreams.size(); ++i) {
             String coLocationGroupKey = "co-" + iterationId.toHexString() + "-" + i;
             headStreams.get(i).getTransformation().setCoLocationGroupKey(coLocationGroupKey);
             tails.get(i).getTransformation().setCoLocationGroupKey(coLocationGroupKey);
         }
-        tailsAndCriteriaTails.addAll(tails.getDataStreams());
 
+        List<DataStream<?>> tailsAndCriteriaTails = new ArrayList<>(tails.getDataStreams());
         checkState(
                 mayHaveCriteria || iterationBodyResult.getTerminationCriteria() == null,
                 "The current iteration type does not support the termination criteria.");
@@ -374,7 +372,7 @@ public class Iterations {
         criteriaHeaders.get(0).getTransformation().setCoLocationGroupKey(coLocationGroupKey);
         criteriaTails.get(0).getTransformation().setCoLocationGroupKey(coLocationGroupKey);
 
-        // Now we notify all the head operators to count the criteria stream.
+        // Now we notify all the head operators to count the criteria streams.
         setCriteriaParallelism(headStreams, terminationCriteria.getParallelism());
         setCriteriaParallelism(criteriaHeaders, terminationCriteria.getParallelism());
 
