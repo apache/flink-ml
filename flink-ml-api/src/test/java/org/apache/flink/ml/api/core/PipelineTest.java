@@ -69,12 +69,9 @@ public class PipelineTest extends AbstractTestBase {
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
         // Builds a PipelineModel that increments input value by 60. This PipelineModel consists of
         // three stages where each stage increments input value by 10, 20, and 30 respectively.
-        SumModel modelA = new SumModel();
-        modelA.setModelData(tEnv.fromValues(10));
-        SumModel modelB = new SumModel();
-        modelB.setModelData(tEnv.fromValues(20));
-        SumModel modelC = new SumModel();
-        modelC.setModelData(tEnv.fromValues(30));
+        SumModel modelA = new SumModel().setModelData(tEnv.fromValues(10));
+        SumModel modelB = new SumModel().setModelData(tEnv.fromValues(20));
+        SumModel modelC = new SumModel().setModelData(tEnv.fromValues(30));
 
         List<Stage<?>> stages = Arrays.asList(modelA, modelB, modelC);
         Model<?> model = new PipelineModel(stages);
@@ -97,10 +94,8 @@ public class PipelineTest extends AbstractTestBase {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
         // Builds a Pipeline that consists of a Model, an Estimator, and a model.
-        SumModel modelA = new SumModel();
-        modelA.setModelData(tEnv.fromValues(10));
-        SumModel modelB = new SumModel();
-        modelB.setModelData(tEnv.fromValues(30));
+        SumModel modelA = new SumModel().setModelData(tEnv.fromValues(10));
+        SumModel modelB = new SumModel().setModelData(tEnv.fromValues(30));
 
         List<Stage<?>> stages = Arrays.asList(modelA, new SumEstimator(), modelB);
         Estimator<?, ?> estimator = new Pipeline(stages);

@@ -35,7 +35,7 @@ public interface Model<T extends Model<T>> extends Transformer<T> {
      *
      * @param inputs a list of tables
      */
-    default void setModelData(Table... inputs) {
+    default T setModelData(Table... inputs) {
         throw new UnsupportedOperationException("this operation is not supported");
     }
 
