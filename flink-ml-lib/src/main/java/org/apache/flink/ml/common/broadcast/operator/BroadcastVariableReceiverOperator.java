@@ -59,6 +59,9 @@ public class BroadcastVariableReceiverOperator<OUT> extends AbstractStreamOperat
     @SuppressWarnings("rawtypes")
     private final List[] caches;
 
+    /** whether each broadcast input has finished. */
+    private boolean[] cachesReady;
+
     /** state storage of the broadcast inputs. */
     private ListState<?>[] cacheStates;
 
@@ -78,6 +81,7 @@ public class BroadcastVariableReceiverOperator<OUT> extends AbstractStreamOperat
             inputList.add(new ProxyInput(this, i + 1));
         }
         this.caches = new List[inTypes.length];
+        this.cachesReady = new boolean[inTypes.length];
         for (int i = 0; i < inTypes.length; i++) {
             caches[i] = new ArrayList<>();
         }
@@ -92,6 +96,7 @@ public class BroadcastVariableReceiverOperator<OUT> extends AbstractStreamOperat
 
     @Override
     public void endInput(int i) {
+        cachesReady[i - 1] = true;
         BroadcastContext.markCacheFinished(
                 broadcastStreamNames[i - 1] + "-" + getRuntimeContext().getIndexOfThisSubtask());
     }
@@ -104,12 +109,7 @@ public class BroadcastVariableReceiverOperator<OUT> extends AbstractStreamOperat
             cacheStates[i].clear();
             cacheStates[i].addAll(caches[i]);
             cacheReadyStates[i].clear();
-            boolean isCacheFinished =
-                    BroadcastContext.isCacheFinished(
-                            broadcastStreamNames[i]
-                                    + "-"
-                                    + getRuntimeContext().getIndexOfThisSubtask());
-            cacheReadyStates[i].add(isCacheFinished);
+            cacheReadyStates[i].add(cachesReady[i]);
         }
     }
 
@@ -133,6 +133,8 @@ public class BroadcastVariableReceiverOperator<OUT> extends AbstractStreamOperat
                     OperatorStateUtils.getUniqueElement(
                                     cacheReadyStates[i], "cache_ready_state_" + i)
                             .orElse(false);
+            // TODO: there may be a memory leak if the BroadcastWrapper finishes fast before this
+            // task finishes.
             BroadcastContext.putBroadcastVariable(
                     broadcastStreamNames[i] + "-" + getRuntimeContext().getIndexOfThisSubtask(),
                     Tuple2.of(cacheReady, caches[i]));
