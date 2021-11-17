@@ -18,9 +18,7 @@
 
 package org.apache.flink.ml.clustering;
 
-import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.ml.clustering.kmeans.KMeans;
 import org.apache.flink.ml.clustering.kmeans.KMeansModel;
@@ -28,6 +26,7 @@ import org.apache.flink.ml.distance.EuclideanDistanceMeasure;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.StageTestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -35,15 +34,18 @@ import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
-import org.apache.flink.table.api.internal.TableImpl;
 import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.types.Row;
+import org.apache.flink.util.CloseableIterator;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.IteratorUtils;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
-import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
@@ -51,12 +53,16 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /** Tests KMeans and KMeansModel. */
 public class KMeansTest extends AbstractTestBase {
+    @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
+
     private static final List<DenseVector> DATA =
             Arrays.asList(
                     Vectors.dense(0.0, 0.0),
@@ -67,6 +73,18 @@ public class KMeansTest extends AbstractTestBase {
                     Vectors.dense(9.6, 0.0));
     private StreamExecutionEnvironment env;
     private StreamTableEnvironment tEnv;
+    private static final List<Set<DenseVector>> expectedGroups =
+            Arrays.asList(
+                    new HashSet<>(
+                            Arrays.asList(
+                                    Vectors.dense(0.0, 0.0),
+                                    Vectors.dense(0.0, 0.3),
+                                    Vectors.dense(0.3, 0.0))),
+                    new HashSet<>(
+                            Arrays.asList(
+                                    Vectors.dense(9.0, 0.0),
+                                    Vectors.dense(9.0, 0.6),
+                                    Vectors.dense(9.6, 0.0))));
     private Table dataTable;
 
     @Before
@@ -83,43 +101,26 @@ public class KMeansTest extends AbstractTestBase {
         dataTable = tEnv.fromDataStream(env.fromCollection(DATA), schema).as("features");
     }
 
-    // Executes the graph and returns a map which maps points to clusterId.
-    private static Map<DenseVector, Integer> executeAndCollect(
-            Table output, String featureCol, String predictionCol) throws Exception {
-        StreamTableEnvironment tEnv =
-                (StreamTableEnvironment) ((TableImpl) output).getTableEnvironment();
-
-        DataStream<Tuple2<DenseVector, Integer>> stream =
-                tEnv.toDataStream(output)
-                        .map(
-                                new MapFunction<Row, Tuple2<DenseVector, Integer>>() {
-                                    @Override
-                                    public Tuple2<DenseVector, Integer> map(Row row) {
-                                        return Tuple2.of(
-                                                (DenseVector) row.getField(featureCol),
-                                                (Integer) row.getField(predictionCol));
-                                    }
-                                });
-
-        List<Tuple2<DenseVector, Integer>> pointsWithClusterId =
-                IteratorUtils.toList(stream.executeAndCollect());
-
-        Map<DenseVector, Integer> clusterIdByPoints = new HashMap<>();
-        for (Tuple2<DenseVector, Integer> entry : pointsWithClusterId) {
-            clusterIdByPoints.put(entry.f0, entry.f1);
+    /**
+     * Executes a table and collects its results. Results are returned as a list of sets, where
+     * elements in the same set are features whose prediction results are the same.
+     *
+     * @param table A table to be executed and to have its result collected
+     * @param featureCol Name of the column in the table that contains the features
+     * @param predictionCol Name of the column in the table that contains the prediction result
+     * @return A map containing the collected results
+     */
+    private static List<Set<DenseVector>> executeAndCollect(
+            Table table, String featureCol, String predictionCol) {
+        Map<Integer, Set<DenseVector>> map = new HashMap<>();
+        for (CloseableIterator<Row> it = table.execute().collect(); it.hasNext(); ) {
+            Row row = it.next();
+            DenseVector vector = (DenseVector) row.getField(featureCol);
+            int predict = (Integer) row.getField(predictionCol);
+            map.putIfAbsent(predict, new HashSet<>());
+            map.get(predict).add(vector);
         }
-        return clusterIdByPoints;
-    }
-
-    private static void verifyClusteringResult(
-            Map<DenseVector, Integer> clusterIdByPoints, List<List<Integer>> groups) {
-        for (List<Integer> group : groups) {
-            for (int i = 1; i < group.size(); i++) {
-                assertEquals(
-                        clusterIdByPoints.get(DATA.get(group.get(0))),
-                        clusterIdByPoints.get(DATA.get(group.get(i))));
-            }
-        }
+        return new ArrayList<>(map.values());
     }
 
     @Test
@@ -158,10 +159,9 @@ public class KMeansTest extends AbstractTestBase {
         assertEquals(
                 Arrays.asList("test_feature", "test_prediction"),
                 output.getResolvedSchema().getColumnNames());
-        Map<DenseVector, Integer> clusterIdByPoints =
+        List<Set<DenseVector>> actualGroups =
                 executeAndCollect(output, kmeans.getFeaturesCol(), kmeans.getPredictionCol());
-        verifyClusteringResult(
-                clusterIdByPoints, Arrays.asList(Arrays.asList(0, 1, 2), Arrays.asList(3, 4, 5)));
+        assertTrue(CollectionUtils.isEqualCollection(expectedGroups, actualGroups));
     }
 
     @Test
@@ -176,10 +176,11 @@ public class KMeansTest extends AbstractTestBase {
         KMeans kmeans = new KMeans().setK(2);
         KMeansModel model = kmeans.fit(input);
         Table output = model.transform(input)[0];
-
-        Map<DenseVector, Integer> clusterIdByPoints =
+        List<Set<DenseVector>> expectedGroups =
+                Collections.singletonList(Collections.singleton(Vectors.dense(0.0, 0.1)));
+        List<Set<DenseVector>> actualGroups =
                 executeAndCollect(output, kmeans.getFeaturesCol(), kmeans.getPredictionCol());
-        assertEquals(Collections.singleton(0), new HashSet<>(clusterIdByPoints.values()));
+        assertTrue(CollectionUtils.isEqualCollection(expectedGroups, actualGroups));
     }
 
     @Test
@@ -191,23 +192,22 @@ public class KMeansTest extends AbstractTestBase {
         assertEquals(
                 Arrays.asList("features", "prediction"),
                 output.getResolvedSchema().getColumnNames());
-        Map<DenseVector, Integer> clusterIdByPoints =
+        List<Set<DenseVector>> actualGroups =
                 executeAndCollect(output, kmeans.getFeaturesCol(), kmeans.getPredictionCol());
-        verifyClusteringResult(
-                clusterIdByPoints, Arrays.asList(Arrays.asList(0, 1, 2), Arrays.asList(3, 4, 5)));
+        assertTrue(CollectionUtils.isEqualCollection(expectedGroups, actualGroups));
     }
 
     @Test
     public void testSaveLoadAndPredict() throws Exception {
-        String path = Files.createTempDirectory("").toString();
-
         KMeans kmeans = new KMeans().setMaxIter(2).setK(2);
-        KMeansModel model = kmeans.fit(dataTable);
 
-        model.save(path);
-        env.execute();
+        KMeans loadedKmeans =
+                StageTestUtils.saveAndReload(env, kmeans, tempFolder.newFolder().getAbsolutePath());
 
-        KMeansModel loadedModel = KMeansModel.load(env, path);
+        KMeansModel model = loadedKmeans.fit(dataTable);
+
+        KMeansModel loadedModel =
+                StageTestUtils.saveAndReload(env, model, tempFolder.newFolder().getAbsolutePath());
         Table output = loadedModel.transform(dataTable)[0];
 
         assertEquals(
@@ -216,10 +216,10 @@ public class KMeansTest extends AbstractTestBase {
         assertEquals(
                 Arrays.asList("features", "prediction"),
                 output.getResolvedSchema().getColumnNames());
-        Map<DenseVector, Integer> clusterIdByPoints =
+
+        List<Set<DenseVector>> actualGroups =
                 executeAndCollect(output, kmeans.getFeaturesCol(), kmeans.getPredictionCol());
-        verifyClusteringResult(
-                clusterIdByPoints, Arrays.asList(Arrays.asList(0, 1, 2), Arrays.asList(3, 4, 5)));
+        assertTrue(CollectionUtils.isEqualCollection(expectedGroups, actualGroups));
     }
 
     @Test
@@ -250,10 +250,8 @@ public class KMeansTest extends AbstractTestBase {
         ReadWriteUtils.updateExistingParams(modelB, modelA.getParamMap());
 
         Table output = modelB.transform(dataTable)[0];
-        Map<DenseVector, Integer> clusterIdByPoints =
+        List<Set<DenseVector>> actualGroups =
                 executeAndCollect(output, kmeans.getFeaturesCol(), kmeans.getPredictionCol());
-
-        verifyClusteringResult(
-                clusterIdByPoints, Arrays.asList(Arrays.asList(0, 1, 2), Arrays.asList(3, 4, 5)));
+        assertTrue(CollectionUtils.isEqualCollection(expectedGroups, actualGroups));
     }
 }

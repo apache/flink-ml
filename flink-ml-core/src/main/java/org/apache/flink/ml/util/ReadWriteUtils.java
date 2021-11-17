@@ -18,9 +18,19 @@
 
 package org.apache.flink.ml.util;
 
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.api.common.serialization.Encoder;
+import org.apache.flink.api.connector.source.Source;
+import org.apache.flink.connector.file.sink.FileSink;
+import org.apache.flink.connector.file.src.FileSource;
+import org.apache.flink.connector.file.src.reader.SimpleStreamFormat;
 import org.apache.flink.ml.api.Stage;
 import org.apache.flink.ml.param.Param;
+import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.sink.filesystem.bucketassigners.BasePathBucketAssigner;
+import org.apache.flink.streaming.api.functions.sink.filesystem.rollingpolicies.OnCheckpointRollingPolicy;
+import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.util.InstantiationUtil;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
@@ -311,5 +321,41 @@ public class ReadWriteUtils {
         } catch (ClassNotFoundException | IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException("Failed to load stage.", e);
         }
+    }
+
+    /**
+     * Saves the model data stream to the given path using the model encoder.
+     *
+     * @param model The model data stream.
+     * @param path The parent directory of the model data file.
+     * @param modelEncoder The encoder to encode the model data.
+     * @param <T> The class type of the model data.
+     */
+    public static <T> void saveModelData(
+            DataStream<T> model, String path, Encoder<T> modelEncoder) {
+        FileSink<T> sink =
+                FileSink.forRowFormat(
+                                new org.apache.flink.core.fs.Path(getDataPath(path)), modelEncoder)
+                        .withRollingPolicy(OnCheckpointRollingPolicy.build())
+                        .withBucketAssigner(new BasePathBucketAssigner<>())
+                        .build();
+        model.sinkTo(sink);
+    }
+
+    /**
+     * Loads the model data from the given path using the model decoder.
+     *
+     * @param env A StreamExecutionEnvironment instance.
+     * @param path The parent directory of the model data file.
+     * @param modelDecoder The decoder used to decode the model data.
+     * @param <T> The class type of the model data.
+     * @return The loaded model data.
+     */
+    public static <T> DataStream<T> loadModelData(
+            StreamExecutionEnvironment env, String path, SimpleStreamFormat<T> modelDecoder) {
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+        Source<T, ?, ?> source =
+                FileSource.forRecordStreamFormat(modelDecoder, getDataPaths(path)).build();
+        return env.fromSource(source, WatermarkStrategy.noWatermarks(), "modelData");
     }
 }

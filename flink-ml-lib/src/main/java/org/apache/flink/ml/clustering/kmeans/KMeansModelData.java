@@ -20,71 +20,83 @@ package org.apache.flink.ml.clustering.kmeans;
 
 import org.apache.flink.api.common.serialization.Encoder;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeutils.base.IntSerializer;
 import org.apache.flink.api.java.typeutils.ObjectArrayTypeInfo;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.file.src.reader.SimpleStreamFormat;
 import org.apache.flink.core.fs.FSDataInputStream;
+import org.apache.flink.core.memory.DataInputViewStreamWrapper;
+import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.api.Schema;
+import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.table.api.Table;
+import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
+import org.apache.flink.table.api.internal.TableImpl;
 
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.io.Input;
-import com.esotericsoftware.kryo.io.Output;
-
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.List;
 
 /** Provides classes to save/load model data. */
 public class KMeansModelData {
+    /** Converts the provided modelData Datastream into corresponding Table. */
+    public static Table getModelDataTable(DataStream<DenseVector[]> modelData) {
+        StreamTableEnvironment tEnv =
+                StreamTableEnvironment.create(modelData.getExecutionEnvironment());
+        return tEnv.fromDataStream(modelData);
+    }
 
-    public static final Schema SCHEMA =
-            Schema.newBuilder()
-                    .column("f0", DataTypes.ARRAY(DataTypes.of(DenseVector.class)))
-                    .build();
+    /** Converts the provided modelData Table into corresponding Datastream. */
+    public static DataStream<DenseVector[]> getModelDataStream(Table table) {
+        StreamTableEnvironment tEnv =
+                (StreamTableEnvironment) ((TableImpl) table).getTableEnvironment();
+        return tEnv.toDataStream(table).map(row -> (DenseVector[]) row.getField("f0"));
+    }
 
     /** Encoder for the KMeans model data. */
     public static class ModelDataEncoder implements Encoder<DenseVector[]> {
         @Override
-        public void encode(DenseVector[] modelData, OutputStream outputStream) {
-            Kryo kryo = new Kryo();
-            Output output = new Output(outputStream);
-            List<double[]> convertedData = new ArrayList<>();
-            for (int i = 0; i < modelData.length; i++) {
-                convertedData.add(modelData[i].values);
+        public void encode(DenseVector[] modelData, OutputStream outputStream) throws IOException {
+            IntSerializer intSerializer = new IntSerializer();
+            DenseVectorSerializer denseVectorSerializer = new DenseVectorSerializer();
+            DataOutputViewStreamWrapper outputViewStreamWrapper =
+                    new DataOutputViewStreamWrapper(outputStream);
+            intSerializer.serialize(modelData.length, outputViewStreamWrapper);
+            for (DenseVector denseVector : modelData) {
+                denseVectorSerializer.serialize(
+                        denseVector, new DataOutputViewStreamWrapper(outputStream));
             }
-            kryo.writeObject(output, convertedData);
-            output.flush();
         }
     }
 
     /** Decoder for the KMeans model data. */
     public static class ModelDataStreamFormat extends SimpleStreamFormat<DenseVector[]> {
         @Override
-        public Reader<DenseVector[]> createReader(Configuration config, FSDataInputStream stream) {
+        public Reader<DenseVector[]> createReader(
+                Configuration config, FSDataInputStream inputStream) {
             return new Reader<DenseVector[]>() {
-                private final Kryo kryo = new Kryo();
-                private final Input input = new Input(stream);
-
                 @Override
-                public DenseVector[] read() {
-                    if (input.eof()) {
+                public DenseVector[] read() throws IOException {
+                    try {
+                        IntSerializer intSerializer = new IntSerializer();
+                        DenseVectorSerializer denseVectorSerializer = new DenseVectorSerializer();
+                        DataInputViewStreamWrapper inputViewStreamWrapper =
+                                new DataInputViewStreamWrapper(inputStream);
+                        int numDenseVectors = intSerializer.deserialize(inputViewStreamWrapper);
+                        DenseVector[] result = new DenseVector[numDenseVectors];
+                        for (int i = 0; i < numDenseVectors; i++) {
+                            result[i] = denseVectorSerializer.deserialize(inputViewStreamWrapper);
+                        }
+                        return result;
+                    } catch (EOFException e) {
                         return null;
                     }
-                    ArrayList<double[]> row = kryo.readObject(input, ArrayList.class);
-
-                    DenseVector[] result = new DenseVector[row.size()];
-                    for (int i = 0; i < result.length; i++) {
-                        result[i] = new DenseVector(row.get(i));
-                    }
-                    return result;
                 }
 
                 @Override
                 public void close() throws IOException {
-                    stream.close();
+                    inputStream.close();
                 }
             };
         }

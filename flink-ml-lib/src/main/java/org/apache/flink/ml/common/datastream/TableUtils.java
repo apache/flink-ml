@@ -22,7 +22,6 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ResolvedSchema;
-import org.apache.flink.table.runtime.typeutils.ExternalTypeInfo;
 
 /** Utility class for table-related operations. */
 public class TableUtils {
@@ -33,7 +32,7 @@ public class TableUtils {
 
         for (int i = 0; i < schema.getColumnCount(); i++) {
             Column column = schema.getColumn(i).get();
-            types[i] = ExternalTypeInfo.of(column.getDataType());
+            types[i] = TypeInformation.of(column.getDataType().getConversionClass());
             names[i] = column.getName();
         }
         return new RowTypeInfo(types, names);
