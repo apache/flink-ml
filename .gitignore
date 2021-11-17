@@ -16,3 +16,6 @@ target
 .DS_Store
 *.ipr
 *.iws
+*.pyc
+flink-ml-python/dist/
+flink-ml-python/apache_flink_ml.egg-info/
