@@ -60,6 +60,7 @@ import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
 import org.apache.flink.util.Collector;
+import org.apache.flink.util.Preconditions;
 
 import org.apache.commons.collections.IteratorUtils;
 
@@ -85,6 +86,8 @@ public class KMeans implements Estimator<KMeans, KMeansModel>, KMeansParams<KMea
 
     @Override
     public KMeansModel fit(Table... inputs) {
+        Preconditions.checkArgument(inputs.length == 1);
+
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
         DataStream<DenseVector> points =
@@ -110,7 +113,7 @@ public class KMeans implements Estimator<KMeans, KMeansModel>, KMeansParams<KMea
                                 body)
                         .get(0);
 
-        Table finalCentroidsTable = tEnv.fromDataStream(finalCentroids, KMeansModelData.SCHEMA);
+        Table finalCentroidsTable = KMeansModelData.getModelDataTable(finalCentroids);
         KMeansModel model = new KMeansModel().setModelData(finalCentroidsTable);
         ReadWriteUtils.updateExistingParams(model, paramMap);
         return model;

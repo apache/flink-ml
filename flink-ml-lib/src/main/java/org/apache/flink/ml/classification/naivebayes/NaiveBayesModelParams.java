@@ -16,29 +16,32 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.param;
+package org.apache.flink.ml.classification.naivebayes;
 
-import org.apache.flink.ml.distance.EuclideanDistanceMeasure;
+import org.apache.flink.ml.common.param.HasFeaturesCol;
+import org.apache.flink.ml.common.param.HasPredictionCol;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.param.ParamValidators;
 import org.apache.flink.ml.param.StringParam;
-import org.apache.flink.ml.param.WithParams;
 
-/** Interface for the shared distanceMeasure param. */
-public interface HasDistanceMeasure<T> extends WithParams<T> {
-    Param<String> DISTANCE_MEASURE =
+/**
+ * Params of {@link NaiveBayesModel}.
+ *
+ * @param <T> The class type of this instance.
+ */
+public interface NaiveBayesModelParams<T> extends HasFeaturesCol<T>, HasPredictionCol<T> {
+    Param<String> MODEL_TYPE =
             new StringParam(
-                    "distanceMeasure",
-                    "The distance measure.",
-                    EuclideanDistanceMeasure.NAME,
-                    ParamValidators.inArray(EuclideanDistanceMeasure.NAME));
+                    "modelType",
+                    "The model type.",
+                    "multinomial",
+                    ParamValidators.inArray("multinomial"));
 
-    default String getDistanceMeasure() {
-        return get(DISTANCE_MEASURE);
+    default String getModelType() {
+        return get(MODEL_TYPE);
     }
 
-    default T setDistanceMeasure(String value) {
-        set(DISTANCE_MEASURE, value);
-        return (T) this;
+    default T setModelType(String value) {
+        return set(MODEL_TYPE, value);
     }
 }

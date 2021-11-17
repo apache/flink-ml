@@ -18,17 +18,12 @@
 
 package org.apache.flink.ml.clustering.kmeans;
 
-import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
-import org.apache.flink.api.connector.source.Source;
 import org.apache.flink.api.java.typeutils.ObjectArrayTypeInfo;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
-import org.apache.flink.connector.file.sink.FileSink;
-import org.apache.flink.connector.file.src.FileSource;
-import org.apache.flink.core.fs.Path;
 import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.distance.DistanceMeasure;
@@ -40,8 +35,6 @@ import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.sink.filesystem.bucketassigners.BasePathBucketAssigner;
-import org.apache.flink.streaming.api.functions.sink.filesystem.rollingpolicies.OnCheckpointRollingPolicy;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -49,6 +42,7 @@ import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
 import org.apache.flink.types.Row;
+import org.apache.flink.util.Preconditions;
 
 import org.apache.commons.collections.IteratorUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -69,6 +63,7 @@ public class KMeansModel implements Model<KMeansModel>, KMeansModelParams<KMeans
 
     @Override
     public KMeansModel setModelData(Table... inputs) {
+        Preconditions.checkArgument(inputs.length == 1);
         centroidsTable = inputs[0];
         return this;
     }
@@ -80,10 +75,11 @@ public class KMeansModel implements Model<KMeansModel>, KMeansModelParams<KMeans
 
     @Override
     public Table[] transform(Table... inputs) {
+        Preconditions.checkArgument(inputs.length == 1);
+
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
-        DataStream<DenseVector[]> centroids =
-                tEnv.toDataStream(centroidsTable).map(row -> (DenseVector[]) row.getField("f0"));
+        DataStream<DenseVector[]> centroids = KMeansModelData.getModelDataStream(centroidsTable);
 
         String featureCol = getFeaturesCol();
         String predictionCol = getPredictionCol();
@@ -182,33 +178,19 @@ public class KMeansModel implements Model<KMeansModel>, KMeansModelParams<KMeans
 
     @Override
     public void save(String path) throws IOException {
-        StreamTableEnvironment tEnv =
-                (StreamTableEnvironment) ((TableImpl) centroidsTable).getTableEnvironment();
-
-        String dataPath = ReadWriteUtils.getDataPath(path);
-        FileSink<DenseVector[]> sink =
-                FileSink.forRowFormat(new Path(dataPath), new KMeansModelData.ModelDataEncoder())
-                        .withRollingPolicy(OnCheckpointRollingPolicy.build())
-                        .withBucketAssigner(new BasePathBucketAssigner<>())
-                        .build();
-        tEnv.toDataStream(centroidsTable)
-                .map(row -> (DenseVector[]) row.getField("f0"))
-                .sinkTo(sink);
-
         ReadWriteUtils.saveMetadata(this, path);
+        ReadWriteUtils.saveModelData(
+                KMeansModelData.getModelDataStream(centroidsTable),
+                path,
+                new KMeansModelData.ModelDataEncoder());
     }
 
     // TODO: Add INFO level logging.
     public static KMeansModel load(StreamExecutionEnvironment env, String path) throws IOException {
-        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
-        Source<DenseVector[], ?, ?> source =
-                FileSource.forRecordStreamFormat(
-                                new KMeansModelData.ModelDataStreamFormat(),
-                                ReadWriteUtils.getDataPaths(path))
-                        .build();
         KMeansModel model = ReadWriteUtils.loadStageParam(path);
-        DataStream<DenseVector[]> modelData =
-                env.fromSource(source, WatermarkStrategy.noWatermarks(), "modelData");
-        return model.setModelData(tEnv.fromDataStream(modelData, KMeansModelData.SCHEMA));
+        DataStream<DenseVector[]> centroids =
+                ReadWriteUtils.loadModelData(
+                        env, path, new KMeansModelData.ModelDataStreamFormat());
+        return model.setModelData(KMeansModelData.getModelDataTable(centroids));
     }
 }

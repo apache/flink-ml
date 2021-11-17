@@ -16,29 +16,28 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.param;
+package org.apache.flink.ml.classification.naivebayes;
 
-import org.apache.flink.ml.distance.EuclideanDistanceMeasure;
+import org.apache.flink.ml.common.param.HasLabelCol;
+import org.apache.flink.ml.param.DoubleParam;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.param.ParamValidators;
-import org.apache.flink.ml.param.StringParam;
-import org.apache.flink.ml.param.WithParams;
 
-/** Interface for the shared distanceMeasure param. */
-public interface HasDistanceMeasure<T> extends WithParams<T> {
-    Param<String> DISTANCE_MEASURE =
-            new StringParam(
-                    "distanceMeasure",
-                    "The distance measure.",
-                    EuclideanDistanceMeasure.NAME,
-                    ParamValidators.inArray(EuclideanDistanceMeasure.NAME));
+/**
+ * Params of {@link NaiveBayes}.
+ *
+ * @param <T> The class type of this instance.
+ */
+public interface NaiveBayesParams<T> extends NaiveBayesModelParams<T>, HasLabelCol<T> {
+    Param<Double> SMOOTHING =
+            new DoubleParam(
+                    "smoothing", "The smoothing parameter.", 1.0, ParamValidators.gtEq(0.0));
 
-    default String getDistanceMeasure() {
-        return get(DISTANCE_MEASURE);
+    default Double getSmoothing() {
+        return get(SMOOTHING);
     }
 
-    default T setDistanceMeasure(String value) {
-        set(DISTANCE_MEASURE, value);
-        return (T) this;
+    default T setSmoothing(Double value) {
+        return set(SMOOTHING, value);
     }
 }
