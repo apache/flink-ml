@@ -55,15 +55,12 @@ public class BroadcastVariableReceiverOperator<OUT> extends AbstractStreamOperat
     @SuppressWarnings("rawtypes")
     private final List<Input> inputList;
 
-    /** caches of the broadcast inputs. */
-    @SuppressWarnings("rawtypes")
-    private final List[] caches;
-
     /** whether each broadcast input has finished. */
     private boolean[] cachesReady;
 
     /** state storage of the broadcast inputs. */
-    private ListState<?>[] cacheStates;
+    @SuppressWarnings("rawtypes")
+    private ListState[] cacheStates;
 
     /** cacheReady state storage of the broadcast inputs. */
     private ListState<Boolean>[] cacheReadyStates;
@@ -80,11 +77,7 @@ public class BroadcastVariableReceiverOperator<OUT> extends AbstractStreamOperat
         for (int i = 0; i < inTypes.length; i++) {
             inputList.add(new ProxyInput(this, i + 1));
         }
-        this.caches = new List[inTypes.length];
         this.cachesReady = new boolean[inTypes.length];
-        for (int i = 0; i < inTypes.length; i++) {
-            caches[i] = new ArrayList<>();
-        }
         this.cacheStates = new ListState[inTypes.length];
         this.cacheReadyStates = new ListState[inTypes.length];
     }
@@ -95,19 +88,24 @@ public class BroadcastVariableReceiverOperator<OUT> extends AbstractStreamOperat
     }
 
     @Override
-    public void endInput(int i) {
+    @SuppressWarnings({"unchecked"})
+    public void endInput(int i) throws Exception {
         cachesReady[i - 1] = true;
-        BroadcastContext.markCacheFinished(
-                broadcastStreamNames[i - 1] + "-" + getRuntimeContext().getIndexOfThisSubtask());
+        String key =
+                broadcastStreamNames[i - 1] + "-" + getRuntimeContext().getIndexOfThisSubtask();
+        BroadcastContext.putBroadcastVariable(
+                key,
+                Tuple2.of(
+                        true,
+                        IteratorUtils.toList(
+                                ((ListState<?>) cacheStates[i - 1]).get().iterator())));
+        BroadcastContext.notifyCacheFinished(key);
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public void snapshotState(StateSnapshotContext context) throws Exception {
         super.snapshotState(context);
         for (int i = 0; i < inTypes.length; i++) {
-            cacheStates[i].clear();
-            cacheStates[i].addAll(caches[i]);
             cacheReadyStates[i].clear();
             cacheReadyStates[i].add(cachesReady[i]);
         }
@@ -121,8 +119,6 @@ public class BroadcastVariableReceiverOperator<OUT> extends AbstractStreamOperat
             cacheStates[i] =
                     context.getOperatorStateStore()
                             .getListState(new ListStateDescriptor("cache_data_" + i, inTypes[i]));
-            caches[i] = IteratorUtils.toList(cacheStates[i].get().iterator());
-
             cacheReadyStates[i] =
                     context.getOperatorStateStore()
                             .getListState(
@@ -137,7 +133,10 @@ public class BroadcastVariableReceiverOperator<OUT> extends AbstractStreamOperat
             // task finishes.
             BroadcastContext.putBroadcastVariable(
                     broadcastStreamNames[i] + "-" + getRuntimeContext().getIndexOfThisSubtask(),
-                    Tuple2.of(cacheReady, caches[i]));
+                    Tuple2.of(
+                            cacheReady,
+                            IteratorUtils.toList(
+                                    ((ListState<?>) cacheStates[i]).get().iterator())));
         }
     }
 
@@ -149,8 +148,8 @@ public class BroadcastVariableReceiverOperator<OUT> extends AbstractStreamOperat
 
         @Override
         @SuppressWarnings("unchecked")
-        public void processElement(StreamRecord<IN> element) {
-            (caches[inputId - 1]).add(element.getValue());
+        public void processElement(StreamRecord<IN> element) throws Exception {
+            (cacheStates[inputId - 1]).add(element.getValue());
         }
     }
 }

@@ -72,7 +72,7 @@ public class BroadcastContext {
     }
 
     @VisibleForTesting
-    public static void markCacheFinished(String key) {
+    public static void notifyCacheFinished(String key) {
         BROADCAST_VARIABLES.computeIfPresent(
                 key,
                 (k, v) -> {
