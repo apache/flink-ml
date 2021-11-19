@@ -2,16 +2,19 @@ Flink ML is a library which provides machine learning (ML) APIs and libraries th
 
 Flink ML is developed under the umbrella of [Apache Flink](https://flink.apache.org/).
 
-## <a name="build"></a>Building the Project
+## <a name="build"></a>Python Packaging
 
-Run the `mvn clean package` command.
+Prerequisites for building apache-flink-ml:
 
-Then You will find a JAR file that contains your application, plus any libraries that you may have added as dependencies to the application: `target/<artifact-id>-<version>.jar`.
+* Unix-like environment (we use Linux, Mac OS X)
+* Python version(3.6, 3.7 or 3.8) is required
 
-## <a name="contributing"></a>Contributing
+Then go to the root directory of flink-ml-python source code and run this command to build the sdist package of apache-flink-ml:
+```bash
+cd flink-ml-python; python setup.py sdist;
+```
 
-You can learn more about how to contribute in the [Apache Flink website](https://flink.apache.org/contributing/how-to-contribute.html). For code contributions, please read carefully the [Contributing Code](https://flink.apache.org/contributing/contribute-code.html) section for an overview of ongoing community work.
-
-## <a name="license"></a>License
-
-The code in this repository is licensed under the [Apache Software License 2](LICENSE).
+The sdist package of apache-flink-ml will be found under ./flink-ml-python/dist/. It could be used for installation, such as:
+```bash
+python -m pip install dist/*.tar.gz
+```

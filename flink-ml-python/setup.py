@@ -77,7 +77,7 @@ try:
         EXAMPLES_PATH = os.path.join(this_directory, "apache_flink_ml/examples")
 
         LICENSE_FILE_PATH = os.path.join(FLINK_ML_ROOT, "LICENSE")
-        README_FILE_PATH = os.path.join(FLINK_ML_ROOT, "README.md")
+        README_FILE_PATH = os.path.join(this_directory, "README.md")
 
         try:
             os.symlink(EXAMPLES_PATH, EXAMPLES_TEMP_PATH)
@@ -91,10 +91,10 @@ try:
     PACKAGES = ['apache_flink_ml',
                 'apache_flink_ml.ml',
                 'apache_flink_ml.ml.api',
+                'apache_flink_ml.ml.lib',
                 'apache_flink_ml.ml.param',
                 'apache_flink_ml.ml.util',
-                'apache_flink_ml.examples',
-                'apache_flink_ml.mllib']
+                'apache_flink_ml.examples']
 
     PACKAGE_DIR = {
         'apache_flink_ml.examples': TEMP_PATH + '/examples'}

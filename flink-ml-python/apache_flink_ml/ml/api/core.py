@@ -194,9 +194,6 @@ class Pipeline(Estimator[E, PipelineModel]):
         model_stages = []
         last_inputs = inputs
         for i, stage in enumerate(self._stages):
-            if not isinstance(stage, AlgoOperator):
-                raise TypeError("The stage must be an AlgoOperator or Estimator.")
-
             if isinstance(stage, Estimator):
                 model_stage = stage.fit(*last_inputs)
             else:
