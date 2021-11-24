@@ -19,5 +19,3 @@
 global-exclude *.py[cod] __pycache__ .DS_Store
 recursive-include deps/examples *.py
 include README.md
-include apache_flink_ml/LICENSE
-include apache_flink_ml/README.txt

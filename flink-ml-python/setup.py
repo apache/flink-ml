@@ -18,7 +18,7 @@
 import io
 import os
 import sys
-from shutil import copytree, copy, rmtree
+from shutil import copytree, rmtree
 
 from setuptools import setup
 
@@ -38,7 +38,7 @@ def remove_if_exists(file_path):
 
 
 this_directory = os.path.abspath(os.path.dirname(__file__))
-version_file = os.path.join(this_directory, 'apache_flink_ml/version.py')
+version_file = os.path.join(this_directory, 'pyflink/ml/version.py')
 
 try:
     exec(open(version_file).read())
@@ -55,10 +55,6 @@ with io.open(os.path.join(this_directory, 'README.md'), 'r', encoding='utf-8') a
 TEMP_PATH = "deps"
 
 EXAMPLES_TEMP_PATH = os.path.join(TEMP_PATH, "examples")
-SCRIPTS_TEMP_PATH = os.path.join(TEMP_PATH, "bin")
-
-LICENSE_FILE_TEMP_PATH = os.path.join('apache_flink_ml', "LICENSE")
-README_FILE_TEMP_PATH = os.path.join("apache_flink_ml", "README.txt")
 
 in_flink_ml_source = os.path.isfile("../flink-ml-api/src/main/java/org/apache/flink/ml/api/core/"
                                     "Stage.java")
@@ -74,34 +70,26 @@ try:
         flink_ml_version = VERSION.replace(".dev0", "-SNAPSHOT")
         FLINK_ML_ROOT = os.path.abspath("..")
 
-        EXAMPLES_PATH = os.path.join(this_directory, "apache_flink_ml/examples")
-
-        LICENSE_FILE_PATH = os.path.join(FLINK_ML_ROOT, "LICENSE")
-        README_FILE_PATH = os.path.join(this_directory, "README.md")
+        EXAMPLES_PATH = os.path.join(this_directory, "pyflink/examples")
 
         try:
             os.symlink(EXAMPLES_PATH, EXAMPLES_TEMP_PATH)
-            os.symlink(LICENSE_FILE_PATH, LICENSE_FILE_TEMP_PATH)
-            os.symlink(README_FILE_PATH, README_FILE_TEMP_PATH)
         except BaseException:  # pylint: disable=broad-except
             copytree(EXAMPLES_PATH, EXAMPLES_TEMP_PATH)
-            copy(LICENSE_FILE_PATH, LICENSE_FILE_TEMP_PATH)
-            copy(README_FILE_PATH, README_FILE_TEMP_PATH)
 
-    PACKAGES = ['apache_flink_ml',
-                'apache_flink_ml.ml',
-                'apache_flink_ml.ml.api',
-                'apache_flink_ml.ml.lib',
-                'apache_flink_ml.ml.param',
-                'apache_flink_ml.ml.util',
-                'apache_flink_ml.examples']
+    PACKAGES = ['pyflink',
+                'pyflink.ml',
+                'pyflink.ml.api',
+                'pyflink.ml.lib',
+                'pyflink.ml.param',
+                'pyflink.ml.util',
+                'pyflink.examples']
 
     PACKAGE_DIR = {
-        'apache_flink_ml.examples': TEMP_PATH + '/examples'}
+        'pyflink.examples': TEMP_PATH + '/examples'}
 
     PACKAGE_DATA = {
-        'apache_flink_ml': ['README.txt', 'LICENSE'],
-        'apache_flink_ml.examples': ['*.py', '*/*.py']}
+        'pyflink.examples': ['*.py', '*/*.py']}
 
     setup(
         name='apache-flink-ml',
@@ -131,5 +119,3 @@ try:
 finally:
     if in_flink_ml_source:
         remove_if_exists(TEMP_PATH)
-        remove_if_exists(LICENSE_FILE_TEMP_PATH)
-        remove_if_exists(README_FILE_TEMP_PATH)

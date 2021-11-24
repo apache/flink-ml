@@ -22,7 +22,7 @@ from typing import TypeVar, Generic, List
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.table import Table
 
-from apache_flink_ml.ml.param.param import WithParams
+from pyflink.ml.param.param import WithParams
 
 T = TypeVar('T')
 E = TypeVar('E')
@@ -141,12 +141,12 @@ class PipelineModel(Model):
         return list(inputs)
 
     def save(self, path: str) -> None:
-        from apache_flink_ml.ml.util import read_write_utils
+        from pyflink.ml.util import read_write_utils
         read_write_utils.save_pipeline(self, self._stages, path)
 
     @classmethod
     def load(cls, env: StreamExecutionEnvironment, path: str) -> 'PipelineModel':
-        from apache_flink_ml.ml.util import read_write_utils
+        from pyflink.ml.util import read_write_utils
         return PipelineModel(read_write_utils.load_pipeline(env, path))
 
     def get_param_map(self):
@@ -206,12 +206,12 @@ class Pipeline(Estimator[E, PipelineModel]):
         return PipelineModel(model_stages)
 
     def save(self, path: str) -> None:
-        from apache_flink_ml.ml.util import read_write_utils
+        from pyflink.ml.util import read_write_utils
         read_write_utils.save_pipeline(self, self._stages, path)
 
     @classmethod
     def load(cls, env: StreamExecutionEnvironment, path: str) -> 'Pipeline':
-        from apache_flink_ml.ml.util import read_write_utils
+        from pyflink.ml.util import read_write_utils
         return Pipeline(read_write_utils.load_pipeline(env, path))
 
     def get_param_map(self):

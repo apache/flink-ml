@@ -24,8 +24,8 @@ from typing import Dict, Any
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.table import StreamTableEnvironment
 
-from apache_flink_ml.ml.api.core import T, Stage
-from apache_flink_ml.ml.param.param import ParamValidators, Param, BooleanParam, IntParam, \
+from pyflink.ml.api.core import T, Stage
+from pyflink.ml.param.param import ParamValidators, Param, BooleanParam, IntParam, \
     FloatParam, StringParam, IntArrayParam, FloatArrayParam, StringArrayParam
 
 BOOLEAN_PARAM = BooleanParam("boolean_param", "Description", False)
@@ -188,12 +188,12 @@ class MyStage(Stage):
         self._init_param()
 
     def save(self, path: str) -> None:
-        from apache_flink_ml.ml.util import read_write_utils
+        from pyflink.ml.util import read_write_utils
         read_write_utils.save_metadata(self, path)
 
     @classmethod
     def load(cls, env: StreamExecutionEnvironment, path: str) -> T:
-        from apache_flink_ml.ml.util import read_write_utils
+        from pyflink.ml.util import read_write_utils
         return read_write_utils.load_stage_param(path)
 
     def get_param_map(self) -> Dict['Param[Any]', Any]:

@@ -26,8 +26,8 @@ from pandas._testing import assert_frame_equal
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.table import Table, StreamTableEnvironment
 
-from apache_flink_ml.ml.api.core import Model, T, PipelineModel, Pipeline
-from apache_flink_ml.ml.param.param import Param
+from pyflink.ml.api.core import Model, T, PipelineModel, Pipeline
+from pyflink.ml.param.param import Param
 
 
 class PipelineTest(unittest.TestCase):
@@ -90,12 +90,12 @@ class Add10Model(Model):
         return [inputs[0].select("a + 10 as a")]
 
     def save(self, path: str) -> None:
-        from apache_flink_ml.ml.util import read_write_utils
+        from pyflink.ml.util import read_write_utils
         read_write_utils.save_metadata(self, path)
 
     @classmethod
     def load(cls, env: StreamExecutionEnvironment, path: str) -> T:
-        from apache_flink_ml.ml.util import read_write_utils
+        from pyflink.ml.util import read_write_utils
         return read_write_utils.load_stage_param(path)
 
     def get_param_map(self) -> Dict['Param[Any]', Any]:
