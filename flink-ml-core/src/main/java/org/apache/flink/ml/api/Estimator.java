@@ -16,17 +16,24 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.api.core;
+package org.apache.flink.ml.api;
 
 import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.table.api.Table;
 
 /**
- * A Transformer is an AlgoOperator with the semantic difference that it encodes the Transformation
- * logic, such that a record in the output typically corresponds to one record in the input. In
- * contrast, an AlgoOperator is a better fit to express aggregation logic where a record in the
- * output could be computed from an arbitrary number of records in the input.
+ * Estimators are responsible for training and generating Models.
  *
- * @param <T> The class type of the Transformer implementation itself.
+ * @param <E> class type of the Estimator implementation itself.
+ * @param <M> class type of the Model this Estimator produces.
  */
 @PublicEvolving
-public interface Transformer<T extends Transformer<T>> extends AlgoOperator<T> {}
+public interface Estimator<E extends Estimator<E, M>, M extends Model<M>> extends Stage<E> {
+    /**
+     * Trains on the given inputs and produces a Model.
+     *
+     * @param inputs a list of tables
+     * @return a Model
+     */
+    M fit(Table... inputs);
+}

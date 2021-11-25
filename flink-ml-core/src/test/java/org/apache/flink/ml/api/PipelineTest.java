@@ -16,10 +16,12 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.api.core;
+package org.apache.flink.ml.api;
 
-import org.apache.flink.ml.api.core.ExampleStages.SumEstimator;
-import org.apache.flink.ml.api.core.ExampleStages.SumModel;
+import org.apache.flink.ml.api.ExampleStages.SumEstimator;
+import org.apache.flink.ml.api.ExampleStages.SumModel;
+import org.apache.flink.ml.builder.Pipeline;
+import org.apache.flink.ml.builder.PipelineModel;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;

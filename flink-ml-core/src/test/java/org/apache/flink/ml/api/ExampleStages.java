@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.api.core;
+package org.apache.flink.ml.api;
 
 import org.apache.flink.api.common.state.BroadcastState;
 import org.apache.flink.api.common.state.ListState;

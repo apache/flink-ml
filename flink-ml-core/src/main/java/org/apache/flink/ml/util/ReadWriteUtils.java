@@ -18,7 +18,7 @@
 
 package org.apache.flink.ml.util;
 
-import org.apache.flink.ml.api.core.Stage;
+import org.apache.flink.ml.api.Stage;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.util.InstantiationUtil;
