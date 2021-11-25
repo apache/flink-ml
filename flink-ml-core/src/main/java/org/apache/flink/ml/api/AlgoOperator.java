@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.api.core;
+package org.apache.flink.ml.api;
 
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.table.api.Table;

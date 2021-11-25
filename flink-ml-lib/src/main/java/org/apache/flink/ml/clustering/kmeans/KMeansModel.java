@@ -29,7 +29,7 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.connector.file.sink.FileSink;
 import org.apache.flink.connector.file.src.FileSource;
 import org.apache.flink.core.fs.Path;
-import org.apache.flink.ml.api.core.Model;
+import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.distance.DistanceMeasure;
 import org.apache.flink.ml.linalg.DenseVector;

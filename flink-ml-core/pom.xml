@@ -28,8 +28,8 @@ under the License.
     <version>0.1-SNAPSHOT</version>
   </parent>
 
-  <artifactId>flink-ml-api</artifactId>
-  <name>Flink ML : API</name>
+  <artifactId>flink-ml-core</artifactId>
+  <name>Flink ML : Core</name>
 
   <dependencies>
     <dependency>

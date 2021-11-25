@@ -52,7 +52,7 @@ under the License.
   </scm>
 
   <modules>
-    <module>flink-ml-api</module>
+    <module>flink-ml-core</module>
     <module>flink-ml-iteration</module>
     <module>flink-ml-lib</module>
     <module>flink-ml-tests</module>

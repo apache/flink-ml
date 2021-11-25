@@ -36,7 +36,7 @@ import org.apache.flink.iteration.IterationConfig;
 import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.Iterations;
 import org.apache.flink.iteration.ReplayableDataStreamList;
-import org.apache.flink.ml.api.core.Estimator;
+import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.EndOfStreamWindows;
 import org.apache.flink.ml.common.datastream.MapPartitionFunctionWrapper;
 import org.apache.flink.ml.common.iteration.ForwardInputsOfLastRound;
