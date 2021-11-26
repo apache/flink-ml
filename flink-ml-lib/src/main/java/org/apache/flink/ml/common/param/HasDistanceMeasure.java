@@ -18,7 +18,7 @@
 
 package org.apache.flink.ml.common.param;
 
-import org.apache.flink.ml.distance.EuclideanDistanceMeasure;
+import org.apache.flink.ml.common.distance.EuclideanDistanceMeasure;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.param.ParamValidators;
 import org.apache.flink.ml.param.StringParam;

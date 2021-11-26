@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.distance;
+package org.apache.flink.ml.common.distance;
 
 import org.apache.flink.ml.linalg.Vector;
 
