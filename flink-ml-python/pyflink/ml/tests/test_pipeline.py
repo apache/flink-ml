@@ -16,29 +16,20 @@
 # limitations under the License.
 ################################################################################
 import os
-import shutil
-import tempfile
-import unittest
 from typing import Dict, Any, List
 
 import pandas as pd
 from pandas._testing import assert_frame_equal
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.table import Table, StreamTableEnvironment
+from pyflink.table import Table
 
-from pyflink.ml.api.core import Model, T, PipelineModel, Pipeline
-from pyflink.ml.param.param import Param
+from pyflink.ml.core.api import Model
+from pyflink.ml.core.builder import PipelineModel, Pipeline
+from pyflink.ml.core.param import Param
+from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
 
 
-class PipelineTest(unittest.TestCase):
-    def setUp(self):
-        self.env = StreamExecutionEnvironment.get_execution_environment()
-        self.t_env = StreamTableEnvironment.create(self.env)
-        self.t_env.get_config().get_configuration().set_string("parallelism.default", "2")
-        self.temp_dir = tempfile.mkdtemp()
-
-    def tearDown(self) -> None:
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
+class PipelineTest(PyFlinkMLTestCase):
 
     def test_pipeline_model(self):
         input_table = self.t_env.from_elements([(1,), (2,), (3,)], ['a'])
@@ -94,7 +85,7 @@ class Add10Model(Model):
         read_write_utils.save_metadata(self, path)
 
     @classmethod
-    def load(cls, env: StreamExecutionEnvironment, path: str) -> T:
+    def load(cls, env: StreamExecutionEnvironment, path: str):
         from pyflink.ml.util import read_write_utils
         return read_write_utils.load_stage_param(path)
 

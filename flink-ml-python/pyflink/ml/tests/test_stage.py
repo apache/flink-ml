@@ -16,17 +16,14 @@
 # limitations under the License.
 ################################################################################
 import os
-import shutil
-import tempfile
-import unittest
 from typing import Dict, Any
 
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.table import StreamTableEnvironment
 
-from pyflink.ml.api.core import T, Stage
-from pyflink.ml.param.param import ParamValidators, Param, BooleanParam, IntParam, \
+from pyflink.ml.core.api import Stage
+from pyflink.ml.core.param import ParamValidators, Param, BooleanParam, IntParam, \
     FloatParam, StringParam, IntArrayParam, FloatArrayParam, StringArrayParam
+from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
 
 BOOLEAN_PARAM = BooleanParam("boolean_param", "Description", False)
 INT_PARAM = IntParam("int_param", "Description", 1, ParamValidators.lt(100))
@@ -45,15 +42,7 @@ PARAM_WITH_NONE_DEFAULT = IntParam("param_with_none_default",
                                    ParamValidators.not_null())
 
 
-class StageTest(unittest.TestCase):
-    def setUp(self):
-        self.env = StreamExecutionEnvironment.get_execution_environment()
-        self.t_env = StreamTableEnvironment.create(self.env)
-        self.t_env.get_config().get_configuration().set_string("parallelism.default", "2")
-        self.temp_dir = tempfile.mkdtemp()
-
-    def tearDown(self) -> None:
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
+class StageTest(PyFlinkMLTestCase):
 
     def test_param_set_value_with_name(self):
         stage = MyStage()
@@ -192,7 +181,7 @@ class MyStage(Stage):
         read_write_utils.save_metadata(self, path)
 
     @classmethod
-    def load(cls, env: StreamExecutionEnvironment, path: str) -> T:
+    def load(cls, env: StreamExecutionEnvironment, path: str):
         from pyflink.ml.util import read_write_utils
         return read_write_utils.load_stage_param(path)
 

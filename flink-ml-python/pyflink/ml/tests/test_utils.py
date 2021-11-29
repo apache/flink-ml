@@ -15,3 +15,20 @@
 #  See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
+import shutil
+import tempfile
+import unittest
+
+from pyflink.datastream import StreamExecutionEnvironment
+from pyflink.table import StreamTableEnvironment
+
+
+class PyFlinkMLTestCase(unittest.TestCase):
+    def setUp(self):
+        self.env = StreamExecutionEnvironment.get_execution_environment()
+        self.t_env = StreamTableEnvironment.create(self.env)
+        self.t_env.get_config().get_configuration().set_string("parallelism.default", "2")
+        self.temp_dir = tempfile.mkdtemp()
+
+    def tearDown(self) -> None:
+        shutil.rmtree(self.temp_dir, ignore_errors=True)

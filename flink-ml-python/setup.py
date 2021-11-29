@@ -56,7 +56,7 @@ TEMP_PATH = "deps"
 
 EXAMPLES_TEMP_PATH = os.path.join(TEMP_PATH, "examples")
 
-in_flink_ml_source = os.path.isfile("../flink-ml-api/src/main/java/org/apache/flink/ml/api/core/"
+in_flink_ml_source = os.path.isfile("../flink-ml-core/src/main/java/org/apache/flink/ml/api/"
                                     "Stage.java")
 try:
     if in_flink_ml_source:
@@ -79,9 +79,8 @@ try:
 
     PACKAGES = ['pyflink',
                 'pyflink.ml',
-                'pyflink.ml.api',
+                'pyflink.ml.core',
                 'pyflink.ml.lib',
-                'pyflink.ml.param',
                 'pyflink.ml.util',
                 'pyflink.examples']
 

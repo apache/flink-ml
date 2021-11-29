@@ -83,7 +83,8 @@ class WithParams(Generic[T], ABC):
         """
         pass
 
-    def _is_compatible_type(self, param: 'Param[V]', value: V) -> bool:
+    @staticmethod
+    def _is_compatible_type(param: 'Param[V]', value: V) -> bool:
         if value is not None and param.type != type(value):
             return False
         if isinstance(value, list):

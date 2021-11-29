@@ -15,3 +15,11 @@
 #  See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
+import sys
+from pathlib import Path
+
+# Because the project and the dependent `pyflink` project have the same directory structure,
+# we need to manually add `flink-ml-python` path to `sys.path` in the test of this project to change
+# the order of package search.
+flink_ml_python_dir = Path(__file__).parents[3]
+sys.path.append(str(flink_ml_python_dir))
