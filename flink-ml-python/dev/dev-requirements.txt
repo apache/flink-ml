@@ -18,3 +18,6 @@ apache-flink==1.14.0
 pandas>=1.0,<1.2.0
 jsonpickle==2.0.0
 cloudpickle==1.2.2
+pytest==4.4.1
+flake8==4.0.1
+mypy==0.910
