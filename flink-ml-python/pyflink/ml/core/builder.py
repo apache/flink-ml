@@ -16,12 +16,13 @@
 # limitations under the License.
 ################################################################################
 
-from typing import List, TypeVar
+from typing import List, TypeVar, Dict, Any
 
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.table import Table
 
 from pyflink.ml.core.api import Estimator, Model, AlgoOperator, Stage
+from pyflink.ml.core.param import Param
 
 E = TypeVar('E')
 
@@ -34,7 +35,7 @@ class PipelineModel(Model):
 
     def __init__(self, stages: List[Stage]):
         self._stages = stages
-        self._param_map = {}
+        self._param_map = {}  # type: Dict[Param[Any], Any]
 
     def transform(self, *inputs: Table) -> List[Table]:
         """
@@ -73,7 +74,7 @@ class Pipeline(Estimator[E, PipelineModel]):
 
     def __init__(self, stages: List[Stage]):
         self._stages = stages
-        self._param_map = {}
+        self._param_map = {}  # type: Dict[Param[Any], Any]
 
     def fit(self, *inputs: Table) -> PipelineModel:
         """
