@@ -30,7 +30,7 @@ class WithParams(Generic[T], ABC):
     Interface for classes that take parameters. It provides APIs to set and get parameters.
     """
 
-    def set(self, param: 'Param[V]', value: V) -> 'T':
+    def set(self, param: 'Param[V]', value: V) -> 'WithParams[T]':
         """
         Sets the value of the parameter.
 
@@ -136,7 +136,7 @@ class ParamValidators(object):
             """
 
             def validate(self, value: T) -> bool:
-                return value is not None and value > lower_bound
+                return value is not None and value > lower_bound  # type: ignore
 
         return GT()
 
@@ -148,7 +148,7 @@ class ParamValidators(object):
             """
 
             def validate(self, value: T) -> bool:
-                return value is not None and value >= lower_bound
+                return value is not None and value >= lower_bound  # type: ignore
 
         return GtEq()
 
@@ -160,7 +160,7 @@ class ParamValidators(object):
             """
 
             def validate(self, value: T) -> bool:
-                return value is not None and value < upper_bound
+                return value is not None and value < upper_bound  # type: ignore
 
         return LT()
 
@@ -172,7 +172,7 @@ class ParamValidators(object):
 
         class LtEq(ParamValidator[T]):
             def validate(self, value: T) -> bool:
-                return value is not None and value <= upper_bound
+                return value is not None and value <= upper_bound  # type: ignore
 
         return LtEq()
 
@@ -186,7 +186,7 @@ class ParamValidators(object):
         class InRange(ParamValidator[T]):
             def validate(self, value: T) -> bool:
                 return (value is not None
-                        and lower_bound <= value <= upper_bound
+                        and lower_bound <= value <= upper_bound  # type: ignore
                         and (lower_inclusive or value != lower_bound)
                         and (upper_inclusive or value != upper_bound))
 
