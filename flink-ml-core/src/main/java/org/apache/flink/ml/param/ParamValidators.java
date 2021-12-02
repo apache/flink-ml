@@ -95,4 +95,9 @@ public class ParamValidators {
             }
         };
     }
+
+    // Check if the parameter value array is not empty array.
+    public static <T> ParamValidator<T[]> nonEmptyArray() {
+        return value -> value != null && value.length > 0;
+    }
 }

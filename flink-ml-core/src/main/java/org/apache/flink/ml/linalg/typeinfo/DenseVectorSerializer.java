@@ -29,14 +29,14 @@ import org.apache.flink.ml.linalg.DenseVector;
 import java.io.IOException;
 import java.util.Arrays;
 
-/** Specialized serializer for {@code DenseVector}. */
+/** Specialized serializer for {@link DenseVector}. */
 public final class DenseVectorSerializer extends TypeSerializerSingleton<DenseVector> {
 
     private static final long serialVersionUID = 1L;
 
     private static final double[] EMPTY = new double[0];
 
-    private static final DenseVectorSerializer INSTANCE = new DenseVectorSerializer();
+    public static final DenseVectorSerializer INSTANCE = new DenseVectorSerializer();
 
     @Override
     public boolean isImmutableType() {
@@ -84,9 +84,7 @@ public final class DenseVectorSerializer extends TypeSerializerSingleton<DenseVe
     public DenseVector deserialize(DataInputView source) throws IOException {
         int len = source.readInt();
         double[] values = new double[len];
-        for (int i = 0; i < len; i++) {
-            values[i] = source.readDouble();
-        }
+        readDoubleArray(values, source, len);
         return new DenseVector(values);
     }
 

@@ -388,5 +388,10 @@ public class StageTest {
         ParamValidator<Integer> notNull = ParamValidators.notNull();
         Assert.assertTrue(notNull.validate(5));
         Assert.assertFalse(notNull.validate(null));
+
+        ParamValidator<Object[]> nonEmptyArray = ParamValidators.nonEmptyArray();
+        Assert.assertTrue(nonEmptyArray.validate(new String[] {"1"}));
+        Assert.assertFalse(nonEmptyArray.validate(null));
+        Assert.assertFalse(nonEmptyArray.validate(new String[0]));
     }
 }
