@@ -64,7 +64,7 @@ public class DenseVectorTypeInfo extends TypeInformation<DenseVector> {
     @Override
     @SuppressWarnings("unchecked")
     public TypeSerializer<DenseVector> createSerializer(ExecutionConfig executionConfig) {
-        return new DenseVectorSerializer();
+        return DenseVectorSerializer.INSTANCE;
     }
 
     // --------------------------------------------------------------------------------------------

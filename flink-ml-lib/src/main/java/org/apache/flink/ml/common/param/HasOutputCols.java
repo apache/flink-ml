@@ -16,18 +16,24 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.linalg;
+package org.apache.flink.ml.common.param;
 
-/** Utility methods for instantiating Vector. */
-public class Vectors {
+import org.apache.flink.ml.param.Param;
+import org.apache.flink.ml.param.ParamValidators;
+import org.apache.flink.ml.param.StringArrayParam;
+import org.apache.flink.ml.param.WithParams;
 
-    /** Creates a dense vector from its values. */
-    public static DenseVector dense(double... values) {
-        return new DenseVector(values);
+/** Interface for the shared outputCols param. */
+public interface HasOutputCols<T> extends WithParams<T> {
+    Param<String[]> OUTPUT_COLS =
+            new StringArrayParam(
+                    "outputCols", "Output column names.", null, ParamValidators.nonEmptyArray());
+
+    default String[] getOutputCols() {
+        return get(OUTPUT_COLS);
     }
 
-    /** Creates a sparse vector from its values. */
-    public static SparseVector sparse(int size, int[] indices, double[] values) {
-        return new SparseVector(size, indices, values);
+    default T setOutputCols(String... value) {
+        return set(OUTPUT_COLS, value);
     }
 }
