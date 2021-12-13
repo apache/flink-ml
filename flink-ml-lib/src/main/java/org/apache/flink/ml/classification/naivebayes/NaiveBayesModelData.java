@@ -44,10 +44,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * The model data of {@link NaiveBayesModel}.
+ * Model data of {@link NaiveBayesModel}.
  *
- * <p>This class also provides methods to convert model data between Table and Datastream, and
- * classes to save/load model data.
+ * <p>This class also provides methods to convert model data from Table to Datastream, and classes
+ * to save/load model data.
  */
 public class NaiveBayesModelData {
     /**
@@ -73,74 +73,74 @@ public class NaiveBayesModelData {
         this.labels = labels;
     }
 
-    /** Converts the provided modelData Datastream into corresponding Table. */
-    public static Table getModelDataTable(DataStream<NaiveBayesModelData> stream) {
+    /**
+     * Converts the table model to a data stream.
+     *
+     * @param modelData The table model data.
+     * @return The data stream model data.
+     */
+    public static DataStream<NaiveBayesModelData> getModelDataStream(Table modelData) {
         StreamTableEnvironment tEnv =
-                StreamTableEnvironment.create(stream.getExecutionEnvironment());
-        return tEnv.fromDataStream(stream);
-    }
-
-    /** Converts the provided modelData Table into corresponding DataStream. */
-    public static DataStream<NaiveBayesModelData> getModelDataStream(Table table) {
-        StreamTableEnvironment tEnv =
-                (StreamTableEnvironment) ((TableImpl) table).getTableEnvironment();
-        return tEnv.toDataStream(table)
+                (StreamTableEnvironment) ((TableImpl) modelData).getTableEnvironment();
+        return tEnv.toDataStream(modelData)
                 .map(
                         (MapFunction<Row, NaiveBayesModelData>)
                                 row -> (NaiveBayesModelData) row.getField("f0"));
     }
 
-    /** Encoder for the {@link NaiveBayesModelData}. */
+    /** Data encoder for the {@link NaiveBayesModelData}. */
     public static class ModelDataEncoder implements Encoder<NaiveBayesModelData> {
         @Override
         public void encode(NaiveBayesModelData modelData, OutputStream outputStream)
                 throws IOException {
-            DataOutputViewStreamWrapper output = new DataOutputViewStreamWrapper(outputStream);
+            DataOutputViewStreamWrapper outputViewStreamWrapper =
+                    new DataOutputViewStreamWrapper(outputStream);
 
-            DenseVectorSerializer denseVectorSerializer = new DenseVectorSerializer();
             MapSerializer<Double, Double> mapSerializer =
-                    new MapSerializer<>(new DoubleSerializer(), new DoubleSerializer());
+                    new MapSerializer<>(DoubleSerializer.INSTANCE, DoubleSerializer.INSTANCE);
 
-            denseVectorSerializer.serialize(modelData.labels, output);
+            DenseVectorSerializer.INSTANCE.serialize(modelData.labels, outputViewStreamWrapper);
 
-            denseVectorSerializer.serialize(modelData.piArray, output);
+            DenseVectorSerializer.INSTANCE.serialize(modelData.piArray, outputViewStreamWrapper);
 
-            output.writeInt(modelData.theta.length);
-            output.writeInt(modelData.theta[0].length);
+            outputViewStreamWrapper.writeInt(modelData.theta.length);
+            outputViewStreamWrapper.writeInt(modelData.theta[0].length);
             for (Map<Double, Double>[] maps : modelData.theta) {
                 for (Map<Double, Double> map : maps) {
-                    mapSerializer.serialize(map, output);
+                    mapSerializer.serialize(map, outputViewStreamWrapper);
                 }
             }
         }
     }
 
-    /** Decoder for the {@link NaiveBayesModelData}. */
-    public static class ModelDataStreamFormat extends SimpleStreamFormat<NaiveBayesModelData> {
+    /** Data decoder for the {@link NaiveBayesModelData}. */
+    public static class ModelDataDecoder extends SimpleStreamFormat<NaiveBayesModelData> {
         @Override
         public Reader<NaiveBayesModelData> createReader(
                 Configuration config, FSDataInputStream inputStream) {
             return new Reader<NaiveBayesModelData>() {
-                private final DataInputViewStreamWrapper input =
-                        new DataInputViewStreamWrapper(inputStream);
 
                 @Override
                 public NaiveBayesModelData read() throws IOException {
                     try {
-                        DenseVectorSerializer denseVectorSerializer = new DenseVectorSerializer();
+                        DataInputViewStreamWrapper inputViewStreamWrapper =
+                                new DataInputViewStreamWrapper(inputStream);
                         MapSerializer<Double, Double> mapSerializer =
-                                new MapSerializer<>(new DoubleSerializer(), new DoubleSerializer());
+                                new MapSerializer<>(
+                                        DoubleSerializer.INSTANCE, DoubleSerializer.INSTANCE);
 
-                        DenseVector labels = denseVectorSerializer.deserialize(input);
+                        DenseVector labels =
+                                DenseVectorSerializer.INSTANCE.deserialize(inputViewStreamWrapper);
 
-                        DenseVector piArray = denseVectorSerializer.deserialize(input);
+                        DenseVector piArray =
+                                DenseVectorSerializer.INSTANCE.deserialize(inputViewStreamWrapper);
 
-                        int featureSize = input.readInt();
-                        int numLabels = input.readInt();
+                        int featureSize = inputViewStreamWrapper.readInt();
+                        int numLabels = inputViewStreamWrapper.readInt();
                         Map<Double, Double>[][] theta = new HashMap[numLabels][featureSize];
                         for (int i = 0; i < featureSize; i++) {
                             for (int j = 0; j < numLabels; j++) {
-                                theta[i][j] = mapSerializer.deserialize(input);
+                                theta[i][j] = mapSerializer.deserialize(inputViewStreamWrapper);
                             }
                         }
                         return new NaiveBayesModelData(theta, piArray, labels);

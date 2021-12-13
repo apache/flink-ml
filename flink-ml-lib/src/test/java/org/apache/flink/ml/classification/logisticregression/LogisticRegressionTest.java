@@ -222,6 +222,9 @@ public class LogisticRegressionTest {
     @Test
     public void testSaveLoadAndPredict() throws Exception {
         LogisticRegression logisticRegression = new LogisticRegression().setWeightCol("weight");
+        logisticRegression =
+                StageTestUtils.saveAndReload(
+                        env, logisticRegression, tempFolder.newFolder().getAbsolutePath());
         LogisticRegressionModel model = logisticRegression.fit(binomialDataTable);
         model = StageTestUtils.saveAndReload(env, model, tempFolder.newFolder().getAbsolutePath());
         assertEquals(

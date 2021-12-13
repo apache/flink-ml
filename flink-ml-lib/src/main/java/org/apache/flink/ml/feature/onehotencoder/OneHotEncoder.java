@@ -20,10 +20,9 @@ package org.apache.flink.ml.feature.onehotencoder;
 
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.MapPartitionFunction;
-import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.api.Estimator;
-import org.apache.flink.ml.common.datastream.MapPartitionFunctionWrapper;
+import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.common.param.HasHandleInvalid;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -67,14 +66,13 @@ public class OneHotEncoder
 
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
+        DataStream<Tuple2<Integer, Integer>> columnsAndValues =
+                tEnv.toDataStream(inputs[0]).flatMap(new ExtractInputColsValueFunction(inputCols));
+
         DataStream<Tuple2<Integer, Integer>> modelData =
-                tEnv.toDataStream(inputs[0])
-                        .flatMap(new ExtractInputColsValueFunction(inputCols))
-                        .keyBy(columnIdAndValue -> columnIdAndValue.f0)
-                        .transform(
-                                "findMaxIndex",
-                                Types.TUPLE(Types.INT, Types.INT),
-                                new MapPartitionFunctionWrapper<>(new FindMaxIndexFunction()));
+                DataStreamUtils.mapPartition(
+                        columnsAndValues.keyBy(columnIdAndValue -> columnIdAndValue.f0),
+                        new FindMaxIndexFunction());
 
         OneHotEncoderModel model =
                 new OneHotEncoderModel().setModelData(tEnv.fromDataStream(modelData));

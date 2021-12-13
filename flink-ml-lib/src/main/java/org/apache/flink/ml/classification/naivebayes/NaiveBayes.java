@@ -21,13 +21,11 @@ package org.apache.flink.ml.classification.naivebayes;
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.MapPartitionFunction;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.ml.api.Estimator;
-import org.apache.flink.ml.common.datastream.MapPartitionFunctionWrapper;
+import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -89,36 +87,24 @@ public class NaiveBayes
                                     }
                                 });
 
-        DataStream<NaiveBayesModelData> modelData =
-                input.flatMap(new ExtractFeatureFunction())
-                        .keyBy(value -> new Tuple2<>(value.f0, value.f1).hashCode())
-                        .transform(
-                                "GenerateFeatureWeightMapFunction",
-                                Types.TUPLE(
-                                        Types.DOUBLE,
-                                        Types.INT,
-                                        Types.MAP(Types.DOUBLE, Types.DOUBLE),
-                                        Types.INT),
-                                new MapPartitionFunctionWrapper<>(
-                                        new GenerateFeatureWeightMapFunction()))
-                        .keyBy(value -> value.f0)
-                        .transform(
-                                "AggregateIntoArrayFunction",
-                                Types.TUPLE(
-                                        Types.DOUBLE,
-                                        Types.INT,
-                                        Types.OBJECT_ARRAY(Types.MAP(Types.DOUBLE, Types.DOUBLE))),
-                                new MapPartitionFunctionWrapper<>(new AggregateIntoArrayFunction()))
-                        .transform(
-                                "GenerateModelFunction",
-                                TypeInformation.of(NaiveBayesModelData.class),
-                                new MapPartitionFunctionWrapper<>(
-                                        new GenerateModelFunction(smoothing)))
-                        .setParallelism(1);
+        DataStream<Tuple3<Double, Integer, Double>> feature =
+                input.flatMap(new ExtractFeatureFunction());
 
-        NaiveBayesModel model =
-                new NaiveBayesModel()
-                        .setModelData(NaiveBayesModelData.getModelDataTable(modelData));
+        DataStream<Tuple4<Double, Integer, Map<Double, Double>, Integer>> featureWeight =
+                DataStreamUtils.mapPartition(
+                        feature.keyBy(value -> new Tuple2<>(value.f0, value.f1).hashCode()),
+                        new GenerateFeatureWeightMapFunction());
+
+        DataStream<Tuple3<Double, Integer, Map<Double, Double>[]>> aggregatedArrays =
+                DataStreamUtils.mapPartition(
+                        featureWeight.keyBy(value -> value.f0), new AggregateIntoArrayFunction());
+
+        DataStream<NaiveBayesModelData> modelData =
+                DataStreamUtils.mapPartition(
+                        aggregatedArrays, new GenerateModelFunction(smoothing));
+        modelData.getTransformation().setParallelism(1);
+
+        NaiveBayesModel model = new NaiveBayesModel().setModelData(tEnv.fromDataStream(modelData));
         ReadWriteUtils.updateExistingParams(model, paramMap);
         return model;
     }

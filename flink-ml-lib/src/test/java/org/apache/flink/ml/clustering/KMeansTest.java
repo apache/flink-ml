@@ -22,6 +22,7 @@ import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.ml.clustering.kmeans.KMeans;
 import org.apache.flink.ml.clustering.kmeans.KMeansModel;
+import org.apache.flink.ml.clustering.kmeans.KMeansModelData;
 import org.apache.flink.ml.common.distance.EuclideanDistanceMeasure;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vectors;
@@ -228,16 +229,17 @@ public class KMeansTest extends AbstractTestBase {
         KMeansModel modelA = kmeans.fit(dataTable);
         Table modelData = modelA.getModelData()[0];
 
-        DataStream<DenseVector[]> output =
-                tEnv.toDataStream(modelData).map(row -> (DenseVector[]) row.getField("f0"));
+        DataStream<KMeansModelData> output =
+                tEnv.toDataStream(modelData).map(row -> (KMeansModelData) row.getField("f0"));
 
         assertEquals(Arrays.asList("f0"), modelData.getResolvedSchema().getColumnNames());
-        List<DenseVector[]> centroids = IteratorUtils.toList(output.executeAndCollect());
-        assertEquals(1, centroids.size());
-        assertEquals(2, centroids.get(0).length);
-        Arrays.sort(centroids.get(0), Comparator.comparingDouble(vector -> vector.get(0)));
-        assertArrayEquals(centroids.get(0)[0].values, new double[] {0.1, 0.1}, 1e-5);
-        assertArrayEquals(centroids.get(0)[1].values, new double[] {9.2, 0.2}, 1e-5);
+        List<KMeansModelData> kMeansModelData = IteratorUtils.toList(output.executeAndCollect());
+        DenseVector[] centroids = kMeansModelData.get(0).centroids;
+        assertEquals(1, kMeansModelData.size());
+        assertEquals(2, centroids.length);
+        Arrays.sort(centroids, Comparator.comparingDouble(vector -> vector.get(0)));
+        assertArrayEquals(centroids[0].values, new double[] {0.1, 0.1}, 1e-5);
+        assertArrayEquals(centroids[1].values, new double[] {9.2, 0.2}, 1e-5);
     }
 
     @Test

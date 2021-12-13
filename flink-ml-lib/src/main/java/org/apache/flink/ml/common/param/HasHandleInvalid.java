@@ -31,7 +31,7 @@ import org.apache.flink.ml.param.WithParams;
  *
  * <ul>
  *   <li>error: raise an exception.
- *   <li>skip: filter out rows with bad values
+ *   <li>skip: filter out rows with bad values.
  * </ul>
  */
 public interface HasHandleInvalid<T> extends WithParams<T> {

@@ -22,6 +22,7 @@ import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Model;
+import org.apache.flink.ml.classification.naivebayes.NaiveBayesModelData.ModelDataDecoder;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.BLAS;
@@ -78,9 +79,6 @@ public class NaiveBayesModel
                 NaiveBayesModelData.getModelDataStream(modelDataTable);
         DataStream<Row> input = tEnv.toDataStream(inputs[0]);
 
-        Map<String, DataStream<?>> broadcastMap = new HashMap<>();
-        broadcastMap.put(broadcastModelKey, modelDataStream);
-
         Function<List<DataStream<?>>, DataStream<Row>> function =
                 dataStreams -> {
                     DataStream stream = dataStreams.get(0);
@@ -110,11 +108,11 @@ public class NaiveBayesModel
 
     public static NaiveBayesModel load(StreamExecutionEnvironment env, String path)
             throws IOException {
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
         NaiveBayesModel model = ReadWriteUtils.loadStageParam(path);
         DataStream<NaiveBayesModelData> modelData =
-                ReadWriteUtils.loadModelData(
-                        env, path, new NaiveBayesModelData.ModelDataStreamFormat());
-        return model.setModelData(NaiveBayesModelData.getModelDataTable(modelData));
+                ReadWriteUtils.loadModelData(env, path, new ModelDataDecoder());
+        return model.setModelData(tEnv.fromDataStream(modelData));
     }
 
     @Override

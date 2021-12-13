@@ -25,7 +25,7 @@ import org.apache.flink.ml.param.ParamValidators;
 import org.apache.flink.ml.param.StringParam;
 
 /**
- * Params of KMeans.
+ * Params of {@link KMeans}.
  *
  * @param <T> The class type of this instance.
  */

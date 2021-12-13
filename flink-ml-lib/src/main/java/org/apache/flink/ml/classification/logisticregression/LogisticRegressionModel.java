@@ -52,7 +52,7 @@ public class LogisticRegressionModel
         implements Model<LogisticRegressionModel>,
                 LogisticRegressionModelParams<LogisticRegressionModel> {
 
-    private Map<Param<?>, Object> paramMap = new HashMap<>();
+    private final Map<Param<?>, Object> paramMap = new HashMap<>();
 
     private Table modelDataTable;
 
@@ -153,7 +153,7 @@ public class LogisticRegressionModel
             }
             DenseVector features = (DenseVector) dataPoint.getField(featuresCol);
             Tuple2<Double, DenseVector> predictionResult = predictRaw(features, coefficient);
-            return Row.join(dataPoint, Row.of(predictionResult.f0), Row.of(predictionResult.f1));
+            return Row.join(dataPoint, Row.of(predictionResult.f0, predictionResult.f1));
         }
     }
 

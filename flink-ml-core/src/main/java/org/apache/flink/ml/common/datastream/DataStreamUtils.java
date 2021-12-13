@@ -18,7 +18,18 @@
 
 package org.apache.flink.ml.common.datastream;
 
+import org.apache.flink.api.common.functions.MapPartitionFunction;
+import org.apache.flink.api.common.state.ListState;
+import org.apache.flink.api.common.state.ListStateDescriptor;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.java.typeutils.TypeExtractor;
+import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
+import org.apache.flink.streaming.api.operators.BoundedOneInput;
+import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
+import org.apache.flink.streaming.api.operators.TimestampedCollector;
+import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 /** Provides utility functions for {@link DataStream}. */
 public class DataStreamUtils {
@@ -37,5 +48,60 @@ public class DataStreamUtils {
      */
     public static DataStream<double[]> allReduceSum(DataStream<double[]> input) {
         return AllReduceImpl.allReduceSum(input);
+    }
+
+    /**
+     * Applies a {@link MapPartitionFunction} on a bounded data stream.
+     *
+     * @param input The input data stream.
+     * @param func The user defined mapPartition function.
+     * @param <IN> The class type of the input element.
+     * @param <OUT> The class type of output element.
+     * @return The result data stream.
+     */
+    public static <IN, OUT> DataStream<OUT> mapPartition(
+            DataStream<IN> input, MapPartitionFunction<IN, OUT> func) {
+        TypeInformation<OUT> resultType =
+                TypeExtractor.getMapPartitionReturnTypes(func, input.getType(), null, true);
+        return input.transform("mapPartition", resultType, new MapPartitionOperator<>(func))
+                .setParallelism(input.getParallelism());
+    }
+
+    /**
+     * A stream operator to apply {@link MapPartitionFunction} on each partition of the input
+     * bounded data stream.
+     */
+    private static class MapPartitionOperator<IN, OUT> extends AbstractStreamOperator<OUT>
+            implements OneInputStreamOperator<IN, OUT>, BoundedOneInput {
+
+        private final MapPartitionFunction<IN, OUT> mapPartitionFunc;
+
+        private ListState<IN> valuesState;
+
+        public MapPartitionOperator(MapPartitionFunction<IN, OUT> mapPartitionFunc) {
+            this.mapPartitionFunc = mapPartitionFunc;
+        }
+
+        @Override
+        public void initializeState(StateInitializationContext context) throws Exception {
+            super.initializeState(context);
+            ListStateDescriptor<IN> descriptor =
+                    new ListStateDescriptor<>(
+                            "inputState",
+                            getOperatorConfig()
+                                    .getTypeSerializerIn(0, getClass().getClassLoader()));
+            valuesState = context.getOperatorStateStore().getListState(descriptor);
+        }
+
+        @Override
+        public void endInput() throws Exception {
+            mapPartitionFunc.mapPartition(valuesState.get(), new TimestampedCollector<>(output));
+            valuesState.clear();
+        }
+
+        @Override
+        public void processElement(StreamRecord<IN> input) throws Exception {
+            valuesState.add(input.getValue());
+        }
     }
 }

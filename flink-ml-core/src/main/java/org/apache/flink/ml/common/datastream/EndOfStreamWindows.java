@@ -37,6 +37,9 @@ public class EndOfStreamWindows extends WindowAssigner<Object, TimeWindow> {
 
     private static final EndOfStreamWindows INSTANCE = new EndOfStreamWindows();
 
+    private static final TimeWindow TIME_WINDOW_INSTANCE =
+            new TimeWindow(Long.MIN_VALUE, Long.MAX_VALUE);
+
     private EndOfStreamWindows() {}
 
     public static EndOfStreamWindows get() {
@@ -46,7 +49,7 @@ public class EndOfStreamWindows extends WindowAssigner<Object, TimeWindow> {
     @Override
     public Collection<TimeWindow> assignWindows(
             Object element, long timestamp, WindowAssignerContext context) {
-        return Collections.singletonList(new TimeWindow(Long.MIN_VALUE, Long.MAX_VALUE));
+        return Collections.singletonList(TIME_WINDOW_INSTANCE);
     }
 
     @Override

@@ -28,7 +28,7 @@ public class BLASTest {
 
     private static final double TOLERANCE = 1e-7;
 
-    private DenseVector inputDenseVec = Vectors.dense(1, -2, 3, 4, -5);
+    private static final DenseVector inputDenseVec = Vectors.dense(1, -2, 3, 4, -5);
 
     @Test
     public void testAsum() {

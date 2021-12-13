@@ -21,7 +21,6 @@ package org.apache.flink.ml.clustering.kmeans;
 import org.apache.flink.api.common.serialization.Encoder;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.base.IntSerializer;
-import org.apache.flink.api.java.typeutils.ObjectArrayTypeInfo;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.file.src.reader.SimpleStreamFormat;
 import org.apache.flink.core.fs.FSDataInputStream;
@@ -38,57 +37,68 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.OutputStream;
 
-/** Provides classes to save/load model data. */
+/**
+ * Model data of {@link KMeansModel}.
+ *
+ * <p>This class also provides methods to convert model data from Table to Datastream, and classes
+ * to save/load model data.
+ */
 public class KMeansModelData {
-    /** Converts the provided modelData Datastream into corresponding Table. */
-    public static Table getModelDataTable(DataStream<DenseVector[]> modelData) {
-        StreamTableEnvironment tEnv =
-                StreamTableEnvironment.create(modelData.getExecutionEnvironment());
-        return tEnv.fromDataStream(modelData);
+
+    public final DenseVector[] centroids;
+
+    public KMeansModelData(DenseVector[] centroids) {
+        this.centroids = centroids;
     }
 
-    /** Converts the provided modelData Table into corresponding Datastream. */
-    public static DataStream<DenseVector[]> getModelDataStream(Table table) {
+    /**
+     * Converts the table model to a data stream.
+     *
+     * @param modelData The table model data.
+     * @return The data stream model data.
+     */
+    public static DataStream<KMeansModelData> getModelDataStream(Table modelData) {
         StreamTableEnvironment tEnv =
-                (StreamTableEnvironment) ((TableImpl) table).getTableEnvironment();
-        return tEnv.toDataStream(table).map(row -> (DenseVector[]) row.getField("f0"));
+                (StreamTableEnvironment) ((TableImpl) modelData).getTableEnvironment();
+        return tEnv.toDataStream(modelData).map(x -> (KMeansModelData) x.getField(0));
     }
 
-    /** Encoder for the KMeans model data. */
-    public static class ModelDataEncoder implements Encoder<DenseVector[]> {
+    /** Data encoder for {@link KMeansModelData}. */
+    public static class ModelDataEncoder implements Encoder<KMeansModelData> {
         @Override
-        public void encode(DenseVector[] modelData, OutputStream outputStream) throws IOException {
-            IntSerializer intSerializer = new IntSerializer();
-            DenseVectorSerializer denseVectorSerializer = new DenseVectorSerializer();
+        public void encode(KMeansModelData modelData, OutputStream outputStream)
+                throws IOException {
             DataOutputViewStreamWrapper outputViewStreamWrapper =
                     new DataOutputViewStreamWrapper(outputStream);
-            intSerializer.serialize(modelData.length, outputViewStreamWrapper);
-            for (DenseVector denseVector : modelData) {
-                denseVectorSerializer.serialize(
+            IntSerializer.INSTANCE.serialize(modelData.centroids.length, outputViewStreamWrapper);
+            for (DenseVector denseVector : modelData.centroids) {
+                DenseVectorSerializer.INSTANCE.serialize(
                         denseVector, new DataOutputViewStreamWrapper(outputStream));
             }
         }
     }
 
-    /** Decoder for the KMeans model data. */
-    public static class ModelDataStreamFormat extends SimpleStreamFormat<DenseVector[]> {
+    /** Data decoder for {@link KMeansModelData}. */
+    public static class ModelDataDecoder extends SimpleStreamFormat<KMeansModelData> {
         @Override
-        public Reader<DenseVector[]> createReader(
+        public Reader<KMeansModelData> createReader(
                 Configuration config, FSDataInputStream inputStream) {
-            return new Reader<DenseVector[]>() {
+            return new Reader<KMeansModelData>() {
+
                 @Override
-                public DenseVector[] read() throws IOException {
+                public KMeansModelData read() throws IOException {
                     try {
-                        IntSerializer intSerializer = new IntSerializer();
-                        DenseVectorSerializer denseVectorSerializer = new DenseVectorSerializer();
                         DataInputViewStreamWrapper inputViewStreamWrapper =
                                 new DataInputViewStreamWrapper(inputStream);
-                        int numDenseVectors = intSerializer.deserialize(inputViewStreamWrapper);
-                        DenseVector[] result = new DenseVector[numDenseVectors];
+                        int numDenseVectors =
+                                IntSerializer.INSTANCE.deserialize(inputViewStreamWrapper);
+                        DenseVector[] centroids = new DenseVector[numDenseVectors];
                         for (int i = 0; i < numDenseVectors; i++) {
-                            result[i] = denseVectorSerializer.deserialize(inputViewStreamWrapper);
+                            centroids[i] =
+                                    DenseVectorSerializer.INSTANCE.deserialize(
+                                            inputViewStreamWrapper);
                         }
-                        return result;
+                        return new KMeansModelData(centroids);
                     } catch (EOFException e) {
                         return null;
                     }
@@ -102,8 +112,8 @@ public class KMeansModelData {
         }
 
         @Override
-        public TypeInformation<DenseVector[]> getProducedType() {
-            return ObjectArrayTypeInfo.getInfoFor(TypeInformation.of(DenseVector.class));
+        public TypeInformation<KMeansModelData> getProducedType() {
+            return TypeInformation.of(KMeansModelData.class);
         }
     }
 }

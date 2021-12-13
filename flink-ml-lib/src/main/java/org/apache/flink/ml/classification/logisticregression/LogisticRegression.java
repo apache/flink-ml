@@ -77,7 +77,7 @@ public class LogisticRegression
         implements Estimator<LogisticRegression, LogisticRegressionModel>,
                 LogisticRegressionParams<LogisticRegression> {
 
-    private Map<Param<?>, Object> paramMap = new HashMap<>();
+    private final Map<Param<?>, Object> paramMap = new HashMap<>();
 
     public LogisticRegression() {
         ParamUtils.initializeMapWithDefaultValues(paramMap, this);
