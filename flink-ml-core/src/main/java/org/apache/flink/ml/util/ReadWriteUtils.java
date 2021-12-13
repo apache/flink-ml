@@ -30,7 +30,6 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.filesystem.bucketassigners.BasePathBucketAssigner;
 import org.apache.flink.streaming.api.functions.sink.filesystem.rollingpolicies.OnCheckpointRollingPolicy;
-import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.util.InstantiationUtil;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
@@ -119,12 +118,12 @@ public class ReadWriteUtils {
     }
 
     /** Returns a subdirectory of the given path for saving/loading model data. */
-    public static String getDataPath(String path) {
+    private static String getDataPath(String path) {
         return Paths.get(path, "data").toString();
     }
 
     /** Returns all data files under the given path as a list of paths. */
-    public static org.apache.flink.core.fs.Path[] getDataPaths(String path) {
+    private static org.apache.flink.core.fs.Path[] getDataPaths(String path) {
         String dataPath = getDataPath(path);
         File[] files = new File(dataPath).listFiles();
 
@@ -353,7 +352,6 @@ public class ReadWriteUtils {
      */
     public static <T> DataStream<T> loadModelData(
             StreamExecutionEnvironment env, String path, SimpleStreamFormat<T> modelDecoder) {
-        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
         Source<T, ?, ?> source =
                 FileSource.forRecordStreamFormat(modelDecoder, getDataPaths(path)).build();
         return env.fromSource(source, WatermarkStrategy.noWatermarks(), "modelData");

@@ -32,6 +32,10 @@ public class DenseVector implements Vector {
         this.values = values;
     }
 
+    public DenseVector(int size) {
+        this.values = new double[size];
+    }
+
     @Override
     public int size() {
         return values.length;

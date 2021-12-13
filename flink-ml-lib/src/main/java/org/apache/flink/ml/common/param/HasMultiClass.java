@@ -18,22 +18,35 @@
 
 package org.apache.flink.ml.common.param;
 
-import org.apache.flink.ml.param.IntParam;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.param.ParamValidators;
+import org.apache.flink.ml.param.StringParam;
 import org.apache.flink.ml.param.WithParams;
 
-/** Interface for the shared maxIter param. */
-public interface HasMaxIter<T> extends WithParams<T> {
-    Param<Integer> MAX_ITER =
-            new IntParam("maxIter", "Maximum number of iterations.", 20, ParamValidators.gt(0));
+/**
+ * Interface for the shared multi-class param.
+ *
+ * <p>Supported options:
+ * <li>auto: selects the classification type based on the number of classes: If the number of unique
+ *     label values from the input data is one or two, set to "binomial". Otherwise, set to
+ *     "multinomial".
+ * <li>binomial: binary logistic regression.
+ * <li>multinomial: multinomial logistic regression.
+ */
+public interface HasMultiClass<T> extends WithParams<T> {
+    Param<String> MULTI_CLASS =
+            new StringParam(
+                    "multiClass",
+                    "Classification type.",
+                    "auto",
+                    ParamValidators.inArray("auto", "binomial", "multinomial"));
 
-    default int getMaxIter() {
-        return get(MAX_ITER);
+    default String getMultiClass() {
+        return get(MULTI_CLASS);
     }
 
-    default T setMaxIter(int value) {
-        set(MAX_ITER, value);
+    default T setMultiClass(String value) {
+        set(MULTI_CLASS, value);
         return (T) this;
     }
 }

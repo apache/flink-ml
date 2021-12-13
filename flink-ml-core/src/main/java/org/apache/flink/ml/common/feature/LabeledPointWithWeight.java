@@ -16,24 +16,22 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.param;
+package org.apache.flink.ml.common.feature;
 
-import org.apache.flink.ml.param.IntParam;
-import org.apache.flink.ml.param.Param;
-import org.apache.flink.ml.param.ParamValidators;
-import org.apache.flink.ml.param.WithParams;
+import org.apache.flink.ml.linalg.DenseVector;
 
-/** Interface for the shared maxIter param. */
-public interface HasMaxIter<T> extends WithParams<T> {
-    Param<Integer> MAX_ITER =
-            new IntParam("maxIter", "Maximum number of iterations.", 20, ParamValidators.gt(0));
+/** Utility class to represent a data point that contains features, label and weight. */
+public class LabeledPointWithWeight {
 
-    default int getMaxIter() {
-        return get(MAX_ITER);
-    }
+    public final DenseVector features;
 
-    default T setMaxIter(int value) {
-        set(MAX_ITER, value);
-        return (T) this;
+    public final double label;
+
+    public final double weight;
+
+    public LabeledPointWithWeight(DenseVector features, double label, double weight) {
+        this.features = features;
+        this.label = label;
+        this.weight = weight;
     }
 }

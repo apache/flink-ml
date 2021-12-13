@@ -16,24 +16,16 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.param;
+package org.apache.flink.ml.classification.logisticregression;
 
-import org.apache.flink.ml.param.IntParam;
-import org.apache.flink.ml.param.Param;
-import org.apache.flink.ml.param.ParamValidators;
-import org.apache.flink.ml.param.WithParams;
+import org.apache.flink.ml.common.param.HasFeaturesCol;
+import org.apache.flink.ml.common.param.HasPredictionCol;
+import org.apache.flink.ml.common.param.HasRawPredictionCol;
 
-/** Interface for the shared maxIter param. */
-public interface HasMaxIter<T> extends WithParams<T> {
-    Param<Integer> MAX_ITER =
-            new IntParam("maxIter", "Maximum number of iterations.", 20, ParamValidators.gt(0));
-
-    default int getMaxIter() {
-        return get(MAX_ITER);
-    }
-
-    default T setMaxIter(int value) {
-        set(MAX_ITER, value);
-        return (T) this;
-    }
-}
+/**
+ * Params for {@link LogisticRegressionModel}.
+ *
+ * @param <T> The class type of this instance.
+ */
+public interface LogisticRegressionModelParams<T>
+        extends HasFeaturesCol<T>, HasPredictionCol<T>, HasRawPredictionCol<T> {}

@@ -18,22 +18,26 @@
 
 package org.apache.flink.ml.common.param;
 
-import org.apache.flink.ml.param.IntParam;
+import org.apache.flink.ml.param.DoubleParam;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.param.ParamValidators;
 import org.apache.flink.ml.param.WithParams;
 
-/** Interface for the shared maxIter param. */
-public interface HasMaxIter<T> extends WithParams<T> {
-    Param<Integer> MAX_ITER =
-            new IntParam("maxIter", "Maximum number of iterations.", 20, ParamValidators.gt(0));
+/** Interface for the shared tolerance param. */
+public interface HasTol<T> extends WithParams<T> {
 
-    default int getMaxIter() {
-        return get(MAX_ITER);
+    Param<Double> TOL =
+            new DoubleParam(
+                    "tol",
+                    "Convergence tolerance for iterative algorithms.",
+                    1e-6,
+                    ParamValidators.gtEq(0));
+
+    default double getTol() {
+        return get(TOL);
     }
 
-    default T setMaxIter(int value) {
-        set(MAX_ITER, value);
-        return (T) this;
+    default T setTol(Double value) {
+        return set(TOL, value);
     }
 }

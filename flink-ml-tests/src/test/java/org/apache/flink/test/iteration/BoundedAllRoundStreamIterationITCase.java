@@ -26,6 +26,7 @@ import org.apache.flink.iteration.IterationConfig;
 import org.apache.flink.iteration.Iterations;
 import org.apache.flink.iteration.ReplayableDataStreamList;
 import org.apache.flink.iteration.compile.DraftExecutionEnvironment;
+import org.apache.flink.ml.common.iteration.TerminateOnMaxIter;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -35,7 +36,6 @@ import org.apache.flink.test.iteration.operators.CollectSink;
 import org.apache.flink.test.iteration.operators.EpochRecord;
 import org.apache.flink.test.iteration.operators.IncrementEpochMap;
 import org.apache.flink.test.iteration.operators.OutputRecord;
-import org.apache.flink.test.iteration.operators.RoundBasedTerminationCriteria;
 import org.apache.flink.test.iteration.operators.SequenceSource;
 import org.apache.flink.test.iteration.operators.StatefulProcessFunction;
 import org.apache.flink.test.iteration.operators.TwoInputReduceAllRoundProcessFunction;
@@ -130,7 +130,7 @@ public class BoundedAllRoundStreamIterationITCase extends TestLogger {
 
         // If termination criteria is created only with the constants streams, it would not have
         // records after the round 1 if the input is not replayed.
-        int numOfRound = terminationCriteriaFollowsConstantsStreams ? 1 : 5;
+        int numOfRound = terminationCriteriaFollowsConstantsStreams ? 1 : 4;
         assertEquals(numOfRound + 1, result.get().size());
 
         Map<Integer, Tuple2<Integer, Integer>> roundsStat =
@@ -211,7 +211,7 @@ public class BoundedAllRoundStreamIterationITCase extends TestLogger {
                                                             ? dataStreams.<EpochRecord>get(0)
                                                             : reducer)
                                                     .flatMap(
-                                                            new RoundBasedTerminationCriteria(
+                                                            new TerminateOnMaxIter(
                                                                     terminationCriteriaRound)));
                         });
         outputs.<OutputRecord<Integer>>get(0).addSink(new CollectSink(result));

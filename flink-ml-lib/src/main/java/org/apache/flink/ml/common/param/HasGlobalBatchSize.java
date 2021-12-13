@@ -23,17 +23,21 @@ import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.param.ParamValidators;
 import org.apache.flink.ml.param.WithParams;
 
-/** Interface for the shared maxIter param. */
-public interface HasMaxIter<T> extends WithParams<T> {
-    Param<Integer> MAX_ITER =
-            new IntParam("maxIter", "Maximum number of iterations.", 20, ParamValidators.gt(0));
+/** Interface for the shared global batch size param. */
+public interface HasGlobalBatchSize<T> extends WithParams<T> {
 
-    default int getMaxIter() {
-        return get(MAX_ITER);
+    Param<Integer> GLOBAL_BATCH_SIZE =
+            new IntParam(
+                    "globalBatchSize",
+                    "Global batch size of training algorithms.",
+                    32,
+                    ParamValidators.gt(0));
+
+    default int getGlobalBatchSize() {
+        return get(GLOBAL_BATCH_SIZE);
     }
 
-    default T setMaxIter(int value) {
-        set(MAX_ITER, value);
-        return (T) this;
+    default T setGlobalBatchSize(Integer value) {
+        return set(GLOBAL_BATCH_SIZE, value);
     }
 }

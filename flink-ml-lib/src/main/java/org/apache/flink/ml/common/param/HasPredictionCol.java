@@ -23,7 +23,7 @@ import org.apache.flink.ml.param.ParamValidators;
 import org.apache.flink.ml.param.StringParam;
 import org.apache.flink.ml.param.WithParams;
 
-/** Interface for the shared featuresCol param. */
+/** Interface for the shared prediction column param. */
 public interface HasPredictionCol<T> extends WithParams<T> {
     Param<String> PREDICTION_COL =
             new StringParam(

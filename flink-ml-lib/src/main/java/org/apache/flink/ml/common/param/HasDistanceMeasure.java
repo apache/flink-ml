@@ -29,7 +29,7 @@ public interface HasDistanceMeasure<T> extends WithParams<T> {
     Param<String> DISTANCE_MEASURE =
             new StringParam(
                     "distanceMeasure",
-                    "The distance measure.",
+                    "Distance measure.",
                     EuclideanDistanceMeasure.NAME,
                     ParamValidators.inArray(EuclideanDistanceMeasure.NAME));
 

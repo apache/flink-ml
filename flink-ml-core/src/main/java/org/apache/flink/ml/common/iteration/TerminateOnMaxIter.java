@@ -16,30 +16,38 @@
  * limitations under the License.
  */
 
-package org.apache.flink.test.iteration.operators;
+package org.apache.flink.ml.common.iteration;
 
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.util.Collector;
 
-/** An termination criteria function that asks to stop after the specialized round. */
-public class RoundBasedTerminationCriteria
-        implements FlatMapFunction<EpochRecord, Integer>, IterationListener<Integer> {
+/**
+ * A FlatMapFunction that emits values iff the iteration's epochWatermark does not exceed a certain
+ * threshold.
+ *
+ * <p>When the output of this FlatMapFunction is used as the termination criteria of an iteration
+ * body, the iteration will be executed for at most the given `maxIter` iterations.
+ *
+ * @param <T> The class type of the input element.
+ */
+public class TerminateOnMaxIter<T>
+        implements FlatMapFunction<T, Integer>, IterationListener<Integer> {
 
-    private final int maxRound;
+    private final int maxIter;
 
-    public RoundBasedTerminationCriteria(int maxRound) {
-        this.maxRound = maxRound;
+    public TerminateOnMaxIter(int maxIter) {
+        this.maxIter = maxIter;
     }
 
     @Override
-    public void flatMap(EpochRecord integer, Collector<Integer> collector) throws Exception {}
+    public void flatMap(T integer, Collector<Integer> collector) {}
 
     @Override
     public void onEpochWatermarkIncremented(
-            int epochWatermark, Context context, Collector<Integer> collector) {
-        if (epochWatermark < maxRound) {
-            collector.collect(0);
+            int epochWatermark, Context context, Collector<Integer> out) {
+        if (epochWatermark + 1 < maxIter) {
+            out.collect(0);
         }
     }
 

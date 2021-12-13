@@ -18,22 +18,26 @@
 
 package org.apache.flink.ml.common.param;
 
-import org.apache.flink.ml.param.IntParam;
+import org.apache.flink.ml.param.DoubleParam;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.param.ParamValidators;
 import org.apache.flink.ml.param.WithParams;
 
-/** Interface for the shared maxIter param. */
-public interface HasMaxIter<T> extends WithParams<T> {
-    Param<Integer> MAX_ITER =
-            new IntParam("maxIter", "Maximum number of iterations.", 20, ParamValidators.gt(0));
+/** Interface for the shared learning rate param. */
+public interface HasLearningRate<T> extends WithParams<T> {
 
-    default int getMaxIter() {
-        return get(MAX_ITER);
+    Param<Double> LEARNING_RATE =
+            new DoubleParam(
+                    "learningRate",
+                    "Learning rate of optimization method.",
+                    0.1,
+                    ParamValidators.gt(0));
+
+    default double getLearningRate() {
+        return get(LEARNING_RATE);
     }
 
-    default T setMaxIter(int value) {
-        set(MAX_ITER, value);
-        return (T) this;
+    default T setLearningRate(Double value) {
+        return set(LEARNING_RATE, value);
     }
 }

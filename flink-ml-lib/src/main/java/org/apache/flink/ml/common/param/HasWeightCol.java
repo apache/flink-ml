@@ -18,22 +18,22 @@
 
 package org.apache.flink.ml.common.param;
 
-import org.apache.flink.ml.param.IntParam;
 import org.apache.flink.ml.param.Param;
-import org.apache.flink.ml.param.ParamValidators;
+import org.apache.flink.ml.param.StringParam;
 import org.apache.flink.ml.param.WithParams;
 
-/** Interface for the shared maxIter param. */
-public interface HasMaxIter<T> extends WithParams<T> {
-    Param<Integer> MAX_ITER =
-            new IntParam("maxIter", "Maximum number of iterations.", 20, ParamValidators.gt(0));
+/**
+ * Interface for the shared weight column param. If this is not set, we treat all instance weights
+ * as 1.0.
+ */
+public interface HasWeightCol<T> extends WithParams<T> {
+    Param<String> WEIGHT_COL = new StringParam("weightCol", "Weight column name.", null);
 
-    default int getMaxIter() {
-        return get(MAX_ITER);
+    default String getWeightCol() {
+        return get(WEIGHT_COL);
     }
 
-    default T setMaxIter(int value) {
-        set(MAX_ITER, value);
-        return (T) this;
+    default T setWeightCol(String colName) {
+        return set(WEIGHT_COL, colName);
     }
 }

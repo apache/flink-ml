@@ -18,22 +18,21 @@
 
 package org.apache.flink.ml.common.param;
 
-import org.apache.flink.ml.param.IntParam;
+import org.apache.flink.ml.param.DoubleParam;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.param.ParamValidators;
 import org.apache.flink.ml.param.WithParams;
 
-/** Interface for the shared maxIter param. */
-public interface HasMaxIter<T> extends WithParams<T> {
-    Param<Integer> MAX_ITER =
-            new IntParam("maxIter", "Maximum number of iterations.", 20, ParamValidators.gt(0));
+/** Interface for the shared regularization param. */
+public interface HasReg<T> extends WithParams<T> {
+    Param<Double> REG =
+            new DoubleParam("reg", "Regularization parameter.", 0., ParamValidators.gtEq(0.));
 
-    default int getMaxIter() {
-        return get(MAX_ITER);
+    default double getReg() {
+        return get(REG);
     }
 
-    default T setMaxIter(int value) {
-        set(MAX_ITER, value);
-        return (T) this;
+    default T setReg(Double value) {
+        return set(REG, value);
     }
 }

@@ -26,9 +26,30 @@ public class BLAS {
     private static final dev.ludovic.netlib.BLAS JAVA_BLAS =
             dev.ludovic.netlib.JavaBLAS.getInstance();
 
+    /** \sum_i |x_i| . */
+    public static double asum(DenseVector x) {
+        return JAVA_BLAS.dasum(x.size(), x.values, 0, 1);
+    }
+
     /** y += a * x . */
     public static void axpy(double a, DenseVector x, DenseVector y) {
         Preconditions.checkArgument(x.size() == y.size(), "Vector size mismatched.");
         JAVA_BLAS.daxpy(x.size(), a, x.values, 1, y.values, 1);
+    }
+
+    /** x \cdot y . */
+    public static double dot(DenseVector x, DenseVector y) {
+        Preconditions.checkArgument(x.size() == y.size(), "Vector size mismatched.");
+        return JAVA_BLAS.ddot(x.size(), x.values, 1, y.values, 1);
+    }
+
+    /** \sqrt(\sum_i x_i * x_i) . */
+    public static double norm2(DenseVector x) {
+        return JAVA_BLAS.dnrm2(x.size(), x.values, 1);
+    }
+
+    /** x = x * a . */
+    public static void scal(double a, DenseVector x) {
+        JAVA_BLAS.dscal(x.size(), a, x.values, 1);
     }
 }

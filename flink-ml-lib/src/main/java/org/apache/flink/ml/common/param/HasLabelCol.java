@@ -23,7 +23,7 @@ import org.apache.flink.ml.param.ParamValidators;
 import org.apache.flink.ml.param.StringParam;
 import org.apache.flink.ml.param.WithParams;
 
-/** Interface for the shared labelCol param. */
+/** Interface for the shared label column param. */
 public interface HasLabelCol<T> extends WithParams<T> {
     Param<String> LABEL_COL =
             new StringParam("labelCol", "Label column name.", "label", ParamValidators.notNull());
