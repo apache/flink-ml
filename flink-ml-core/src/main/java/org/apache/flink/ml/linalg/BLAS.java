@@ -52,4 +52,41 @@ public class BLAS {
     public static void scal(double a, DenseVector x) {
         JAVA_BLAS.dscal(x.size(), a, x.values, 1);
     }
+
+    /**
+     * y = alpha * matrix * x + beta * y or y = alpha * (matrix^T) * x + beta * y.
+     *
+     * @param alpha The alpha value.
+     * @param matrix Dense matrix with size m x n.
+     * @param transMatrix Whether transposes matrix before multiply.
+     * @param x Dense vector with size n.
+     * @param beta The beta value.
+     * @param y Dense vector with size m.
+     */
+    public static void gemv(
+            double alpha,
+            DenseMatrix matrix,
+            boolean transMatrix,
+            DenseVector x,
+            double beta,
+            DenseVector y) {
+        Preconditions.checkArgument(
+                transMatrix
+                        ? (matrix.numRows() == x.size() && matrix.numCols() == y.size())
+                        : (matrix.numRows() == y.size() && matrix.numCols() == x.size()),
+                "Matrix and vector size mismatched.");
+        final String trans = transMatrix ? "T" : "N";
+        JAVA_BLAS.dgemv(
+                trans,
+                matrix.numRows(),
+                matrix.numCols(),
+                alpha,
+                matrix.values,
+                matrix.numRows(),
+                x.values,
+                1,
+                beta,
+                y.values,
+                1);
+    }
 }

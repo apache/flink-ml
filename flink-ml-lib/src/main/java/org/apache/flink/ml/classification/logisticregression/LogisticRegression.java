@@ -311,7 +311,7 @@ public class LogisticRegression
 
         private ListState<LabeledPointWithWeight> trainDataState;
 
-        private Random random = new Random(2021);
+        private final Random random = new Random(2021);
 
         private List<LabeledPointWithWeight> miniBatchData;
 
