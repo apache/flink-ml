@@ -27,8 +27,9 @@ import static org.junit.Assert.assertEquals;
 public class BLASTest {
 
     private static final double TOLERANCE = 1e-7;
-
     private static final DenseVector inputDenseVec = Vectors.dense(1, -2, 3, 4, -5);
+    private static final DenseMatrix inputDenseMat =
+            new DenseMatrix(2, 5, new double[] {1, -2, 3, 4, -5, 1, -2, 3, 4, -5});
 
     @Test
     public void testAsum() {
@@ -60,5 +61,13 @@ public class BLASTest {
         BLAS.scal(2, inputDenseVec);
         double[] expectedResult = new double[] {2, -4, 6, 8, -10};
         assertArrayEquals(expectedResult, inputDenseVec.values, TOLERANCE);
+    }
+
+    @Test
+    public void testGemv() {
+        DenseVector anotherDenseVec = Vectors.dense(1.0, 2.0);
+        BLAS.gemv(-2.0, inputDenseMat, false, inputDenseVec, 0.0, anotherDenseVec);
+        double[] expectedResult = new double[] {96.0, -60.0};
+        assertArrayEquals(expectedResult, anotherDenseVec.values, TOLERANCE);
     }
 }
