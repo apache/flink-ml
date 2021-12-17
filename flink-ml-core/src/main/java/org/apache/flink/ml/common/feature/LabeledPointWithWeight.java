@@ -23,15 +23,41 @@ import org.apache.flink.ml.linalg.DenseVector;
 /** Utility class to represent a data point that contains features, label and weight. */
 public class LabeledPointWithWeight {
 
-    public final DenseVector features;
+    private DenseVector features;
 
-    public final double label;
+    private double label;
 
-    public final double weight;
+    private double weight;
 
     public LabeledPointWithWeight(DenseVector features, double label, double weight) {
         this.features = features;
         this.label = label;
+        this.weight = weight;
+    }
+
+    public LabeledPointWithWeight() {}
+
+    public DenseVector getFeatures() {
+        return features;
+    }
+
+    public void setFeatures(DenseVector features) {
+        this.features = features;
+    }
+
+    public double getLabel() {
+        return label;
+    }
+
+    public void setLabel(double label) {
+        this.label = label;
+    }
+
+    public double getWeight() {
+        return weight;
+    }
+
+    public void setWeight(double weight) {
         this.weight = weight;
     }
 }

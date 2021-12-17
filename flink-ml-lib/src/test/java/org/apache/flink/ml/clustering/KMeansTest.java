@@ -60,7 +60,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-/** Tests KMeans and KMeansModel. */
+/** Tests {@link KMeans} and {@link KMeansModel}. */
 public class KMeansTest extends AbstractTestBase {
     @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
 
@@ -150,7 +150,7 @@ public class KMeansTest extends AbstractTestBase {
     }
 
     @Test
-    public void testFeaturePredictionParam() throws Exception {
+    public void testFeaturePredictionParam() {
         Table input = dataTable.as("test_feature");
         KMeans kmeans =
                 new KMeans().setFeaturesCol("test_feature").setPredictionCol("test_prediction");
@@ -166,7 +166,7 @@ public class KMeansTest extends AbstractTestBase {
     }
 
     @Test
-    public void testFewerDistinctPointsThanCluster() throws Exception {
+    public void testFewerDistinctPointsThanCluster() {
         List<DenseVector> data =
                 Arrays.asList(
                         Vectors.dense(0.0, 0.1), Vectors.dense(0.0, 0.1), Vectors.dense(0.0, 0.1));
@@ -185,7 +185,7 @@ public class KMeansTest extends AbstractTestBase {
     }
 
     @Test
-    public void testFitAndPredict() throws Exception {
+    public void testFitAndPredict() {
         KMeans kmeans = new KMeans().setMaxIter(2).setK(2);
         KMeansModel model = kmeans.fit(dataTable);
         Table output = model.transform(dataTable)[0];
@@ -201,18 +201,14 @@ public class KMeansTest extends AbstractTestBase {
     @Test
     public void testSaveLoadAndPredict() throws Exception {
         KMeans kmeans = new KMeans().setMaxIter(2).setK(2);
-
         KMeans loadedKmeans =
                 StageTestUtils.saveAndReload(env, kmeans, tempFolder.newFolder().getAbsolutePath());
-
         KMeansModel model = loadedKmeans.fit(dataTable);
-
         KMeansModel loadedModel =
                 StageTestUtils.saveAndReload(env, model, tempFolder.newFolder().getAbsolutePath());
         Table output = loadedModel.transform(dataTable)[0];
-
         assertEquals(
-                Arrays.asList("f0"),
+                Collections.singletonList("centroids"),
                 loadedModel.getModelData()[0].getResolvedSchema().getColumnNames());
         assertEquals(
                 Arrays.asList("features", "prediction"),
@@ -226,16 +222,17 @@ public class KMeansTest extends AbstractTestBase {
     @Test
     public void testGetModelData() throws Exception {
         KMeans kmeans = new KMeans().setMaxIter(2).setK(2);
-        KMeansModel modelA = kmeans.fit(dataTable);
-        Table modelData = modelA.getModelData()[0];
+        KMeansModel model = kmeans.fit(dataTable);
+        assertEquals(
+                Collections.singletonList("centroids"),
+                model.getModelData()[0].getResolvedSchema().getColumnNames());
 
-        DataStream<KMeansModelData> output =
-                tEnv.toDataStream(modelData).map(row -> (KMeansModelData) row.getField("f0"));
-
-        assertEquals(Arrays.asList("f0"), modelData.getResolvedSchema().getColumnNames());
-        List<KMeansModelData> kMeansModelData = IteratorUtils.toList(output.executeAndCollect());
-        DenseVector[] centroids = kMeansModelData.get(0).centroids;
-        assertEquals(1, kMeansModelData.size());
+        DataStream<KMeansModelData> modelData =
+                KMeansModelData.getModelDataStream(model.getModelData()[0]);
+        List<KMeansModelData> collectedModelData =
+                IteratorUtils.toList(modelData.executeAndCollect());
+        assertEquals(1, collectedModelData.size());
+        DenseVector[] centroids = collectedModelData.get(0).centroids;
         assertEquals(2, centroids.length);
         Arrays.sort(centroids, Comparator.comparingDouble(vector -> vector.get(0)));
         assertArrayEquals(centroids[0].values, new double[] {0.1, 0.1}, 1e-5);
@@ -243,12 +240,10 @@ public class KMeansTest extends AbstractTestBase {
     }
 
     @Test
-    public void testSetModelData() throws Exception {
+    public void testSetModelData() {
         KMeans kmeans = new KMeans().setMaxIter(2).setK(2);
         KMeansModel modelA = kmeans.fit(dataTable);
-        Table modelData = modelA.getModelData()[0];
-
-        KMeansModel modelB = new KMeansModel().setModelData(modelData);
+        KMeansModel modelB = new KMeansModel().setModelData(modelA.getModelData());
         ReadWriteUtils.updateExistingParams(modelB, modelA.getParamMap());
 
         Table output = modelB.transform(dataTable)[0];

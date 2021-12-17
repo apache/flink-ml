@@ -29,7 +29,6 @@ import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
@@ -54,17 +53,13 @@ public class NaiveBayesModelData {
      * Log of class conditional probabilities, whose dimension is C (number of classes) by D (number
      * of features).
      */
-    public final Map<Double, Double>[][] theta;
+    public Map<Double, Double>[][] theta;
 
     /** Log of class priors, whose dimension is C (number of classes). */
-    public final DenseVector piArray;
+    public DenseVector piArray;
 
     /** Value of labels. */
-    public final DenseVector labels;
-
-    public NaiveBayesModelData(Map<Double, Double>[][] theta, double[] piArray, double[] labels) {
-        this(theta, Vectors.dense(piArray), Vectors.dense(labels));
-    }
+    public DenseVector labels;
 
     public NaiveBayesModelData(
             Map<Double, Double>[][] theta, DenseVector piArray, DenseVector labels) {
@@ -72,6 +67,8 @@ public class NaiveBayesModelData {
         this.piArray = piArray;
         this.labels = labels;
     }
+
+    public NaiveBayesModelData() {}
 
     /**
      * Converts the table model to a data stream.
@@ -85,7 +82,11 @@ public class NaiveBayesModelData {
         return tEnv.toDataStream(modelData)
                 .map(
                         (MapFunction<Row, NaiveBayesModelData>)
-                                row -> (NaiveBayesModelData) row.getField("f0"));
+                                row ->
+                                        new NaiveBayesModelData(
+                                                (Map<Double, Double>[][]) row.getField(0),
+                                                (DenseVector) row.getField(1),
+                                                (DenseVector) row.getField(2)));
     }
 
     /** Data encoder for the {@link NaiveBayesModelData}. */
