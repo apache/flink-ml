@@ -114,7 +114,7 @@ public class LogisticRegression
                                 dataPoint -> {
                                     Double weight =
                                             getWeightCol() == null
-                                                    ? new Double(1.0)
+                                                    ? 1.0
                                                     : (Double) dataPoint.getField(getWeightCol());
                                     Double label = (Double) dataPoint.getField(getLabelCol());
                                     boolean isBinomial =
@@ -160,9 +160,9 @@ public class LogisticRegression
         @Override
         public void processElement(StreamRecord<LabeledPointWithWeight> streamRecord) {
             if (dim == 0) {
-                dim = streamRecord.getValue().features.size();
+                dim = streamRecord.getValue().getFeatures().size();
             } else {
-                if (dim != streamRecord.getValue().features.size()) {
+                if (dim != streamRecord.getValue().getFeatures().size()) {
                     throw new RuntimeException(
                             "The training data should all have same dimensions.");
                 }
@@ -390,7 +390,7 @@ public class LogisticRegression
         }
 
         @Override
-        public void onIterationTerminated(Context context, Collector collector) {
+        public void onIterationTerminated(Context context, Collector<double[]> collector) {
             trainDataState.clear();
             coefficientState.clear();
             feedbackBufferState.clear();

@@ -27,6 +27,7 @@ import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -339,7 +340,8 @@ public class NaiveBayes
                 piArray[i] = Math.log(weightSum + smoothing) - piLog;
             }
 
-            NaiveBayesModelData modelData = new NaiveBayesModelData(theta, piArray, labels);
+            NaiveBayesModelData modelData =
+                    new NaiveBayesModelData(theta, Vectors.dense(piArray), Vectors.dense(labels));
             collector.collect(modelData);
         }
     }

@@ -52,8 +52,8 @@ public class LogisticGradient implements Serializable {
         double weightSum = 0.0;
         double lossSum = 0.0;
         for (LabeledPointWithWeight dataPoint : dataPoints) {
-            lossSum += dataPoint.weight * computeLoss(dataPoint, coefficient);
-            weightSum += dataPoint.weight;
+            lossSum += dataPoint.getWeight() * computeLoss(dataPoint, coefficient);
+            weightSum += dataPoint.getWeight();
         }
         if (Double.compare(0, l2) != 0) {
             lossSum += l2 * Math.pow(BLAS.norm2(coefficient), 2);
@@ -81,16 +81,17 @@ public class LogisticGradient implements Serializable {
     }
 
     private double computeLoss(LabeledPointWithWeight dataPoint, DenseVector coefficient) {
-        double dot = BLAS.dot(dataPoint.features, coefficient);
-        double labelScaled = 2 * dataPoint.label - 1;
+        double dot = BLAS.dot(dataPoint.getFeatures(), coefficient);
+        double labelScaled = 2 * dataPoint.getLabel() - 1;
         return Math.log(1 + Math.exp(-dot * labelScaled));
     }
 
     private void computeGradient(
             LabeledPointWithWeight dataPoint, DenseVector coefficient, DenseVector cumGradient) {
-        double dot = BLAS.dot(dataPoint.features, coefficient);
-        double labelScaled = 2 * dataPoint.label - 1;
-        double multiplier = dataPoint.weight * (-labelScaled / (Math.exp(dot * labelScaled) + 1));
-        BLAS.axpy(multiplier, dataPoint.features, cumGradient);
+        double dot = BLAS.dot(dataPoint.getFeatures(), coefficient);
+        double labelScaled = 2 * dataPoint.getLabel() - 1;
+        double multiplier =
+                dataPoint.getWeight() * (-labelScaled / (Math.exp(dot * labelScaled) + 1));
+        BLAS.axpy(multiplier, dataPoint.getFeatures(), cumGradient);
     }
 }

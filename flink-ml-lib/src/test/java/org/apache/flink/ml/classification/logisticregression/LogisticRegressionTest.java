@@ -228,7 +228,7 @@ public class LogisticRegressionTest {
         LogisticRegressionModel model = logisticRegression.fit(binomialDataTable);
         model = StageTestUtils.saveAndReload(env, model, tempFolder.newFolder().getAbsolutePath());
         assertEquals(
-                Collections.singletonList("f0"),
+                Collections.singletonList("coefficient"),
                 model.getModelData()[0].getResolvedSchema().getColumnNames());
         Table output = model.transform(binomialDataTable)[0];
         verifyPredictionResult(
@@ -242,11 +242,10 @@ public class LogisticRegressionTest {
     public void testGetModelData() throws Exception {
         LogisticRegression logisticRegression = new LogisticRegression().setWeightCol("weight");
         LogisticRegressionModel model = logisticRegression.fit(binomialDataTable);
-        List<Row> collectedModelData =
-                IteratorUtils.toList(
-                        tEnv.toDataStream(model.getModelData()[0]).executeAndCollect());
         LogisticRegressionModelData modelData =
-                (LogisticRegressionModelData) collectedModelData.get(0).getField(0);
+                LogisticRegressionModelData.getModelDataStream(model.getModelData()[0])
+                        .executeAndCollect()
+                        .next();
         assertNotNull(modelData);
         assertArrayEquals(expectedCoefficient, modelData.coefficient.values, 0.1);
     }

@@ -45,11 +45,13 @@ import java.io.OutputStream;
  */
 public class KMeansModelData {
 
-    public final DenseVector[] centroids;
+    public DenseVector[] centroids;
 
     public KMeansModelData(DenseVector[] centroids) {
         this.centroids = centroids;
     }
+
+    public KMeansModelData() {}
 
     /**
      * Converts the table model to a data stream.
@@ -60,7 +62,8 @@ public class KMeansModelData {
     public static DataStream<KMeansModelData> getModelDataStream(Table modelData) {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) modelData).getTableEnvironment();
-        return tEnv.toDataStream(modelData).map(x -> (KMeansModelData) x.getField(0));
+        return tEnv.toDataStream(modelData)
+                .map(x -> new KMeansModelData((DenseVector[]) x.getField(0)));
     }
 
     /** Data encoder for {@link KMeansModelData}. */

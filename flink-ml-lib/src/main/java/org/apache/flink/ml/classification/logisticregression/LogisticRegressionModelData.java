@@ -44,11 +44,13 @@ import java.io.OutputStream;
  */
 public class LogisticRegressionModelData {
 
-    public final DenseVector coefficient;
+    public DenseVector coefficient;
 
     public LogisticRegressionModelData(DenseVector coefficient) {
         this.coefficient = coefficient;
     }
+
+    public LogisticRegressionModelData() {}
 
     /**
      * Converts the table model to a data stream.
@@ -59,7 +61,8 @@ public class LogisticRegressionModelData {
     public static DataStream<LogisticRegressionModelData> getModelDataStream(Table modelData) {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) modelData).getTableEnvironment();
-        return tEnv.toDataStream(modelData).map(x -> (LogisticRegressionModelData) x.getField(0));
+        return tEnv.toDataStream(modelData)
+                .map(x -> new LogisticRegressionModelData((DenseVector) x.getField(0)));
     }
 
     /** Data encoder for {@link LogisticRegressionModel}. */
