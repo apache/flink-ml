@@ -46,7 +46,8 @@ public interface IterationListener<T> {
      *     the invocation of this method.
      * @param collector The collector for returning result values.
      */
-    void onEpochWatermarkIncremented(int epochWatermark, Context context, Collector<T> collector);
+    void onEpochWatermarkIncremented(int epochWatermark, Context context, Collector<T> collector)
+            throws Exception;
 
     /**
      * This callback is invoked after the execution of the iteration body has terminated.
@@ -56,7 +57,7 @@ public interface IterationListener<T> {
      *     the invocation of this method.
      * @param collector The collector for returning result values.
      */
-    void onIterationTerminated(Context context, Collector<T> collector);
+    void onIterationTerminated(Context context, Collector<T> collector) throws Exception;
 
     /**
      * Information available in an invocation of the callbacks defined in the

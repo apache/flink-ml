@@ -361,8 +361,8 @@ public class LogisticRegression
 
         @Override
         public void onEpochWatermarkIncremented(
-                int epochWatermark, Context context, Collector<double[]> collector) {
-            // TODO: let this method throws exception.
+                int epochWatermark, Context context, Collector<double[]> collector)
+                throws Exception {
             if (epochWatermark == 0) {
                 coefficient = new DenseVector(feedbackBuffer);
                 coefficientDim = coefficient.size();
@@ -372,12 +372,8 @@ public class LogisticRegression
                 updateModel();
             }
             Arrays.fill(gradient.values, 0);
-            try {
-                if (trainData == null) {
-                    trainData = IteratorUtils.toList(trainDataState.get().iterator());
-                }
-            } catch (Exception e) {
-                throw new RuntimeException(e);
+            if (trainData == null) {
+                trainData = IteratorUtils.toList(trainDataState.get().iterator());
             }
             miniBatchData = getMiniBatchData(trainData, localBatchSize);
             Tuple2<Double, Double> weightSumAndLossSum =

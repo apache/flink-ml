@@ -276,37 +276,33 @@ public class KMeans implements Estimator<KMeans, KMeansModel>, KMeansParams<KMea
 
         @Override
         public void onEpochWatermarkIncremented(
-                int epochWatermark, Context context, Collector<Tuple2<Integer, DenseVector>> out) {
-            // TODO: update onEpochWatermarkIncremented to throw Exception.
-            try {
-                List<DenseVector[]> list = IteratorUtils.toList(centroids.get().iterator());
-                if (list.size() != 1) {
-                    throw new RuntimeException(
-                            "The operator received "
-                                    + list.size()
-                                    + " list of centroids in this round");
-                }
-                DenseVector[] centroidValues = list.get(0);
-
-                for (DenseVector point : points.get()) {
-                    double minDistance = Double.MAX_VALUE;
-                    int closestCentroidId = -1;
-
-                    for (int i = 0; i < centroidValues.length; i++) {
-                        DenseVector centroid = centroidValues[i];
-                        double distance = distanceMeasure.distance(centroid, point);
-                        if (distance < minDistance) {
-                            minDistance = distance;
-                            closestCentroidId = i;
-                        }
-                    }
-
-                    output.collect(new StreamRecord<>(Tuple2.of(closestCentroidId, point)));
-                }
-                centroids.clear();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
+                int epochWatermark, Context context, Collector<Tuple2<Integer, DenseVector>> out)
+                throws Exception {
+            List<DenseVector[]> list = IteratorUtils.toList(centroids.get().iterator());
+            if (list.size() != 1) {
+                throw new RuntimeException(
+                        "The operator received "
+                                + list.size()
+                                + " list of centroids in this round");
             }
+            DenseVector[] centroidValues = list.get(0);
+
+            for (DenseVector point : points.get()) {
+                double minDistance = Double.MAX_VALUE;
+                int closestCentroidId = -1;
+
+                for (int i = 0; i < centroidValues.length; i++) {
+                    DenseVector centroid = centroidValues[i];
+                    double distance = distanceMeasure.distance(centroid, point);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestCentroidId = i;
+                    }
+                }
+
+                output.collect(new StreamRecord<>(Tuple2.of(closestCentroidId, point)));
+            }
+            centroids.clear();
         }
 
         @Override
