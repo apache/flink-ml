@@ -23,13 +23,13 @@ under the License.
   <parent>
     <groupId>org.apache.flink</groupId>
     <artifactId>flink-ml-parent</artifactId>
-    <version>0.1-SNAPSHOT</version>
+    <version>2.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>flink-ml-uber_${scala.binary.version}</artifactId>
   <name>Flink ML : Uber</name>
   <description>
-    This module contains both the api and libraries for writing Flink ML programs.
+    This module contains the basic modules for writing Flink ML programs.
   </description>
 
   <packaging>jar</packaging>
@@ -40,9 +40,10 @@ under the License.
       <artifactId>flink-ml-core</artifactId>
       <version>${project.version}</version>
     </dependency>
+
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-ml-lib_${scala.binary.version}</artifactId>
+      <artifactId>flink-ml-iteration</artifactId>
       <version>${project.version}</version>
     </dependency>
   </dependencies>
@@ -63,8 +64,8 @@ under the License.
               <artifactSet>
                 <includes combine.children="append">
                   <include>org.apache.flink:flink-ml-core</include>
-                  <include>org.apache.flink:flink-ml-lib_${scala.binary.version}</include>
-                  <include>com.github.fommil.netlib:core</include>
+                  <include>org.apache.flink:flink-ml-iteration</include>
+                  <include>dev.ludovic.netlib:blas</include>
                 </includes>
               </artifactSet>
             </configuration>
