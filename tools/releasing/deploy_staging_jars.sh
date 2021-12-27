@@ -42,6 +42,6 @@ fi
 cd ${PROJECT_ROOT}
 
 echo "Deploying to repository.apache.org"
-${MVN} clean deploy -Prelease -DskipTests -DretryFailedDeploymentCount=10 $CUSTOM_OPTIONS -Dscala-2.12
+${MVN} clean deploy -Papache-release -DskipTests -DretryFailedDeploymentCount=10 $CUSTOM_OPTIONS
 
 cd ${CURR_DIR}

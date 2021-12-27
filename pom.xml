@@ -61,7 +61,7 @@ under the License.
 
   <properties>
     <flink.shaded.version>12.0</flink.shaded.version>
-    <scala.binary.version>2.11</scala.binary.version>
+    <scala.binary.version>2.12</scala.binary.version>
     <jackson.version>2.10.1</jackson.version>
     <target.java.version>1.8</target.java.version>
     <spotless.version>2.4.2</spotless.version>
@@ -219,7 +219,7 @@ under the License.
       The script can be found under tools/releasing/create_source_release.sh.
     -->
     <profile>
-      <id>release</id>
+      <id>apache-release</id>
       <build>
         <plugins>
           <plugin>

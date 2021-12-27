@@ -63,17 +63,13 @@ cd ${PROJECT_ROOT}/flink-ml-python/
 mv dist/* ${RELEASE_DIR}
 
 SOURCE_DIST="apache-flink-ml-$RELEASE_VERSION.tar.gz"
-WHL_VERSION=`echo "$RELEASE_VERSION" | tr - _`
-WHL_DIST="apache_flink_ml-$WHL_VERSION-py3-none-any.whl"
 
 cd ${RELEASE_DIR}
 # Sign sha the files
 if [ "$SKIP_GPG" == "false" ] ; then
     gpg --armor --detach-sig ${SOURCE_DIST}
-    gpg --armor --detach-sig ${WHL_DIST}
 fi
 ${SHASUM} "${SOURCE_DIST}" > "${SOURCE_DIST}.sha512"
-${SHASUM} "${WHL_DIST}" > "${WHL_DIST}.sha512"
 
 echo "Created Python SDK distribution files at $RELEASE_DIR."
 
