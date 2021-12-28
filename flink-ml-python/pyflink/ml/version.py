@@ -20,4 +20,4 @@
 The version will be consistent with the flink ml version and follow the PEP440.
 .. seealso:: https://www.python.org/dev/peps/pep-0440
 """
-__version__ = "2.0.dev0"
+__version__ = "2.1.dev0"
