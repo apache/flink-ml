@@ -1,4 +1,4 @@
-Flink ML is a library which provides machine learning (ML) APIs and libraries that simplify the building of machine learning pipelines. It provides a set of standard ML APIs for MLlib developers to implement ML algorithms, as well as libraries of ML algorithms that can be used to build ML pipelines for both training and inference jobs.
+Flink ML is a library which provides machine learning (ML) APIs and infrastructures that simplify the building of ML pipelines. Users can implement ML algorithms with the standard ML APIs and further use these infrastructures to build ML pipelines for both training and inference jobs.
 
 Flink ML is developed under the umbrella of [Apache Flink](https://flink.apache.org/).
 
@@ -6,7 +6,7 @@ Flink ML is developed under the umbrella of [Apache Flink](https://flink.apache.
 
 Run the `mvn clean package` command.
 
-Then You will find a JAR file that contains your application, plus any libraries that you may have added as dependencies to the application: `target/<artifact-id>-<version>.jar`.
+Then you will find a JAR file that contains your application, plus any libraries that you may have added as dependencies to the application: `target/<artifact-id>-<version>.jar`.
 
 ## <a name="contributing"></a>Contributing
 
