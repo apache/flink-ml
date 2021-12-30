@@ -28,7 +28,7 @@ under the License.
         <version>2.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>flink-ml-iteration</artifactId>
+    <artifactId>flink-ml-iteration_${scala.binary.version}</artifactId>
     <name>Flink ML : Iteration</name>
 
     <properties>
