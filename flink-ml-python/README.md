@@ -1,4 +1,4 @@
-Flink ML is a library which provides machine learning (ML) APIs and libraries that simplify the building of machine learning pipelines. It provides a set of standard ML APIs for MLlib developers to implement ML algorithms, as well as libraries of ML algorithms that can be used to build ML pipelines for both training and inference jobs.
+Flink ML is a library which provides machine learning (ML) APIs and infrastructures that simplify the building of ML pipelines. Users can implement ML algorithms with the standard ML APIs and further use these infrastructures to build ML pipelines for both training and inference jobs.
 
 Flink ML is developed under the umbrella of [Apache Flink](https://flink.apache.org/).
 
