@@ -18,13 +18,14 @@
 import io
 import os
 import sys
+from platform import python_version
 from shutil import copytree, rmtree
 
 from setuptools import setup
 
-if sys.version_info < (3, 6):
-    print("Python versions prior to 3.6 are not supported for Flink ML.",
-          file=sys.stderr)
+if sys.version_info < (3, 6) or sys.version_info > (3, 8):
+    print("Only Python versions between 3.6 and 3.8 (inclusive) are supported for Flink ML. "
+          "The current Python version is %s." % python_version(), file=sys.stderr)
     sys.exit(-1)
 
 
