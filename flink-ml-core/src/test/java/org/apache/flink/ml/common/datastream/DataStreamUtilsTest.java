@@ -19,6 +19,7 @@
 package org.apache.flink.ml.common.datastream;
 
 import org.apache.flink.api.common.functions.MapPartitionFunction;
+import org.apache.flink.api.common.functions.RichMapPartitionFunction;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.configuration.Configuration;
@@ -35,6 +36,7 @@ import org.junit.Test;
 import java.util.List;
 
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertNotNull;
 
 /** Tests the {@link DataStreamUtils}. */
 public class DataStreamUtilsTest {
@@ -62,9 +64,10 @@ public class DataStreamUtilsTest {
     }
 
     /** A simple implementation for a {@link MapPartitionFunction}. */
-    private static class TestMapPartitionFunc implements MapPartitionFunction<Long, Integer> {
+    private static class TestMapPartitionFunc extends RichMapPartitionFunction<Long, Integer> {
 
         public void mapPartition(Iterable<Long> values, Collector<Integer> out) {
+            assertNotNull(getRuntimeContext());
             int cnt = 0;
             for (long ignored : values) {
                 cnt++;
