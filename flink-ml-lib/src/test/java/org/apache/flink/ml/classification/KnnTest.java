@@ -16,12 +16,15 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.classification.knn;
+package org.apache.flink.ml.classification;
 
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.ml.classification.knn.Knn;
+import org.apache.flink.ml.classification.knn.KnnModel;
+import org.apache.flink.ml.classification.knn.KnnModelData;
 import org.apache.flink.ml.linalg.DenseMatrix;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vectors;

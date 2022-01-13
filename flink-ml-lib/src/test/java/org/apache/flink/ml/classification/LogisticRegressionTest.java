@@ -16,13 +16,16 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.classification.logisticregression;
+package org.apache.flink.ml.classification;
 
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.ml.classification.logisticregression.LogisticRegression;
+import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModel;
+import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelData;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.ReadWriteUtils;
