@@ -1,4 +1,13 @@
-{{/*
+---
+title: Blogs
+menu:
+  after:
+    name: blog
+    weight: 10001
+aliases:
+  - /posts/
+---
+<!--
 Licensed to the Apache Software Foundation (ASF) under one
 or more contributor license agreements.  See the NOTICE file
 distributed with this work for additional information
@@ -15,14 +24,4 @@ software distributed under the License is distributed on an
 KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
-*/}}{{/*
-    Shortcode for linking to a file in the training repo github. This shortcode
-    will automatically discover the repo and correct branch.
-
-    Parmeters: 
-        - file: The absolute path to the image file (required)
-        - name: The rendered link name (required)
-*/}}
-<a href="{{ .Site.Params.TrainingExercises }}/blob/{{ .Site.Params.Branch }}/{{ .Get "file" }}">
-    {{ .Get "name" }}
-</a>
+-->

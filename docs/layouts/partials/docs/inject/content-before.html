@@ -19,17 +19,18 @@ under the License.
 <!--
     Partial that renders before the content on every page.
 -->
+
 {{ if $.Site.Params.ShowOutDatedWarning }}
 <article class="markdown">
     <blockquote style="border-color:#f66">
-        {{ markdownify "This documentation is for an out-of-date version of Apache Flink Stateful Functions. We recommend you use the latest [stable version](https://ci.apache.org/projects/flink/flink-statefun-docs-stable/)."}}
+        {{ markdownify "This documentation is for an out-of-date version of Apache Flink Machine Learning Library. We recommend you use the latest [stable version](https://ci.apache.org/projects/flink/flink-ml-docs-stable/)."}}
     </blockquote>
 </article>
 {{ end }}
 {{ if (not $.Site.Params.IsStable) }}
 <article class="markdown">
     <blockquote style="border-color:#f66">
-        {{ markdownify "This documentation is for an unreleased version of Apache Flink Stateful Functions. We recommend you use the latest [stable version](https://ci.apache.org/projects/flink/flink-statefun-docs-stable/)."}}
+        {{ markdownify "This documentation is for an unreleased version of Apache Flink Machine Learning Library. We recommend you use the latest [stable version](https://ci.apache.org/projects/flink/flink-ml-docs-stable/)."}}
     </blockquote>
 </article>
 {{ end }}
