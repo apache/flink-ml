@@ -29,9 +29,6 @@ infrastructures that simplify the building of ML pipelines. Users can implement
 ML algorithms with the standard ML APIs and further use these infrastructures to
 build ML pipelines for both training and inference jobs.
 
-Flink ML is developed under the umbrella of [Apache
-Flink](https://flink.apache.org/).
-
 {{< columns >}}
 ## Try Flink ML
 
@@ -49,3 +46,6 @@ Flink’s user mailing list is consistently ranked as one of the most active of
 any Apache project, and is a great way to get help quickly.
 
 {{< /columns >}}
+
+Flink ML is developed under the umbrella of [Apache
+Flink](https://flink.apache.org/).

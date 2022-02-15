@@ -45,8 +45,8 @@ top-level heading for the page.
     ---
 
     ---
-    title: "Title of the Page" <-- Title rendered in the side nave
-    weight: 1 <-- Weight controls the ordering of pages in the side nav. 
+    title: "Title of the Page" <-- Title rendered in the side nav
+    weight: 1 <-- Weight controls the ordering of pages in the side nav
     type: docs <-- required
     aliases:  <-- Alias to setup redirect from removed page to this one
       - /alias/to/removed/page.html
@@ -76,7 +76,7 @@ different ordering, because you don't like how a headline looks.
 #### Table of Contents
 
 Table of contents are added automatically to every page, based on heading levels
-2 - 4. The ToC can be ommitted by adding the following to the front matter of
+2 - 4. The ToC can be omitted by adding the following to the front matter of
 the page:
 
     ---

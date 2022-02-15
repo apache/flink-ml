@@ -65,7 +65,7 @@ make sure the following dependencies also exist in `pom.xml`.
 
 Kmeans is a widely-used clustering algorithm and has been supported by Flink ML.
 The example code below creates a Flink job with Flink ML that initializes and
-trains a Kmeans model, and finally use it to predict the cluster id of certain
+trains a Kmeans model, and finally uses it to predict the cluster id of certain
 data points.
 
 ```java
@@ -158,7 +158,7 @@ StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
 Then the program creates the Table containing data for the training and
 prediction process of the following Kmeans algorithm. Flink ML operators
-searches the names of the columns of the input table for input data, and produce
+search the names of the columns of the input table for input data, and produce
 prediction results to designated column of the output Table.
 
 ```java
@@ -176,7 +176,7 @@ Table input = tEnv.fromDataStream(inputStream).as(featuresCol);
 
 ### Creating, Configuring, Training & Using Kmeans
 
-Flink ML classes for Kmeans algorithm includes `KMeans` and `KMeansModel`.
+Flink ML classes for Kmeans algorithm include `KMeans` and `KMeansModel`.
 `KMeans` implements the training process of Kmeans algorithm based on the
 provided training data, and finally generates a `KMeansModel`.
 `KmeansModel.transform()` method encodes the Transformation logic of this
