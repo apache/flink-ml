@@ -33,7 +33,7 @@ build ML pipelines for both training and inference jobs.
 ## Try Flink ML
 
 If you’re interested in playing around with Flink ML, check out our [example
-codes](({{< ref "docs/try-flink-ml/quick-start" >}})). It provides a step by
+codes]({{< ref "docs/try-flink-ml/quick-start" >}}). It provides a step by
 step introduction to the APIs and guides you through real applications.
 
 <--->
