@@ -1,6 +1,5 @@
 ---
 title: "Kmeans"
-weight: 1
 type: docs
 aliases:
 - /operators/clustering/kmeans.html
@@ -31,19 +30,19 @@ into a predefined number of clusters.
 
 ## Input Columns
 
-| Param name  | Type    | Default    | Description    |
-| :---------- | :------ | :--------- | :------------- |
-| featuresCol | Vector  | "features" | Feature vector |
+| Param name  | Type   | Default      | Description    |
+| :---------- | :----- | :----------- | :------------- |
+| featuresCol | Vector | `"features"` | Feature vector |
 
 ## Output Columns
 
-| Param name    | Type    | Default      | Description              |
-| :------------ | :------ | :----------- | :----------------------- |
-| predictionCol | Integer | "prediction" | Predicted cluster center |
+| Param name    | Type    | Default        | Description              |
+| :------------ | :------ | :------------- | :----------------------- |
+| predictionCol | Integer | `"prediction"` | Predicted cluster center |
 
 ## Parameters
 
-Below are parameters required by `KmeansModel`.
+Below are parameters required by `KMeansModel`.
 
 | Key             | Default                         | Type   | Required | Description                                                  |
 | --------------- | ------------------------------- | ------ | -------- | ------------------------------------------------------------ |
@@ -51,7 +50,7 @@ Below are parameters required by `KmeansModel`.
 | featuresCol     | `"features"`                    | String | no       | Features column name.                                        |
 | predictionCol   | `"prediction"`                  | String | no       | Prediction column name.                                      |
 
-`Kmeans` need parameters above and also below.
+`KMeans` needs parameters above and also below.
 
 | Key      | Default    | Type    | Required | Description                                                |
 | -------- | ---------- | ------- | -------- | ---------------------------------------------------------- |
