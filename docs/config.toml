@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-baseURL = '//nightlies.apache.org/flink/flink-ml-docs-master'
+baseURL = '//nightlies.apache.org/flink/flink-ml-docs-release-2.0'
 languageCode = 'en-us'
 title = 'Apache Flink Machine Learning Library'
 enableGitInfo = false
@@ -38,10 +38,10 @@ pygmentsUseClasses = true
 
   # For stable releases, leave the bugfix version out (e.g. 1.2). For snapshot
   # release this should be the same as the regular version
-  VersionTitle = "2.0.0"
+  VersionTitle = "2.0"
 
   # The branch for this version of Apache Flink Machine Learning Library
-  Branch = "master"
+  Branch = "release-2.0"
 
   # The github repository for Apache Flink Machine Learning Library
   Repo = "//github.com/apache/flink-ml"
@@ -57,6 +57,7 @@ pygmentsUseClasses = true
   # of the menu
   MenuLinks = [
     ["Project Homepage", "//flink.apache.org"],
+    ["JavaDocs", "//nightlies.apache.org/flink/flink-ml-docs-release-2.0/api/java/"],
   ]
 
   PreviousDocs = []
