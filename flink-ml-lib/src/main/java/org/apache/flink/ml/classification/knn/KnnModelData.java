@@ -27,6 +27,7 @@ import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
+import org.apache.flink.ml.api.ModelInfo;
 import org.apache.flink.ml.linalg.DenseMatrix;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.typeinfo.DenseMatrixSerializer;
@@ -39,6 +40,7 @@ import org.apache.flink.table.api.internal.TableImpl;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.List;
 
 /**
  * Model data of {@link KnnModel}.
@@ -47,18 +49,38 @@ import java.io.OutputStream;
  * classes to save/load model data.
  */
 public class KnnModelData {
-
     public DenseMatrix packedFeatures;
     public DenseVector featureNormSquares;
     public DenseVector labels;
 
     public KnnModelData() {}
 
-    public KnnModelData(
-            DenseMatrix packedFeatures, DenseVector featureNormSquares, DenseVector labels) {
-        this.packedFeatures = packedFeatures;
-        this.featureNormSquares = featureNormSquares;
-        this.labels = labels;
+    public KnnModelData(List<KnnModelElement> modelRecords) {
+        int featureDim = modelRecords.get(0).packedFeatures.numRows();
+        int totalCols = 0;
+        for (KnnModelElement record : modelRecords) {
+            totalCols += record.packedFeatures.numCols();
+        }
+        packedFeatures = new DenseMatrix(featureDim, totalCols);
+        featureNormSquares = new DenseVector(totalCols);
+        labels = new DenseVector(totalCols);
+        int offset = 0;
+        for (KnnModelElement record : modelRecords) {
+            System.arraycopy(
+                    record.packedFeatures.values,
+                    0,
+                    packedFeatures.values,
+                    offset * featureDim,
+                    featureDim * record.packedFeatures.numCols());
+            System.arraycopy(
+                    record.featureNormSquares.values,
+                    0,
+                    featureNormSquares.values,
+                    offset,
+                    record.featureNormSquares.size());
+            System.arraycopy(record.labels.values, 0, labels.values, offset, record.labels.size());
+            offset += record.featureNormSquares.size();
+        }
     }
 
     /**
@@ -67,47 +89,48 @@ public class KnnModelData {
      * @param modelDataTable The table model data.
      * @return The data stream model data.
      */
-    public static DataStream<KnnModelData> getModelDataStream(Table modelDataTable) {
+    public static DataStream<KnnModelElement> getModelDataStream(Table modelDataTable) {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) modelDataTable).getTableEnvironment();
-        return tEnv.toDataStream(modelDataTable)
-                .map(
-                        x ->
-                                new KnnModelData(
-                                        (DenseMatrix) x.getField(0),
-                                        (DenseVector) x.getField(1),
-                                        (DenseVector) x.getField(2)));
+        return tEnv.toDataStream(modelDataTable).map(x -> (KnnModelElement) x.getField(0));
     }
 
     /** Encoder for {@link KnnModelData}. */
-    public static class ModelDataEncoder implements Encoder<KnnModelData> {
+    public static class ModelDataEncoder implements Encoder<KnnModelElement> {
         @Override
-        public void encode(KnnModelData knnModelData, OutputStream outputStream)
+        public void encode(KnnModelElement modelRecord, OutputStream outputStream)
                 throws IOException {
             DataOutputView dataOutputView = new DataOutputViewStreamWrapper(outputStream);
-            DenseMatrixSerializer.INSTANCE.serialize(knnModelData.packedFeatures, dataOutputView);
+            DenseMatrixSerializer.INSTANCE.serialize(modelRecord.packedFeatures, dataOutputView);
             DenseVectorSerializer.INSTANCE.serialize(
-                    knnModelData.featureNormSquares, dataOutputView);
-            DenseVectorSerializer.INSTANCE.serialize(knnModelData.labels, dataOutputView);
+                    modelRecord.featureNormSquares, dataOutputView);
+            DenseVectorSerializer.INSTANCE.serialize(modelRecord.labels, dataOutputView);
+            dataOutputView.writeLong(modelRecord.versionId);
+            dataOutputView.writeBoolean(modelRecord.isLastRecord);
         }
     }
 
     /** Decoder for {@link KnnModelData}. */
-    public static class ModelDataDecoder extends SimpleStreamFormat<KnnModelData> {
+    public static class ModelDataDecoder extends SimpleStreamFormat<KnnModelElement> {
         @Override
-        public Reader<KnnModelData> createReader(Configuration config, FSDataInputStream stream) {
-            return new Reader<KnnModelData>() {
+        public Reader<KnnModelElement> createReader(Configuration config, FSDataInputStream stream) {
+            return new Reader<KnnModelElement>() {
 
                 private final DataInputView source = new DataInputViewStreamWrapper(stream);
 
                 @Override
-                public KnnModelData read() throws IOException {
+                public KnnModelElement read() throws IOException {
                     try {
                         DenseMatrix matrix = DenseMatrixSerializer.INSTANCE.deserialize(source);
                         DenseVector normSquares =
                                 DenseVectorSerializer.INSTANCE.deserialize(source);
                         DenseVector labels = DenseVectorSerializer.INSTANCE.deserialize(source);
-                        return new KnnModelData(matrix, normSquares, labels);
+                        return new KnnModelElement(
+                                matrix,
+                                normSquares,
+                                labels,
+                                source.readLong(),
+                                source.readBoolean());
                     } catch (EOFException e) {
                         return null;
                     }
@@ -121,8 +144,39 @@ public class KnnModelData {
         }
 
         @Override
-        public TypeInformation<KnnModelData> getProducedType() {
-            return TypeInformation.of(KnnModelData.class);
+        public TypeInformation<KnnModelElement> getProducedType() {
+            return TypeInformation.of(KnnModelElement.class);
+        }
+    }
+
+    public static class KnnModelElement implements ModelInfo {
+        public DenseMatrix packedFeatures;
+        public DenseVector featureNormSquares;
+        public DenseVector labels;
+        public long versionId;
+        public boolean isLastRecord;
+
+        public KnnModelElement(
+                DenseMatrix packedFeatures,
+                DenseVector featureNormSquares,
+                DenseVector labels,
+                long versionId,
+                boolean isLastRecord) {
+            this.packedFeatures = packedFeatures;
+            this.featureNormSquares = featureNormSquares;
+            this.labels = labels;
+            this.versionId = versionId;
+            this.isLastRecord = isLastRecord;
+        }
+
+        @Override
+        public long getVersionId() {
+            return versionId;
+        }
+
+        @Override
+        public boolean getIsLastRecord() {
+            return isLastRecord;
         }
     }
 }

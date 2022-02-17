@@ -28,6 +28,7 @@ import org.apache.flink.connector.file.src.reader.SimpleStreamFormat;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
+import org.apache.flink.ml.api.ModelInfo;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -48,7 +49,7 @@ import java.util.Map;
  * <p>This class also provides methods to convert model data from Table to Datastream, and classes
  * to save/load model data.
  */
-public class NaiveBayesModelData {
+public class NaiveBayesModelData implements ModelInfo {
     /**
      * Log of class conditional probabilities, whose dimension is C (number of classes) by D (number
      * of features).
@@ -61,14 +62,43 @@ public class NaiveBayesModelData {
     /** Value of labels. */
     public DenseVector labels;
 
+    public long versionId;
+    public boolean isLastRecord;
+
     public NaiveBayesModelData(
             Map<Double, Double>[][] theta, DenseVector piArray, DenseVector labels) {
+        this(theta, piArray, labels, System.nanoTime(), true);
+    }
+
+    public NaiveBayesModelData(
+            Map<Double, Double>[][] theta,
+            DenseVector piArray,
+            DenseVector labels,
+            long versionId,
+            boolean isLastRecord) {
         this.theta = theta;
         this.piArray = piArray;
         this.labels = labels;
+        this.versionId = versionId;
+        this.isLastRecord = isLastRecord;
     }
 
     public NaiveBayesModelData() {}
+
+    public NaiveBayesModelData setVersionId(long versionId) {
+        this.versionId = versionId;
+        return this;
+    }
+
+    @Override
+    public long getVersionId() {
+        return this.versionId;
+    }
+
+    @Override
+    public boolean getIsLastRecord() {
+        return isLastRecord;
+    }
 
     /**
      * Converts the table model to a data stream.
@@ -86,7 +116,9 @@ public class NaiveBayesModelData {
                                         new NaiveBayesModelData(
                                                 (Map<Double, Double>[][]) row.getField(0),
                                                 (DenseVector) row.getField(1),
-                                                (DenseVector) row.getField(2)));
+                                                (DenseVector) row.getField(2),
+                                                (long) row.getField(3),
+                                                (boolean) row.getField(4)));
     }
 
     /** Data encoder for the {@link NaiveBayesModelData}. */
@@ -111,6 +143,8 @@ public class NaiveBayesModelData {
                     mapSerializer.serialize(map, outputViewStreamWrapper);
                 }
             }
+            outputViewStreamWrapper.writeLong(modelData.versionId);
+            outputViewStreamWrapper.writeBoolean(modelData.isLastRecord);
         }
     }
 
@@ -144,7 +178,12 @@ public class NaiveBayesModelData {
                                 theta[i][j] = mapSerializer.deserialize(inputViewStreamWrapper);
                             }
                         }
-                        return new NaiveBayesModelData(theta, piArray, labels);
+                        return new NaiveBayesModelData(
+                                theta,
+                                piArray,
+                                labels,
+                                inputViewStreamWrapper.readLong(),
+                                inputViewStreamWrapper.readBoolean());
                     } catch (EOFException e) {
                         return null;
                     }

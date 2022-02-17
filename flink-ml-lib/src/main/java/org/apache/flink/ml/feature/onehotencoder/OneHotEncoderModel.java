@@ -20,7 +20,6 @@ package org.apache.flink.ml.feature.onehotencoder;
 
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
@@ -87,7 +86,7 @@ public class OneHotEncoderModel
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) modelDataTable).getTableEnvironment();
         DataStream<Row> input = tEnv.toDataStream(inputs[0]);
-        DataStream<Tuple2<Integer, Integer>> modelStream =
+        DataStream<OneHotEncoderModelData> modelStream =
                 OneHotEncoderModelData.getModelDataStream(modelDataTable);
 
         Function<List<DataStream<?>>, DataStream<Row>> function =
@@ -122,7 +121,7 @@ public class OneHotEncoderModel
             throws IOException {
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
         OneHotEncoderModel model = ReadWriteUtils.loadStageParam(path);
-        DataStream<Tuple2<Integer, Integer>> modelData =
+        DataStream<OneHotEncoderModelData> modelData =
                 ReadWriteUtils.loadModelData(
                         env, path, new OneHotEncoderModelData.ModelDataStreamFormat());
         return model.setModelData(tEnv.fromDataStream(modelData));
@@ -149,7 +148,7 @@ public class OneHotEncoderModel
         private final String[] inputCols;
         private final boolean dropLast;
         private final String broadcastModelKey;
-        private List<Tuple2<Integer, Integer>> model = null;
+        private Map<Integer, Integer> model = null;
 
         public GenerateOutputsFunction(
                 String[] inputCols, boolean dropLast, String broadcastModelKey) {
@@ -161,12 +160,17 @@ public class OneHotEncoderModel
         @Override
         public Row map(Row row) {
             if (model == null) {
-                model = getRuntimeContext().getBroadcastVariable(broadcastModelKey);
+                model =
+                        ((OneHotEncoderModelData)
+                                        getRuntimeContext()
+                                                .getBroadcastVariable(broadcastModelKey)
+                                                .get(0))
+                                .mapping;
             }
             int[] categorySizes = new int[model.size()];
             int offset = dropLast ? 0 : 1;
-            for (Tuple2<Integer, Integer> tup : model) {
-                categorySizes[tup.f0] = tup.f1 + offset;
+            for (int key : model.keySet()) {
+                categorySizes[key] = model.get(key) + offset;
             }
             Row result = new Row(categorySizes.length);
             for (int i = 0; i < categorySizes.length; i++) {

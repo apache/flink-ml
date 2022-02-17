@@ -26,6 +26,7 @@ import org.apache.flink.connector.file.src.reader.SimpleStreamFormat;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
+import org.apache.flink.ml.api.ModelInfo;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -43,15 +44,33 @@ import java.io.OutputStream;
  * <p>This class also provides methods to convert model data from Table to Datastream, and classes
  * to save/load model data.
  */
-public class KMeansModelData {
+public class KMeansModelData implements ModelInfo {
 
     public DenseVector[] centroids;
+    public long versionId;
+    public boolean isLastRecord;
 
     public KMeansModelData(DenseVector[] centroids) {
+        this(centroids, System.nanoTime(), true);
+    }
+
+    public KMeansModelData(DenseVector[] centroids, long versionId, boolean isLastRecord) {
         this.centroids = centroids;
+        this.versionId = versionId;
+        this.isLastRecord = isLastRecord;
     }
 
     public KMeansModelData() {}
+
+    @Override
+    public long getVersionId() {
+        return this.versionId;
+    }
+
+    @Override
+    public boolean getIsLastRecord() {
+        return isLastRecord;
+    }
 
     /**
      * Converts the table model to a data stream.
@@ -63,7 +82,12 @@ public class KMeansModelData {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) modelData).getTableEnvironment();
         return tEnv.toDataStream(modelData)
-                .map(x -> new KMeansModelData((DenseVector[]) x.getField(0)));
+                .map(
+                        x ->
+                                new KMeansModelData(
+                                        (DenseVector[]) x.getField(0),
+                                        (long) x.getField(1),
+                                        (boolean) x.getField(2)));
     }
 
     /** Data encoder for {@link KMeansModelData}. */
@@ -75,9 +99,10 @@ public class KMeansModelData {
                     new DataOutputViewStreamWrapper(outputStream);
             IntSerializer.INSTANCE.serialize(modelData.centroids.length, outputViewStreamWrapper);
             for (DenseVector denseVector : modelData.centroids) {
-                DenseVectorSerializer.INSTANCE.serialize(
-                        denseVector, new DataOutputViewStreamWrapper(outputStream));
+                DenseVectorSerializer.INSTANCE.serialize(denseVector, outputViewStreamWrapper);
             }
+            outputViewStreamWrapper.writeLong(modelData.versionId);
+            outputViewStreamWrapper.writeBoolean(modelData.isLastRecord);
         }
     }
 
@@ -101,7 +126,10 @@ public class KMeansModelData {
                                     DenseVectorSerializer.INSTANCE.deserialize(
                                             inputViewStreamWrapper);
                         }
-                        return new KMeansModelData(centroids);
+                        return new KMeansModelData(
+                                centroids,
+                                inputViewStreamWrapper.readLong(),
+                                inputViewStreamWrapper.readBoolean());
                     } catch (EOFException e) {
                         return null;
                     }

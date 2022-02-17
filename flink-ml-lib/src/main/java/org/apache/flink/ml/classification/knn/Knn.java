@@ -22,6 +22,7 @@ import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.RichMapPartitionFunction;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.ml.api.Estimator;
+import org.apache.flink.ml.classification.knn.KnnModelData.KnnModelElement;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.linalg.BLAS;
 import org.apache.flink.ml.linalg.DenseMatrix;
@@ -65,7 +66,7 @@ public class Knn implements Estimator<Knn, KnnModel>, KnnParams<Knn> {
         /* Tuple3 : <feature, label, norm square> */
         DataStream<Tuple3<DenseVector, Double, Double>> inputDataWithNorm =
                 computeNormSquare(tEnv.toDataStream(inputs[0]));
-        DataStream<KnnModelData> modelData = genModelData(inputDataWithNorm);
+        DataStream<KnnModelElement> modelData = genModelData(inputDataWithNorm);
         KnnModel model = new KnnModel().setModelData(tEnv.fromDataStream(modelData));
         ReadWriteUtils.updateExistingParams(model, getParamMap());
         return model;
@@ -95,45 +96,45 @@ public class Knn implements Estimator<Knn, KnnModel>, KnnParams<Knn> {
      * @param inputDataWithNormSqare Input data with norm square.
      * @return Knn model.
      */
-    private static DataStream<KnnModelData> genModelData(
+    private static DataStream<KnnModelElement> genModelData(
             DataStream<Tuple3<DenseVector, Double, Double>> inputDataWithNormSqare) {
-        DataStream<KnnModelData> modelData =
-                DataStreamUtils.mapPartition(
-                        inputDataWithNormSqare,
-                        new RichMapPartitionFunction<
-                                Tuple3<DenseVector, Double, Double>, KnnModelData>() {
-                            @Override
-                            public void mapPartition(
-                                    Iterable<Tuple3<DenseVector, Double, Double>> dataPoints,
-                                    Collector<KnnModelData> out) {
-                                List<Tuple3<DenseVector, Double, Double>> bufferedDataPoints =
-                                        new ArrayList<>();
-                                for (Tuple3<DenseVector, Double, Double> dataPoint : dataPoints) {
-                                    bufferedDataPoints.add(dataPoint);
-                                }
-                                int featureDim = bufferedDataPoints.get(0).f0.size();
-                                DenseMatrix packedFeatures =
-                                        new DenseMatrix(featureDim, bufferedDataPoints.size());
-                                DenseVector normSquares =
-                                        new DenseVector(bufferedDataPoints.size());
-                                DenseVector labels = new DenseVector(bufferedDataPoints.size());
-                                int offset = 0;
-                                for (Tuple3<DenseVector, Double, Double> dataPoint :
-                                        bufferedDataPoints) {
-                                    System.arraycopy(
-                                            dataPoint.f0.values,
-                                            0,
-                                            packedFeatures.values,
-                                            offset * featureDim,
-                                            featureDim);
-                                    labels.values[offset] = dataPoint.f1;
-                                    normSquares.values[offset++] = dataPoint.f2;
-                                }
-                                out.collect(new KnnModelData(packedFeatures, normSquares, labels));
+        return DataStreamUtils.mapPartition(
+                inputDataWithNormSqare,
+                new RichMapPartitionFunction<
+                        Tuple3<DenseVector, Double, Double>, KnnModelElement>() {
+                    @Override
+                    public void mapPartition(
+                            Iterable<Tuple3<DenseVector, Double, Double>> dataPoints,
+                            Collector<KnnModelElement> out) {
+                        List<Tuple3<DenseVector, Double, Double>> bufferedDataPoints =
+                                new ArrayList<>();
+                        for (Tuple3<DenseVector, Double, Double> dataPoint : dataPoints) {
+                            bufferedDataPoints.add(dataPoint);
+                        }
+                        if (bufferedDataPoints.size() != 0) {
+                            int featureDim = bufferedDataPoints.get(0).f0.size();
+                            DenseMatrix packedFeatures =
+                                    new DenseMatrix(featureDim, bufferedDataPoints.size());
+                            DenseVector normSquares = new DenseVector(bufferedDataPoints.size());
+                            DenseVector labels = new DenseVector(bufferedDataPoints.size());
+                            int offset = 0;
+                            for (Tuple3<DenseVector, Double, Double> dataPoint :
+                                    bufferedDataPoints) {
+                                System.arraycopy(
+                                        dataPoint.f0.values,
+                                        0,
+                                        packedFeatures.values,
+                                        offset * featureDim,
+                                        featureDim);
+                                labels.values[offset] = dataPoint.f1;
+                                normSquares.values[offset++] = dataPoint.f2;
                             }
-                        });
-        modelData.getTransformation().setParallelism(1);
-        return modelData;
+                            out.collect(
+                                    new KnnModelElement(
+                                            packedFeatures, normSquares, labels, 1, true));
+                        }
+                    }
+                });
     }
 
     /**

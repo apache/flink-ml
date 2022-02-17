@@ -24,8 +24,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.ml.classification.knn.Knn;
 import org.apache.flink.ml.classification.knn.KnnModel;
-import org.apache.flink.ml.classification.knn.KnnModelData;
-import org.apache.flink.ml.linalg.DenseMatrix;
+import org.apache.flink.ml.classification.knn.KnnModelData.KnnModelElement;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -49,6 +48,7 @@ import org.junit.rules.TemporaryFolder;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
@@ -189,7 +189,7 @@ public class KnnTest {
                 StageTestUtils.saveAndReload(
                         env, knnModel, tempFolder.newFolder().getAbsolutePath());
         assertEquals(
-                Arrays.asList("packedFeatures", "featureNormSquares", "labels"),
+                Collections.singletonList("f0"),
                 knnModel.getModelData()[0].getResolvedSchema().getColumnNames());
         Table output = knnModel.transform(predictData)[0];
         verifyPredictionResult(output, knn.getLabelCol(), knn.getPredictionCol());
@@ -212,15 +212,9 @@ public class KnnTest {
         KnnModel knnModel = knn.fit(trainData);
         Table modelData = knnModel.getModelData()[0];
         DataStream<Row> output = tEnv.toDataStream(modelData);
-        assertEquals("packedFeatures", modelData.getResolvedSchema().getColumnNames().get(0));
-        assertEquals("featureNormSquares", modelData.getResolvedSchema().getColumnNames().get(1));
-        assertEquals("labels", modelData.getResolvedSchema().getColumnNames().get(2));
+        assertEquals("f0", modelData.getResolvedSchema().getColumnNames().get(0));
         List<Row> modelRows = IteratorUtils.toList(output.executeAndCollect());
-        KnnModelData data =
-                new KnnModelData(
-                        (DenseMatrix) modelRows.get(0).getField(0),
-                        (DenseVector) modelRows.get(0).getField(1),
-                        (DenseVector) modelRows.get(0).getField(2));
+        KnnModelElement data = (KnnModelElement) modelRows.get(0).getField(0);
         Assert.assertNotNull(data);
         assertEquals(2, data.packedFeatures.numRows());
         assertEquals(data.packedFeatures.numCols(), data.labels.size());

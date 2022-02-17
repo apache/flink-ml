@@ -231,7 +231,7 @@ public class LogisticRegressionTest {
         LogisticRegressionModel model = logisticRegression.fit(binomialDataTable);
         model = StageTestUtils.saveAndReload(env, model, tempFolder.newFolder().getAbsolutePath());
         assertEquals(
-                Collections.singletonList("coefficient"),
+                Arrays.asList("coefficient", "versionId", "isLastRecord"),
                 model.getModelData()[0].getResolvedSchema().getColumnNames());
         Table output = model.transform(binomialDataTable)[0];
         verifyPredictionResult(

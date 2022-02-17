@@ -21,22 +21,23 @@ package org.apache.flink.ml.feature.onehotencoder;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.serialization.Encoder;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.api.common.typeinfo.Types;
-import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.common.typeutils.base.IntSerializer;
+import org.apache.flink.api.common.typeutils.base.MapSerializer;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.file.src.reader.SimpleStreamFormat;
 import org.apache.flink.core.fs.FSDataInputStream;
+import org.apache.flink.core.memory.DataInputViewStreamWrapper;
+import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
+import org.apache.flink.ml.api.ModelInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
 import org.apache.flink.types.Row;
 
-import com.esotericsoftware.kryo.io.Input;
-import com.esotericsoftware.kryo.io.Output;
-
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Map;
 
 /**
  * Model data of {@link OneHotEncoderModel}.
@@ -44,54 +45,98 @@ import java.io.OutputStream;
  * <p>This class also provides methods to convert model data from Table to Datastream, and classes
  * to save/load model data.
  */
-public class OneHotEncoderModelData {
+public class OneHotEncoderModelData implements ModelInfo {
+    public Map<Integer, Integer> mapping;
+    public long versionId;
+    public boolean isLastRecord;
+
+    public OneHotEncoderModelData(Map<Integer, Integer> mapping) {
+        this(mapping, System.nanoTime(), true);
+    }
+
+    public OneHotEncoderModelData(
+            Map<Integer, Integer> mapping, long versionId, boolean isLastRecord) {
+        this.mapping = mapping;
+        this.versionId = versionId;
+        this.isLastRecord = isLastRecord;
+    }
+
+    public OneHotEncoderModelData() {}
+
+    @Override
+    public long getVersionId() {
+        return versionId;
+    }
+
+    @Override
+    public boolean getIsLastRecord() {
+        return isLastRecord;
+    }
+
     /**
      * Converts the table model to a data stream.
      *
      * @param modelData The table model data.
      * @return The data stream model data.
      */
-    public static DataStream<Tuple2<Integer, Integer>> getModelDataStream(Table modelData) {
+    public static DataStream<OneHotEncoderModelData> getModelDataStream(Table modelData) {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) modelData).getTableEnvironment();
         return tEnv.toDataStream(modelData)
                 .map(
-                        new MapFunction<Row, Tuple2<Integer, Integer>>() {
-                            @Override
-                            public Tuple2<Integer, Integer> map(Row row) {
-                                return new Tuple2<>(
-                                        (int) row.getField("f0"), (int) row.getField("f1"));
-                            }
-                        });
+                        (MapFunction<Row, OneHotEncoderModelData>)
+                                row ->
+                                        new OneHotEncoderModelData(
+                                                (Map<Integer, Integer>) row.getField(0),
+                                                (long) row.getField(1),
+                                                (boolean) row.getField(2)));
     }
 
     /** Data encoder for the OneHotEncoder model data. */
-    public static class ModelDataEncoder implements Encoder<Tuple2<Integer, Integer>> {
+    public static class ModelDataEncoder implements Encoder<OneHotEncoderModelData> {
         @Override
-        public void encode(Tuple2<Integer, Integer> modelData, OutputStream outputStream) {
-            Output output = new Output(outputStream);
-            output.writeInt(modelData.f0);
-            output.writeInt(modelData.f1);
-            output.flush();
+        public void encode(OneHotEncoderModelData modelData, OutputStream outputStream) {
+            DataOutputViewStreamWrapper outputViewStreamWrapper =
+                    new DataOutputViewStreamWrapper(outputStream);
+
+            MapSerializer<Integer, Integer> mapSerializer =
+                    new MapSerializer<>(IntSerializer.INSTANCE, IntSerializer.INSTANCE);
+            try {
+                mapSerializer.serialize(modelData.mapping, outputViewStreamWrapper);
+                outputViewStreamWrapper.writeLong(modelData.versionId);
+                outputViewStreamWrapper.writeBoolean(modelData.isLastRecord);
+            } catch (IOException e) {
+                e.printStackTrace();
+                throw new RuntimeException("OneHot model data sink err.");
+            }
         }
     }
 
     /** Data decoder for the OneHotEncoder model data. */
-    public static class ModelDataStreamFormat extends SimpleStreamFormat<Tuple2<Integer, Integer>> {
+    public static class ModelDataStreamFormat extends SimpleStreamFormat<OneHotEncoderModelData> {
         @Override
-        public Reader<Tuple2<Integer, Integer>> createReader(
+        public Reader<OneHotEncoderModelData> createReader(
                 Configuration config, FSDataInputStream stream) {
-            return new Reader<Tuple2<Integer, Integer>>() {
-                private final Input input = new Input(stream);
+            return new Reader<OneHotEncoderModelData>() {
 
                 @Override
-                public Tuple2<Integer, Integer> read() {
-                    if (input.eof()) {
+                public OneHotEncoderModelData read() {
+                    try {
+                        DataInputViewStreamWrapper inputViewStreamWrapper =
+                                new DataInputViewStreamWrapper(stream);
+
+                        MapSerializer<Integer, Integer> mapSerializer =
+                                new MapSerializer<>(IntSerializer.INSTANCE, IntSerializer.INSTANCE);
+                        Map<Integer, Integer> mapping =
+                                mapSerializer.deserialize(inputViewStreamWrapper);
+
+                        return new OneHotEncoderModelData(
+                                mapping,
+                                inputViewStreamWrapper.readLong(),
+                                inputViewStreamWrapper.readBoolean());
+                    } catch (IOException e) {
                         return null;
                     }
-                    int f0 = input.readInt();
-                    int f1 = input.readInt();
-                    return new Tuple2<>(f0, f1);
                 }
 
                 @Override
@@ -102,8 +147,8 @@ public class OneHotEncoderModelData {
         }
 
         @Override
-        public TypeInformation<Tuple2<Integer, Integer>> getProducedType() {
-            return Types.TUPLE(Types.INT, Types.INT);
+        public TypeInformation<OneHotEncoderModelData> getProducedType() {
+            return TypeInformation.of(OneHotEncoderModelData.class);
         }
     }
 }

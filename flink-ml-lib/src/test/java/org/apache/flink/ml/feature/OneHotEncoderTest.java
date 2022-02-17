@@ -19,7 +19,6 @@
 package org.apache.flink.ml.feature;
 
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.ml.common.param.HasHandleInvalid;
 import org.apache.flink.ml.feature.onehotencoder.OneHotEncoder;
@@ -270,12 +269,14 @@ public class OneHotEncoderTest {
     @Test
     public void testGetModelData() throws Exception {
         OneHotEncoderModel model = estimator.fit(trainTable);
-        Tuple2<Integer, Integer> expected = new Tuple2<>(0, 2);
-        Tuple2<Integer, Integer> actual =
+        Map<Integer, Integer> expected = new HashMap<>();
+        expected.put(0, 2);
+        Map<Integer, Integer> map =
                 OneHotEncoderModelData.getModelDataStream(model.getModelData()[0])
                         .executeAndCollect()
-                        .next();
-        assertEquals(expected, actual);
+                        .next()
+                        .mapping;
+        assertEquals(expected, map);
     }
 
     @Test

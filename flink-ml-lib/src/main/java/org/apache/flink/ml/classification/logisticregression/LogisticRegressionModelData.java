@@ -25,6 +25,7 @@ import org.apache.flink.connector.file.src.reader.SimpleStreamFormat;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
+import org.apache.flink.ml.api.ModelInfo;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -42,15 +43,34 @@ import java.io.OutputStream;
  * <p>This class also provides methods to convert model data from Table to Datastream, and classes
  * to save/load model data.
  */
-public class LogisticRegressionModelData {
+public class LogisticRegressionModelData implements ModelInfo {
 
     public DenseVector coefficient;
+    public long versionId;
+    public boolean isLastRecord;
 
     public LogisticRegressionModelData(DenseVector coefficient) {
+        this(coefficient, System.nanoTime(), true);
+    }
+
+    public LogisticRegressionModelData(
+            DenseVector coefficient, long versionId, boolean isLastRecord) {
         this.coefficient = coefficient;
+        this.versionId = versionId;
+        this.isLastRecord = isLastRecord;
     }
 
     public LogisticRegressionModelData() {}
+
+    @Override
+    public boolean getIsLastRecord() {
+        return this.isLastRecord;
+    }
+
+    @Override
+    public long getVersionId() {
+        return this.versionId;
+    }
 
     /**
      * Converts the table model to a data stream.
@@ -62,7 +82,12 @@ public class LogisticRegressionModelData {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) modelData).getTableEnvironment();
         return tEnv.toDataStream(modelData)
-                .map(x -> new LogisticRegressionModelData((DenseVector) x.getField(0)));
+                .map(
+                        x ->
+                                new LogisticRegressionModelData(
+                                        (DenseVector) x.getField(0),
+                                        (long) x.getField(1),
+                                        (boolean) x.getField(2)));
     }
 
     /** Data encoder for {@link LogisticRegressionModel}. */
@@ -71,8 +96,11 @@ public class LogisticRegressionModelData {
         @Override
         public void encode(LogisticRegressionModelData modelData, OutputStream outputStream)
                 throws IOException {
-            DenseVectorSerializer.INSTANCE.serialize(
-                    modelData.coefficient, new DataOutputViewStreamWrapper(outputStream));
+            DataOutputViewStreamWrapper viewStreamWrapper =
+                    new DataOutputViewStreamWrapper(outputStream);
+            DenseVectorSerializer.INSTANCE.serialize(modelData.coefficient, viewStreamWrapper);
+            viewStreamWrapper.writeBoolean(modelData.isLastRecord);
+            viewStreamWrapper.writeLong(modelData.versionId);
         }
     }
 
@@ -87,10 +115,14 @@ public class LogisticRegressionModelData {
                 @Override
                 public LogisticRegressionModelData read() throws IOException {
                     try {
+                        DataInputViewStreamWrapper viewStreamWrapper =
+                                new DataInputViewStreamWrapper(inputStream);
                         DenseVector coefficient =
-                                DenseVectorSerializer.INSTANCE.deserialize(
-                                        new DataInputViewStreamWrapper(inputStream));
-                        return new LogisticRegressionModelData(coefficient);
+                                DenseVectorSerializer.INSTANCE.deserialize(viewStreamWrapper);
+                        return new LogisticRegressionModelData(
+                                coefficient,
+                                viewStreamWrapper.readLong(),
+                                viewStreamWrapper.readBoolean());
                     } catch (EOFException e) {
                         return null;
                     }

@@ -69,11 +69,11 @@ public class OneHotEncoder
         DataStream<Tuple2<Integer, Integer>> columnsAndValues =
                 tEnv.toDataStream(inputs[0]).flatMap(new ExtractInputColsValueFunction(inputCols));
 
-        DataStream<Tuple2<Integer, Integer>> modelData =
+        DataStream<OneHotEncoderModelData> modelData =
                 DataStreamUtils.mapPartition(
                         columnsAndValues.keyBy(columnIdAndValue -> columnIdAndValue.f0),
                         new FindMaxIndexFunction());
-
+        modelData.getTransformation().setParallelism(1);
         OneHotEncoderModel model =
                 new OneHotEncoderModel().setModelData(tEnv.fromDataStream(modelData));
         ReadWriteUtils.updateExistingParams(model, paramMap);
@@ -126,20 +126,20 @@ public class OneHotEncoder
 
     /** Function to find the max index value for each column. */
     private static class FindMaxIndexFunction
-            implements MapPartitionFunction<Tuple2<Integer, Integer>, Tuple2<Integer, Integer>> {
+            implements MapPartitionFunction<Tuple2<Integer, Integer>, OneHotEncoderModelData> {
 
         @Override
         public void mapPartition(
                 Iterable<Tuple2<Integer, Integer>> iterable,
-                Collector<Tuple2<Integer, Integer>> collector) {
+                Collector<OneHotEncoderModelData> collector) {
             Map<Integer, Integer> map = new HashMap<>();
             for (Tuple2<Integer, Integer> value : iterable) {
                 map.put(
                         value.f0,
                         Math.max(map.getOrDefault(value.f0, Integer.MIN_VALUE), value.f1));
             }
-            for (Map.Entry<Integer, Integer> entry : map.entrySet()) {
-                collector.collect(new Tuple2<>(entry.getKey(), entry.getValue()));
+            if (map.size() != 0) {
+                collector.collect(new OneHotEncoderModelData(map));
             }
         }
     }

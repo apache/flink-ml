@@ -23,6 +23,7 @@ import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Model;
+import org.apache.flink.ml.classification.knn.KnnModelData.KnnModelElement;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.BLAS;
@@ -74,7 +75,7 @@ public class KnnModel implements Model<KnnModel>, KnnModelParams<KnnModel> {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
         DataStream<Row> data = tEnv.toDataStream(inputs[0]);
-        DataStream<KnnModelData> knnModel = KnnModelData.getModelDataStream(modelDataTable);
+        DataStream<KnnModelElement> knnModel = KnnModelData.getModelDataStream(modelDataTable);
         final String broadcastModelKey = "broadcastModelKey";
         RowTypeInfo inputTypeInfo = TableUtils.getRowTypeInfo(inputs[0].getResolvedSchema());
         RowTypeInfo outputTypeInfo =
@@ -120,7 +121,7 @@ public class KnnModel implements Model<KnnModel>, KnnModelParams<KnnModel> {
     public static KnnModel load(StreamExecutionEnvironment env, String path) throws IOException {
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
         KnnModel model = ReadWriteUtils.loadStageParam(path);
-        DataStream<KnnModelData> modelData =
+        DataStream<KnnModelElement> modelData =
                 ReadWriteUtils.loadModelData(env, path, new KnnModelData.ModelDataDecoder());
         return model.setModelData(tEnv.fromDataStream(modelData));
     }
@@ -143,8 +144,7 @@ public class KnnModel implements Model<KnnModel>, KnnModelParams<KnnModel> {
         public Row map(Row row) {
             if (knnModelData == null) {
                 knnModelData =
-                        (KnnModelData)
-                                getRuntimeContext().getBroadcastVariable(broadcastKey).get(0);
+                        new KnnModelData(getRuntimeContext().getBroadcastVariable(broadcastKey));
                 distanceVector = new DenseVector(knnModelData.labels.size());
             }
             DenseVector feature = (DenseVector) row.getField(featureCol);
