@@ -1,9 +1,9 @@
 ---
-title: Operators
-icon: <i class="fa fa-book title maindish" aria-hidden="true"></i>
-bold: true
+title: Feature Engineering
 bookCollapseSection: true
-weight: 3
+weight: 1
+aliases:
+  - /operators/feature/
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

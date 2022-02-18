@@ -41,8 +41,8 @@ import static org.apache.flink.ml.builder.GraphNode.StageType;
 
 /**
  * A GraphModel acts as a Model. A GraphModel consists of a DAG of stages, each of which could be an
- * Estimator, Model, Transformer or AlgoOperators. When `GraphModel::transform` is called, the
- * stages are executed in a topologically-sorted order. When a stage is executed, its
+ * Estimator, Model, Transformer or AlgoOperator. When `GraphModel::transform` is called, the stages
+ * are executed in a topologically-sorted order. When a stage is executed, its
  * `AlgoOperator::transform` method will be called on the input tables (from the input edges) and
  * produce output tables to the output edges.
  */
