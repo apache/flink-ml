@@ -1,9 +1,10 @@
 ---
-title: Operators
-icon: <i class="fa fa-book title maindish" aria-hidden="true"></i>
+title: Development
+icon: <i class="fa fa-code title maindish" aria-hidden="true"></i>
 bold: true
+sectionBreak: true
 bookCollapseSection: true
-weight: 3
+weight: 2
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
