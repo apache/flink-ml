@@ -281,4 +281,16 @@ public class LogisticRegressionTest {
                     e.getCause().getCause().getMessage());
         }
     }
+
+    @Test
+    public void testMoreSubtaskThanData() throws Exception {
+        env.setParallelism(12);
+        LogisticRegression logisticRegression = new LogisticRegression().setWeightCol("weight");
+        Table output = logisticRegression.fit(binomialDataTable).transform(binomialDataTable)[0];
+        verifyPredictionResult(
+                output,
+                logisticRegression.getFeaturesCol(),
+                logisticRegression.getPredictionCol(),
+                logisticRegression.getRawPredictionCol());
+    }
 }
