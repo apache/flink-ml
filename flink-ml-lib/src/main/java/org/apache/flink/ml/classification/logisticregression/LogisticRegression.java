@@ -363,6 +363,9 @@ public class LogisticRegression
         public void onEpochWatermarkIncremented(
                 int epochWatermark, Context context, Collector<double[]> collector)
                 throws Exception {
+            if (!trainDataState.get().iterator().hasNext()) {
+                return;
+            }
             if (epochWatermark == 0) {
                 coefficient = new DenseVector(feedbackBuffer);
                 coefficientDim = coefficient.size();
