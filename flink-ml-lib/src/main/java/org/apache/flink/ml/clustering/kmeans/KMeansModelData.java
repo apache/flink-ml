@@ -18,6 +18,7 @@
 
 package org.apache.flink.ml.clustering.kmeans;
 
+import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.serialization.Encoder;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.base.IntSerializer;
@@ -29,16 +30,20 @@ import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
+import org.apache.flink.util.Preconditions;
 
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Arrays;
+import java.util.Random;
 
 /**
- * Model data of {@link KMeansModel}.
+ * Model data of {@link KMeansModel} and {@link OnlineKMeansModel}.
  *
  * <p>This class also provides methods to convert model data from Table to Datastream, and classes
  * to save/load model data.
@@ -47,11 +52,68 @@ public class KMeansModelData {
 
     public DenseVector[] centroids;
 
-    public KMeansModelData(DenseVector[] centroids) {
+    /**
+     * The weight of the centroids. It is used when updating the model data in online training
+     * process.
+     *
+     * <p>KMeansModelData objects generated during {@link KMeans#fit(Table...)} also contains this
+     * field, so that it can be used as the initial model data of the online training process.
+     */
+    public DenseVector weights;
+
+    public KMeansModelData(DenseVector[] centroids, DenseVector weights) {
+        Preconditions.checkArgument(centroids.length == weights.size());
         this.centroids = centroids;
+        this.weights = weights;
     }
 
     public KMeansModelData() {}
+
+    /**
+     * Generates a Table containing a {@link KMeansModelData} instance with randomly generated
+     * centroids.
+     *
+     * @param env The environment where to create the table.
+     * @param k The number of generated centroids.
+     * @param dim The size of generated centroids.
+     * @param weight The weight of the centroids.
+     * @param seed Random seed.
+     */
+    public static Table generateRandomModelData(
+            StreamExecutionEnvironment env, int k, int dim, double weight, long seed) {
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+        return tEnv.fromDataStream(
+                env.fromElements(1).map(new RandomCentroidsCreator(k, dim, weight, seed)));
+    }
+
+    private static class RandomCentroidsCreator implements MapFunction<Integer, KMeansModelData> {
+        private final int k;
+        private final int dim;
+        private final double weight;
+        private final long seed;
+
+        private RandomCentroidsCreator(int k, int dim, double weight, long seed) {
+            this.k = k;
+            this.dim = dim;
+            this.weight = weight;
+            this.seed = seed;
+        }
+
+        @Override
+        public KMeansModelData map(Integer integer) {
+            DenseVector[] centroids = new DenseVector[k];
+            Random random = new Random(seed);
+            for (int i = 0; i < k; i++) {
+                centroids[i] = new DenseVector(dim);
+                for (int j = 0; j < dim; j++) {
+                    centroids[i].values[j] = random.nextDouble();
+                }
+            }
+            DenseVector weights = new DenseVector(k);
+            Arrays.fill(weights.values, weight);
+            return new KMeansModelData(centroids, weights);
+        }
+    }
 
     /**
      * Converts the table model to a data stream.
@@ -63,7 +125,11 @@ public class KMeansModelData {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) modelData).getTableEnvironment();
         return tEnv.toDataStream(modelData)
-                .map(x -> new KMeansModelData((DenseVector[]) x.getField(0)));
+                .map(
+                        x ->
+                                new KMeansModelData(
+                                        (DenseVector[]) x.getField(0),
+                                        (DenseVector) x.getField(1)));
     }
 
     /** Data encoder for {@link KMeansModelData}. */
@@ -78,6 +144,8 @@ public class KMeansModelData {
                 DenseVectorSerializer.INSTANCE.serialize(
                         denseVector, new DataOutputViewStreamWrapper(outputStream));
             }
+            DenseVectorSerializer.INSTANCE.serialize(
+                    modelData.weights, new DataOutputViewStreamWrapper(outputStream));
         }
     }
 
@@ -101,7 +169,9 @@ public class KMeansModelData {
                                     DenseVectorSerializer.INSTANCE.deserialize(
                                             inputViewStreamWrapper);
                         }
-                        return new KMeansModelData(centroids);
+                        DenseVector weights =
+                                DenseVectorSerializer.INSTANCE.deserialize(inputViewStreamWrapper);
+                        return new KMeansModelData(centroids, weights);
                     } catch (EOFException e) {
                         return null;
                     }

@@ -26,15 +26,14 @@ import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.param.ParamValidators;
 
 /**
- * Params of {@link KMeansModel}.
+ * Params of {@link KMeansModel} and {@link OnlineKMeansModel}.
  *
  * @param <T> The class type of this instance.
  */
 public interface KMeansModelParams<T>
         extends HasDistanceMeasure<T>, HasFeaturesCol<T>, HasPredictionCol<T> {
-
     Param<Integer> K =
-            new IntParam("k", "The number of clusters to create.", 2, ParamValidators.gt(1));
+            new IntParam("k", "The max number of clusters to create.", 2, ParamValidators.gt(1));
 
     default int getK() {
         return get(K);

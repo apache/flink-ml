@@ -76,7 +76,7 @@ public class BroadcastContext {
         BROADCAST_VARIABLES.computeIfPresent(
                 key,
                 (k, v) -> {
-                    // sends an dummy email to avoid possible stuck.
+                    // sends a dummy email to avoid possible stuck.
                     if (null != v.mailboxExecutor) {
                         v.mailboxExecutor.execute(() -> {}, "empty mail");
                     }
