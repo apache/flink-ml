@@ -216,6 +216,18 @@ class ParamValidators(object):
 
         return NotNull()
 
+    @staticmethod
+    def non_empty_array() -> ParamValidator[List[T]]:
+        """
+        Checks if the parameter value is not empty array.
+        """
+
+        class NonEmptyArray(ParamValidator[List[T]]):
+            def validate(self, value: List[T]) -> bool:
+                return value is not None and len(value) > 0
+
+        return NonEmptyArray()
+
 
 class Param(Generic[T]):
     """
@@ -233,8 +245,7 @@ class Param(Generic[T]):
         if default_value is not None and not validator.validate(default_value):
             raise ValueError(f"Parameter {name} is given an invalid value {default_value}")
 
-    @staticmethod
-    def json_encode(value: T) -> str:
+    def json_encode(self, value: T) -> str:
         """
         Encodes the given object into a json-formatted string.
 
@@ -243,8 +254,7 @@ class Param(Generic[T]):
         """
         return str(jsonpickle.encode(value, keys=True))
 
-    @staticmethod
-    def json_decode(json: str) -> T:
+    def json_decode(self, json: str) -> T:
         """
         Decodes the given string into an object of class type T.
 

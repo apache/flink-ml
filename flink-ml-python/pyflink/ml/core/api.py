@@ -87,10 +87,10 @@ class Model(Transformer[T], ABC):
     the extra APIs to set and get model data.
     """
 
-    def set_model_data(self, *inputs: Table) -> None:
+    def set_model_data(self, *inputs: Table) -> 'Model':
         raise Exception("This operation is not supported.")
 
-    def get_model_data(self) -> None:
+    def get_model_data(self) -> List[Table]:
         """
         Gets a list of tables representing the model data. Each table could be an unbounded stream
         of model data changes.
