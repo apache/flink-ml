@@ -35,9 +35,9 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 public class DataStreamUtils {
     /**
      * Applies allReduceSum on the input data stream. The input data stream is supposed to contain
-     * one double array in each partition. The result data stream has the same parallelism as the
-     * input, where each partition contains one double array that sums all of the double arrays in
-     * the input data stream.
+     * up to one double array in each partition. The result data stream has the same parallelism as
+     * the input, where each partition contains one double array that sums all of the double arrays
+     * in the input data stream.
      *
      * <p>Note that we throw exception when one of the following two cases happen:
      * <li>There exists one partition that contains more than one double array.

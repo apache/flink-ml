@@ -37,7 +37,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Applies all-reduce on a data stream where each partition contains only one double array.
+ * Applies all-reduce on a data stream where each partition contains up to one double array.
  *
  * <p>AllReduce is a communication primitive widely used in MPI. In this implementation, all workers
  * do reduce on a partition of the whole data and they all get the final reduce result. In detail,
@@ -55,7 +55,7 @@ class AllReduceImpl {
 
     /**
      * Applies allReduceSum on the input data stream. The input data stream is supposed to contain
-     * one double array in each worker. The result data stream has the same parallelism as the
+     * up to one double array in each worker. The result data stream has the same parallelism as the
      * input, where each worker contains one double array that sums all of the double arrays in the
      * input data stream.
      *

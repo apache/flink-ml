@@ -129,10 +129,11 @@ public class LogisticRegression
                                     return new LabeledPointWithWeight(features, label, weight);
                                 });
         DataStream<double[]> initModelData =
-                trainData.transform(
-                        "genInitModelData",
-                        PrimitiveArrayTypeInfo.DOUBLE_PRIMITIVE_ARRAY_TYPE_INFO,
-                        new GenInitModelData());
+                trainData
+                        .transform("getModelDim", BasicTypeInfo.INT_TYPE_INFO, new GetModelDim())
+                        .setParallelism(1)
+                        .broadcast()
+                        .map(double[]::new);
 
         DataStream<LogisticRegressionModelData> modelData = train(trainData, initModelData);
         LogisticRegressionModel model =
@@ -141,12 +142,9 @@ public class LogisticRegression
         return model;
     }
 
-    /**
-     * Generates initialized model data. Note that the parallelism of model data is same as the
-     * input train data, not one.
-     */
-    private static class GenInitModelData extends AbstractStreamOperator<double[]>
-            implements OneInputStreamOperator<LabeledPointWithWeight, double[]>, BoundedOneInput {
+    /** Gets the dimension of the model data. */
+    private static class GetModelDim extends AbstractStreamOperator<Integer>
+            implements OneInputStreamOperator<LabeledPointWithWeight, Integer>, BoundedOneInput {
 
         private int dim = 0;
 
@@ -154,7 +152,7 @@ public class LogisticRegression
 
         @Override
         public void endInput() {
-            output.collect(new StreamRecord<>(new double[dim]));
+            output.collect(new StreamRecord<>(dim));
         }
 
         @Override
@@ -363,9 +361,6 @@ public class LogisticRegression
         public void onEpochWatermarkIncremented(
                 int epochWatermark, Context context, Collector<double[]> collector)
                 throws Exception {
-            if (!trainDataState.get().iterator().hasNext()) {
-                return;
-            }
             if (epochWatermark == 0) {
                 coefficient = new DenseVector(feedbackBuffer);
                 coefficientDim = coefficient.size();
@@ -378,14 +373,16 @@ public class LogisticRegression
             if (trainData == null) {
                 trainData = IteratorUtils.toList(trainDataState.get().iterator());
             }
-            miniBatchData = getMiniBatchData(trainData, localBatchSize);
-            Tuple2<Double, Double> weightSumAndLossSum =
-                    logisticGradient.computeLoss(miniBatchData, coefficient);
-            logisticGradient.computeGradient(miniBatchData, coefficient, gradient);
-            System.arraycopy(gradient.values, 0, feedbackBuffer, 0, gradient.size());
-            feedbackBuffer[coefficientDim] = weightSumAndLossSum.f0;
-            feedbackBuffer[coefficientDim + 1] = weightSumAndLossSum.f1;
-            collector.collect(feedbackBuffer);
+            if (trainData.size() > 0) {
+                miniBatchData = getMiniBatchData(trainData, localBatchSize);
+                Tuple2<Double, Double> weightSumAndLossSum =
+                        logisticGradient.computeLoss(miniBatchData, coefficient);
+                logisticGradient.computeGradient(miniBatchData, coefficient, gradient);
+                System.arraycopy(gradient.values, 0, feedbackBuffer, 0, gradient.size());
+                feedbackBuffer[coefficientDim] = weightSumAndLossSum.f0;
+                feedbackBuffer[coefficientDim + 1] = weightSumAndLossSum.f1;
+                collector.collect(feedbackBuffer);
+            }
         }
 
         @Override

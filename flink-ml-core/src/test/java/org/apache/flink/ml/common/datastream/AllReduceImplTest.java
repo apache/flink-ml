@@ -20,6 +20,7 @@ package org.apache.flink.ml.common.datastream;
 
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
+import org.apache.flink.api.common.typeinfo.PrimitiveArrayTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
@@ -33,8 +34,10 @@ import org.junit.runners.Parameterized;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Iterator;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.fail;
 
 /** Tests the {@link AllReduceImpl}. */
@@ -160,6 +163,20 @@ public class AllReduceImplTest {
                         "The input double array must have same length.",
                         e.getCause().getCause().getMessage());
             }
+        }
+
+        @Test
+        public void testAllReduceWithEmptyInput() throws Exception {
+            StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+            env.setParallelism(parallelism);
+            DataStream<double[]> elements =
+                    env.fromParallelCollection(
+                                    new NumberSequenceIterator(1L, parallelism),
+                                    BasicTypeInfo.LONG_TYPE_INFO)
+                            .flatMap((FlatMapFunction<Long, double[]>) (value, out) -> {})
+                            .returns(PrimitiveArrayTypeInfo.DOUBLE_PRIMITIVE_ARRAY_TYPE_INFO);
+            Iterator<double[]> result = DataStreamUtils.allReduceSum(elements).executeAndCollect();
+            assertFalse(result.hasNext());
         }
     }
 }
