@@ -24,6 +24,8 @@ import org.apache.flink.api.connector.source.Source;
 import org.apache.flink.connector.file.sink.FileSink;
 import org.apache.flink.connector.file.src.FileSource;
 import org.apache.flink.connector.file.src.reader.SimpleStreamFormat;
+import org.apache.flink.core.fs.FileSystem;
+import org.apache.flink.core.fs.Path;
 import org.apache.flink.ml.api.Stage;
 import org.apache.flink.ml.builder.Graph;
 import org.apache.flink.ml.builder.GraphData;
@@ -42,13 +44,11 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -92,7 +92,7 @@ public class ReadWriteUtils {
     public static void saveMetadata(Stage<?> stage, String path, Map<String, ?> extraMetadata)
             throws IOException {
         // Creates parent directories if not already created.
-        new File(path).mkdirs();
+        FileSystem fs = mkdirs(path);
 
         Map<String, Object> metadata = new HashMap<>(extraMetadata);
         metadata.put("className", stage.getClass().getName());
@@ -101,11 +101,14 @@ public class ReadWriteUtils {
         // TODO: add version in the metadata.
         String metadataStr = OBJECT_MAPPER.writeValueAsString(metadata);
 
-        File metadataFile = new File(path, "metadata");
-        if (!metadataFile.createNewFile()) {
-            throw new IOException("File " + metadataFile.toString() + " already exists.");
+        Path metadataPath = new Path(path, "metadata");
+        if (fs.exists(metadataPath)) {
+            throw new IOException("File " + metadataPath + " already exists.");
         }
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(metadataFile))) {
+        try (BufferedWriter writer =
+                new BufferedWriter(
+                        new OutputStreamWriter(
+                                fs.create(metadataPath, FileSystem.WriteMode.NO_OVERWRITE)))) {
             writer.write(metadataStr);
         }
     }
@@ -125,20 +128,7 @@ public class ReadWriteUtils {
 
     /** Returns a subdirectory of the given path for saving/loading model data. */
     private static String getDataPath(String path) {
-        return Paths.get(path, "data").toString();
-    }
-
-    /** Returns all data files under the given path as a list of paths. */
-    private static org.apache.flink.core.fs.Path[] getDataPaths(String path) {
-        String dataPath = getDataPath(path);
-        File[] files = new File(dataPath).listFiles();
-
-        org.apache.flink.core.fs.Path[] paths = new org.apache.flink.core.fs.Path[files.length];
-        for (int i = 0; i < paths.length; i++) {
-            paths[i] = org.apache.flink.core.fs.Path.fromLocalFile(files[i]);
-        }
-
-        return paths;
+        return new Path(path, "data").toString();
     }
 
     /**
@@ -153,9 +143,11 @@ public class ReadWriteUtils {
      */
     public static Map<String, ?> loadMetadata(String path, String expectedClassName)
             throws IOException {
-        Path metadataPath = Paths.get(path, "metadata");
+        Path metadataPath = new Path(path, "metadata");
+        FileSystem fs = metadataPath.getFileSystem();
+
         StringBuilder buffer = new StringBuilder();
-        try (BufferedReader br = new BufferedReader(new FileReader(metadataPath.toString()))) {
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(metadataPath)))) {
             String line;
             while ((line = br.readLine()) != null) {
                 if (!line.startsWith("#")) {
@@ -184,9 +176,10 @@ public class ReadWriteUtils {
     // with zero or more `0` to have the same length as numStages. The resulting string can be
     // used as the directory to save a stage of the Pipeline or PipelineModel.
     private static String getPathForPipelineStage(int stageIdx, int numStages, String parentPath) {
-        String format = String.format("%%0%dd", String.valueOf(numStages).length());
+        String format =
+                String.format("stages%s%%0%dd", File.separator, String.valueOf(numStages).length());
         String fileName = String.format(format, stageIdx);
-        return Paths.get(parentPath, "stages", fileName).toString();
+        return new Path(parentPath, fileName).toString();
     }
 
     /**
@@ -199,7 +192,7 @@ public class ReadWriteUtils {
     public static void savePipeline(Stage<?> pipeline, List<Stage<?>> stages, String path)
             throws IOException {
         // Creates parent directories if not already created.
-        new File(path).mkdirs();
+        mkdirs(path);
 
         Map<String, Object> extraMetadata = new HashMap<>();
         extraMetadata.put("numStages", stages.size());
@@ -237,6 +230,13 @@ public class ReadWriteUtils {
         return stages;
     }
 
+    private static FileSystem mkdirs(String path) throws IOException {
+        Path temp = new Path(path);
+        FileSystem fs = temp.getFileSystem();
+        fs.mkdirs(temp);
+        return fs;
+    }
+
     /**
      * Saves a Graph or GraphModel with the given GraphData to the given path.
      *
@@ -247,7 +247,7 @@ public class ReadWriteUtils {
     public static void saveGraph(Stage<?> graph, GraphData graphData, String path)
             throws IOException {
         // Creates parent directories if not already created.
-        new File(path).mkdirs();
+        mkdirs(path);
 
         Map<String, Object> extraMetadata = new HashMap<>();
         extraMetadata.put("graphData", graphData.toMap());
@@ -432,7 +432,7 @@ public class ReadWriteUtils {
     public static <T> DataStream<T> loadModelData(
             StreamExecutionEnvironment env, String path, SimpleStreamFormat<T> modelDecoder) {
         Source<T, ?, ?> source =
-                FileSource.forRecordStreamFormat(modelDecoder, getDataPaths(path)).build();
+                FileSource.forRecordStreamFormat(modelDecoder, new Path(getDataPath(path))).build();
         return env.fromSource(source, WatermarkStrategy.noWatermarks(), "modelData");
     }
 }
