@@ -19,7 +19,7 @@
 package org.apache.flink.ml.param;
 
 /** Class for the long array parameter. */
-public class LongArrayParam extends Param<Long[]> {
+public class LongArrayParam extends ArrayParam<Long> {
 
     public LongArrayParam(
             String name,

@@ -19,7 +19,6 @@
 package org.apache.flink.ml.param;
 
 import org.apache.flink.annotation.PublicEvolving;
-import org.apache.flink.ml.util.ReadWriteUtils;
 
 import java.io.IOException;
 import java.io.Serializable;
@@ -58,24 +57,24 @@ public class Param<T> implements Serializable {
     }
 
     /**
-     * Encodes the given object into a json-formatted string.
+     * Encodes the given java object into a json-supported object.
      *
-     * @param value An object of class type T.
-     * @return A json-formatted string.
+     * @param value A java object of class type T.
+     * @return A json-supported object.
      */
-    public String jsonEncode(T value) throws IOException {
-        return ReadWriteUtils.OBJECT_MAPPER.writeValueAsString(value);
+    public Object jsonEncode(T value) throws IOException {
+        return value;
     }
 
     /**
-     * Decodes the given string into an object of class type T.
+     * Decodes the given json-supported object into an object of class type T.
      *
-     * @param json A json-formatted string.
-     * @return An object of class type T.
+     * @param json A json-supported object.
+     * @return A java object of class type T.
      */
     @SuppressWarnings("unchecked")
-    public T jsonDecode(String json) throws IOException {
-        return ReadWriteUtils.OBJECT_MAPPER.readValue(json, clazz);
+    public T jsonDecode(Object json) throws IOException {
+        return (T) json;
     }
 
     @Override

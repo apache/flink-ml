@@ -16,27 +16,17 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.param;
+package org.apache.flink.ml.benchmark.datagenerator;
 
-import java.io.IOException;
+import org.apache.flink.ml.common.param.HasSeed;
+import org.apache.flink.table.api.Table;
+import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 
-/** Class for the long parameter. */
-public class LongParam extends Param<Long> {
-
-    public LongParam(
-            String name, String description, Long defaultValue, ParamValidator<Long> validator) {
-        super(name, Long.class, description, defaultValue, validator);
-    }
-
-    public LongParam(String name, String description, Long defaultValue) {
-        this(name, description, defaultValue, ParamValidators.alwaysTrue());
-    }
-
-    @Override
-    public Long jsonDecode(Object json) throws IOException {
-        if (json instanceof Integer) {
-            return ((Integer) json).longValue();
-        }
-        return (Long) json;
-    }
+/** Interface for generating data as table arrays. */
+public interface DataGenerator<T extends DataGenerator<T>> extends HasSeed<T> {
+    /**
+     * Gets an array of Tables containing the data generated in the provided stream table
+     * environment.
+     */
+    Table[] getData(StreamTableEnvironment tEnv);
 }

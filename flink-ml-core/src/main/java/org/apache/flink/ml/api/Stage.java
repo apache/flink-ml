@@ -31,6 +31,8 @@ import java.io.Serializable;
  *
  * <p>Each stage is with parameters, and requires a public empty constructor for restoration.
  *
+ * <p>NOTE: every Stage subclass should have a no-arg constructor.
+ *
  * <p>NOTE: every Stage subclass should implement a static method with signature {@code static T
  * load(StreamTableEnvironment tEnv, String path)}, where {@code T} refers to the concrete subclass.
  * This static method should instantiate a new stage instance based on the data read from the given

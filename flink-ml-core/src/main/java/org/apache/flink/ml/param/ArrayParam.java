@@ -18,25 +18,26 @@
 
 package org.apache.flink.ml.param;
 
+import org.apache.flink.ml.util.ReadWriteUtils;
+
 import java.io.IOException;
 
-/** Class for the long parameter. */
-public class LongParam extends Param<Long> {
+/** Class for array-type parameters. */
+public class ArrayParam<T> extends Param<T[]> {
 
-    public LongParam(
-            String name, String description, Long defaultValue, ParamValidator<Long> validator) {
-        super(name, Long.class, description, defaultValue, validator);
-    }
-
-    public LongParam(String name, String description, Long defaultValue) {
-        this(name, description, defaultValue, ParamValidators.alwaysTrue());
+    public ArrayParam(
+            String name,
+            Class<T[]> clazz,
+            String description,
+            T[] defaultValue,
+            ParamValidator<T[]> validator) {
+        super(name, clazz, description, defaultValue, validator);
     }
 
     @Override
-    public Long jsonDecode(Object json) throws IOException {
-        if (json instanceof Integer) {
-            return ((Integer) json).longValue();
-        }
-        return (Long) json;
+    public T[] jsonDecode(Object json) throws IOException {
+        // Converts Object Mapper's default ArrayList<T> to T[].
+        String jsonStr = ReadWriteUtils.OBJECT_MAPPER.writeValueAsString(json);
+        return ReadWriteUtils.OBJECT_MAPPER.readValue(jsonStr, clazz);
     }
 }

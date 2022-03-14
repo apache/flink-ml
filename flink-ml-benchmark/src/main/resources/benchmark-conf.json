@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "KMeans-1": {
+    "stage": {
+      "className": "org.apache.flink.ml.clustering.kmeans.KMeans",
+      "paramMap": {
+        "featuresCol": "features",
+        "predictionCol": "prediction"
+      }
+    },
+    "inputData": {
+      "className": "org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator",
+      "paramMap": {
+        "seed": 2,
+        "colNames": ["features"],
+        "numValues": 10000,
+        "vectorDim": 10
+      }
+    }
+  },
+  "KMeansModel-1": {
+    "stage": {
+      "className": "org.apache.flink.ml.clustering.kmeans.KMeansModel",
+      "paramMap": {
+        "featuresCol": "features",
+        "k": 2,
+        "distanceMeasure": "euclidean",
+        "predictionCol": "prediction"
+      }
+    },
+    "modelData":  {
+      "className": "org.apache.flink.ml.benchmark.datagenerator.clustering.KMeansModelDataGenerator",
+      "paramMap": {
+        "seed": 1,
+        "arraySize": 2,
+        "vectorDim": 10
+      }
+    },
+    "inputData": {
+      "className": "org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator",
+      "paramMap": {
+        "seed": 2,
+        "colNames": ["features"],
+        "numValues": 10000,
+        "vectorDim": 10
+      }
+    }
+  }
+}

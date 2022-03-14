@@ -19,7 +19,7 @@
 package org.apache.flink.ml.param;
 
 /** Class for the integer array parameter. */
-public class IntArrayParam extends Param<Integer[]> {
+public class IntArrayParam extends ArrayParam<Integer> {
 
     public IntArrayParam(
             String name,

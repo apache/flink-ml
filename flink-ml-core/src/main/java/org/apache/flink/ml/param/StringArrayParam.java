@@ -19,7 +19,7 @@
 package org.apache.flink.ml.param;
 
 /** Class for the string array parameter. */
-public class StringArrayParam extends Param<String[]> {
+public class StringArrayParam extends ArrayParam<String> {
 
     public StringArrayParam(
             String name,

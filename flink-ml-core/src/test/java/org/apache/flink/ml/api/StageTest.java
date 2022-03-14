@@ -57,8 +57,17 @@ public class StageTest {
         Param<Integer> INT_PARAM =
                 new IntParam("intParam", "Description", 1, ParamValidators.lt(100));
 
+        // This param might be regarded as integer type given a small value.
         Param<Long> LONG_PARAM =
                 new LongParam("longParam", "Description", 2L, ParamValidators.lt(100));
+
+        // This param must be regarded as long type given a large enough value.
+        Param<Long> LONG_PARAM2 =
+                new LongParam(
+                        "longParam2",
+                        "Description",
+                        Integer.MAX_VALUE + 1L,
+                        ParamValidators.lt(Integer.MAX_VALUE + 100L));
 
         Param<Float> FLOAT_PARAM =
                 new FloatParam("floatParam", "Description", 3.0f, ParamValidators.lt(100));
@@ -259,6 +268,7 @@ public class StageTest {
         MyStage stage = new MyStage();
         assertInvalidValue(stage, MyParams.INT_PARAM, 100);
         assertInvalidValue(stage, MyParams.LONG_PARAM, 100L);
+        assertInvalidValue(stage, MyParams.LONG_PARAM2, Integer.MAX_VALUE + 100L);
         assertInvalidValue(stage, MyParams.FLOAT_PARAM, 100.0f);
         assertInvalidValue(stage, MyParams.DOUBLE_PARAM, 100.0);
         assertInvalidClass(stage, MyParams.INT_PARAM, "100");
@@ -281,11 +291,14 @@ public class StageTest {
         stage.set(MyParams.LONG_PARAM, 50L);
         Assert.assertEquals(50L, (long) stage.get(MyParams.LONG_PARAM));
 
+        stage.set(MyParams.LONG_PARAM2, Integer.MAX_VALUE + 50L);
+        Assert.assertEquals(Integer.MAX_VALUE + 50L, (long) stage.get(MyParams.LONG_PARAM2));
+
         stage.set(MyParams.FLOAT_PARAM, 50f);
-        Assert.assertEquals(50f, (float) stage.get(MyParams.FLOAT_PARAM), 0.0001);
+        Assert.assertEquals(50f, stage.get(MyParams.FLOAT_PARAM), 0.0001);
 
         stage.set(MyParams.DOUBLE_PARAM, 50.0);
-        Assert.assertEquals(50, (double) stage.get(MyParams.DOUBLE_PARAM), 0.0001);
+        Assert.assertEquals(50, stage.get(MyParams.DOUBLE_PARAM), 0.0001);
 
         stage.set(MyParams.STRING_PARAM, "50");
         Assert.assertEquals("50", stage.get(MyParams.STRING_PARAM));
@@ -311,9 +324,39 @@ public class StageTest {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
         MyStage stage = new MyStage();
+
         stage.set(stage.paramWithNullDefault, 1);
+        stage.set(MyParams.BOOLEAN_PARAM, true);
+        stage.set(MyParams.INT_PARAM, 50);
+        stage.set(MyParams.LONG_PARAM, 50L);
+        stage.set(MyParams.LONG_PARAM2, Integer.MAX_VALUE + 50L);
+        stage.set(MyParams.FLOAT_PARAM, 50f);
+        stage.set(MyParams.DOUBLE_PARAM, 50.0);
+        stage.set(MyParams.STRING_PARAM, "50");
+        stage.set(MyParams.INT_ARRAY_PARAM, new Integer[] {50, 51});
+        stage.set(MyParams.LONG_ARRAY_PARAM, new Long[] {50L, 51L});
+        stage.set(MyParams.FLOAT_ARRAY_PARAM, new Float[] {50.0f, 51.0f});
+        stage.set(MyParams.DOUBLE_ARRAY_PARAM, new Double[] {50.0, 51.0});
+        stage.set(MyParams.STRING_ARRAY_PARAM, new String[] {"50", "51"});
+
         Stage<?> loadedStage = validateStageSaveLoad(tEnv, stage, Collections.emptyMap());
-        Assert.assertEquals(1, (int) loadedStage.get(MyParams.INT_PARAM));
+
+        Assert.assertEquals(1, (int) loadedStage.get(stage.paramWithNullDefault));
+        Assert.assertEquals(true, loadedStage.get(MyParams.BOOLEAN_PARAM));
+        Assert.assertEquals(50, (int) loadedStage.get(MyParams.INT_PARAM));
+        Assert.assertEquals(50L, (long) loadedStage.get(MyParams.LONG_PARAM));
+        Assert.assertEquals(Integer.MAX_VALUE + 50L, (long) loadedStage.get(MyParams.LONG_PARAM2));
+        Assert.assertEquals(50f, loadedStage.get(MyParams.FLOAT_PARAM), 0.0001);
+        Assert.assertEquals(50, loadedStage.get(MyParams.DOUBLE_PARAM), 0.0001);
+        Assert.assertEquals("50", loadedStage.get(MyParams.STRING_PARAM));
+        Assert.assertArrayEquals(new Integer[] {50, 51}, loadedStage.get(MyParams.INT_ARRAY_PARAM));
+        Assert.assertArrayEquals(new Long[] {50L, 51L}, loadedStage.get(MyParams.LONG_ARRAY_PARAM));
+        Assert.assertArrayEquals(
+                new Float[] {50.0f, 51.0f}, loadedStage.get(MyParams.FLOAT_ARRAY_PARAM));
+        Assert.assertArrayEquals(
+                new Double[] {50.0, 51.0}, loadedStage.get(MyParams.DOUBLE_ARRAY_PARAM));
+        Assert.assertArrayEquals(
+                new String[] {"50", "51"}, loadedStage.get(MyParams.STRING_ARRAY_PARAM));
     }
 
     @Test
@@ -323,8 +366,9 @@ public class StageTest {
         MyStage stage = new MyStage();
         stage.set(stage.paramWithNullDefault, 1);
         Stage<?> loadedStage =
-                validateStageSaveLoad(tEnv, stage, Collections.singletonMap("intParam", 10));
-        Assert.assertEquals(10, (int) loadedStage.get(MyParams.INT_PARAM));
+                validateStageSaveLoad(
+                        tEnv, stage, Collections.singletonMap("paramWithNullDefault", 10));
+        Assert.assertEquals(10, (int) loadedStage.get(stage.paramWithNullDefault));
     }
 
     @Test

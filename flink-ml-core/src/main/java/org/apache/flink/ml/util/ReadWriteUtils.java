@@ -33,6 +33,7 @@ import org.apache.flink.ml.builder.GraphModel;
 import org.apache.flink.ml.builder.GraphNode;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.param.Param;
+import org.apache.flink.ml.param.WithParams;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.filesystem.bucketassigners.BasePathBucketAssigner;
@@ -66,17 +67,17 @@ public class ReadWriteUtils {
     // A helper method that calls encodes the given parameter value to a json string. We can not
     // call param.jsonEncode(value) directly because Param::jsonEncode(...) needs the actual type
     // of the value.
-    private static <T> String jsonEncodeHelper(Param<T> param, Object value) throws IOException {
+    private static <T> Object jsonEncodeHelper(Param<T> param, Object value) throws IOException {
         return param.jsonEncode((T) value);
     }
 
     // Converts Map<Param<?>, Object> to Map<String, String> which maps the parameter name to the
     // string-encoded parameter value.
-    private static Map<String, String> jsonEncode(Map<Param<?>, Object> paramMap)
+    private static Map<String, Object> jsonEncode(Map<Param<?>, Object> paramMap)
             throws IOException {
-        Map<String, String> result = new HashMap<>(paramMap.size());
+        Map<String, Object> result = new HashMap<>(paramMap.size());
         for (Map.Entry<Param<?>, Object> entry : paramMap.entrySet()) {
-            String json = jsonEncodeHelper(entry.getKey(), entry.getValue());
+            Object json = jsonEncodeHelper(entry.getKey(), entry.getValue());
             result.put(entry.getKey().name, json);
         }
         return result;
@@ -94,9 +95,6 @@ public class ReadWriteUtils {
      */
     public static void saveMetadata(Stage<?> stage, String path, Map<String, ?> extraMetadata)
             throws IOException {
-        // Creates parent directories if not already created.
-        FileSystem fs = mkdirs(path);
-
         Map<String, Object> metadata = new HashMap<>(extraMetadata);
         metadata.put("className", stage.getClass().getName());
         metadata.put("timestamp", System.currentTimeMillis());
@@ -104,15 +102,27 @@ public class ReadWriteUtils {
         // TODO: add version in the metadata.
         String metadataStr = OBJECT_MAPPER.writeValueAsString(metadata);
 
-        Path metadataPath = new Path(path, "metadata");
-        if (fs.exists(metadataPath)) {
-            throw new IOException("File " + metadataPath + " already exists.");
+        saveToFile(new Path(path, "metadata").toUri().toString(), metadataStr, false);
+    }
+
+    /** Saves a given string to the specified file. */
+    public static void saveToFile(String pathStr, String content, boolean isOverwrite)
+            throws IOException {
+        Path path = new Path(pathStr);
+
+        // Creates parent directories if not already created.
+        FileSystem fs = mkdirs(path.getParent());
+
+        FileSystem.WriteMode writeMode = FileSystem.WriteMode.OVERWRITE;
+        if (!isOverwrite) {
+            writeMode = FileSystem.WriteMode.NO_OVERWRITE;
+            if (fs.exists(path)) {
+                throw new IOException("File " + path + " already exists.");
+            }
         }
         try (BufferedWriter writer =
-                new BufferedWriter(
-                        new OutputStreamWriter(
-                                fs.create(metadataPath, FileSystem.WriteMode.NO_OVERWRITE)))) {
-            writer.write(metadataStr);
+                new BufferedWriter(new OutputStreamWriter(fs.create(path, writeMode)))) {
+            writer.write(content);
         }
     }
 
@@ -195,7 +205,7 @@ public class ReadWriteUtils {
     public static void savePipeline(Stage<?> pipeline, List<Stage<?>> stages, String path)
             throws IOException {
         // Creates parent directories if not already created.
-        mkdirs(path);
+        mkdirs(new Path(path));
 
         Map<String, Object> extraMetadata = new HashMap<>();
         extraMetadata.put("numStages", stages.size());
@@ -232,10 +242,9 @@ public class ReadWriteUtils {
         return stages;
     }
 
-    private static FileSystem mkdirs(String path) throws IOException {
-        Path temp = new Path(path);
-        FileSystem fs = temp.getFileSystem();
-        fs.mkdirs(temp);
+    private static FileSystem mkdirs(Path path) throws IOException {
+        FileSystem fs = path.getFileSystem();
+        fs.mkdirs(path);
         return fs;
     }
 
@@ -249,7 +258,7 @@ public class ReadWriteUtils {
     public static void saveGraph(Stage<?> graph, GraphData graphData, String path)
             throws IOException {
         // Creates parent directories if not already created.
-        mkdirs(path);
+        mkdirs(new Path(path));
 
         Map<String, Object> extraMetadata = new HashMap<>();
         extraMetadata.put("graphData", graphData.toMap());
@@ -277,6 +286,7 @@ public class ReadWriteUtils {
      * @param expectedClassName The expected class name of the pipeline.
      * @return A Graph or GraphModel instance.
      */
+    @SuppressWarnings("unchecked")
     public static Stage<?> loadGraph(
             StreamTableEnvironment tEnv, String path, String expectedClassName) throws IOException {
         Map<String, ?> metadata = loadMetadata(path, expectedClassName);
@@ -311,20 +321,23 @@ public class ReadWriteUtils {
                 graphData.outputModelDataIds);
     }
 
-    // A helper method that sets stage's parameter value. We can not call stage.set(param, value)
-    // directly because stage::set(...) needs the actual type of the value.
-    public static <T> void setParam(Stage<?> stage, Param<T> param, Object value) {
-        stage.set(param, (T) value);
+    // A helper method that sets WithParams object's parameter value. We can not call
+    // WithParams.set(param, value)
+    // directly because WithParams::set(...) needs the actual type of the value.
+    @SuppressWarnings("unchecked")
+    public static <T> void setParam(WithParams<?> instance, Param<T> param, Object value) {
+        instance.set(param, (T) value);
     }
 
-    // A helper method that updates stage's param map using values from the paramOverrides. This
-    // method only
-    // updates values for parameters already defined in the stage's param map.
-    public static void updateExistingParams(Stage<?> stage, Map<Param<?>, Object> paramOverrides) {
-        Set<Param<?>> existingParams = stage.getParamMap().keySet();
+    // A helper method that updates WithParams instance's param map using values from the
+    // paramOverrides. This method only updates values for parameters already defined in the
+    // instance's param map.
+    public static void updateExistingParams(
+            WithParams<?> instance, Map<Param<?>, Object> paramOverrides) {
+        Set<Param<?>> existingParams = instance.getParamMap().keySet();
         for (Map.Entry<Param<?>, Object> entry : paramOverrides.entrySet()) {
             if (existingParams.contains(entry.getKey())) {
-                setParam(stage, entry.getKey(), entry.getValue());
+                setParam(instance, entry.getKey(), entry.getValue());
             }
         }
     }
@@ -343,29 +356,39 @@ public class ReadWriteUtils {
      * @param <T> The class type of the Stage subclass.
      * @return An instance of class type T.
      */
-    @SuppressWarnings("unchecked")
     public static <T extends Stage<T>> T loadStageParam(String path) throws IOException {
-        Map<String, ?> metadata = loadMetadata(path, "");
-        String className = (String) metadata.get("className");
-        Map<String, String> paramMap = (Map<String, String>) metadata.get("paramMap");
-
         try {
-            Class<T> clazz = (Class<T>) Class.forName(className);
-            T instance = InstantiationUtil.instantiate(clazz);
-
-            Map<String, Param<?>> nameToParam = new HashMap<>();
-            for (Param<?> param : ParamUtils.getPublicFinalParamFields(instance)) {
-                nameToParam.put(param.name, param);
-            }
-
-            for (Map.Entry<String, String> entry : paramMap.entrySet()) {
-                Param<?> param = nameToParam.get(entry.getKey());
-                setParam(instance, param, param.jsonDecode(entry.getValue()));
-            }
-            return instance;
+            return instantiateWithParams(loadMetadata(path, ""));
         } catch (ClassNotFoundException e) {
             throw new RuntimeException("Failed to load stage.", e);
         }
+    }
+
+    /**
+     * Instantiates a WithParams subclass from the provided json map.
+     *
+     * @param jsonMap a map containing className and paramMap.
+     * @return the instantiated WithParams subclass instance.
+     */
+    @SuppressWarnings("unchecked")
+    public static <T extends WithParams<T>> T instantiateWithParams(Map<String, ?> jsonMap)
+            throws ClassNotFoundException, IOException {
+        String className = (String) jsonMap.get("className");
+        Class<T> clazz = (Class<T>) Class.forName(className);
+        T instance = InstantiationUtil.instantiate(clazz);
+
+        Map<String, Param<?>> nameToParam = new HashMap<>();
+        for (Param<?> param : ParamUtils.getPublicFinalParamFields(instance)) {
+            nameToParam.put(param.name, param);
+        }
+
+        Map<String, Object> paramMap = (Map<String, Object>) jsonMap.get("paramMap");
+        for (Map.Entry<String, Object> entry : paramMap.entrySet()) {
+            Param<?> param = nameToParam.get(entry.getKey());
+            setParam(instance, param, param.jsonDecode(entry.getValue()));
+        }
+
+        return instance;
     }
 
     /**
