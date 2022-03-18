@@ -90,7 +90,7 @@ custom functionality to its documentation markdown. For example:
 
     {{< artifact flink-ml-core withScalaVersion >}}
 
-This will be replaced by the maven artifact for flink-streaming-java that users
+This will be replaced by the maven artifact for flink-ml-core that users
 should copy into their pom.xml file. It will render out to:
 
 ```xml
