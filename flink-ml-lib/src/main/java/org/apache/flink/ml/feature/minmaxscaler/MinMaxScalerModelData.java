@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.classification.knn;
+package org.apache.flink.ml.feature.minmaxscaler;
 
 import org.apache.flink.api.common.serialization.Encoder;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
@@ -27,9 +27,7 @@ import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
-import org.apache.flink.ml.linalg.DenseMatrix;
 import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.typeinfo.DenseMatrixSerializer;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
@@ -41,24 +39,21 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 /**
- * Model data of {@link KnnModel}.
+ * Model data of {@link MinMaxScalerModel}.
  *
  * <p>This class also provides methods to convert model data from Table to a data stream, and
  * classes to save/load model data.
  */
-public class KnnModelData {
+public class MinMaxScalerModelData {
+    public DenseVector minVector;
 
-    public DenseMatrix packedFeatures;
-    public DenseVector featureNormSquares;
-    public DenseVector labels;
+    public DenseVector maxVector;
 
-    public KnnModelData() {}
+    public MinMaxScalerModelData() {}
 
-    public KnnModelData(
-            DenseMatrix packedFeatures, DenseVector featureNormSquares, DenseVector labels) {
-        this.packedFeatures = packedFeatures;
-        this.featureNormSquares = featureNormSquares;
-        this.labels = labels;
+    public MinMaxScalerModelData(DenseVector minVector, DenseVector maxVector) {
+        this.minVector = minVector;
+        this.maxVector = maxVector;
     }
 
     /**
@@ -67,45 +62,41 @@ public class KnnModelData {
      * @param modelDataTable The table model data.
      * @return The data stream model data.
      */
-    public static DataStream<KnnModelData> getModelDataStream(Table modelDataTable) {
+    public static DataStream<MinMaxScalerModelData> getModelDataStream(Table modelDataTable) {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) modelDataTable).getTableEnvironment();
         return tEnv.toDataStream(modelDataTable)
                 .map(
                         x ->
-                                new KnnModelData(
-                                        (DenseMatrix) x.getField(0),
-                                        (DenseVector) x.getField(1),
-                                        (DenseVector) x.getField(2)));
+                                new MinMaxScalerModelData(
+                                        (DenseVector) x.getField(0), (DenseVector) x.getField(1)));
     }
 
-    /** Encoder for {@link KnnModelData}. */
-    public static class ModelDataEncoder implements Encoder<KnnModelData> {
+    /** Encoder for {@link MinMaxScalerModelData}. */
+    public static class ModelDataEncoder implements Encoder<MinMaxScalerModelData> {
         @Override
-        public void encode(KnnModelData modelData, OutputStream outputStream) throws IOException {
+        public void encode(MinMaxScalerModelData modelData, OutputStream outputStream)
+                throws IOException {
             DataOutputView dataOutputView = new DataOutputViewStreamWrapper(outputStream);
-            DenseMatrixSerializer.INSTANCE.serialize(modelData.packedFeatures, dataOutputView);
-            DenseVectorSerializer.INSTANCE.serialize(modelData.featureNormSquares, dataOutputView);
-            DenseVectorSerializer.INSTANCE.serialize(modelData.labels, dataOutputView);
+            DenseVectorSerializer.INSTANCE.serialize(modelData.minVector, dataOutputView);
+            DenseVectorSerializer.INSTANCE.serialize(modelData.maxVector, dataOutputView);
         }
     }
 
-    /** Decoder for {@link KnnModelData}. */
-    public static class ModelDataDecoder extends SimpleStreamFormat<KnnModelData> {
+    /** Decoder for {@link MinMaxScalerModelData}. */
+    public static class ModelDataDecoder extends SimpleStreamFormat<MinMaxScalerModelData> {
         @Override
-        public Reader<KnnModelData> createReader(Configuration config, FSDataInputStream stream) {
-            return new Reader<KnnModelData>() {
-
-                private final DataInputView source = new DataInputViewStreamWrapper(stream);
+        public Reader<MinMaxScalerModelData> createReader(
+                Configuration config, FSDataInputStream stream) {
+            return new Reader<MinMaxScalerModelData>() {
 
                 @Override
-                public KnnModelData read() throws IOException {
+                public MinMaxScalerModelData read() throws IOException {
+                    DataInputView source = new DataInputViewStreamWrapper(stream);
                     try {
-                        DenseMatrix matrix = DenseMatrixSerializer.INSTANCE.deserialize(source);
-                        DenseVector normSquares =
-                                DenseVectorSerializer.INSTANCE.deserialize(source);
-                        DenseVector labels = DenseVectorSerializer.INSTANCE.deserialize(source);
-                        return new KnnModelData(matrix, normSquares, labels);
+                        DenseVector minVector = DenseVectorSerializer.INSTANCE.deserialize(source);
+                        DenseVector maxVector = DenseVectorSerializer.INSTANCE.deserialize(source);
+                        return new MinMaxScalerModelData(minVector, maxVector);
                     } catch (EOFException e) {
                         return null;
                     }
@@ -119,8 +110,8 @@ public class KnnModelData {
         }
 
         @Override
-        public TypeInformation<KnnModelData> getProducedType() {
-            return TypeInformation.of(KnnModelData.class);
+        public TypeInformation<MinMaxScalerModelData> getProducedType() {
+            return TypeInformation.of(MinMaxScalerModelData.class);
         }
     }
 }
