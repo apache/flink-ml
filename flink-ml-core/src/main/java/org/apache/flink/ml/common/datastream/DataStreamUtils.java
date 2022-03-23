@@ -25,7 +25,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.TypeExtractor;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
+import org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator;
 import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.TimestampedCollector;
@@ -71,15 +71,14 @@ public class DataStreamUtils {
      * A stream operator to apply {@link MapPartitionFunction} on each partition of the input
      * bounded data stream.
      */
-    private static class MapPartitionOperator<IN, OUT> extends AbstractStreamOperator<OUT>
+    private static class MapPartitionOperator<IN, OUT>
+            extends AbstractUdfStreamOperator<OUT, MapPartitionFunction<IN, OUT>>
             implements OneInputStreamOperator<IN, OUT>, BoundedOneInput {
-
-        private final MapPartitionFunction<IN, OUT> mapPartitionFunc;
 
         private ListState<IN> valuesState;
 
         public MapPartitionOperator(MapPartitionFunction<IN, OUT> mapPartitionFunc) {
-            this.mapPartitionFunc = mapPartitionFunc;
+            super(mapPartitionFunc);
         }
 
         @Override
@@ -95,7 +94,7 @@ public class DataStreamUtils {
 
         @Override
         public void endInput() throws Exception {
-            mapPartitionFunc.mapPartition(valuesState.get(), new TimestampedCollector<>(output));
+            userFunction.mapPartition(valuesState.get(), new TimestampedCollector<>(output));
             valuesState.clear();
         }
 
