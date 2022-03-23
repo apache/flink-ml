@@ -68,4 +68,9 @@ public class DenseVector implements Vector {
     public int hashCode() {
         return Arrays.hashCode(values);
     }
+
+    @Override
+    public DenseVector clone() {
+        return new DenseVector(values.clone());
+    }
 }

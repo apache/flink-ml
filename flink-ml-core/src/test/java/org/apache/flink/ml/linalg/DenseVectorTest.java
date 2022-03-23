@@ -18,25 +18,23 @@
 
 package org.apache.flink.ml.linalg;
 
-import java.io.Serializable;
+import org.junit.Test;
 
-/** A vector of double values. */
-public interface Vector extends Serializable {
+import static org.junit.Assert.assertArrayEquals;
 
-    /** Gets the size of the vector. */
-    int size();
+/** Tests the behavior of {@link DenseVector}. */
+public class DenseVectorTest {
 
-    /** Gets the value of the ith element. */
-    double get(int i);
+    private static final double TOLERANCE = 1e-7;
 
-    /** Converts the instance to a double array. */
-    double[] toArray();
+    @Test
+    public void testClone() {
+        DenseVector denseVec = Vectors.dense(1, 2, 3);
+        DenseVector clonedDenseVec = denseVec.clone();
+        assertArrayEquals(clonedDenseVec.values, new double[] {1, 2, 3}, TOLERANCE);
 
-    /** Converts the instance to a dense vector. */
-    default DenseVector toDense() {
-        return new DenseVector(toArray());
+        clonedDenseVec.values[0] = -1;
+        assertArrayEquals(denseVec.values, new double[] {1, 2, 3}, TOLERANCE);
+        assertArrayEquals(clonedDenseVec.values, new double[] {-1, 2, 3}, TOLERANCE);
     }
-
-    /** Makes a deep copy of the vector. */
-    Vector clone();
 }

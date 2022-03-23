@@ -32,9 +32,31 @@ public class BLAS {
     }
 
     /** y += a * x . */
-    public static void axpy(double a, DenseVector x, DenseVector y) {
+    public static void axpy(double a, Vector x, DenseVector y) {
         Preconditions.checkArgument(x.size() == y.size(), "Vector size mismatched.");
-        JAVA_BLAS.daxpy(x.size(), a, x.values, 1, y.values, 1);
+        if (x instanceof SparseVector) {
+            axpy(a, (SparseVector) x, y);
+        } else {
+            axpy(a, (DenseVector) x, y);
+        }
+    }
+
+    /** Computes the hadamard product of the two vectors (y = y \hdot x). */
+    public static void hDot(Vector x, Vector y) {
+        Preconditions.checkArgument(x.size() == y.size(), "Vector size mismatched.");
+        if (x instanceof SparseVector) {
+            if (y instanceof SparseVector) {
+                hDot((SparseVector) x, (SparseVector) y);
+            } else {
+                hDot((SparseVector) x, (DenseVector) y);
+            }
+        } else {
+            if (y instanceof SparseVector) {
+                hDot((DenseVector) x, (SparseVector) y);
+            } else {
+                hDot((DenseVector) x, (DenseVector) y);
+            }
+        }
     }
 
     /** x \cdot y . */
@@ -88,5 +110,61 @@ public class BLAS {
                 beta,
                 y.values,
                 1);
+    }
+
+    private static void axpy(double a, DenseVector x, DenseVector y) {
+        JAVA_BLAS.daxpy(x.size(), a, x.values, 1, y.values, 1);
+    }
+
+    private static void axpy(double a, SparseVector x, DenseVector y) {
+        for (int i = 0; i < x.indices.length; i++) {
+            int index = x.indices[i];
+            y.values[index] += a * x.values[i];
+        }
+    }
+
+    private static void hDot(SparseVector x, SparseVector y) {
+        int idx = 0;
+        int idy = 0;
+        while (idx < x.indices.length && idy < y.indices.length) {
+            int indexX = x.indices[idx];
+            while (idy < y.indices.length && y.indices[idy] < indexX) {
+                y.values[idy] = 0;
+                idy++;
+            }
+            if (idy < y.indices.length && y.indices[idy] == indexX) {
+                y.values[idy] *= x.values[idx];
+                idy++;
+            }
+            idx++;
+        }
+        while (idy < y.indices.length) {
+            y.values[idy] = 0;
+            idy++;
+        }
+    }
+
+    private static void hDot(SparseVector x, DenseVector y) {
+        int idx = 0;
+        for (int i = 0; i < y.size(); i++) {
+            if (idx < x.indices.length && x.indices[idx] == i) {
+                y.values[i] *= x.values[idx];
+                idx++;
+            } else {
+                y.values[i] = 0;
+            }
+        }
+    }
+
+    private static void hDot(DenseVector x, SparseVector y) {
+        for (int i = 0; i < y.values.length; i++) {
+            y.values[i] *= x.values[y.indices[i]];
+        }
+    }
+
+    private static void hDot(DenseVector x, DenseVector y) {
+        for (int i = 0; i < x.values.length; i++) {
+            y.values[i] *= x.values[i];
+        }
     }
 }

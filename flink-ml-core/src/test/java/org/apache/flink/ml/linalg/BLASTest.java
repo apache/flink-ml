@@ -38,9 +38,16 @@ public class BLASTest {
 
     @Test
     public void testAxpy() {
+        // Tests axpy(dense, dense).
         DenseVector anotherDenseVec = Vectors.dense(1, 2, 3, 4, 5);
         BLAS.axpy(1, inputDenseVec, anotherDenseVec);
         double[] expectedResult = new double[] {2, 0, 6, 8, 0};
+        assertArrayEquals(expectedResult, anotherDenseVec.values, TOLERANCE);
+
+        // Tests axpy(sparse, dense).
+        SparseVector sparseVec = Vectors.sparse(5, new int[] {0, 2, 4}, new double[] {1, 3, 5});
+        BLAS.axpy(2, sparseVec, anotherDenseVec);
+        expectedResult = new double[] {4, 0, 12, 8, 10};
         assertArrayEquals(expectedResult, anotherDenseVec.values, TOLERANCE);
     }
 
@@ -69,5 +76,35 @@ public class BLASTest {
         BLAS.gemv(-2.0, inputDenseMat, false, inputDenseVec, 0.0, anotherDenseVec);
         double[] expectedResult = new double[] {96.0, -60.0};
         assertArrayEquals(expectedResult, anotherDenseVec.values, TOLERANCE);
+    }
+
+    @Test
+    public void testHDot() {
+        // Tests hDot(sparse, sparse).
+        SparseVector sparseVec1 = Vectors.sparse(5, new int[] {0, 2, 3}, new double[] {1, 3, 5});
+        SparseVector sparseVec2 = Vectors.sparse(5, new int[] {0, 1, 4}, new double[] {1, 3, 5});
+        BLAS.hDot(sparseVec1, sparseVec2);
+        assertEquals(5, sparseVec2.size());
+        assertArrayEquals(new int[] {0, 1, 4}, sparseVec2.indices);
+        assertArrayEquals(new double[] {1, 0, 0}, sparseVec2.values, TOLERANCE);
+
+        // Tests hDot(dense, dense).
+        DenseVector denseVec1 = Vectors.dense(1, 2, 3, 4, 5);
+        DenseVector denseVec2 = Vectors.dense(1, 2, 3, 4, 5);
+        BLAS.hDot(denseVec1, denseVec2);
+        double[] expectedResult = new double[] {1, 4, 9, 16, 25};
+        assertArrayEquals(expectedResult, denseVec2.values, TOLERANCE);
+
+        // Tests hDot(sparse, dense).
+        BLAS.hDot(sparseVec1, denseVec1);
+        expectedResult = new double[] {1, 0, 9, 20, 0};
+        assertArrayEquals(expectedResult, denseVec1.values, TOLERANCE);
+
+        // Tests hDot(dense, sparse).
+        DenseVector denseVec3 = Vectors.dense(1, 2, 3, 4, 5);
+        BLAS.hDot(denseVec3, sparseVec1);
+        assertEquals(5, sparseVec1.size());
+        assertArrayEquals(new int[] {0, 2, 3}, sparseVec1.indices);
+        assertArrayEquals(new double[] {1, 9, 20}, sparseVec1.values, TOLERANCE);
     }
 }

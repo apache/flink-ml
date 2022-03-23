@@ -165,4 +165,9 @@ public class SparseVector implements Vector {
                 "(" + n + ", " + Arrays.toString(indices) + ", " + Arrays.toString(values) + ")";
         return sbr;
     }
+
+    @Override
+    public SparseVector clone() {
+        return new SparseVector(n, indices.clone(), values.clone());
+    }
 }

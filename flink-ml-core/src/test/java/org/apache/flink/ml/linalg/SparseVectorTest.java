@@ -32,8 +32,10 @@ import java.io.IOException;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
-/** Tests the behavior of Vectors. */
+/** Tests the behavior of {@link SparseVector}. */
 public class SparseVectorTest {
+    private static final double TOLERANCE = 1e-7;
+
     @Test
     public void testConstructor() {
         int n = 4;
@@ -128,5 +130,21 @@ public class SparseVectorTest {
         assertEquals(vector.n, vector2.n);
         assertArrayEquals(vector.indices, vector2.indices);
         assertArrayEquals(vector.values, vector2.values, 1e-5);
+    }
+
+    @Test
+    public void testClone() {
+        SparseVector sparseVec = Vectors.sparse(3, new int[] {0, 2}, new double[] {1, 3});
+        SparseVector clonedSparseVec = sparseVec.clone();
+        assertEquals(3, clonedSparseVec.size());
+        assertArrayEquals(clonedSparseVec.indices, new int[] {0, 2});
+        assertArrayEquals(clonedSparseVec.values, new double[] {1, 3}, TOLERANCE);
+
+        clonedSparseVec.values[0] = -1;
+        assertEquals(sparseVec.size(), clonedSparseVec.size());
+        assertArrayEquals(sparseVec.indices, new int[] {0, 2});
+        assertArrayEquals(sparseVec.values, new double[] {1, 3}, TOLERANCE);
+        assertArrayEquals(clonedSparseVec.indices, new int[] {0, 2});
+        assertArrayEquals(clonedSparseVec.values, new double[] {-1, 3}, TOLERANCE);
     }
 }
