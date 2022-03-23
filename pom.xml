@@ -57,6 +57,7 @@ under the License.
     <module>flink-ml-lib</module>
     <module>flink-ml-tests</module>
     <module>flink-ml-uber</module>
+    <module>flink-ml-examples</module>
   </modules>
 
   <properties>
