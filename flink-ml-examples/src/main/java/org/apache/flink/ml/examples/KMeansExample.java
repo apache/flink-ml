@@ -34,8 +34,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Example of how to use Flink ML that initializes and trains a KMeans model, and uses it to predict
- * the cluster id of evaluation data set.
- * Note, since KMeans is an unsupervised learning model, the dataset will not contain a label column.
+ * the cluster id of evaluation data set. Note, since KMeans is an unsupervised learning model, the
+ * dataset will not contain a label column.
  */
 public class KMeansExample {
 
