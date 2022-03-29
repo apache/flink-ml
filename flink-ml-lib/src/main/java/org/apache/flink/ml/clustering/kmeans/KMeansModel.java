@@ -92,7 +92,8 @@ public class KMeansModel implements Model<KMeansModel>, KMeansModelParams<KMeans
                                     new PredictLabelFunction(
                                             broadcastModelKey,
                                             getFeaturesCol(),
-                                            DistanceMeasure.getInstance(getDistanceMeasure())),
+                                            DistanceMeasure.getInstance(getDistanceMeasure()),
+                                            getK()),
                                     outputTypeInfo);
                         });
 
@@ -108,13 +109,19 @@ public class KMeansModel implements Model<KMeansModel>, KMeansModelParams<KMeans
 
         private final DistanceMeasure distanceMeasure;
 
+        private final int k;
+
         private DenseVector[] centroids;
 
         public PredictLabelFunction(
-                String broadcastModelKey, String featuresCol, DistanceMeasure distanceMeasure) {
+                String broadcastModelKey,
+                String featuresCol,
+                DistanceMeasure distanceMeasure,
+                int k) {
             this.broadcastModelKey = broadcastModelKey;
             this.featuresCol = featuresCol;
             this.distanceMeasure = distanceMeasure;
+            this.k = k;
         }
 
         @Override
@@ -123,19 +130,11 @@ public class KMeansModel implements Model<KMeansModel>, KMeansModelParams<KMeans
                 KMeansModelData modelData =
                         (KMeansModelData)
                                 getRuntimeContext().getBroadcastVariable(broadcastModelKey).get(0);
+                Preconditions.checkArgument(modelData.centroids.length <= k);
                 centroids = modelData.centroids;
             }
             DenseVector point = (DenseVector) dataPoint.getField(featuresCol);
-            double minDistance = Double.MAX_VALUE;
-            int closestCentroidId = -1;
-            for (int i = 0; i < centroids.length; i++) {
-                DenseVector centroid = centroids[i];
-                double distance = distanceMeasure.distance(centroid, point);
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    closestCentroidId = i;
-                }
-            }
+            int closestCentroidId = KMeans.findClosestCentroidId(centroids, point, distanceMeasure);
             return Row.join(dataPoint, Row.of(closestCentroidId));
         }
     }

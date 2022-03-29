@@ -16,33 +16,26 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.clustering.kmeans;
+package org.apache.flink.ml.common.param;
 
-import org.apache.flink.ml.common.param.HasMaxIter;
-import org.apache.flink.ml.common.param.HasSeed;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.param.ParamValidators;
 import org.apache.flink.ml.param.StringParam;
+import org.apache.flink.ml.param.WithParams;
 
-/**
- * Params of {@link KMeans}.
- *
- * @param <T> The class type of this instance.
- */
-public interface KMeansParams<T> extends HasSeed<T>, HasMaxIter<T>, KMeansModelParams<T> {
-    Param<String> INIT_MODE =
+/** Interface for the shared batch strategy param. */
+public interface HasBatchStrategy<T> extends WithParams<T> {
+    /** Strategy to create mini batches with a fixed batch size. */
+    String COUNT_STRATEGY = "count";
+
+    Param<String> BATCH_STRATEGY =
             new StringParam(
-                    "initMode",
-                    "The initialization algorithm. Supported options: 'random'.",
-                    "random",
-                    ParamValidators.inArray("random"));
+                    "batchStrategy",
+                    "Strategy to create mini batch from online train data.",
+                    COUNT_STRATEGY,
+                    ParamValidators.inArray(COUNT_STRATEGY));
 
-    default String getInitMode() {
-        return get(INIT_MODE);
-    }
-
-    default T setInitMode(String value) {
-        set(INIT_MODE, value);
-        return (T) this;
+    default String getBatchStrategy() {
+        return get(BATCH_STRATEGY);
     }
 }

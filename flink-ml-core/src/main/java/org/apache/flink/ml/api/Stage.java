@@ -40,6 +40,6 @@ import java.io.Serializable;
  */
 @PublicEvolving
 public interface Stage<T extends Stage<T>> extends WithParams<T>, Serializable {
-    /** Saves this stage to the given path. */
+    /** Saves the metadata and bounded data of this stage to the given path. */
     void save(String path) throws IOException;
 }

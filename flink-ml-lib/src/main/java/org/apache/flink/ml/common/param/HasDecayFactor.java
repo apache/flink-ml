@@ -16,33 +16,27 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.clustering.kmeans;
+package org.apache.flink.ml.common.param;
 
-import org.apache.flink.ml.common.param.HasMaxIter;
-import org.apache.flink.ml.common.param.HasSeed;
+import org.apache.flink.ml.param.DoubleParam;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.param.ParamValidators;
-import org.apache.flink.ml.param.StringParam;
+import org.apache.flink.ml.param.WithParams;
 
-/**
- * Params of {@link KMeans}.
- *
- * @param <T> The class type of this instance.
- */
-public interface KMeansParams<T> extends HasSeed<T>, HasMaxIter<T>, KMeansModelParams<T> {
-    Param<String> INIT_MODE =
-            new StringParam(
-                    "initMode",
-                    "The initialization algorithm. Supported options: 'random'.",
-                    "random",
-                    ParamValidators.inArray("random"));
+/** Interface for the shared decay factor param. */
+public interface HasDecayFactor<T> extends WithParams<T> {
+    Param<Double> DECAY_FACTOR =
+            new DoubleParam(
+                    "decayFactor",
+                    "The forgetfulness of the previous centroids.",
+                    0.,
+                    ParamValidators.inRange(0, 1));
 
-    default String getInitMode() {
-        return get(INIT_MODE);
+    default double getDecayFactor() {
+        return get(DECAY_FACTOR);
     }
 
-    default T setInitMode(String value) {
-        set(INIT_MODE, value);
-        return (T) this;
+    default T setDecayFactor(Double value) {
+        return set(DECAY_FACTOR, value);
     }
 }
