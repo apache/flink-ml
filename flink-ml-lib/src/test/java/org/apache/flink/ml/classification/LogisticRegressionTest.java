@@ -227,9 +227,9 @@ public class LogisticRegressionTest {
         LogisticRegression logisticRegression = new LogisticRegression().setWeightCol("weight");
         logisticRegression =
                 StageTestUtils.saveAndReload(
-                        env, logisticRegression, tempFolder.newFolder().getAbsolutePath());
+                        tEnv, logisticRegression, tempFolder.newFolder().getAbsolutePath());
         LogisticRegressionModel model = logisticRegression.fit(binomialDataTable);
-        model = StageTestUtils.saveAndReload(env, model, tempFolder.newFolder().getAbsolutePath());
+        model = StageTestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
         assertEquals(
                 Collections.singletonList("coefficient"),
                 model.getModelData()[0].getResolvedSchema().getColumnNames());

@@ -20,10 +20,15 @@ package org.apache.flink.ml.common.datastream;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.table.api.Table;
+import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ResolvedSchema;
+import org.apache.flink.types.Row;
 
-/** Utility class for table-related operations. */
+/** Utility class for operations related to Table API. */
 public class TableUtils {
     // Constructs a RowTypeInfo from the given schema.
     public static RowTypeInfo getRowTypeInfo(ResolvedSchema schema) {
@@ -36,5 +41,11 @@ public class TableUtils {
             names[i] = column.getName();
         }
         return new RowTypeInfo(types, names);
+    }
+
+    public static StreamExecutionEnvironment getExecutionEnvironment(StreamTableEnvironment tEnv) {
+        Table table = tEnv.fromValues();
+        DataStream<Row> dataStream = tEnv.toDataStream(table);
+        return dataStream.getExecutionEnvironment();
     }
 }

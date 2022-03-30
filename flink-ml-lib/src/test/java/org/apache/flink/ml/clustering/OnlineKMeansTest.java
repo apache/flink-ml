@@ -275,7 +275,7 @@ public class OnlineKMeansTest extends TestLogger {
                         .setPredictionCol("prediction")
                         .setGlobalBatchSize(6)
                         .setInitialModelData(
-                                KMeansModelData.generateRandomModelData(env, 2, 2, 0.0, 0));
+                                KMeansModelData.generateRandomModelData(tEnv, 2, 2, 0.0, 0));
         OnlineKMeansModel onlineModel = onlineKMeans.fit(onlineTrainTable);
         transformAndOutputData(onlineModel);
 
@@ -367,7 +367,7 @@ public class OnlineKMeansTest extends TestLogger {
                         .setPredictionCol("prediction")
                         .setGlobalBatchSize(2)
                         .setInitialModelData(
-                                KMeansModelData.generateRandomModelData(env, 2, 2, 0.0, 0));
+                                KMeansModelData.generateRandomModelData(tEnv, 2, 2, 0.0, 0));
 
         try {
             onlineKMeans.fit(onlineTrainTable);
@@ -400,13 +400,13 @@ public class OnlineKMeansTest extends TestLogger {
         String savePath = tempFolder.newFolder().getAbsolutePath();
         onlineKMeans.save(savePath);
         miniCluster.executeJobBlocking(env.getStreamGraph().getJobGraph());
-        OnlineKMeans loadedOnlineKMeans = OnlineKMeans.load(env, savePath);
+        OnlineKMeans loadedOnlineKMeans = OnlineKMeans.load(tEnv, savePath);
 
         OnlineKMeansModel onlineModel = loadedOnlineKMeans.fit(onlineTrainTable);
 
         String modelSavePath = tempFolder.newFolder().getAbsolutePath();
         onlineModel.save(modelSavePath);
-        OnlineKMeansModel loadedOnlineModel = OnlineKMeansModel.load(env, modelSavePath);
+        OnlineKMeansModel loadedOnlineModel = OnlineKMeansModel.load(tEnv, modelSavePath);
         loadedOnlineModel.setModelData(onlineModel.getModelData());
 
         transformAndOutputData(loadedOnlineModel);
@@ -430,7 +430,7 @@ public class OnlineKMeansTest extends TestLogger {
                         .setPredictionCol("prediction")
                         .setGlobalBatchSize(6)
                         .setInitialModelData(
-                                KMeansModelData.generateRandomModelData(env, 2, 2, 0.0, 0));
+                                KMeansModelData.generateRandomModelData(tEnv, 2, 2, 0.0, 0));
         OnlineKMeansModel onlineModel = onlineKMeans.fit(onlineTrainTable);
         transformAndOutputData(onlineModel);
 

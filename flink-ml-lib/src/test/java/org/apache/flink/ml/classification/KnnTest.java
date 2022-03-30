@@ -183,11 +183,11 @@ public class KnnTest {
     public void testSaveLoadAndPredict() throws Exception {
         Knn knn = new Knn();
         Knn loadedKnn =
-                StageTestUtils.saveAndReload(env, knn, tempFolder.newFolder().getAbsolutePath());
+                StageTestUtils.saveAndReload(tEnv, knn, tempFolder.newFolder().getAbsolutePath());
         KnnModel knnModel = loadedKnn.fit(trainData);
         knnModel =
                 StageTestUtils.saveAndReload(
-                        env, knnModel, tempFolder.newFolder().getAbsolutePath());
+                        tEnv, knnModel, tempFolder.newFolder().getAbsolutePath());
         assertEquals(
                 Arrays.asList("packedFeatures", "featureNormSquares", "labels"),
                 knnModel.getModelData()[0].getResolvedSchema().getColumnNames());
@@ -201,7 +201,7 @@ public class KnnTest {
         KnnModel knnModel = knn.fit(trainData);
         KnnModel newModel =
                 StageTestUtils.saveAndReload(
-                        env, knnModel, tempFolder.newFolder().getAbsolutePath());
+                        tEnv, knnModel, tempFolder.newFolder().getAbsolutePath());
         Table output = newModel.transform(predictData)[0];
         verifyPredictionResult(output, knn.getLabelCol(), knn.getPredictionCol());
     }

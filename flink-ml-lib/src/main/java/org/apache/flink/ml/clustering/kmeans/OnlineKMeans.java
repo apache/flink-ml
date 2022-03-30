@@ -40,7 +40,6 @@ import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.windowing.AllWindowFunction;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
@@ -129,13 +128,10 @@ public class OnlineKMeans
                 new KMeansModelData.ModelDataEncoder());
     }
 
-    public static OnlineKMeans load(StreamExecutionEnvironment env, String path)
-            throws IOException {
+    public static OnlineKMeans load(StreamTableEnvironment tEnv, String path) throws IOException {
         OnlineKMeans onlineKMeans = ReadWriteUtils.loadStageParam(path);
-        DataStream<KMeansModelData> initModelDataStream =
-                ReadWriteUtils.loadModelData(env, path, new KMeansModelData.ModelDataDecoder());
-        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
-        onlineKMeans.initModelDataTable = tEnv.fromDataStream(initModelDataStream);
+        onlineKMeans.initModelDataTable =
+                ReadWriteUtils.loadModelData(tEnv, path, new KMeansModelData.ModelDataDecoder());
         return onlineKMeans;
     }
 

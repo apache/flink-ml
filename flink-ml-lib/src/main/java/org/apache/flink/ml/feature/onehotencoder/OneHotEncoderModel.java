@@ -31,7 +31,6 @@ import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
@@ -118,14 +117,13 @@ public class OneHotEncoderModel
                 new OneHotEncoderModelData.ModelDataEncoder());
     }
 
-    public static OneHotEncoderModel load(StreamExecutionEnvironment env, String path)
+    public static OneHotEncoderModel load(StreamTableEnvironment tEnv, String path)
             throws IOException {
-        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
         OneHotEncoderModel model = ReadWriteUtils.loadStageParam(path);
-        DataStream<Tuple2<Integer, Integer>> modelData =
+        Table modelDataTable =
                 ReadWriteUtils.loadModelData(
-                        env, path, new OneHotEncoderModelData.ModelDataStreamFormat());
-        return model.setModelData(tEnv.fromDataStream(modelData));
+                        tEnv, path, new OneHotEncoderModelData.ModelDataStreamFormat());
+        return model.setModelData(modelDataTable);
     }
 
     @Override

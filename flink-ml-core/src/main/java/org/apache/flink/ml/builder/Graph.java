@@ -26,8 +26,8 @@ import org.apache.flink.ml.api.Stage;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
+import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.util.Preconditions;
 
 import javax.annotation.Nullable;
@@ -147,7 +147,7 @@ public final class Graph implements Estimator<Graph, GraphModel> {
         ReadWriteUtils.saveGraph(this, graphData, path);
     }
 
-    public static Graph load(StreamExecutionEnvironment env, String path) throws IOException {
-        return (Graph) ReadWriteUtils.loadGraph(env, path, Graph.class.getName());
+    public static Graph load(StreamTableEnvironment tEnv, String path) throws IOException {
+        return (Graph) ReadWriteUtils.loadGraph(tEnv, path, Graph.class.getName());
     }
 }

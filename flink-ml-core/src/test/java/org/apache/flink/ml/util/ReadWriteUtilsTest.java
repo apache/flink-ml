@@ -83,7 +83,7 @@ public class ReadWriteUtilsTest extends AbstractTestBase {
         model.save(path);
         env.execute();
 
-        ExampleStages.SumModel loadedModel = ExampleStages.SumModel.load(env, path);
+        ExampleStages.SumModel loadedModel = ExampleStages.SumModel.load(tEnv, path);
         // Executes the loaded SumModel and verifies that it produces the expected output.
         TestUtils.executeAndCheckOutput(env, loadedModel, inputs, output, null, null);
     }
