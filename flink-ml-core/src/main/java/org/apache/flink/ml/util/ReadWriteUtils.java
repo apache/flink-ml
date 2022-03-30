@@ -31,11 +31,14 @@ import org.apache.flink.ml.builder.Graph;
 import org.apache.flink.ml.builder.GraphData;
 import org.apache.flink.ml.builder.GraphModel;
 import org.apache.flink.ml.builder.GraphNode;
+import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.filesystem.bucketassigners.BasePathBucketAssigner;
 import org.apache.flink.streaming.api.functions.sink.filesystem.rollingpolicies.OnCheckpointRollingPolicy;
+import org.apache.flink.table.api.Table;
+import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.util.InstantiationUtil;
 import org.apache.flink.util.Preconditions;
 
@@ -211,21 +214,20 @@ public class ReadWriteUtils {
      * <p>The method throws RuntimeException if the expectedClassName is not empty AND it does not
      * match the className of the previously saved Pipeline or PipelineModel.
      *
-     * @param env A StreamExecutionEnvironment instance.
+     * @param tEnv A StreamTableEnvironment instance.
      * @param path The parent directory to load the pipeline metadata and its stages.
      * @param expectedClassName The expected class name of the pipeline.
      * @return A list of stages.
      */
     public static List<Stage<?>> loadPipeline(
-            StreamExecutionEnvironment env, String path, String expectedClassName)
-            throws IOException {
+            StreamTableEnvironment tEnv, String path, String expectedClassName) throws IOException {
         Map<String, ?> metadata = loadMetadata(path, expectedClassName);
         int numStages = (Integer) metadata.get("numStages");
         List<Stage<?>> stages = new ArrayList<>(numStages);
 
         for (int i = 0; i < numStages; i++) {
             String stagePath = getPathForPipelineStage(i, numStages, path);
-            stages.add(loadStage(env, stagePath));
+            stages.add(loadStage(tEnv, stagePath));
         }
         return stages;
     }
@@ -270,14 +272,13 @@ public class ReadWriteUtils {
      * <p>The method throws RuntimeException if the expectedClassName is not empty AND it does not
      * match the className of the previously saved Pipeline or PipelineModel.
      *
-     * @param env A StreamExecutionEnvironment instance.
+     * @param tEnv A StreamTableEnvironment instance.
      * @param path The parent directory to load the pipeline metadata and its stages.
      * @param expectedClassName The expected class name of the pipeline.
      * @return A Graph or GraphModel instance.
      */
     public static Stage<?> loadGraph(
-            StreamExecutionEnvironment env, String path, String expectedClassName)
-            throws IOException {
+            StreamTableEnvironment tEnv, String path, String expectedClassName) throws IOException {
         Map<String, ?> metadata = loadMetadata(path, expectedClassName);
         GraphData graphData = GraphData.fromMap((Map<String, Object>) metadata.get("graphData"));
 
@@ -289,7 +290,7 @@ public class ReadWriteUtils {
 
         for (GraphNode node : graphData.nodes) {
             String stagePath = getPathForPipelineStage(node.nodeId, maxNodeId + 1, path);
-            node.stage = loadStage(env, stagePath);
+            node.stage = loadStage(tEnv, stagePath);
         }
 
         if (expectedClassName.equals(GraphModel.class.getName())) {
@@ -375,20 +376,19 @@ public class ReadWriteUtils {
      *
      * <p>Required: the stage class must have a static load() method.
      *
-     * @param env A StreamExecutionEnvironment instance.
+     * @param tEnv A StreamTableEnvironment instance.
      * @param path The parent directory of the stage metadata file.
      * @return An instance of Stage.
      */
-    public static Stage<?> loadStage(StreamExecutionEnvironment env, String path)
-            throws IOException {
+    public static Stage<?> loadStage(StreamTableEnvironment tEnv, String path) throws IOException {
         Map<String, ?> metadata = loadMetadata(path, "");
         String className = (String) metadata.get("className");
 
         try {
             Class<?> clazz = Class.forName(className);
-            Method method = clazz.getMethod("load", StreamExecutionEnvironment.class, String.class);
+            Method method = clazz.getMethod("load", StreamTableEnvironment.class, String.class);
             method.setAccessible(true);
-            return (Stage<?>) method.invoke(null, env, path);
+            return (Stage<?>) method.invoke(null, tEnv, path);
         } catch (NoSuchMethodException e) {
             String methodName = String.format("%s::load(String)", className);
             throw new RuntimeException(
@@ -423,16 +423,19 @@ public class ReadWriteUtils {
     /**
      * Loads the model data from the given path using the model decoder.
      *
-     * @param env A StreamExecutionEnvironment instance.
+     * @param tEnv A StreamTableEnvironment instance.
      * @param path The parent directory of the model data file.
      * @param modelDecoder The decoder used to decode the model data.
      * @param <T> The class type of the model data.
      * @return The loaded model data.
      */
-    public static <T> DataStream<T> loadModelData(
-            StreamExecutionEnvironment env, String path, SimpleStreamFormat<T> modelDecoder) {
+    public static <T> Table loadModelData(
+            StreamTableEnvironment tEnv, String path, SimpleStreamFormat<T> modelDecoder) {
+        StreamExecutionEnvironment env = TableUtils.getExecutionEnvironment(tEnv);
         Source<T, ?, ?> source =
                 FileSource.forRecordStreamFormat(modelDecoder, new Path(getDataPath(path))).build();
-        return env.fromSource(source, WatermarkStrategy.noWatermarks(), "modelData");
+        DataStream<T> modelDataStream =
+                env.fromSource(source, WatermarkStrategy.noWatermarks(), "modelData");
+        return tEnv.fromDataStream(modelDataStream);
     }
 }

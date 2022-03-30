@@ -32,7 +32,6 @@ import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
@@ -106,13 +105,11 @@ public class NaiveBayesModel
                 new NaiveBayesModelData.ModelDataEncoder());
     }
 
-    public static NaiveBayesModel load(StreamExecutionEnvironment env, String path)
+    public static NaiveBayesModel load(StreamTableEnvironment tEnv, String path)
             throws IOException {
-        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
         NaiveBayesModel model = ReadWriteUtils.loadStageParam(path);
-        DataStream<NaiveBayesModelData> modelData =
-                ReadWriteUtils.loadModelData(env, path, new ModelDataDecoder());
-        return model.setModelData(tEnv.fromDataStream(modelData));
+        Table modelDataTable = ReadWriteUtils.loadModelData(tEnv, path, new ModelDataDecoder());
+        return model.setModelData(modelDataTable);
     }
 
     @Override

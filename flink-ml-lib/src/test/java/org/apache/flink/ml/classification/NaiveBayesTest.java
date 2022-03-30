@@ -262,11 +262,11 @@ public class NaiveBayesTest {
     public void testSaveLoad() throws Exception {
         estimator =
                 StageTestUtils.saveAndReload(
-                        env, estimator, tempFolder.newFolder().getAbsolutePath());
+                        tEnv, estimator, tempFolder.newFolder().getAbsolutePath());
 
         NaiveBayesModel model = estimator.fit(trainTable);
 
-        model = StageTestUtils.saveAndReload(env, model, tempFolder.newFolder().getAbsolutePath());
+        model = StageTestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
 
         Table outputTable = model.transform(predictTable)[0];
 

@@ -136,7 +136,7 @@ public class IndexToStringModelTest extends AbstractTestBase {
                         .setInputCols("inputCol1", "inputCol2")
                         .setOutputCols("outputCol1", "outputCol2")
                         .setModelData(modelTable);
-        model = StageTestUtils.saveAndReload(env, model, tempFolder.newFolder().getAbsolutePath());
+        model = StageTestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
 
         assertEquals(
                 Collections.singletonList("stringArrays"),

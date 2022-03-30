@@ -27,6 +27,7 @@ import org.apache.flink.connector.file.src.reader.SimpleStreamFormat;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
+import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -73,15 +74,15 @@ public class KMeansModelData {
      * Generates a Table containing a {@link KMeansModelData} instance with randomly generated
      * centroids.
      *
-     * @param env The environment where to create the table.
+     * @param tEnv The environment where to create the table.
      * @param k The number of generated centroids.
      * @param dim The size of generated centroids.
      * @param weight The weight of the centroids.
      * @param seed Random seed.
      */
     public static Table generateRandomModelData(
-            StreamExecutionEnvironment env, int k, int dim, double weight, long seed) {
-        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+            StreamTableEnvironment tEnv, int k, int dim, double weight, long seed) {
+        StreamExecutionEnvironment env = TableUtils.getExecutionEnvironment(tEnv);
         return tEnv.fromDataStream(
                 env.fromElements(1).map(new RandomCentroidsCreator(k, dim, weight, seed)));
     }

@@ -50,7 +50,6 @@ import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.windowing.AllWindowFunction;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
@@ -125,7 +124,7 @@ public class KMeans implements Estimator<KMeans, KMeansModel>, KMeansParams<KMea
         ReadWriteUtils.saveMetadata(this, path);
     }
 
-    public static KMeans load(StreamExecutionEnvironment env, String path) throws IOException {
+    public static KMeans load(StreamTableEnvironment tEnv, String path) throws IOException {
         return ReadWriteUtils.loadStageParam(path);
     }
 

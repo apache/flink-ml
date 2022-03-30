@@ -19,7 +19,9 @@
 package org.apache.flink.ml.util;
 
 import org.apache.flink.ml.api.Stage;
+import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 
 import java.lang.reflect.Method;
 
@@ -30,7 +32,9 @@ public class StageTestUtils {
      * stage.
      */
     public static <T extends Stage<T>> T saveAndReload(
-            StreamExecutionEnvironment env, T stage, String path) throws Exception {
+            StreamTableEnvironment tEnv, T stage, String path) throws Exception {
+        StreamExecutionEnvironment env = TableUtils.getExecutionEnvironment(tEnv);
+
         stage.save(path);
         try {
             env.execute();
@@ -42,7 +46,7 @@ public class StageTestUtils {
         }
 
         Method method =
-                stage.getClass().getMethod("load", StreamExecutionEnvironment.class, String.class);
-        return (T) method.invoke(null, env, path);
+                stage.getClass().getMethod("load", StreamTableEnvironment.class, String.class);
+        return (T) method.invoke(null, tEnv, path);
     }
 }

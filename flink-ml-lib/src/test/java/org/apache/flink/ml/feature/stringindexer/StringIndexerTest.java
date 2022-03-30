@@ -251,10 +251,10 @@ public class StringIndexerTest extends AbstractTestBase {
                         .setHandleInvalid(StringIndexerParams.KEEP_INVALID);
         stringIndexer =
                 StageTestUtils.saveAndReload(
-                        env, stringIndexer, tempFolder.newFolder().getAbsolutePath());
+                        tEnv, stringIndexer, tempFolder.newFolder().getAbsolutePath());
 
         StringIndexerModel model = stringIndexer.fit(trainTable);
-        model = StageTestUtils.saveAndReload(env, model, tempFolder.newFolder().getAbsolutePath());
+        model = StageTestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
 
         assertEquals(
                 Collections.singletonList("stringArrays"),

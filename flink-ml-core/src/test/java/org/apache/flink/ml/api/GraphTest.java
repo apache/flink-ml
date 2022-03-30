@@ -27,6 +27,7 @@ import org.apache.flink.ml.builder.Graph;
 import org.apache.flink.ml.builder.GraphBuilder;
 import org.apache.flink.ml.builder.GraphModel;
 import org.apache.flink.ml.builder.TableId;
+import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -60,7 +61,7 @@ public class GraphTest extends AbstractTestBase {
     // Executes the given stage using the given inputs and verifies that it produces the expected
     // output. Then repeats this procedure after saving and loading the given stage.
     private static void executeSaveLoadAndCheckOutput(
-            StreamExecutionEnvironment env,
+            StreamTableEnvironment tEnv,
             Stage<?> stage,
             List<List<Integer>> inputs,
             List<Integer> expectedOutput,
@@ -68,6 +69,8 @@ public class GraphTest extends AbstractTestBase {
             List<Integer> expectedModelDataOutput,
             boolean modelDataExists)
             throws Exception {
+        StreamExecutionEnvironment env = TableUtils.getExecutionEnvironment(tEnv);
+
         // Executes the given stage and verifies that it produces the expected output.
         TestUtils.executeAndCheckOutput(
                 env, stage, inputs, expectedOutput, modelDataInputs, expectedModelDataOutput);
@@ -81,9 +84,9 @@ public class GraphTest extends AbstractTestBase {
 
         Stage<?> loadedStage = null;
         if (stage instanceof Estimator) {
-            loadedStage = Graph.load(env, path);
+            loadedStage = Graph.load(tEnv, path);
         } else {
-            loadedStage = GraphModel.load(env, path);
+            loadedStage = GraphModel.load(tEnv, path);
         }
         // Executes the loaded stage and verifies that it produces the expected output.
         TestUtils.executeAndCheckOutput(
@@ -115,7 +118,7 @@ public class GraphTest extends AbstractTestBase {
         inputValues.add(Arrays.asList(10, 11, 12));
         List<Integer> expectedOutputValues = Arrays.asList(3, 4, 5, 11, 12, 13);
         executeSaveLoadAndCheckOutput(
-                env, model, inputValues, expectedOutputValues, null, null, true);
+                tEnv, model, inputValues, expectedOutputValues, null, null, true);
     }
 
     @Test
@@ -143,7 +146,7 @@ public class GraphTest extends AbstractTestBase {
         inputValues.add(Arrays.asList(10, 11, 12));
         List<Integer> expectedOutputValues = Arrays.asList(7, 8, 9, 43, 44, 45);
         executeSaveLoadAndCheckOutput(
-                env, model, inputValues, expectedOutputValues, null, null, false);
+                tEnv, model, inputValues, expectedOutputValues, null, null, false);
     }
 
     @Test
@@ -176,7 +179,7 @@ public class GraphTest extends AbstractTestBase {
                 Collections.singletonList(Collections.singletonList(2));
         List<Integer> expectedModelDataOutputValues = Collections.singletonList(3);
         executeSaveLoadAndCheckOutput(
-                env,
+                tEnv,
                 model,
                 inputValues,
                 expectedOutputValues,
@@ -210,7 +213,7 @@ public class GraphTest extends AbstractTestBase {
         inputValues.add(Arrays.asList(10, 11, 12));
         List<Integer> expectedOutputValues = Arrays.asList(7, 8, 9, 43, 44, 45);
         executeSaveLoadAndCheckOutput(
-                env, estimator, inputValues, expectedOutputValues, null, null, false);
+                tEnv, estimator, inputValues, expectedOutputValues, null, null, false);
     }
 
     @Test
@@ -242,7 +245,7 @@ public class GraphTest extends AbstractTestBase {
         List<Integer> expectedOutputValues = Arrays.asList(7, 8, 9, 16, 17, 18);
         List<Integer> expectedModelDataOutputValues = Collections.singletonList(6);
         executeSaveLoadAndCheckOutput(
-                env,
+                tEnv,
                 estimator,
                 inputValues,
                 expectedOutputValues,

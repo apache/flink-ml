@@ -28,7 +28,6 @@ import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
@@ -85,8 +84,7 @@ public class OneHotEncoder
         ReadWriteUtils.saveMetadata(this, path);
     }
 
-    public static OneHotEncoder load(StreamExecutionEnvironment env, String path)
-            throws IOException {
+    public static OneHotEncoder load(StreamTableEnvironment tEnv, String path) throws IOException {
         return ReadWriteUtils.loadStageParam(path);
     }
 

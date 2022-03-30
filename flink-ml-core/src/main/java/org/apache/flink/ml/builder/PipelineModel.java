@@ -26,8 +26,8 @@ import org.apache.flink.ml.api.Stage;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
+import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.util.Preconditions;
 
 import java.io.IOException;
@@ -77,10 +77,9 @@ public final class PipelineModel implements Model<PipelineModel> {
         ReadWriteUtils.savePipeline(this, stages, path);
     }
 
-    public static PipelineModel load(StreamExecutionEnvironment env, String path)
-            throws IOException {
+    public static PipelineModel load(StreamTableEnvironment tEnv, String path) throws IOException {
         return new PipelineModel(
-                ReadWriteUtils.loadPipeline(env, path, PipelineModel.class.getName()));
+                ReadWriteUtils.loadPipeline(tEnv, path, PipelineModel.class.getName()));
     }
 
     /**

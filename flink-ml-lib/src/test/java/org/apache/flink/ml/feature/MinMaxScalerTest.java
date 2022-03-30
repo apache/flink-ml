@@ -180,10 +180,10 @@ public class MinMaxScalerTest {
         MinMaxScaler minMaxScaler = new MinMaxScaler();
         MinMaxScaler loadedMinMaxScaler =
                 StageTestUtils.saveAndReload(
-                        env, minMaxScaler, tempFolder.newFolder().getAbsolutePath());
+                        tEnv, minMaxScaler, tempFolder.newFolder().getAbsolutePath());
         MinMaxScalerModel model = loadedMinMaxScaler.fit(trainDataTable);
         MinMaxScalerModel loadedModel =
-                StageTestUtils.saveAndReload(env, model, tempFolder.newFolder().getAbsolutePath());
+                StageTestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
         assertEquals(
                 Arrays.asList("minVector", "maxVector"),
                 model.getModelData()[0].getResolvedSchema().getColumnNames());

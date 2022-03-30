@@ -258,9 +258,9 @@ public class OneHotEncoderTest {
     public void testSaveLoad() throws Exception {
         estimator =
                 StageTestUtils.saveAndReload(
-                        env, estimator, tempFolder.newFolder().getAbsolutePath());
+                        tEnv, estimator, tempFolder.newFolder().getAbsolutePath());
         OneHotEncoderModel model = estimator.fit(trainTable);
-        model = StageTestUtils.saveAndReload(env, model, tempFolder.newFolder().getAbsolutePath());
+        model = StageTestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
         Table outputTable = model.transform(predictTable)[0];
         Map<Double, Vector>[] actualOutput =
                 executeAndCollect(outputTable, model.getInputCols(), model.getOutputCols());

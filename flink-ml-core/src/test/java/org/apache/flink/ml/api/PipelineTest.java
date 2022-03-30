@@ -74,7 +74,7 @@ public class PipelineTest extends AbstractTestBase {
         model.save(path);
         env.execute();
 
-        Model<?> loadedModel = PipelineModel.load(env, path);
+        Model<?> loadedModel = PipelineModel.load(tEnv, path);
         // Executes the loaded PipelineModel and verifies that it produces the expected output.
         TestUtils.executeAndCheckOutput(env, loadedModel, inputs, output, null, null);
     }
@@ -98,7 +98,7 @@ public class PipelineTest extends AbstractTestBase {
         estimator.save(path);
         env.execute();
 
-        Estimator<?, ?> loadedEstimator = Pipeline.load(env, path);
+        Estimator<?, ?> loadedEstimator = Pipeline.load(tEnv, path);
         // Executes the loaded Pipeline and verifies that it produces the expected output.
         TestUtils.executeAndCheckOutput(env, loadedEstimator, inputs, output, null, null);
     }

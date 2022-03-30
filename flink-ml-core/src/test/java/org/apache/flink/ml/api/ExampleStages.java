@@ -28,7 +28,6 @@ import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
@@ -103,14 +102,12 @@ public class ExampleStages {
             ReadWriteUtils.saveMetadata(this, path);
         }
 
-        public static SumModel load(StreamExecutionEnvironment env, String path)
-                throws IOException {
-            StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
-            DataStream<Integer> modelData =
-                    ReadWriteUtils.loadModelData(env, path, new TestUtils.IntegerStreamFormat());
+        public static SumModel load(StreamTableEnvironment tEnv, String path) throws IOException {
+            Table modelDataTable =
+                    ReadWriteUtils.loadModelData(tEnv, path, new TestUtils.IntegerStreamFormat());
 
             SumModel model = ReadWriteUtils.loadStageParam(path);
-            return model.setModelData(tEnv.fromDataStream(modelData));
+            return model.setModelData(modelDataTable);
         }
     }
 
@@ -196,7 +193,7 @@ public class ExampleStages {
             ReadWriteUtils.saveMetadata(this, path);
         }
 
-        public static SumEstimator load(StreamExecutionEnvironment env, String path)
+        public static SumEstimator load(StreamTableEnvironment tEnv, String path)
                 throws IOException {
             return ReadWriteUtils.loadStageParam(path);
         }
@@ -250,7 +247,7 @@ public class ExampleStages {
             ReadWriteUtils.saveMetadata(this, path);
         }
 
-        public static UnionAlgoOperator load(StreamExecutionEnvironment env, String path)
+        public static UnionAlgoOperator load(StreamTableEnvironment tEnv, String path)
                 throws IOException {
             return ReadWriteUtils.loadStageParam(path);
         }
