@@ -84,7 +84,7 @@ public class StandardScaler
                                         TypeInformation.of(DenseVector.class),
                                         TypeInformation.of(DenseVector.class),
                                         BasicTypeInfo.LONG_TYPE_INFO),
-                                new ComputeMetaOperator(getFeaturesCol()));
+                                new ComputeMetaOperator(getInputCol()));
 
         DataStream<StandardScalerModelData> modelData =
                 sumAndSquaredSumAndWeight
@@ -206,10 +206,10 @@ public class StandardScaler
         private DenseVector squaredSum;
         private long numElements;
 
-        private final String featuresCol;
+        private final String inputCol;
 
-        public ComputeMetaOperator(String featuresCol) {
-            this.featuresCol = featuresCol;
+        public ComputeMetaOperator(String inputCol) {
+            this.inputCol = inputCol;
         }
 
         @Override
@@ -220,15 +220,15 @@ public class StandardScaler
         }
 
         @Override
-        public void processElement(StreamRecord<Row> element) throws Exception {
-            Vector feature = (Vector) element.getValue().getField(featuresCol);
+        public void processElement(StreamRecord<Row> element) {
+            Vector inputVec = (Vector) element.getValue().getField(inputCol);
             if (numElements == 0) {
-                sum = new DenseVector(feature.size());
-                squaredSum = new DenseVector(feature.size());
+                sum = new DenseVector(inputVec.size());
+                squaredSum = new DenseVector(inputVec.size());
             }
-            BLAS.axpy(1, feature, sum);
-            BLAS.hDot(feature, feature);
-            BLAS.axpy(1, feature, squaredSum);
+            BLAS.axpy(1, inputVec, sum);
+            BLAS.hDot(inputVec, inputVec);
+            BLAS.axpy(1, inputVec, squaredSum);
             numElements++;
         }
 

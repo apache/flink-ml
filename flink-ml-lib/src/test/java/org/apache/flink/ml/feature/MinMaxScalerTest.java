@@ -97,8 +97,8 @@ public class MinMaxScalerTest {
         env.enableCheckpointing(100);
         env.setRestartStrategy(RestartStrategies.noRestart());
         tEnv = StreamTableEnvironment.create(env);
-        trainDataTable = tEnv.fromDataStream(env.fromCollection(TRAIN_DATA)).as("features");
-        predictDataTable = tEnv.fromDataStream(env.fromCollection(PREDICT_DATA)).as("features");
+        trainDataTable = tEnv.fromDataStream(env.fromCollection(TRAIN_DATA)).as("input");
+        predictDataTable = tEnv.fromDataStream(env.fromCollection(PREDICT_DATA)).as("input");
     }
 
     private static void verifyPredictionResult(
@@ -118,34 +118,30 @@ public class MinMaxScalerTest {
     @Test
     public void testParam() {
         MinMaxScaler minMaxScaler = new MinMaxScaler();
-        assertEquals("features", minMaxScaler.getFeaturesCol());
-        assertEquals("prediction", minMaxScaler.getPredictionCol());
+        assertEquals("input", minMaxScaler.getInputCol());
+        assertEquals("output", minMaxScaler.getOutputCol());
         assertEquals(0.0, minMaxScaler.getMin(), EPS);
         assertEquals(1.0, minMaxScaler.getMax(), EPS);
-        minMaxScaler
-                .setFeaturesCol("test_features")
-                .setPredictionCol("test_output")
-                .setMin(1.0)
-                .setMax(4.0);
-        assertEquals("test_features", minMaxScaler.getFeaturesCol());
+        minMaxScaler.setInputCol("test_input").setOutputCol("test_output").setMin(1.0).setMax(4.0);
+        assertEquals("test_input", minMaxScaler.getInputCol());
         assertEquals(1.0, minMaxScaler.getMin(), EPS);
         assertEquals(4.0, minMaxScaler.getMax(), EPS);
-        assertEquals("test_output", minMaxScaler.getPredictionCol());
+        assertEquals("test_output", minMaxScaler.getOutputCol());
     }
 
     @Test
     public void testOutputSchema() {
         MinMaxScaler minMaxScaler =
                 new MinMaxScaler()
-                        .setFeaturesCol("test_features")
-                        .setPredictionCol("test_output")
+                        .setInputCol("test_input")
+                        .setOutputCol("test_output")
                         .setMin(1.0)
                         .setMax(4.0);
 
-        MinMaxScalerModel model = minMaxScaler.fit(trainDataTable.as("test_features"));
-        Table output = model.transform(predictDataTable.as("test_features"))[0];
+        MinMaxScalerModel model = minMaxScaler.fit(trainDataTable.as("test_input"));
+        Table output = model.transform(predictDataTable.as("test_input"))[0];
         assertEquals(
-                Arrays.asList("test_features", "test_output"),
+                Arrays.asList("test_input", "test_output"),
                 output.getResolvedSchema().getColumnNames());
     }
 
@@ -153,17 +149,16 @@ public class MinMaxScalerTest {
     public void testMaxValueEqualsMinValueButPredictValueNotEquals() throws Exception {
         List<Row> trainData =
                 new ArrayList<>(Collections.singletonList(Row.of(Vectors.dense(40.0, 80.0))));
-        Table trainTable = tEnv.fromDataStream(env.fromCollection(trainData)).as("features");
+        Table trainTable = tEnv.fromDataStream(env.fromCollection(trainData)).as("input");
         List<Row> predictData =
                 new ArrayList<>(Collections.singletonList(Row.of(Vectors.dense(30.0, 50.0))));
-        Table predictDataTable =
-                tEnv.fromDataStream(env.fromCollection(predictData)).as("features");
+        Table predictDataTable = tEnv.fromDataStream(env.fromCollection(predictData)).as("input");
         MinMaxScaler minMaxScaler = new MinMaxScaler().setMax(10.0).setMin(0.0);
         MinMaxScalerModel model = minMaxScaler.fit(trainTable);
         Table result = model.transform(predictDataTable)[0];
         verifyPredictionResult(
                 result,
-                minMaxScaler.getPredictionCol(),
+                minMaxScaler.getOutputCol(),
                 Collections.singletonList(Vectors.dense(5.0, 5.0)));
     }
 
@@ -172,7 +167,7 @@ public class MinMaxScalerTest {
         MinMaxScaler minMaxScaler = new MinMaxScaler();
         MinMaxScalerModel minMaxScalerModel = minMaxScaler.fit(trainDataTable);
         Table output = minMaxScalerModel.transform(predictDataTable)[0];
-        verifyPredictionResult(output, minMaxScaler.getPredictionCol(), EXPECTED_DATA);
+        verifyPredictionResult(output, minMaxScaler.getOutputCol(), EXPECTED_DATA);
     }
 
     @Test
@@ -188,7 +183,7 @@ public class MinMaxScalerTest {
                 Arrays.asList("minVector", "maxVector"),
                 model.getModelData()[0].getResolvedSchema().getColumnNames());
         Table output = loadedModel.transform(predictDataTable)[0];
-        verifyPredictionResult(output, minMaxScaler.getPredictionCol(), EXPECTED_DATA);
+        verifyPredictionResult(output, minMaxScaler.getOutputCol(), EXPECTED_DATA);
     }
 
     @Test
@@ -213,6 +208,6 @@ public class MinMaxScalerTest {
         MinMaxScalerModel modelB = new MinMaxScalerModel().setModelData(modelData);
         ReadWriteUtils.updateExistingParams(modelB, modelA.getParamMap());
         Table output = modelB.transform(predictDataTable)[0];
-        verifyPredictionResult(output, minMaxScaler.getPredictionCol(), EXPECTED_DATA);
+        verifyPredictionResult(output, minMaxScaler.getOutputCol(), EXPECTED_DATA);
     }
 }

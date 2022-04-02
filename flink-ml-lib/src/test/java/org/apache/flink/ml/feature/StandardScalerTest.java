@@ -93,7 +93,7 @@ public class StandardScalerTest extends AbstractTestBase {
         env.enableCheckpointing(100);
         env.setRestartStrategy(RestartStrategies.noRestart());
         tEnv = StreamTableEnvironment.create(env);
-        denseTable = tEnv.fromDataStream(env.fromCollection(denseInput)).as("features");
+        denseTable = tEnv.fromDataStream(env.fromCollection(denseInput)).as("input");
     }
 
     @SuppressWarnings("unchecked")
@@ -131,34 +131,32 @@ public class StandardScalerTest extends AbstractTestBase {
     public void testParam() {
         StandardScaler standardScaler = new StandardScaler();
 
-        assertEquals("features", standardScaler.getFeaturesCol());
+        assertEquals("input", standardScaler.getInputCol());
         assertEquals(false, standardScaler.getWithMean());
         assertEquals(true, standardScaler.getWithStd());
-        assertEquals("prediction", standardScaler.getPredictionCol());
+        assertEquals("output", standardScaler.getOutputCol());
 
         standardScaler
-                .setFeaturesCol("test_features")
+                .setInputCol("test_input")
                 .setWithMean(true)
                 .setWithStd(false)
-                .setPredictionCol("test_prediction");
+                .setOutputCol("test_output");
 
-        assertEquals("test_features", standardScaler.getFeaturesCol());
+        assertEquals("test_input", standardScaler.getInputCol());
         assertEquals(true, standardScaler.getWithMean());
         assertEquals(false, standardScaler.getWithStd());
-        assertEquals("test_prediction", standardScaler.getPredictionCol());
+        assertEquals("test_output", standardScaler.getOutputCol());
     }
 
     @Test
     public void testOutputSchema() {
-        Table tempTable = denseTable.as("test_features");
+        Table tempTable = denseTable.as("test_input");
         StandardScaler standardScaler =
-                new StandardScaler()
-                        .setFeaturesCol("test_features")
-                        .setPredictionCol("test_prediction");
+                new StandardScaler().setInputCol("test_input").setOutputCol("test_output");
         Table output = standardScaler.fit(tempTable).transform(tempTable)[0];
 
         assertEquals(
-                Arrays.asList("test_features", "test_prediction"),
+                Arrays.asList("test_input", "test_output"),
                 output.getResolvedSchema().getColumnNames());
     }
 
@@ -166,22 +164,21 @@ public class StandardScalerTest extends AbstractTestBase {
     public void testFitAndPredictWithStd() throws Exception {
         StandardScaler standardScaler = new StandardScaler();
         Table output = standardScaler.fit(denseTable).transform(denseTable)[0];
-        verifyPredictionResult(expectedResWithStd, output, standardScaler.getPredictionCol());
+        verifyPredictionResult(expectedResWithStd, output, standardScaler.getOutputCol());
     }
 
     @Test
     public void testFitAndPredictWithMean() throws Exception {
         StandardScaler standardScaler = new StandardScaler().setWithStd(false).setWithMean(true);
         Table output = standardScaler.fit(denseTable).transform(denseTable)[0];
-        verifyPredictionResult(expectedResWithMean, output, standardScaler.getPredictionCol());
+        verifyPredictionResult(expectedResWithMean, output, standardScaler.getOutputCol());
     }
 
     @Test
     public void testFitAndPredictWithMeanAndStd() throws Exception {
         StandardScaler standardScaler = new StandardScaler().setWithMean(true);
         Table output = standardScaler.fit(denseTable).transform(denseTable)[0];
-        verifyPredictionResult(
-                expectedResWithMeanAndStd, output, standardScaler.getPredictionCol());
+        verifyPredictionResult(expectedResWithMeanAndStd, output, standardScaler.getOutputCol());
     }
 
     @Test
@@ -199,7 +196,7 @@ public class StandardScalerTest extends AbstractTestBase {
                 model.getModelData()[0].getResolvedSchema().getColumnNames());
 
         Table output = model.transform(denseTable)[0];
-        verifyPredictionResult(expectedResWithStd, output, standardScaler.getPredictionCol());
+        verifyPredictionResult(expectedResWithStd, output, standardScaler.getOutputCol());
     }
 
     @Test
@@ -234,7 +231,7 @@ public class StandardScalerTest extends AbstractTestBase {
         newModel.setModelData(model.getModelData());
         Table output = newModel.transform(denseTable)[0];
 
-        verifyPredictionResult(expectedResWithStd, output, standardScaler.getPredictionCol());
+        verifyPredictionResult(expectedResWithStd, output, standardScaler.getOutputCol());
     }
 
     @Test
@@ -244,7 +241,7 @@ public class StandardScalerTest extends AbstractTestBase {
                         Row.of(Vectors.sparse(3, new int[] {0, 1}, new double[] {-2.5, 1})),
                         Row.of(Vectors.sparse(3, new int[] {1, 2}, new double[] {2, -2})),
                         Row.of(Vectors.sparse(3, new int[] {0, 2}, new double[] {1.4, 1})));
-        Table sparseTable = tEnv.fromDataStream(env.fromCollection(sparseInput)).as("features");
+        Table sparseTable = tEnv.fromDataStream(env.fromCollection(sparseInput)).as("input");
 
         final List<DenseVector> expectedResWithStd =
                 Arrays.asList(
@@ -254,7 +251,7 @@ public class StandardScalerTest extends AbstractTestBase {
         StandardScaler standardScaler = new StandardScaler();
         Table output = standardScaler.fit(sparseTable).transform(sparseTable)[0];
 
-        verifyPredictionResult(expectedResWithStd, output, standardScaler.getPredictionCol());
+        verifyPredictionResult(expectedResWithStd, output, standardScaler.getOutputCol());
     }
 
     @Test
@@ -262,7 +259,7 @@ public class StandardScalerTest extends AbstractTestBase {
     public void testFitOnEmptyData() throws Exception {
         Table emptyTable =
                 tEnv.fromDataStream(env.fromCollection(denseInput).filter(x -> x.getArity() == 0))
-                        .as("features");
+                        .as("input");
         StandardScalerModel model = new StandardScaler().fit(emptyTable);
         Table modelDataTable = model.getModelData()[0];
         try {

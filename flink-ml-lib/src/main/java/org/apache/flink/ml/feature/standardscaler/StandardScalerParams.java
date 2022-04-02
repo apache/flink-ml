@@ -18,8 +18,8 @@
 
 package org.apache.flink.ml.feature.standardscaler;
 
-import org.apache.flink.ml.common.param.HasFeaturesCol;
-import org.apache.flink.ml.common.param.HasPredictionCol;
+import org.apache.flink.ml.common.param.HasInputCol;
+import org.apache.flink.ml.common.param.HasOutputCol;
 import org.apache.flink.ml.param.BooleanParam;
 import org.apache.flink.ml.param.Param;
 
@@ -28,7 +28,7 @@ import org.apache.flink.ml.param.Param;
  *
  * @param <T> The class type of this instance.
  */
-public interface StandardScalerParams<T> extends HasFeaturesCol<T>, HasPredictionCol<T> {
+public interface StandardScalerParams<T> extends HasInputCol<T>, HasOutputCol<T> {
     Param<Boolean> WITH_MEAN =
             new BooleanParam(
                     "withMean", "Whether centers the data with mean before scaling.", false);

@@ -81,7 +81,7 @@ public class MinMaxScalerModel
                         ArrayUtils.addAll(
                                 inputTypeInfo.getFieldTypes(),
                                 TypeInformation.of(DenseVector.class)),
-                        ArrayUtils.addAll(inputTypeInfo.getFieldNames(), getPredictionCol()));
+                        ArrayUtils.addAll(inputTypeInfo.getFieldNames(), getOutputCol()));
         DataStream<Row> output =
                 BroadcastUtils.withBroadcastStream(
                         Collections.singletonList(data),
@@ -90,10 +90,7 @@ public class MinMaxScalerModel
                             DataStream input = inputList.get(0);
                             return input.map(
                                     new PredictOutputFunction(
-                                            broadcastModelKey,
-                                            getMax(),
-                                            getMin(),
-                                            getFeaturesCol()),
+                                            broadcastModelKey, getMax(), getMin(), getInputCol()),
                                     outputTypeInfo);
                         });
         return new Table[] {tEnv.fromDataStream(output)};
@@ -131,7 +128,7 @@ public class MinMaxScalerModel
 
     /** This operator loads model data and predicts result. */
     private static class PredictOutputFunction extends RichMapFunction<Row, Row> {
-        private final String featureCol;
+        private final String inputCol;
         private final String broadcastKey;
         private final double upperBound;
         private final double lowerBound;
@@ -139,11 +136,11 @@ public class MinMaxScalerModel
         private DenseVector offsetVector;
 
         public PredictOutputFunction(
-                String broadcastKey, double upperBound, double lowerBound, String featureCol) {
+                String broadcastKey, double upperBound, double lowerBound, String inputCol) {
             this.upperBound = upperBound;
             this.lowerBound = lowerBound;
             this.broadcastKey = broadcastKey;
-            this.featureCol = featureCol;
+            this.inputCol = inputCol;
         }
 
         @Override
@@ -169,13 +166,13 @@ public class MinMaxScalerModel
                     }
                 }
             }
-            DenseVector feature = (DenseVector) row.getField(featureCol);
-            DenseVector outputVector = new DenseVector(scaleVector.size());
+            DenseVector inputVec = (DenseVector) row.getField(inputCol);
+            DenseVector outputVec = new DenseVector(scaleVector.size());
             for (int i = 0; i < scaleVector.size(); ++i) {
-                outputVector.values[i] =
-                        feature.values[i] * scaleVector.values[i] + offsetVector.values[i];
+                outputVec.values[i] =
+                        inputVec.values[i] * scaleVector.values[i] + offsetVector.values[i];
             }
-            return Row.join(row, Row.of(outputVector));
+            return Row.join(row, Row.of(outputVec));
         }
     }
 }

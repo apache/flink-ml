@@ -18,8 +18,8 @@
 
 package org.apache.flink.ml.feature.minmaxscaler;
 
-import org.apache.flink.ml.common.param.HasFeaturesCol;
-import org.apache.flink.ml.common.param.HasPredictionCol;
+import org.apache.flink.ml.common.param.HasInputCol;
+import org.apache.flink.ml.common.param.HasOutputCol;
 import org.apache.flink.ml.param.DoubleParam;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.param.ParamValidators;
@@ -29,7 +29,7 @@ import org.apache.flink.ml.param.ParamValidators;
  *
  * @param <T> The class type of this instance.
  */
-public interface MinMaxScalerParams<T> extends HasFeaturesCol<T>, HasPredictionCol<T> {
+public interface MinMaxScalerParams<T> extends HasInputCol<T>, HasOutputCol<T> {
     Param<Double> MIN =
             new DoubleParam(
                     "min",

@@ -67,7 +67,7 @@ public class StandardScalerModel
                 new RowTypeInfo(
                         ArrayUtils.addAll(
                                 inputTypeInfo.getFieldTypes(), TypeInformation.of(Vector.class)),
-                        ArrayUtils.addAll(inputTypeInfo.getFieldNames(), getPredictionCol()));
+                        ArrayUtils.addAll(inputTypeInfo.getFieldNames(), getOutputCol()));
 
         final String broadcastModelKey = "broadcastModelKey";
         DataStream<StandardScalerModelData> modelDataStream =
@@ -82,7 +82,7 @@ public class StandardScalerModel
                             return inputData.map(
                                     new PredictOutputFunction(
                                             broadcastModelKey,
-                                            getFeaturesCol(),
+                                            getInputCol(),
                                             getWithMean(),
                                             getWithStd()),
                                     outputTypeInfo);
@@ -94,16 +94,16 @@ public class StandardScalerModel
     /** A utility function used for prediction. */
     private static class PredictOutputFunction extends RichMapFunction<Row, Row> {
         private final String broadcastModelKey;
-        private final String featuresCol;
+        private final String inputCol;
         private final boolean withMean;
         private final boolean withStd;
         private DenseVector mean;
         private DenseVector scale;
 
         public PredictOutputFunction(
-                String broadcastModelKey, String featuresCol, boolean withMean, boolean withStd) {
+                String broadcastModelKey, String inputCol, boolean withMean, boolean withStd) {
             this.broadcastModelKey = broadcastModelKey;
-            this.featuresCol = featuresCol;
+            this.inputCol = inputCol;
             this.withMean = withMean;
             this.withStd = withStd;
         }
@@ -126,16 +126,16 @@ public class StandardScalerModel
                 }
             }
 
-            Vector output = ((Vector) (dataPoint.getField(featuresCol))).clone();
+            Vector outputVec = ((Vector) (dataPoint.getField(inputCol))).clone();
             if (withMean) {
-                output = output.toDense();
-                BLAS.axpy(-1, mean, (DenseVector) output);
+                outputVec = outputVec.toDense();
+                BLAS.axpy(-1, mean, (DenseVector) outputVec);
             }
             if (withStd) {
-                BLAS.hDot(scale, output);
+                BLAS.hDot(scale, outputVec);
             }
 
-            return Row.join(dataPoint, Row.of(output));
+            return Row.join(dataPoint, Row.of(outputVec));
         }
     }
 

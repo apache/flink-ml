@@ -74,22 +74,23 @@ public class MinMaxScaler
     @Override
     public MinMaxScalerModel fit(Table... inputs) {
         Preconditions.checkArgument(inputs.length == 1);
-        final String featureCol = getFeaturesCol();
+        final String inputCol = getInputCol();
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
-        DataStream<DenseVector> features =
+        DataStream<DenseVector> inputData =
                 tEnv.toDataStream(inputs[0])
                         .map(
                                 (MapFunction<Row, DenseVector>)
-                                        value -> (DenseVector) value.getField(featureCol));
+                                        value -> (DenseVector) value.getField(inputCol));
         DataStream<DenseVector> minMaxValues =
-                features.transform(
+                inputData
+                        .transform(
                                 "reduceInEachPartition",
-                                features.getType(),
+                                inputData.getType(),
                                 new MinMaxReduceFunctionOperator())
                         .transform(
                                 "reduceInFinalPartition",
-                                features.getType(),
+                                inputData.getType(),
                                 new MinMaxReduceFunctionOperator())
                         .setParallelism(1);
         DataStream<MinMaxScalerModelData> modelData =
