@@ -81,7 +81,7 @@ public class IndexToStringModelTest extends AbstractTestBase {
     }
 
     @Test
-    public void testPredictParam() {
+    public void testOutputSchema() {
         IndexToStringModel indexToStringModel =
                 new IndexToStringModel()
                         .setInputCols("inputCol1", "inputCol2")

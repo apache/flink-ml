@@ -191,7 +191,7 @@ public class LogisticRegressionTest {
     }
 
     @Test
-    public void testFeaturePredictionParam() {
+    public void testOutputSchema() {
         Table tempTable = binomialDataTable.as("test_features", "test_label", "test_weight");
         LogisticRegression logisticRegression =
                 new LogisticRegression()

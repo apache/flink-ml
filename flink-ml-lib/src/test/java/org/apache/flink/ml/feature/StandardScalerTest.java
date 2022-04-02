@@ -149,7 +149,7 @@ public class StandardScalerTest extends AbstractTestBase {
     }
 
     @Test
-    public void testFeaturePredictionParam() {
+    public void testOutputSchema() {
         Table tempTable = denseTable.as("test_features");
         StandardScaler standardScaler =
                 new StandardScaler()

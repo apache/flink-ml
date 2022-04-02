@@ -170,7 +170,7 @@ public class NaiveBayesTest {
     }
 
     @Test
-    public void testFeaturePredictionParam() {
+    public void testOutputSchema() {
         trainTable = trainTable.as("test_features", "test_label");
         predictTable = predictTable.as("test_features");
 

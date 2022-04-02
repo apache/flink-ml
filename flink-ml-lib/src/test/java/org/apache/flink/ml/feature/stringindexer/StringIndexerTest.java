@@ -96,7 +96,7 @@ public class StringIndexerTest extends AbstractTestBase {
     }
 
     @Test
-    public void testFitParam() {
+    public void testParam() {
         StringIndexer stringIndexer = new StringIndexer();
         assertEquals(stringIndexer.getStringOrderType(), StringIndexerParams.ARBITRARY_ORDER);
         assertEquals(stringIndexer.getHandleInvalid(), StringIndexerParams.ERROR_INVALID);
@@ -114,7 +114,7 @@ public class StringIndexerTest extends AbstractTestBase {
     }
 
     @Test
-    public void testPredictParam() {
+    public void testOutputSchema() {
         StringIndexer stringIndexer =
                 new StringIndexer()
                         .setInputCols("inputCol1", "inputCol2")

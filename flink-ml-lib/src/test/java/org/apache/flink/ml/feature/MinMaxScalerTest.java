@@ -134,7 +134,7 @@ public class MinMaxScalerTest {
     }
 
     @Test
-    public void testFeaturePredictionParam() {
+    public void testOutputSchema() {
         MinMaxScaler minMaxScaler =
                 new MinMaxScaler()
                         .setFeaturesCol("test_features")

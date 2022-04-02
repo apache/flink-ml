@@ -148,7 +148,7 @@ public class KMeansTest extends AbstractTestBase {
     }
 
     @Test
-    public void testFeaturePredictionParam() {
+    public void testOutputSchema() {
         Table input = dataTable.as("test_feature");
         KMeans kmeans =
                 new KMeans().setFeaturesCol("test_feature").setPredictionCol("test_prediction");

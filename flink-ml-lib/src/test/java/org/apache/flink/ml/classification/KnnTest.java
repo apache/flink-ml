@@ -149,7 +149,7 @@ public class KnnTest {
     }
 
     @Test
-    public void testFeaturePredictionParam() throws Exception {
+    public void testOutputSchema() throws Exception {
         Knn knn =
                 new Knn()
                         .setLabelCol("test_label")
