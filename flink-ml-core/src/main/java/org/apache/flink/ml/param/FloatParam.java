@@ -18,6 +18,8 @@
 
 package org.apache.flink.ml.param;
 
+import java.io.IOException;
+
 /** Class for the float parameter. */
 public class FloatParam extends Param<Float> {
 
@@ -28,5 +30,13 @@ public class FloatParam extends Param<Float> {
 
     public FloatParam(String name, String description, Float defaultValue) {
         this(name, description, defaultValue, ParamValidators.alwaysTrue());
+    }
+
+    @Override
+    public Float jsonDecode(Object json) throws IOException {
+        if (json instanceof Double) {
+            return ((Double) json).floatValue();
+        }
+        return (Float) json;
     }
 }

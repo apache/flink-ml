@@ -19,7 +19,7 @@
 package org.apache.flink.ml.param;
 
 /** Class for the float array parameter. */
-public class FloatArrayParam extends Param<Float[]> {
+public class FloatArrayParam extends ArrayParam<Float> {
 
     public FloatArrayParam(
             String name,

@@ -16,27 +16,27 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.param;
+package org.apache.flink.ml.benchmark.datagenerator.param;
 
-import java.io.IOException;
+import org.apache.flink.ml.param.IntParam;
+import org.apache.flink.ml.param.Param;
+import org.apache.flink.ml.param.ParamValidators;
+import org.apache.flink.ml.param.WithParams;
 
-/** Class for the long parameter. */
-public class LongParam extends Param<Long> {
+/** Interface for the benchmark vector dimension param. */
+public interface HasVectorDim<T> extends WithParams<T> {
+    Param<Integer> VECTOR_DIM =
+            new IntParam(
+                    "vectorDim",
+                    "Dimension of vector-typed data to be generated.",
+                    1,
+                    ParamValidators.gt(0));
 
-    public LongParam(
-            String name, String description, Long defaultValue, ParamValidator<Long> validator) {
-        super(name, Long.class, description, defaultValue, validator);
+    default int getVectorDim() {
+        return get(VECTOR_DIM);
     }
 
-    public LongParam(String name, String description, Long defaultValue) {
-        this(name, description, defaultValue, ParamValidators.alwaysTrue());
-    }
-
-    @Override
-    public Long jsonDecode(Object json) throws IOException {
-        if (json instanceof Integer) {
-            return ((Integer) json).longValue();
-        }
-        return (Long) json;
+    default T setVectorDim(int value) {
+        return set(VECTOR_DIM, value);
     }
 }

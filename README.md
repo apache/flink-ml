@@ -14,6 +14,12 @@ Then you will find a JAR file that contains your application, plus any libraries
 that you may have added as dependencies to the application:
 `target/<artifact-id>-<version>.jar`.
 
+## <a name="benchmark"></a>Benchmark
+
+Flink ML provides functionalities to benchmark its machine learning algorithms.
+For detailed information, please check the [Benchmark
+Getting Started](./flink-ml-benchmark/README.md).
+
 ## <a name="documentation"></a>Documentation
 
 The documentation of Flink ML is located on the website:

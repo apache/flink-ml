@@ -19,7 +19,7 @@
 package org.apache.flink.ml.param;
 
 /** Class for the double array parameter. */
-public class DoubleArrayParam extends Param<Double[]> {
+public class DoubleArrayParam extends ArrayParam<Double> {
 
     public DoubleArrayParam(
             String name,
