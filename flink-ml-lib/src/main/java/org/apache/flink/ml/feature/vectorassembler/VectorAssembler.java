@@ -97,16 +97,16 @@ public class VectorAssembler
                 out.collect(Row.join(value, Row.of(assembledVector)));
             } catch (Exception e) {
                 switch (handleInvalid) {
-                    case VectorAssemblerParams.ERROR_INVALID:
+                    case ERROR_INVALID:
                         throw e;
-                    case VectorAssemblerParams.SKIP_INVALID:
+                    case SKIP_INVALID:
                         return;
-                    case VectorAssemblerParams.KEEP_INVALID:
+                    case KEEP_INVALID:
                         out.collect(Row.join(value, Row.of((Object) null)));
                         return;
                     default:
                         throw new UnsupportedOperationException(
-                                "handleInvalid=" + handleInvalid + " is not supported");
+                                "Unsupported " + HANDLE_INVALID + " type: " + handleInvalid);
                 }
             }
         }

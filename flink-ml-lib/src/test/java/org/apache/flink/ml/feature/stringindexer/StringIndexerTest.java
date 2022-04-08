@@ -20,6 +20,7 @@ package org.apache.flink.ml.feature.stringindexer;
 
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.ml.common.param.HasHandleInvalid;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.ml.util.StageTestUtils;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
@@ -216,11 +217,16 @@ public class StringIndexerTest extends AbstractTestBase {
             output = stringIndexer.fit(trainTable).transform(predictTable)[0];
             IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect());
             fail();
-        } catch (Exception e) {
+        } catch (Throwable e) {
+            while (e.getCause() != null) {
+                e = e.getCause();
+            }
             assertEquals(
                     "The input contains unseen string: e. "
-                            + "See handleInvalid parameter for more options.",
-                    e.getCause().getCause().getCause().getCause().getCause().getMessage());
+                            + "See "
+                            + HasHandleInvalid.HANDLE_INVALID
+                            + " parameter for more options.",
+                    e.getMessage());
         }
     }
 

@@ -176,19 +176,21 @@ public class StringIndexerModel
                     outputIndices.setField(i, modelDataMap[i].get(stringVal));
                 } else {
                     switch (handleInValid) {
-                        case StringIndexerModelParams.SKIP_INVALID:
+                        case SKIP_INVALID:
                             return;
-                        case StringIndexerModelParams.ERROR_INVALID:
+                        case ERROR_INVALID:
                             throw new RuntimeException(
                                     "The input contains unseen string: "
                                             + stringVal
-                                            + ". See handleInvalid parameter for more options.");
-                        case StringIndexerModelParams.KEEP_INVALID:
+                                            + ". See "
+                                            + HANDLE_INVALID
+                                            + " parameter for more options.");
+                        case KEEP_INVALID:
                             outputIndices.setField(i, modelDataMap[i].size());
                             break;
                         default:
-                            throw new IllegalStateException(
-                                    "Unsupported types of handling invalid data: " + handleInValid);
+                            throw new UnsupportedOperationException(
+                                    "Unsupported " + HANDLE_INVALID + "type: " + handleInValid);
                     }
                 }
             }

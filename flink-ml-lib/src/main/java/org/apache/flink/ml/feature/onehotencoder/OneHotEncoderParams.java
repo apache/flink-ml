@@ -27,6 +27,9 @@ import org.apache.flink.ml.param.Param;
 /**
  * Params of OneHotEncoderModel.
  *
+ * <p>The `keep` and `skip` option of {@link HasHandleInvalid} is not supported in {@link
+ * OneHotEncoderParams}.
+ *
  * @param <T> The class type of this instance.
  */
 public interface OneHotEncoderParams<T>

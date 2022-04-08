@@ -106,10 +106,11 @@ public class IndexToStringModelTest extends AbstractTestBase {
         try {
             IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect());
             fail();
-        } catch (Exception e) {
-            assertEquals(
-                    "The input contains unseen index: 4.",
-                    e.getCause().getCause().getCause().getCause().getCause().getMessage());
+        } catch (Throwable e) {
+            while (e.getCause() != null) {
+                e = e.getCause();
+            }
+            assertEquals("The input contains unseen index: 4.", e.getMessage());
         }
     }
 

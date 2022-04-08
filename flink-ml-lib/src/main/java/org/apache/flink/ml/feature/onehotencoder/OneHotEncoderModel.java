@@ -25,7 +25,6 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
-import org.apache.flink.ml.common.param.HasHandleInvalid;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -68,7 +67,7 @@ public class OneHotEncoderModel
         final boolean dropLast = getDropLast();
         final String broadcastModelKey = "OneHotModelStream";
 
-        Preconditions.checkArgument(getHandleInvalid().equals(HasHandleInvalid.ERROR_INVALID));
+        Preconditions.checkArgument(getHandleInvalid().equals(ERROR_INVALID));
         Preconditions.checkArgument(inputs.length == 1);
         Preconditions.checkArgument(inputCols.length == outputCols.length);
 

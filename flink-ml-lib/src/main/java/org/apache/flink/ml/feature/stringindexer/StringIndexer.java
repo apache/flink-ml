@@ -141,27 +141,31 @@ public class StringIndexer
             for (int i = 0; i < stringsAndCntsByColumn.length; i++) {
                 List<Tuple2<String, Long>> stringsAndCnts = stringsAndCntsByColumn[i];
                 switch (stringOrderType) {
-                    case StringIndexerParams.ALPHABET_ASC_ORDER:
+                    case ALPHABET_ASC_ORDER:
                         stringsAndCnts.sort(Comparator.comparing(valAndCnt -> valAndCnt.f0));
                         break;
-                    case StringIndexerParams.ALPHABET_DESC_ORDER:
+                    case ALPHABET_DESC_ORDER:
                         stringsAndCnts.sort(
                                 (valAndCnt1, valAndCnt2) ->
                                         -valAndCnt1.f0.compareTo(valAndCnt2.f0));
                         break;
-                    case StringIndexerParams.FREQUENCY_ASC_ORDER:
+                    case FREQUENCY_ASC_ORDER:
                         stringsAndCnts.sort(Comparator.comparing(valAndCnt -> valAndCnt.f1));
                         break;
-                    case StringIndexerParams.FREQUENCY_DESC_ORDER:
+                    case FREQUENCY_DESC_ORDER:
                         stringsAndCnts.sort(
                                 (valAndCnt1, valAndCnt2) ->
                                         -valAndCnt1.f1.compareTo(valAndCnt2.f1));
                         break;
-                    case StringIndexerParams.ARBITRARY_ORDER:
+                    case ARBITRARY_ORDER:
                         break;
                     default:
-                        throw new IllegalStateException(
-                                "Unsupported string order type: " + stringOrderType);
+                        throw new UnsupportedOperationException(
+                                "Unsupported "
+                                        + STRING_ORDER_TYPE
+                                        + " type: "
+                                        + stringOrderType
+                                        + ".");
                 }
 
                 stringArrays[i] = new String[stringsAndCnts.size()];

@@ -32,18 +32,21 @@ import org.apache.flink.ml.param.WithParams;
  * <ul>
  *   <li>error: raise an exception.
  *   <li>skip: filter out rows with bad values.
+ *   <li>keep: keep bad rows according to a specific rule. Check out each algorithm for detail
+ *       rules.
  * </ul>
  */
 public interface HasHandleInvalid<T> extends WithParams<T> {
     String ERROR_INVALID = "error";
     String SKIP_INVALID = "skip";
+    String KEEP_INVALID = "keep";
 
     Param<String> HANDLE_INVALID =
             new StringParam(
                     "handleInvalid",
                     "Strategy to handle invalid entries.",
                     ERROR_INVALID,
-                    ParamValidators.inArray(ERROR_INVALID, SKIP_INVALID));
+                    ParamValidators.inArray(ERROR_INVALID, SKIP_INVALID, KEEP_INVALID));
 
     default String getHandleInvalid() {
         return get(HANDLE_INVALID);

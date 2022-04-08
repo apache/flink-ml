@@ -22,7 +22,6 @@ import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.ml.common.param.HasHandleInvalid;
 import org.apache.flink.ml.feature.vectorassembler.VectorAssembler;
-import org.apache.flink.ml.feature.vectorassembler.VectorAssemblerParams;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vectors;
@@ -122,7 +121,7 @@ public class VectorAssemblerTest extends AbstractTestBase {
                 new VectorAssembler()
                         .setInputCols("vec", "num", "sparseVec")
                         .setOutputCol("assembledVec")
-                        .setHandleInvalid(VectorAssemblerParams.KEEP_INVALID);
+                        .setHandleInvalid(HasHandleInvalid.KEEP_INVALID);
         Table output = vectorAssembler.transform(inputDataTable)[0];
         assertEquals(
                 Arrays.asList("id", "vec", "num", "sparseVec", "assembledVec"),
@@ -141,10 +140,11 @@ public class VectorAssemblerTest extends AbstractTestBase {
             Table outputTable = vectorAssembler.transform(inputDataTable)[0];
             outputTable.execute().collect().next();
             Assert.fail("Expected IllegalArgumentException");
-        } catch (Exception e) {
-            assertEquals(
-                    "Input column value should not be null.",
-                    e.getCause().getCause().getCause().getCause().getCause().getMessage());
+        } catch (Throwable e) {
+            while (e.getCause() != null) {
+                e = e.getCause();
+            }
+            assertEquals("Input column value should not be null.", e.getMessage());
         }
     }
 
@@ -154,7 +154,7 @@ public class VectorAssemblerTest extends AbstractTestBase {
                 new VectorAssembler()
                         .setInputCols("vec", "num", "sparseVec")
                         .setOutputCol("assembledVec")
-                        .setHandleInvalid(VectorAssemblerParams.SKIP_INVALID);
+                        .setHandleInvalid(HasHandleInvalid.SKIP_INVALID);
         Table output = vectorAssembler.transform(inputDataTable)[0];
         assertEquals(
                 Arrays.asList("id", "vec", "num", "sparseVec", "assembledVec"),

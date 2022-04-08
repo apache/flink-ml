@@ -23,7 +23,6 @@ import org.apache.flink.api.common.functions.MapPartitionFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
-import org.apache.flink.ml.common.param.HasHandleInvalid;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -59,7 +58,7 @@ public class OneHotEncoder
     @Override
     public OneHotEncoderModel fit(Table... inputs) {
         Preconditions.checkArgument(inputs.length == 1);
-        Preconditions.checkArgument(getHandleInvalid().equals(HasHandleInvalid.ERROR_INVALID));
+        Preconditions.checkArgument(getHandleInvalid().equals(ERROR_INVALID));
 
         final String[] inputCols = getInputCols();
 
