@@ -22,7 +22,7 @@ import org.apache.flink.ml.util.ReadWriteUtils;
 
 import java.io.IOException;
 
-/** Class for array-type parameters. */
+/** Class for the array parameter. */
 public class ArrayParam<T> extends Param<T[]> {
 
     public ArrayParam(

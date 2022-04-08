@@ -16,16 +16,27 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.feature.stringindexer;
+package org.apache.flink.ml.param;
 
-import org.apache.flink.ml.common.param.HasHandleInvalid;
-import org.apache.flink.ml.common.param.HasInputCols;
-import org.apache.flink.ml.common.param.HasOutputCols;
+import org.apache.flink.ml.util.ReadWriteUtils;
 
-/**
- * Params of {@link StringIndexerModel}.
- *
- * @param <T> The class type of this instance.
- */
-public interface StringIndexerModelParams<T>
-        extends HasInputCols<T>, HasOutputCols<T>, HasHandleInvalid<T> {}
+import java.io.IOException;
+
+/** Class for the array parameter. */
+public class ArrayArrayParam<T> extends Param<T[][]> {
+
+    public ArrayArrayParam(
+            String name,
+            Class<T[][]> clazz,
+            String description,
+            T[][] defaultValue,
+            ParamValidator<T[][]> validator) {
+        super(name, clazz, description, defaultValue, validator);
+    }
+
+    @Override
+    public T[][] jsonDecode(Object json) throws IOException {
+        String jsonStr = ReadWriteUtils.OBJECT_MAPPER.writeValueAsString(json);
+        return ReadWriteUtils.OBJECT_MAPPER.readValue(jsonStr, clazz);
+    }
+}

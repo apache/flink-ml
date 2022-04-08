@@ -35,6 +35,7 @@ import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.types.Row;
 
 import org.apache.commons.collections.IteratorUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -141,10 +142,9 @@ public class VectorAssemblerTest extends AbstractTestBase {
             outputTable.execute().collect().next();
             Assert.fail("Expected IllegalArgumentException");
         } catch (Throwable e) {
-            while (e.getCause() != null) {
-                e = e.getCause();
-            }
-            assertEquals("Input column value should not be null.", e.getMessage());
+            assertEquals(
+                    "Input column value should not be null.",
+                    ExceptionUtils.getRootCause(e).getMessage());
         }
     }
 

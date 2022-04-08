@@ -31,6 +31,7 @@ import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.types.Row;
 
 import org.apache.commons.collections.IteratorUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -218,15 +219,12 @@ public class StringIndexerTest extends AbstractTestBase {
             IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect());
             fail();
         } catch (Throwable e) {
-            while (e.getCause() != null) {
-                e = e.getCause();
-            }
             assertEquals(
                     "The input contains unseen string: e. "
                             + "See "
                             + HasHandleInvalid.HANDLE_INVALID
                             + " parameter for more options.",
-                    e.getMessage());
+                    ExceptionUtils.getRootCause(e).getMessage());
         }
     }
 

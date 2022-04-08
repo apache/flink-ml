@@ -23,6 +23,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Transformer;
 import org.apache.flink.ml.common.datastream.TableUtils;
+import org.apache.flink.ml.common.param.HasHandleInvalid;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vector;
@@ -47,6 +48,9 @@ import java.util.Map;
 /**
  * A feature transformer that combines a given list of input columns into a vector column. Types of
  * input columns must be either vector or numerical value.
+ *
+ * <p>The `keep` option of {@link HasHandleInvalid} means that we output bad rows with output column
+ * set to null.
  */
 public class VectorAssembler
         implements Transformer<VectorAssembler>, VectorAssemblerParams<VectorAssembler> {

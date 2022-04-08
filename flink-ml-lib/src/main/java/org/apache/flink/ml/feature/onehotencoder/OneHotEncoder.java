@@ -23,6 +23,7 @@ import org.apache.flink.api.common.functions.MapPartitionFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
+import org.apache.flink.ml.common.param.HasHandleInvalid;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -43,6 +44,9 @@ import java.util.Map;
  *
  * <p>Data of selected input columns should be indexed numbers in order for OneHotEncoder to
  * function correctly.
+ *
+ * <p>The `keep` and `skip` option of {@link HasHandleInvalid} is not supported in {@link
+ * OneHotEncoderParams}.
  *
  * <p>See https://en.wikipedia.org/wiki/One-hot.
  */
