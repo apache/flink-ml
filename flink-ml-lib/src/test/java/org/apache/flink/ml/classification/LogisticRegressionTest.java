@@ -37,6 +37,7 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 
 import org.apache.commons.collections.IteratorUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -275,10 +276,10 @@ public class LogisticRegressionTest {
             new LogisticRegression().fit(multinomialDataTable);
             env.execute();
             fail();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             assertEquals(
                     "Multinomial classification is not supported yet. Supported options: [auto, binomial].",
-                    e.getCause().getCause().getMessage());
+                    ExceptionUtils.getRootCause(e).getMessage());
         }
     }
 

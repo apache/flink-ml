@@ -372,11 +372,7 @@ public class OnlineKMeansTest extends TestLogger {
         try {
             onlineKMeans.fit(onlineTrainTable);
             Assert.fail("Expected IllegalStateException");
-        } catch (Exception e) {
-            Throwable exception = e;
-            while (exception.getCause() != null) {
-                exception = exception.getCause();
-            }
+        } catch (Throwable exception) {
             assertEquals(IllegalStateException.class, exception.getClass());
             assertEquals(
                     "There are more subtasks in the training process than the number "

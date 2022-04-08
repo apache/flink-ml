@@ -25,6 +25,7 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
+import org.apache.flink.ml.common.param.HasHandleInvalid;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -47,6 +48,9 @@ import java.util.Map;
 /**
  * A Model which transforms input string/numeric column(s) to integer column(s) using the model data
  * computed by {@link StringIndexer}.
+ *
+ * <p>The `keep` option of {@link HasHandleInvalid} means that we put the invalid entries in a
+ * special bucket, whose index is the number of distinct values in this column.
  */
 public class StringIndexerModel
         implements Model<StringIndexerModel>, StringIndexerModelParams<StringIndexerModel> {

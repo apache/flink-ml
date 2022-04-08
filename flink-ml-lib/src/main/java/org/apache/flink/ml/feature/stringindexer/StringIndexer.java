@@ -25,6 +25,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
+import org.apache.flink.ml.common.param.HasHandleInvalid;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -54,6 +55,9 @@ import java.util.Map;
  * <p>The input columns are cast to string if they are numeric values. By default, the output model
  * is arbitrarily ordered. Users can control this by setting {@link
  * StringIndexerParams#STRING_ORDER_TYPE}.
+ *
+ * <p>The `keep` option of {@link HasHandleInvalid} means that we put the invalid entries in a
+ * special bucket, whose index is the number of distinct values in this column.
  */
 public class StringIndexer
         implements Estimator<StringIndexer, StringIndexerModel>,

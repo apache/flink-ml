@@ -16,16 +16,20 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.feature.stringindexer;
+package org.apache.flink.ml.param;
 
-import org.apache.flink.ml.common.param.HasHandleInvalid;
-import org.apache.flink.ml.common.param.HasInputCols;
-import org.apache.flink.ml.common.param.HasOutputCols;
+/** Class for the array of double array parameter. */
+public class DoubleArrayArrayParam extends ArrayArrayParam<Double> {
 
-/**
- * Params of {@link StringIndexerModel}.
- *
- * @param <T> The class type of this instance.
- */
-public interface StringIndexerModelParams<T>
-        extends HasInputCols<T>, HasOutputCols<T>, HasHandleInvalid<T> {}
+    public DoubleArrayArrayParam(
+            String name,
+            String description,
+            Double[][] defaultValue,
+            ParamValidator<Double[][]> validator) {
+        super(name, Double[][].class, description, defaultValue, validator);
+    }
+
+    public DoubleArrayArrayParam(String name, String description, Double[][] defaultValue) {
+        this(name, description, defaultValue, ParamValidators.alwaysTrue());
+    }
+}

@@ -36,6 +36,7 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -225,10 +226,7 @@ public class OneHotEncoderTest {
             outputTable.execute().collect().next();
             Assert.fail("Expected IllegalArgumentException");
         } catch (Exception e) {
-            Throwable exception = e;
-            while (exception.getCause() != null) {
-                exception = exception.getCause();
-            }
+            Throwable exception = ExceptionUtils.getRootCause(e);
             assertEquals(IllegalArgumentException.class, exception.getClass());
             assertEquals("Value 0.5 cannot be parsed as indexed integer.", exception.getMessage());
         }

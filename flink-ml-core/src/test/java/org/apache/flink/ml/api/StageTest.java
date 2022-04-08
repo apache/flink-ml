@@ -19,6 +19,7 @@
 package org.apache.flink.ml.api;
 
 import org.apache.flink.ml.param.BooleanParam;
+import org.apache.flink.ml.param.DoubleArrayArrayParam;
 import org.apache.flink.ml.param.DoubleArrayParam;
 import org.apache.flink.ml.param.DoubleParam;
 import org.apache.flink.ml.param.FloatArrayParam;
@@ -99,6 +100,12 @@ public class StageTest {
 
         Param<String[]> STRING_ARRAY_PARAM =
                 new StringArrayParam("stringArrayParam", "Description", new String[] {"14", "15"});
+
+        Param<Double[][]> DOUBLE_ARRAY_ARRAY_PARAM =
+                new DoubleArrayArrayParam(
+                        "doubleArrayArrayParam",
+                        "Description",
+                        new Double[][] {new Double[] {14.0, 15.0}, new Double[] {16.0, 17.0}});
     }
 
     /**
@@ -317,6 +324,15 @@ public class StageTest {
 
         stage.set(MyParams.STRING_ARRAY_PARAM, new String[] {"50", "51"});
         Assert.assertArrayEquals(new String[] {"50", "51"}, stage.get(MyParams.STRING_ARRAY_PARAM));
+
+        stage.set(
+                MyParams.DOUBLE_ARRAY_ARRAY_PARAM,
+                new Double[][] {new Double[] {50.0, 51.0}, new Double[] {52.0, 53.0}});
+        Assert.assertEquals(2, stage.get(MyParams.DOUBLE_ARRAY_ARRAY_PARAM).length);
+        Assert.assertArrayEquals(
+                new Double[] {50.0, 51.0}, stage.get(MyParams.DOUBLE_ARRAY_ARRAY_PARAM)[0]);
+        Assert.assertArrayEquals(
+                new Double[] {52.0, 53.0}, stage.get(MyParams.DOUBLE_ARRAY_ARRAY_PARAM)[1]);
     }
 
     @Test
@@ -338,6 +354,9 @@ public class StageTest {
         stage.set(MyParams.FLOAT_ARRAY_PARAM, new Float[] {50.0f, 51.0f});
         stage.set(MyParams.DOUBLE_ARRAY_PARAM, new Double[] {50.0, 51.0});
         stage.set(MyParams.STRING_ARRAY_PARAM, new String[] {"50", "51"});
+        stage.set(
+                MyParams.DOUBLE_ARRAY_ARRAY_PARAM,
+                new Double[][] {new Double[] {50.0, 51.0}, new Double[] {52.0, 53.0}});
 
         Stage<?> loadedStage = validateStageSaveLoad(tEnv, stage, Collections.emptyMap());
 
@@ -357,6 +376,11 @@ public class StageTest {
                 new Double[] {50.0, 51.0}, loadedStage.get(MyParams.DOUBLE_ARRAY_PARAM));
         Assert.assertArrayEquals(
                 new String[] {"50", "51"}, loadedStage.get(MyParams.STRING_ARRAY_PARAM));
+        Assert.assertEquals(2, stage.get(MyParams.DOUBLE_ARRAY_ARRAY_PARAM).length);
+        Assert.assertArrayEquals(
+                new Double[] {50.0, 51.0}, stage.get(MyParams.DOUBLE_ARRAY_ARRAY_PARAM)[0]);
+        Assert.assertArrayEquals(
+                new Double[] {52.0, 53.0}, stage.get(MyParams.DOUBLE_ARRAY_ARRAY_PARAM)[1]);
     }
 
     @Test

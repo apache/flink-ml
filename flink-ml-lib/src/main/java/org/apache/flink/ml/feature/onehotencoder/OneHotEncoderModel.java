@@ -25,6 +25,7 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
+import org.apache.flink.ml.common.param.HasHandleInvalid;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -50,6 +51,9 @@ import java.util.function.Function;
 /**
  * A Model which encodes data into one-hot format using the model data computed by {@link
  * OneHotEncoder}.
+ *
+ * <p>The `keep` and `skip` option of {@link HasHandleInvalid} is not supported in {@link
+ * OneHotEncoderParams}.
  */
 public class OneHotEncoderModel
         implements Model<OneHotEncoderModel>, OneHotEncoderParams<OneHotEncoderModel> {

@@ -36,6 +36,7 @@ import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.types.Row;
 
 import org.apache.commons.collections.IteratorUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -267,10 +268,7 @@ public class StandardScalerTest extends AbstractTestBase {
                     StandardScalerModelData.getModelDataStream(modelDataTable).executeAndCollect());
             fail();
         } catch (Throwable e) {
-            while (e.getCause() != null) {
-                e = e.getCause();
-            }
-            assertEquals("The training set is empty.", e.getMessage());
+            assertEquals("The training set is empty.", ExceptionUtils.getRootCause(e).getMessage());
         }
     }
 }

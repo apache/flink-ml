@@ -25,9 +25,6 @@ import org.apache.flink.ml.common.param.HasOutputCol;
 /**
  * Params of VectorAssembler.
  *
- * <p>The `keep` option of {@link HasHandleInvalid} means that we output bad rows with output column
- * set to null.
- *
  * @param <T> The class type of this instance.
  */
 public interface VectorAssemblerParams<T>
