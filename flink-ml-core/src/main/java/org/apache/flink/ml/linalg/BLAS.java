@@ -65,10 +65,52 @@ public class BLAS {
         }
     }
 
-    /** x \cdot y . */
-    public static double dot(DenseVector x, DenseVector y) {
+    /** Computes the dot of the two vectors (y \dot x). */
+    public static double dot(Vector x, Vector y) {
         Preconditions.checkArgument(x.size() == y.size(), "Vector size mismatched.");
+        if (x instanceof SparseVector) {
+            if (y instanceof SparseVector) {
+                return dot((SparseVector) x, (SparseVector) y);
+            } else {
+                return dot((DenseVector) y, (SparseVector) x);
+            }
+        } else {
+            if (y instanceof SparseVector) {
+                return dot((DenseVector) x, (SparseVector) y);
+            } else {
+                return dot((DenseVector) x, (DenseVector) y);
+            }
+        }
+    }
+
+    private static double dot(DenseVector x, DenseVector y) {
         return JAVA_BLAS.ddot(x.size(), x.values, 1, y.values, 1);
+    }
+
+    private static double dot(DenseVector x, SparseVector y) {
+        double dotValue = 0.0;
+        for (int i = 0; i < y.indices.length; ++i) {
+            dotValue += y.values[i] * x.values[y.indices[i]];
+        }
+        return dotValue;
+    }
+
+    private static double dot(SparseVector x, SparseVector y) {
+        double dotValue = 0;
+        int p0 = 0;
+        int p1 = 0;
+        while (p0 < x.values.length && p1 < y.values.length) {
+            if (x.indices[p0] == y.indices[p1]) {
+                dotValue += x.values[p0] * y.values[p1];
+                p0++;
+                p1++;
+            } else if (x.indices[p0] < y.indices[p1]) {
+                p0++;
+            } else {
+                p1++;
+            }
+        }
+        return dotValue;
     }
 
     /** \sqrt(\sum_i x_i * x_i) . */

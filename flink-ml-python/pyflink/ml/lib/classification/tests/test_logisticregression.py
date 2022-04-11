@@ -22,7 +22,7 @@ from pyflink.table import Table
 
 from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo, DenseVector
 from pyflink.ml.lib.classification.logisticregression import LogisticRegression, \
-    LogisticRegressionModel
+    LogisticRegressionModel, OnlineLogisticRegression
 from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
 
 
@@ -135,7 +135,9 @@ class LogisticRegressionTest(PyFlinkMLTestCase):
         regression.save(path)
         regression = LogisticRegression.load(self.t_env, path)  # type: LogisticRegression
         model = regression.fit(self.binomial_data_table)
-        self.assertEqual(model.get_model_data()[0].get_schema().get_field_names(), ['coefficient'])
+        self.assertEqual(
+            model.get_model_data()[0].get_schema().get_field_names(),
+            ['coefficient', 'modelVersion'])
         output = model.transform(self.binomial_data_table)[0]
         field_names = output.get_schema().get_field_names()
         self.verify_predict_result(
@@ -183,3 +185,38 @@ class LogisticRegressionTest(PyFlinkMLTestCase):
                 else:
                     self.assertAlmostEqual(1, prediction, delta=1e-7)
                     self.assertTrue(raw_prediction.get(0) < 0.5)
+
+
+class OnlineLogisticRegressionTest(PyFlinkMLTestCase):
+
+    def setUp(self):
+        super(OnlineLogisticRegressionTest, self).setUp()
+
+    def test_param(self):
+        online_logistic_regression = OnlineLogisticRegression()
+        self.assertEqual("features", online_logistic_regression.features_col)
+        self.assertEqual("count", online_logistic_regression.batch_strategy)
+        self.assertEqual("label", online_logistic_regression.label_col)
+        self.assertEqual(None, online_logistic_regression.weight_col)
+        self.assertEqual(0.0, online_logistic_regression.reg)
+        self.assertEqual(0.0, online_logistic_regression.elastic_net)
+        self.assertEqual(0.1, online_logistic_regression.alpha)
+        self.assertEqual(0.1, online_logistic_regression.beta)
+        self.assertEqual(32, online_logistic_regression.global_batch_size)
+
+        online_logistic_regression \
+            .set_features_col("test_feature") \
+            .set_label_col("test_label") \
+            .set_global_batch_size(5) \
+            .set_reg(0.5) \
+            .set_elastic_net(0.25) \
+            .set_alpha(0.1) \
+            .set_beta(0.2)
+
+        self.assertEqual("test_feature", online_logistic_regression.features_col)
+        self.assertEqual("test_label", online_logistic_regression.label_col)
+        self.assertEqual(0.5, online_logistic_regression.reg)
+        self.assertEqual(0.25, online_logistic_regression.elastic_net)
+        self.assertEqual(0.1, online_logistic_regression.alpha)
+        self.assertEqual(0.2, online_logistic_regression.beta)
+        self.assertEqual(5, online_logistic_regression.global_batch_size)
