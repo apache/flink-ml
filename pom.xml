@@ -69,7 +69,7 @@ under the License.
     <spotless.version>2.4.2</spotless.version>
     <slf4j.version>1.7.15</slf4j.version>
     <log4j.version>2.17.0</log4j.version>
-    <junit.version>4.12</junit.version>
+    <junit.version>4.13.1</junit.version>
     <flink.forkCount>1C</flink.forkCount>
     <flink.reuseForks>true</flink.reuseForks>
     <flink.version>1.14.0</flink.version>
