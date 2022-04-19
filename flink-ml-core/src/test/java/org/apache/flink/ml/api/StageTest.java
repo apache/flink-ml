@@ -463,5 +463,11 @@ public class StageTest {
         Assert.assertTrue(nonEmptyArray.validate(new String[] {"1"}));
         Assert.assertFalse(nonEmptyArray.validate(null));
         Assert.assertFalse(nonEmptyArray.validate(new String[0]));
+
+        ParamValidator<String[]> isSubArray = ParamValidators.isSubSet("a", "b", "c");
+        Assert.assertFalse(isSubArray.validate(null));
+        Assert.assertFalse(isSubArray.validate(new String[] {"c", "v"}));
+        Assert.assertTrue(isSubArray.validate(new String[] {"a", "b"}));
+        Assert.assertFalse(isSubArray.validate(new String[] {"e", "v"}));
     }
 }
