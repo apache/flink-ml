@@ -45,5 +45,154 @@
         "vectorDim": 10
       }
     }
+  },
+  "KMeansModel-2": {
+    "stage": {
+      "className": "org.apache.flink.ml.clustering.kmeans.KMeansModel",
+      "paramMap": {
+        "featuresCol": "features",
+        "k": 2,
+        "distanceMeasure": "euclidean",
+        "predictionCol": "prediction"
+      }
+    },
+    "modelData":  {
+      "className": "org.apache.flink.ml.benchmark.datagenerator.clustering.KMeansModelDataGenerator",
+      "paramMap": {
+        "seed": 1,
+        "arraySize": 2,
+        "vectorDim": 10
+      }
+    },
+    "inputData": {
+      "className": "org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator",
+      "paramMap": {
+        "seed": 2,
+        "colNames": ["features"],
+        "numValues": 20000,
+        "vectorDim": 10
+      }
+    }
+  },
+  "KMeansModel-3": {
+    "stage": {
+      "className": "org.apache.flink.ml.clustering.kmeans.KMeansModel",
+      "paramMap": {
+        "featuresCol": "features",
+        "k": 2,
+        "distanceMeasure": "euclidean",
+        "predictionCol": "prediction"
+      }
+    },
+    "modelData":  {
+      "className": "org.apache.flink.ml.benchmark.datagenerator.clustering.KMeansModelDataGenerator",
+      "paramMap": {
+        "seed": 1,
+        "arraySize": 2,
+        "vectorDim": 10
+      }
+    },
+    "inputData": {
+      "className": "org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator",
+      "paramMap": {
+        "seed": 2,
+        "colNames": ["features"],
+        "numValues": 30000,
+        "vectorDim": 10
+      }
+    }
+  },
+  "KMeansModel-4": {
+    "stage": {
+      "className": "org.apache.flink.ml.clustering.kmeans.KMeansModel",
+      "paramMap": {
+        "featuresCol": "features",
+        "k": 2,
+        "distanceMeasure": "euclidean",
+        "predictionCol": "prediction"
+      }
+    },
+    "modelData":  {
+      "className": "org.apache.flink.ml.benchmark.datagenerator.clustering.KMeansModelDataGenerator",
+      "paramMap": {
+        "seed": 1,
+        "arraySize": 2,
+        "vectorDim": 10
+      }
+    },
+    "inputData": {
+      "className": "org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator",
+      "paramMap": {
+        "seed": 2,
+        "colNames": ["features"],
+        "numValues": 40000,
+        "vectorDim": 10
+      }
+    }
+  },
+  "KMeansModel-5": {
+    "stage": {
+      "className": "org.apache.flink.ml.clustering.kmeans.KMeansModel",
+      "paramMap": {
+        "featuresCol": "features",
+        "k": 2,
+        "distanceMeasure": "euclidean",
+        "predictionCol": "prediction"
+      }
+    },
+    "modelData":  {
+      "className": "org.apache.flink.ml.benchmark.datagenerator.clustering.KMeansModelDataGenerator",
+      "paramMap": {
+        "seed": 1,
+        "arraySize": 2,
+        "vectorDim": 10
+      }
+    },
+    "inputData": {
+      "className": "org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator",
+      "paramMap": {
+        "seed": 2,
+        "colNames": ["features"],
+        "numValues": 50000,
+        "vectorDim": 10
+      }
+    }
+  },
+  "Undefined-Parameter": {
+    "stage": {
+      "className": "org.apache.flink.ml.clustering.kmeans.KMeans",
+      "paramMap": {
+        "featuresCol": "features",
+        "featureCol": "feature",
+        "predictionCol": "prediction"
+      }
+    },
+    "inputData": {
+      "className": "org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator",
+      "paramMap": {
+        "seed": 2,
+        "colNames": ["features"],
+        "numValues": 10000,
+        "vectorDim": 10
+      }
+    }
+  },
+  "Unmatch-Input": {
+    "stage": {
+      "className": "org.apache.flink.ml.clustering.kmeans.KMeans",
+      "paramMap": {
+        "featuresCol": "features",
+        "predictionCol": "prediction"
+      }
+    },
+    "inputData": {
+      "className": "org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator",
+      "paramMap": {
+        "seed": 2,
+        "colNames": ["non-features"],
+        "numValues": 10000,
+        "vectorDim": 10
+      }
+    }
   }
 }

@@ -31,84 +31,94 @@ import org.apache.commons.cli.Options;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
+import java.util.Collections;
 import java.util.Map;
 
 /** Entry class for benchmark execution. */
 public class Benchmark {
-    private static final Logger LOG = LoggerFactory.getLogger(Benchmark.class);
-
     static final String VERSION_KEY = "version";
 
-    static final Option HELP_OPTION =
+    private static final Logger LOG = LoggerFactory.getLogger(Benchmark.class);
+
+    private static final Option HELP_OPTION =
             Option.builder("h")
                     .longOpt("help")
                     .desc("Show the help message for the command line interface.")
                     .build();
 
-    static final Option OUTPUT_FILE_OPTION =
+    private static final Option OUTPUT_FILE_OPTION =
             Option.builder()
                     .longOpt("output-file")
                     .desc("The output file name to save benchmark results.")
                     .hasArg()
                     .build();
 
-    static final Options OPTIONS =
+    private static final Options OPTIONS =
             new Options().addOption(HELP_OPTION).addOption(OUTPUT_FILE_OPTION);
 
-    public static void printHelp() {
+    private static void printHelp() {
         HelpFormatter formatter = new HelpFormatter();
         formatter.setLeftPadding(5);
         formatter.setWidth(80);
 
-        System.out.println("./flink-ml-benchmark.sh <config-file-path> [OPTIONS]");
-        System.out.println();
+        System.out.println("./benchmark-run.sh <config-file-path> [OPTIONS]\n");
         formatter.setSyntaxPrefix("The following options are available:");
         formatter.printHelp(" ", OPTIONS);
 
         System.out.println();
     }
 
-    @SuppressWarnings("unchecked")
-    public static void executeBenchmarks(CommandLine commandLine) throws Exception {
+    private static void executeBenchmarks(CommandLine commandLine) throws Exception {
         String configFile = commandLine.getArgs()[0];
-        Map<String, ?> benchmarks = BenchmarkUtils.parseJsonFile(configFile);
-        System.out.println("Found benchmarks " + benchmarks.keySet());
+        Map<String, Map<String, Map<String, ?>>> benchmarks =
+                BenchmarkUtils.parseJsonFile(configFile);
+        System.out.printf("Found %d benchmarks.\n", benchmarks.keySet().size());
+        String saveFile = commandLine.getOptionValue(OUTPUT_FILE_OPTION.getLongOpt());
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
-        List<BenchmarkResult> results = new ArrayList<>();
-        for (Map.Entry<String, ?> benchmark : benchmarks.entrySet()) {
-            LOG.info("Running benchmark " + benchmark.getKey() + ".");
+        int index = 0;
+        for (Map.Entry<String, Map<String, Map<String, ?>>> entry : benchmarks.entrySet()) {
+            String benchmarkName = entry.getKey();
+            Map<String, Map<String, ?>> benchmarkMap = entry.getValue();
 
-            BenchmarkResult result =
-                    BenchmarkUtils.runBenchmark(
-                            tEnv, benchmark.getKey(), (Map<String, ?>) benchmark.getValue());
+            LOG.info(
+                    String.format(
+                            "Running benchmark %d/%d: %s",
+                            index++, benchmarks.keySet().size(), benchmarkName));
 
-            results.add(result);
-            LOG.info(BenchmarkUtils.getResultsMapAsJson(result));
+            try {
+                BenchmarkResult result =
+                        BenchmarkUtils.runBenchmark(tEnv, benchmarkName, benchmarkMap);
+                benchmarkMap.put("results", result.toMap());
+                LOG.info(String.format("Benchmark %s finished.\n%s", benchmarkName, benchmarkMap));
+            } catch (Exception e) {
+                benchmarkMap.put(
+                        "results",
+                        Collections.singletonMap(
+                                "exception",
+                                String.format(
+                                        "%s(%s:%s)",
+                                        e,
+                                        e.getStackTrace()[0].getFileName(),
+                                        e.getStackTrace()[0].getLineNumber())));
+                LOG.error(String.format("Benchmark %s failed.\n%s", benchmarkName, e));
+            }
         }
+        System.out.println("Benchmarks execution completed.");
 
         String benchmarkResultsJson =
-                BenchmarkUtils.getResultsMapAsJson(results.toArray(new BenchmarkResult[0]));
-        System.out.println("Benchmarks execution completed.");
-        System.out.println("Benchmark results summary:");
-        System.out.println(benchmarkResultsJson);
-
+                ReadWriteUtils.OBJECT_MAPPER
+                        .writerWithDefaultPrettyPrinter()
+                        .writeValueAsString(benchmarks);
         if (commandLine.hasOption(OUTPUT_FILE_OPTION.getLongOpt())) {
-            String saveFile = commandLine.getOptionValue(OUTPUT_FILE_OPTION.getLongOpt());
             ReadWriteUtils.saveToFile(saveFile, benchmarkResultsJson, true);
-            System.out.println("Benchmark results saved as json in " + saveFile + ".");
+            System.out.printf("Benchmark results saved as json in %s.\n", saveFile);
+        } else {
+            System.out.printf("Benchmark results summary:\n%s\n", benchmarkResultsJson);
         }
-    }
-
-    public static void printInvalidError(String[] args) {
-        System.out.println("Invalid command line arguments " + Arrays.toString(args));
-        System.out.println();
-        System.out.println("Specify the help option (-h or --help) to get help on the command.");
     }
 
     public static void main(String[] args) throws Exception {
@@ -120,7 +130,9 @@ public class Benchmark {
         } else if (commandLine.getArgs().length == 1) {
             executeBenchmarks(commandLine);
         } else {
-            printInvalidError(args);
+            System.out.printf("Invalid command line arguments %s\n\n", Arrays.toString(args));
+            System.out.println(
+                    "Specify the help option (-h or --help) to get help on the command.");
         }
     }
 }

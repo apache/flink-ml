@@ -20,6 +20,9 @@ package org.apache.flink.ml.benchmark;
 
 import org.apache.flink.util.Preconditions;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 /** The result of executing a benchmark. */
 public class BenchmarkResult {
     /** The benchmark name. */
@@ -54,5 +57,17 @@ public class BenchmarkResult {
         this.inputThroughput = inputThroughput;
         this.outputRecordNum = outputRecordNum;
         this.outputThroughput = outputThroughput;
+    }
+
+    public Map<String, ?> toMap() {
+        return new LinkedHashMap<String, Object>() {
+            {
+                put("totalTimeMs", totalTimeMs);
+                put("inputRecordNum", inputRecordNum);
+                put("inputThroughput", inputThroughput);
+                put("outputRecordNum", outputRecordNum);
+                put("outputThroughput", outputThroughput);
+            }
+        };
     }
 }
