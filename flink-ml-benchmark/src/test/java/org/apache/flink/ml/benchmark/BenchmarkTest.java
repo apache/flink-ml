@@ -49,7 +49,7 @@ public class BenchmarkTest extends AbstractTestBase {
         FileUtils.copyInputStreamToFile(inputStream, configFile);
 
         Map<String, ?> benchmarks = BenchmarkUtils.parseJsonFile(configFile.getAbsolutePath());
-        assertEquals(benchmarks.size(), 2);
+        assertEquals(benchmarks.size(), 8);
         assertTrue(benchmarks.containsKey("KMeans-1"));
         assertTrue(benchmarks.containsKey("KMeansModel-1"));
     }
@@ -59,7 +59,7 @@ public class BenchmarkTest extends AbstractTestBase {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
-        Map<String, Object> params = new HashMap<>();
+        Map<String, Map<String, ?>> params = new HashMap<>();
 
         Map<String, Object> stageParams = new HashMap<>();
         stageParams.put("className", KMeans.class.getCanonicalName());

@@ -48,7 +48,7 @@ cp ./lib/*.jar $FLINK_HOME/lib/
 
 ## Run Benchmark Example
 
-Please start a Flink standalone session in your local environment with the
+Please start a Flink standalone cluster in your local environment with the
 following command.
 
 ```bash
@@ -63,7 +63,7 @@ Then in Flink ML's binary distribution's folder, execute the following command
 to run the default benchmarks.
 
 ```bash
-./bin/flink-ml-benchmark.sh ./conf/benchmark-conf.json --output-file results.json
+./bin/benchmark-run.sh conf/benchmark-conf.json --output-file results.json
 ```
 
 You will notice that some Flink jobs are submitted to your Flink cluster, and
@@ -71,52 +71,82 @@ the following information is printed out in your terminal. This means that you
 have successfully executed the default benchmarks.
 
 ```
-Found benchmarks [KMeansModel-1, KMeans-1]
+Found 8 benchmarks.
+
 ...
+
 Benchmarks execution completed.
-Benchmark results summary:
-[ {
-  "name" : "KMeansModel-1",
-  "totalTimeMs" : 782.0,
-  "inputRecordNum" : 10000,
-  "inputThroughput" : 12787.723785166241,
-  "outputRecordNum" : 10000,
-  "outputThroughput" : 12787.723785166241
-}, {
-  "name" : "KMeans-1",
-  "totalTimeMs" : 7022.0,
-  "inputRecordNum" : 10000,
-  "inputThroughput" : 1424.0956992309884,
-  "outputRecordNum" : 1,
-  "outputThroughput" : 0.14240956992309883
-} ]
 Benchmark results saved as json in results.json.
 ```
 
-The command above would save the results into `results.json` as below.
+The command above would save the results into `results.json` as a map. For a
+successfully executed benchmark, a map entry of the following format would be
+added.
 
 ```json
-[ {
-  "name" : "KMeansModel-1",
-  "totalTimeMs" : 782.0,
-  "inputRecordNum" : 10000,
-  "inputThroughput" : 12787.723785166241,
-  "outputRecordNum" : 10000,
-  "outputThroughput" : 12787.723785166241
-}, {
-  "name" : "KMeans-1",
-  "totalTimeMs" : 7022.0,
-  "inputRecordNum" : 10000,
-  "inputThroughput" : 1424.0956992309884,
-  "outputRecordNum" : 1,
-  "outputThroughput" : 0.14240956992309883
-} ]
+{
+  "KMeans-1" : {
+    "stage" : {
+      "className" : "org.apache.flink.ml.clustering.kmeans.KMeans",
+      "paramMap" : {
+        "featuresCol" : "features",
+        "predictionCol" : "prediction"
+      }
+    },
+    "inputData" : {
+      "className" : "org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator",
+      "paramMap" : {
+        "seed" : 2,
+        "colNames" : [ "features" ],
+        "numValues" : 10000,
+        "vectorDim" : 10
+      }
+    },
+    "results" : {
+      "totalTimeMs" : 7148.0,
+      "inputRecordNum" : 10000,
+      "inputThroughput" : 1398.9927252378288,
+      "outputRecordNum" : 1,
+      "outputThroughput" : 0.13989927252378287
+    }
+  }
+}
 ```
 
-## Customize Benchmark Configuration
+If a benchmark failed, it would be saved in the file as follows.
 
-`flink-ml-benchmark.sh` parses benchmarks to be executed according to the input
-configuration file, like `./conf/benchmark-conf.json`. It can also parse your
+```json
+{
+  "Unmatch-Input" : {
+    "stage" : {
+      "className" : "org.apache.flink.ml.clustering.kmeans.KMeans",
+      "paramMap" : {
+        "featuresCol" : "features",
+        "predictionCol" : "prediction"
+      }
+    },
+    "inputData" : {
+      "className" : "org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator",
+      "paramMap" : {
+        "seed" : 2,
+        "colNames" : [ "non-features" ],
+        "numValues" : 10000,
+        "vectorDim" : 10
+      }
+    },
+    "results" : {
+      "exception" : "java.lang.NullPointerException(ReadWriteUtils.java:388)"
+    }
+  }
+}
+```
+
+## Advanced Topics
+
+### Customize Benchmark Configuration
+
+`benchmark-run.sh` parses benchmarks to be executed according to the input
+configuration file, like `conf/benchmark-conf.json`. It can also parse your
 custom configuration file so long as it contains a JSON object in the following
 format.
 
@@ -138,10 +168,10 @@ format.
   - `"paramMap"`: A JSON object containing the parameters related to the
     specific `Stage` or `DataGenerator`.
 
-Combining the format requirements above, the example configuration in
-`./conf/benchmark-conf.json` is as follows. This configuration contains two
-benchmarks. The first benchmark name is "KMeans-1", and is executed on `KMeans`
-stage. The stage is benchmarked against 10000 randomly generated vectors.
+Combining the format requirements above, an example configuration is as follows.
+This configuration contains two benchmarks. The first benchmark name is
+"KMeans-1", and is executed on `KMeans` stage. The stage is benchmarked against
+10000 randomly generated vectors.
 
 ```json
 {
@@ -194,3 +224,20 @@ stage. The stage is benchmarked against 10000 randomly generated vectors.
   }
 }
 ```
+
+### Benchmark Results Visualization
+
+`benchmark-results-visualize.py` is provided as a helper script to visualize
+benchmark results. For example, we can visualize the benchmark results generated
+in `results.json` as follows.
+
+```shell
+python3 ./bin/benchmark-results-visualize.py results.json --pattern "^KMeansModel.*$"
+```
+
+This command selects all benchmark results whose names start with `KmeansModel`
+and visualizes their `inputThroughput` against `numValues` as below. It is clear
+from this plot that in our example environment, when number of data is small,
+the algorithm's throughput is positively correlated to the number of data.
+
+![](../docs/static/fig/benchmark_results_visualization_example.svg)
