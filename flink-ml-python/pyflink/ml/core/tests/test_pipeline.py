@@ -20,8 +20,7 @@ from typing import Dict, Any, List
 
 import pandas as pd
 from pandas._testing import assert_frame_equal
-from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.table import Table
+from pyflink.table import Table, StreamTableEnvironment
 
 from pyflink.ml.core.api import Model
 from pyflink.ml.core.builder import PipelineModel, Pipeline
@@ -46,7 +45,7 @@ class PipelineTest(PyFlinkMLTestCase):
         # Saves and loads the PipelineModel.
         path = os.path.join(self.temp_dir, "test_pipeline_model")
         model.save(path)
-        loaded_model = PipelineModel.load(self.env, path)
+        loaded_model = PipelineModel.load(self.t_env, path)
 
         output_table2 = loaded_model.transform(input_table)[0]
         assert_frame_equal(output_table2.to_pandas(),
@@ -67,7 +66,7 @@ class PipelineTest(PyFlinkMLTestCase):
         # Saves and loads the PipelineModel.
         path = os.path.join(self.temp_dir, "test_pipeline")
         estimator.save(path)
-        loaded_estimator = Pipeline.load(self.env, path)
+        loaded_estimator = Pipeline.load(self.t_env, path)
 
         model = loaded_estimator.fit(input_table)
         output_table = model.transform(input_table)[0]
@@ -85,7 +84,7 @@ class Add10Model(Model):
         read_write_utils.save_metadata(self, path)
 
     @classmethod
-    def load(cls, env: StreamExecutionEnvironment, path: str):
+    def load(cls, t_env: StreamTableEnvironment, path: str):
         from pyflink.ml.util import read_write_utils
         return read_write_utils.load_stage_param(path)
 

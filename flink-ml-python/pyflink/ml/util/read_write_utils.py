@@ -22,7 +22,7 @@ from importlib import import_module
 from typing import List, Dict, Any
 
 import cloudpickle
-from pyflink.datastream import StreamExecutionEnvironment
+from pyflink.table import StreamTableEnvironment
 
 from pyflink.ml.core.api import Stage
 
@@ -47,17 +47,17 @@ def save_pipeline(pipeline: Stage, stages: List[Stage], path: str) -> None:
         stage.save(stage_path)
 
 
-def load_pipeline(env: StreamExecutionEnvironment, path: str) -> List[Stage]:
+def load_pipeline(t_env: StreamTableEnvironment, path: str) -> List[Stage]:
     """
     Loads the stages of a Pipeline or PipelineModel from the given path.
 
-    :param env: A StreamExecutionEnvironment instance.
+    :param t_env: A StreamTableEnvironment instance.
     :param path: A StreamExecutionEnvironment instance.
     :return: A list of stages.
     """
     meta_data = load_metadata(path)
     num_stages = meta_data['num_stages']
-    return [load_stage(env, get_path_for_pipeline_stage(i, num_stages, path))
+    return [load_stage(t_env, get_path_for_pipeline_stage(i, num_stages, path))
             for i in range(num_stages)]
 
 
@@ -106,14 +106,14 @@ def load_metadata(path: str) -> Dict[str, Any]:
     return meta_data
 
 
-def load_stage(env: StreamExecutionEnvironment, path: str) -> Stage:
+def load_stage(t_env: StreamTableEnvironment, path: str) -> Stage:
     """
     Loads the stage from the given path by invoking the static load() method of the stage. The
     stage module name and class name are read from the metadata file under the given path. The
     load() method is expected to construct the stage instance with the saved parameters, model data
     and other metadata if exists.
 
-    :param env: A StreamExecutionEnvironment instance.
+    :param t_env: A StreamTableEnvironment instance.
     :param path: The parent directory of the stage metadata file.
     :return: An instance of Stage.
     """
@@ -121,7 +121,7 @@ def load_stage(env: StreamExecutionEnvironment, path: str) -> Stage:
     module_name = metadata.get('module_name')
     class_name = metadata.get('class_name')
     stage_class = getattr(import_module(module_name), class_name)
-    return stage_class.load(env, path)
+    return stage_class.load(t_env, path)
 
 
 def load_stage_param(path: str) -> Stage:

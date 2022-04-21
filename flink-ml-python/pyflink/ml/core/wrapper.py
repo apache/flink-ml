@@ -18,9 +18,8 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
 
-from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.java_gateway import get_gateway
-from pyflink.table import Table
+from pyflink.table import Table, StreamTableEnvironment
 from pyflink.util.java_utils import to_jarray
 
 from pyflink.ml.core.api import Model, Transformer, AlgoOperator, Stage, Estimator
@@ -56,7 +55,10 @@ class JavaWithParams(WithParams, JavaWrapper):
         'reg': 'reg',
         'seed': 'seed',
         'tol': 'tol',
-        'weight_col': 'weightCol'
+        'weight_col': 'weightCol',
+        'k': 'k',
+        'model_type': 'modelType',
+        'smoothing': 'smoothing'
     }
 
     def __init__(self, java_params):
@@ -138,9 +140,8 @@ class JavaModel(Model, JavaTransformer, ABC):
         return [Table(t, self._t_env) for t in self._java_obj.getModelData()]
 
     @classmethod
-    def load(cls, env: StreamExecutionEnvironment, path: str):
-        java_model = _to_java_reference(cls._java_model_path()).load(
-            env._j_stream_execution_environment, path)
+    def load(cls, t_env: StreamTableEnvironment, path: str):
+        java_model = _to_java_reference(cls._java_model_path()).load(t_env._j_tenv, path)
         instance = cls(java_model)
         return instance
 
@@ -169,12 +170,11 @@ class JavaEstimator(Estimator, JavaStage, ABC):
         pass
 
     @classmethod
-    def load(cls, env: StreamExecutionEnvironment, path: str):
+    def load(cls, t_env: StreamTableEnvironment, path: str):
         """
         Instantiates a new stage instance based on the data read from the given path.
         """
-        java_estimator = _to_java_reference(cls._java_estimator_path()).load(
-            env._j_stream_execution_environment, path)
+        java_estimator = _to_java_reference(cls._java_estimator_path()).load(t_env._j_tenv, path)
         instance = cls()
         instance._java_obj = java_estimator
         return instance

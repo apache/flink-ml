@@ -18,8 +18,7 @@
 
 from typing import List, TypeVar, Dict, Any
 
-from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.table import Table
+from pyflink.table import Table, StreamTableEnvironment
 
 from pyflink.ml.core.api import Estimator, Model, AlgoOperator, Stage
 from pyflink.ml.core.param import Param
@@ -58,9 +57,9 @@ class PipelineModel(Model):
         read_write_utils.save_pipeline(self, self._stages, path)
 
     @classmethod
-    def load(cls, env: StreamExecutionEnvironment, path: str) -> 'PipelineModel':
+    def load(cls, t_env: StreamTableEnvironment, path: str) -> 'PipelineModel':
         from pyflink.ml.util import read_write_utils
-        return PipelineModel(read_write_utils.load_pipeline(env, path))
+        return PipelineModel(read_write_utils.load_pipeline(t_env, path))
 
     def get_param_map(self):
         return self._param_map
@@ -124,9 +123,9 @@ class Pipeline(Estimator[E, PipelineModel]):
         read_write_utils.save_pipeline(self, self._stages, path)
 
     @classmethod
-    def load(cls, env: StreamExecutionEnvironment, path: str) -> 'Pipeline':
+    def load(cls, t_env: StreamTableEnvironment, path: str) -> 'Pipeline':
         from pyflink.ml.util import read_write_utils
-        return Pipeline(read_write_utils.load_pipeline(env, path))
+        return Pipeline(read_write_utils.load_pipeline(t_env, path))
 
     def get_param_map(self):
         return self._param_map
