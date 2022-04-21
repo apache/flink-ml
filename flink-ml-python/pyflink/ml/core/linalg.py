@@ -16,10 +16,122 @@
 # limitations under the License.
 ################################################################################
 import array
+import struct
 from abc import ABC, abstractmethod
 from typing import Union, Sized
 
 import numpy as np
+from py4j.java_gateway import JavaObject, get_java_class
+from pyflink.common import TypeInformation
+from pyflink.common import typeinfo
+from pyflink.common.typeinfo import _from_java_type, _is_instance_of
+from pyflink.fn_execution.stream_slow import OutputStream, InputStream
+from pyflink.java_gateway import get_gateway
+
+_from_java_type_alias = _from_java_type
+
+
+def _from_java_type_wrapper(j_type_info: JavaObject) -> TypeInformation:
+    gateway = get_gateway()
+    JGenericTypeInfo = gateway.jvm.org.apache.flink.api.java.typeutils.GenericTypeInfo
+    if _is_instance_of(j_type_info, JGenericTypeInfo):
+        JClass = j_type_info.getTypeClass()
+        if JClass == get_java_class(gateway.jvm.org.apache.flink.ml.linalg.DenseVector):
+            return DenseVectorTypeInfo()
+        elif JClass == get_java_class(gateway.jvm.org.apache.flink.ml.linalg.DenseMatrix):
+            return DenseMatrixTypeInfo()
+    return _from_java_type_alias(j_type_info)
+
+
+typeinfo._from_java_type = _from_java_type_wrapper
+
+
+class DenseVectorTypeInfo(TypeInformation):
+    def __init__(self):
+        super(DenseVectorTypeInfo, self).__init__()
+        self._output_stream = OutputStream()
+        self._input_stream = InputStream(None)
+
+    def need_conversion(self):
+        return True
+
+    def to_internal_type(self, obj):
+        assert isinstance(obj, DenseVector)
+        values = [float(v) for v in obj._values]
+        stream = self._output_stream
+        stream.write_int32(len(values))
+        for value in values:
+            stream.write_double(value)
+        internal_data = bytearray(stream.get())
+        stream.clear()
+        return internal_data
+
+    def from_internal_type(self, obj):
+        if obj is not None:
+            assert isinstance(obj, bytearray)
+            # reset input stream
+            stream = self._input_stream
+            stream.data = bytes(obj)
+            stream.pos = 0
+
+            length = stream.read_int32()
+            values = [stream.read_double() for _ in range(length)]
+            return Vectors.dense(values)
+
+    def get_java_type_info(self):
+        if not self._j_typeinfo:
+            self._j_typeinfo = get_gateway().jvm \
+                .org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo.INSTANCE
+        return self._j_typeinfo
+
+    def __eq__(self, o: object) -> bool:
+        return isinstance(o, DenseVectorTypeInfo)
+
+    def __repr__(self):
+        return "DenseVectorTypeInfo"
+
+
+class DenseMatrixTypeInfo(TypeInformation):
+    def __init__(self):
+        super(DenseMatrixTypeInfo, self).__init__()
+        self._output_stream = OutputStream()
+        self._input_stream = InputStream(None)
+
+    def need_conversion(self):
+        return True
+
+    def to_internal_type(self, matrix):
+        assert isinstance(matrix, DenseMatrix)
+        stream = self._output_stream
+        stream.write_int32(matrix.num_rows())
+        stream.write_int32(matrix.num_cols())
+        for value in matrix._values:
+            stream.write_double(value)
+
+    def from_internal_type(self, obj):
+        if obj is not None:
+            assert isinstance(obj, bytearray)
+            # reset input stream
+            stream = self._input_stream
+            stream.data = bytes(obj)
+            stream.pos = 0
+
+            m = stream.read_int32()
+            n = stream.read_int32()
+            values = [stream.read_double() for _ in range(m * n)]
+            return DenseMatrix(m, n, values)
+
+    def get_java_type_info(self):
+        if not self._j_typeinfo:
+            self._j_typeinfo = get_gateway().jvm \
+                .org.apache.flink.ml.linalg.typeinfo.DenseMatrixTypeInfo.INSTANCE
+        return self._j_typeinfo
+
+    def __eq__(self, o: object) -> bool:
+        return isinstance(o, DenseMatrixTypeInfo)
+
+    def __repr__(self):
+        return "DenseMatrixTypeInfo"
 
 
 class Vector(ABC):
@@ -208,6 +320,20 @@ class DenseVector(Vector):
 
     def __repr__(self):
         return "DenseVector([%s])" % (", ".join(str(i) for i in self._values))
+
+    def __hash__(self):
+        size = len(self)
+        result = 31 + size
+        nnz = 0
+        i = 0
+        while i < size and nnz < 128:
+            if self._values[i] != 0:
+                result = 31 * result + i
+                bits = _double_to_long_bits(self._values[i])
+                result = 31 * result + (bits ^ (bits >> 32))
+                nnz += 1
+            i += 1
+        return result
 
     def _unary_op(op):
         def _(self):
@@ -542,3 +668,10 @@ class DenseMatrix(Matrix):
         self_values = np.ravel(self.to_array(), order="F")
         other_values = np.ravel(other.to_array(), order="F")
         return np.all(self_values == other_values)
+
+
+def _double_to_long_bits(value: float) -> int:
+    if np.isnan(value):
+        value = float("nan")
+    # pack double into 64 bits, then unpack as long int
+    return struct.unpack("Q", struct.pack("d", value))[0]

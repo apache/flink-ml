@@ -19,8 +19,7 @@
 from abc import ABC, abstractmethod
 from typing import TypeVar, List, Generic
 
-from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.table import Table
+from pyflink.table import Table, StreamTableEnvironment
 
 from pyflink.ml.core.param import WithParams
 
@@ -47,7 +46,7 @@ class Stage(WithParams[T], ABC):
 
     @classmethod
     @abstractmethod
-    def load(cls, env: StreamExecutionEnvironment, path: str) -> T:
+    def load(cls, t_env: StreamTableEnvironment, path: str) -> T:
         """
         Instantiates a new stage instance based on the data read from the given path.
         """

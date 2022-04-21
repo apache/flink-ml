@@ -14,7 +14,7 @@
 # limitations under the License.
 setuptools>=18.0
 wheel
-apache-flink==1.14.0
+apache-flink==1.14.4
 pandas>=1.0,<1.2.0
 jsonpickle==2.0.0
 cloudpickle==1.2.2

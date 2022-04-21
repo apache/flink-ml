@@ -18,7 +18,7 @@
 import os
 from typing import Dict, Any
 
-from pyflink.datastream import StreamExecutionEnvironment
+from pyflink.table import StreamTableEnvironment
 
 from pyflink.ml.core.api import Stage
 from pyflink.ml.core.param import ParamValidators, Param, BooleanParam, IntParam, \
@@ -181,7 +181,7 @@ class MyStage(Stage):
         read_write_utils.save_metadata(self, path)
 
     @classmethod
-    def load(cls, env: StreamExecutionEnvironment, path: str):
+    def load(cls, t_env: StreamTableEnvironment, path: str):
         from pyflink.ml.util import read_write_utils
         return read_write_utils.load_stage_param(path)
 
