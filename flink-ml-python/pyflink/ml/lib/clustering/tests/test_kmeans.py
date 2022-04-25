@@ -18,7 +18,7 @@
 import os
 import typing
 from pyflink.common import Types, Row
-from typing import List
+from typing import List, Dict, Set
 
 from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo, DenseVector
 from pyflink.ml.lib.clustering.kmeans import KMeans, KMeansModel, OnlineKMeans
@@ -27,7 +27,7 @@ from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
 
 def group_features_by_prediction(
         rows: List[Row], feature_index: int, prediction_index: int):
-    map = {}
+    map = {}  # type: Dict[int, Set]
     for row in rows:
         vector = typing.cast(DenseVector, row[feature_index])
         predict = typing.cast(int, row[prediction_index])
