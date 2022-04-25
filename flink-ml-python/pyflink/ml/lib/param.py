@@ -369,3 +369,42 @@ class HasWeightCol(WithParams, ABC):
     @property
     def weight_col(self):
         return self.get_weight_col()
+
+
+class HasBatchStrategy(WithParams, ABC):
+    """
+    Base class for the shared batch strategy param.
+    """
+    BATCH_STRATEGY: Param[str] = StringParam(
+        "batch_strategy",
+        "Strategy to create mini batch from online train data.",
+        "count",
+        ParamValidators.in_array(["count"]))
+
+    def get_batch_strategy(self) -> str:
+        return self.get(self.BATCH_STRATEGY)
+
+    @property
+    def batch_strategy(self):
+        return self.get_batch_strategy()
+
+
+class HasDecayFactor(WithParams, ABC):
+    """
+    Base class for the shared decay factor param.
+    """
+    DECAY_FACTOR: Param[float] = FloatParam(
+        "decay_factor",
+        "The forgetfulness of the previous centroids.",
+        0.,
+        ParamValidators.in_range(0, 1))
+
+    def set_decay_factor(self, value: float):
+        return self.set(self.DECAY_FACTOR, value)
+
+    def get_decay_factor(self) -> float:
+        return self.get(self.DECAY_FACTOR)
+
+    @property
+    def decay_factor(self):
+        return self.get(self.DECAY_FACTOR)

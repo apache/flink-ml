@@ -58,7 +58,10 @@ class JavaWithParams(WithParams, JavaWrapper):
         'weight_col': 'weightCol',
         'k': 'k',
         'model_type': 'modelType',
-        'smoothing': 'smoothing'
+        'smoothing': 'smoothing',
+        'init_mode': 'initMode',
+        'batch_strategy': 'batchStrategy',
+        'decay_factor': 'decayFactor'
     }
 
     def __init__(self, java_params):

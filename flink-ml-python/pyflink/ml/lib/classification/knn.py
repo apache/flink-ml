@@ -17,6 +17,8 @@
 ################################################################################
 from abc import ABC
 
+import typing
+
 from pyflink.ml.core.param import Param, IntParam, ParamValidators
 from pyflink.ml.core.wrapper import JavaWithParams
 from pyflink.ml.lib.classification.common import (JavaClassificationModel,
@@ -25,6 +27,7 @@ from pyflink.ml.lib.param import HasFeaturesCol, HasPredictionCol, HasLabelCol
 
 
 class _KNNModelParams(
+    JavaWithParams,
     HasFeaturesCol,
     HasPredictionCol,
     ABC
@@ -39,8 +42,11 @@ class _KNNModelParams(
         5,
         ParamValidators.gt(0))
 
+    def __init__(self, java_params):
+        super(_KNNModelParams, self).__init__(java_params)
+
     def set_k(self, value: int):
-        return self.set(self.K, value)
+        return typing.cast(_KNNModelParams, self.set(self.K, value))
 
     def get_k(self) -> int:
         return self.get(self.K)
@@ -51,9 +57,8 @@ class _KNNModelParams(
 
 
 class _KNNParams(
-    JavaWithParams,
-    HasLabelCol,
-    _KNNModelParams
+    _KNNModelParams,
+    HasLabelCol
 ):
     """
     Params for :class:`KNN`.

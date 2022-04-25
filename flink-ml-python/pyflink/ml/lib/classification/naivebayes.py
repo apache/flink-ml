@@ -17,6 +17,8 @@
 ################################################################################
 from abc import ABC
 
+import typing
+
 from pyflink.ml.core.param import Param, StringParam, ParamValidators, FloatParam
 from pyflink.ml.core.wrapper import JavaWithParams
 from pyflink.ml.lib.classification.common import (JavaClassificationModel,
@@ -25,6 +27,7 @@ from pyflink.ml.lib.param import HasFeaturesCol, HasPredictionCol, HasLabelCol
 
 
 class _NaiveBayesModelParams(
+    JavaWithParams,
     HasFeaturesCol,
     HasPredictionCol,
     ABC
@@ -39,6 +42,9 @@ class _NaiveBayesModelParams(
         "multinomial",
         ParamValidators.in_array(["multinomial"]))
 
+    def __init__(self, java_params):
+        super(_NaiveBayesModelParams, self).__init__(java_params)
+
     def set_model_type(self, value: str):
         return self.set(self.MODEL_TYPE, value)
 
@@ -51,9 +57,8 @@ class _NaiveBayesModelParams(
 
 
 class _NaiveBayesParams(
-    JavaWithParams,
+    _NaiveBayesModelParams,
     HasLabelCol,
-    _NaiveBayesModelParams
 ):
     """
     Params for :class:`NaiveBayes`.
@@ -69,7 +74,7 @@ class _NaiveBayesParams(
         super(_NaiveBayesParams, self).__init__(java_params)
 
     def set_smoothing(self, value: float):
-        return self.set(self.SMOOTHING, value)
+        return typing.cast(_NaiveBayesParams, self.set(self.SMOOTHING, value))
 
     def get_smoothing(self) -> float:
         return self.get(self.SMOOTHING)
