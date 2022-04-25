@@ -26,6 +26,7 @@ from pyflink.ml.lib.param import (HasWeightCol, HasMaxIter, HasReg, HasLearningR
 
 
 class _LogisticRegressionModelParams(
+    JavaWithParams,
     HasFeaturesCol,
     HasPredictionCol,
     HasRawPredictionCol,
@@ -34,11 +35,13 @@ class _LogisticRegressionModelParams(
     """
     Params for :class:`LogisticRegressionModel`.
     """
-    pass
+
+    def __init__(self, java_params):
+        super(_LogisticRegressionModelParams, self).__init__(java_params)
 
 
 class _LogisticRegressionParams(
-    JavaWithParams,
+    _LogisticRegressionModelParams,
     HasLabelCol,
     HasWeightCol,
     HasMaxIter,
@@ -46,8 +49,7 @@ class _LogisticRegressionParams(
     HasLearningRate,
     HasGlobalBatchSize,
     HasTol,
-    HasMultiClass,
-    _LogisticRegressionModelParams
+    HasMultiClass
 ):
     """
     Params for :class:`LogisticRegression`.
