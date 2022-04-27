@@ -1,3 +1,17 @@
+github:
+  enabled_merge_buttons:
+    squash: true
+    merge: false
+    rebase: true
+  collaborators:
+    - flinkbot
+  labels:
+    - flink
+    - machine-learning
+    - ml
+    - big-data
+    - java
+    - python
 notifications:
   commits:      commits@flink.apache.org
   issues:       issues@flink.apache.org
