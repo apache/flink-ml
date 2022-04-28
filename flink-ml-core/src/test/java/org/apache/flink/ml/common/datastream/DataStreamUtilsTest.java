@@ -19,6 +19,7 @@
 package org.apache.flink.ml.common.datastream;
 
 import org.apache.flink.api.common.functions.MapPartitionFunction;
+import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.functions.RichMapPartitionFunction;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeinfo.Types;
@@ -61,6 +62,16 @@ public class DataStreamUtilsTest {
         List<Integer> counts = IteratorUtils.toList(countsPerPartition.executeAndCollect());
         assertArrayEquals(
                 new int[] {5, 5, 5, 5}, counts.stream().mapToInt(Integer::intValue).toArray());
+    }
+
+    @Test
+    public void testReduce() throws Exception {
+        DataStream<Long> dataStream =
+                env.fromParallelCollection(new NumberSequenceIterator(0L, 19L), Types.LONG);
+        DataStream<Long> result =
+                DataStreamUtils.reduce(dataStream, (ReduceFunction<Long>) Long::sum);
+        List<Long> sum = IteratorUtils.toList(result.executeAndCollect());
+        assertArrayEquals(new long[] {190L}, sum.stream().mapToLong(Long::longValue).toArray());
     }
 
     /** A simple implementation for a {@link MapPartitionFunction}. */

@@ -18,12 +18,16 @@
 
 package org.apache.flink.ml.common.datastream;
 
+import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.functions.MapPartitionFunction;
+import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.TypeExtractor;
+import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.runtime.state.StateInitializationContext;
+import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator;
 import org.apache.flink.streaming.api.operators.BoundedOneInput;
@@ -32,6 +36,7 @@ import org.apache.flink.streaming.api.operators.TimestampedCollector;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 /** Provides utility functions for {@link DataStream}. */
+@Internal
 public class DataStreamUtils {
     /**
      * Applies allReduceSum on the input data stream. The input data stream is supposed to contain
@@ -55,8 +60,8 @@ public class DataStreamUtils {
      *
      * @param input The input data stream.
      * @param func The user defined mapPartition function.
-     * @param <IN> The class type of the input element.
-     * @param <OUT> The class type of output element.
+     * @param <IN> The class type of the input.
+     * @param <OUT> The class type of output.
      * @return The result data stream.
      */
     public static <IN, OUT> DataStream<OUT> mapPartition(
@@ -65,6 +70,28 @@ public class DataStreamUtils {
                 TypeExtractor.getMapPartitionReturnTypes(func, input.getType(), null, true);
         return input.transform("mapPartition", resultType, new MapPartitionOperator<>(func))
                 .setParallelism(input.getParallelism());
+    }
+
+    /**
+     * Applies a {@link ReduceFunction} on a bounded data stream. The output stream contains at most
+     * one stream record and its parallelism is one.
+     *
+     * @param input The input data stream.
+     * @param func The user defined reduce function.
+     * @param <T> The class type of the input.
+     * @return The result data stream.
+     */
+    public static <T> DataStream<T> reduce(DataStream<T> input, ReduceFunction<T> func) {
+        DataStream<T> partialReducedStream =
+                input.transform("reduce", input.getType(), new ReduceOperator<>(func))
+                        .setParallelism(input.getParallelism());
+        if (partialReducedStream.getParallelism() == 1) {
+            return partialReducedStream;
+        } else {
+            return partialReducedStream
+                    .transform("reduce", input.getType(), new ReduceOperator<>(func))
+                    .setParallelism(1);
+        }
     }
 
     /**
@@ -101,6 +128,58 @@ public class DataStreamUtils {
         @Override
         public void processElement(StreamRecord<IN> input) throws Exception {
             valuesState.add(input.getValue());
+        }
+    }
+
+    /** A stream operator to apply {@link ReduceFunction} on the input bounded data stream. */
+    private static class ReduceOperator<T> extends AbstractUdfStreamOperator<T, ReduceFunction<T>>
+            implements OneInputStreamOperator<T, T>, BoundedOneInput {
+        /** The temp result of the reduce function. */
+        private T result;
+
+        private ListState<T> state;
+
+        public ReduceOperator(ReduceFunction<T> userFunction) {
+            super(userFunction);
+        }
+
+        @Override
+        public void endInput() {
+            if (result != null) {
+                output.collect(new StreamRecord<>(result));
+            }
+        }
+
+        @Override
+        public void processElement(StreamRecord<T> streamRecord) throws Exception {
+            if (result == null) {
+                result = streamRecord.getValue();
+            } else {
+                result = userFunction.reduce(streamRecord.getValue(), result);
+            }
+        }
+
+        @Override
+        public void initializeState(StateInitializationContext context) throws Exception {
+            super.initializeState(context);
+            state =
+                    context.getOperatorStateStore()
+                            .getListState(
+                                    new ListStateDescriptor<T>(
+                                            "state",
+                                            getOperatorConfig()
+                                                    .getTypeSerializerIn(
+                                                            0, getClass().getClassLoader())));
+            result = OperatorStateUtils.getUniqueElement(state, "state").orElse(null);
+        }
+
+        @Override
+        public void snapshotState(StateSnapshotContext context) throws Exception {
+            super.snapshotState(context);
+            state.clear();
+            if (result != null) {
+                state.add(result);
+            }
         }
     }
 }

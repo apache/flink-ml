@@ -16,24 +16,23 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.classification.logisticregression;
+package org.apache.flink.ml.regression.linearregression;
 
 import org.apache.flink.ml.common.param.HasElasticNet;
 import org.apache.flink.ml.common.param.HasGlobalBatchSize;
 import org.apache.flink.ml.common.param.HasLabelCol;
 import org.apache.flink.ml.common.param.HasLearningRate;
 import org.apache.flink.ml.common.param.HasMaxIter;
-import org.apache.flink.ml.common.param.HasMultiClass;
 import org.apache.flink.ml.common.param.HasReg;
 import org.apache.flink.ml.common.param.HasTol;
 import org.apache.flink.ml.common.param.HasWeightCol;
 
 /**
- * Params for {@link LogisticRegression}.
+ * Params for {@link LinearRegression}.
  *
  * @param <T> The class type of this instance.
  */
-public interface LogisticRegressionParams<T>
+public interface LinearRegressionParams<T>
         extends HasLabelCol<T>,
                 HasWeightCol<T>,
                 HasMaxIter<T>,
@@ -42,5 +41,4 @@ public interface LogisticRegressionParams<T>
                 HasLearningRate<T>,
                 HasGlobalBatchSize<T>,
                 HasTol<T>,
-                HasMultiClass<T>,
-                LogisticRegressionModelParams<T> {}
+                LinearRegressionModelParams<T> {}

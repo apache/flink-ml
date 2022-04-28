@@ -34,10 +34,16 @@ public class BLAS {
     /** y += a * x . */
     public static void axpy(double a, Vector x, DenseVector y) {
         Preconditions.checkArgument(x.size() == y.size(), "Vector size mismatched.");
+        axpy(a, x, y, x.size());
+    }
+
+    /** y += a * x for the first k dimensions, with the other dimensions unchanged. */
+    public static void axpy(double a, Vector x, DenseVector y, int k) {
+        Preconditions.checkArgument(x.size() >= k && y.size() >= k);
         if (x instanceof SparseVector) {
-            axpy(a, (SparseVector) x, y);
+            axpy(a, (SparseVector) x, y, k);
         } else {
-            axpy(a, (DenseVector) x, y);
+            axpy(a, (DenseVector) x, y, k);
         }
     }
 
@@ -112,13 +118,16 @@ public class BLAS {
                 1);
     }
 
-    private static void axpy(double a, DenseVector x, DenseVector y) {
-        JAVA_BLAS.daxpy(x.size(), a, x.values, 1, y.values, 1);
+    private static void axpy(double a, DenseVector x, DenseVector y, int k) {
+        JAVA_BLAS.daxpy(k, a, x.values, 1, y.values, 1);
     }
 
-    private static void axpy(double a, SparseVector x, DenseVector y) {
+    private static void axpy(double a, SparseVector x, DenseVector y, int k) {
         for (int i = 0; i < x.indices.length; i++) {
             int index = x.indices[i];
+            if (index >= k) {
+                return;
+            }
             y.values[index] += a * x.values[i];
         }
     }

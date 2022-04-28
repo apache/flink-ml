@@ -52,6 +52,22 @@ public class BLASTest {
     }
 
     @Test
+    public void testAxpyK() {
+        // Tests axpy(dense, dense, k).
+        DenseVector anotherDenseVec = Vectors.dense(1, 2, 3);
+        BLAS.axpy(1, inputDenseVec, anotherDenseVec, 3);
+        double[] expectedResult = new double[] {2, 0, 6};
+        assertArrayEquals(expectedResult, anotherDenseVec.values, TOLERANCE);
+
+        // Tests axpy(sparse, dense, k).
+        SparseVector sparseVec = Vectors.sparse(5, new int[] {0, 2, 4}, new double[] {1, 3, 5});
+        anotherDenseVec = Vectors.dense(1, 2, 3, 4, 5, 6, 7);
+        BLAS.axpy(2, sparseVec, anotherDenseVec, 5);
+        expectedResult = new double[] {3, 2, 9, 4, 15, 6, 7};
+        assertArrayEquals(expectedResult, anotherDenseVec.values, TOLERANCE);
+    }
+
+    @Test
     public void testDot() {
         DenseVector anotherDenseVec = Vectors.dense(1, 2, 3, 4, 5);
         assertEquals(-3, BLAS.dot(inputDenseVec, anotherDenseVec), TOLERANCE);

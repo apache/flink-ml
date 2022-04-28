@@ -16,18 +16,16 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.classification.logisticregression;
+package org.apache.flink.ml.regression.linearregression;
 
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.BLAS;
 import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -45,16 +43,16 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-/** A Model which classifies data using the model data computed by {@link LogisticRegression}. */
-public class LogisticRegressionModel
-        implements Model<LogisticRegressionModel>,
-                LogisticRegressionModelParams<LogisticRegressionModel> {
+/** A Model which predicts data using the model data computed by {@link LinearRegression}. */
+public class LinearRegressionModel
+        implements Model<LinearRegressionModel>,
+                LinearRegressionModelParams<LinearRegressionModel> {
 
     private final Map<Param<?>, Object> paramMap = new HashMap<>();
 
     private Table modelDataTable;
 
-    public LogisticRegressionModel() {
+    public LinearRegressionModel() {
         ParamUtils.initializeMapWithDefaultValues(paramMap, this);
     }
 
@@ -66,19 +64,14 @@ public class LogisticRegressionModel
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
         DataStream<Row> inputStream = tEnv.toDataStream(inputs[0]);
         final String broadcastModelKey = "broadcastModelKey";
-        DataStream<LogisticRegressionModelData> modelDataStream =
-                LogisticRegressionModelData.getModelDataStream(modelDataTable);
+        DataStream<LinearRegressionModelData> modelDataStream =
+                LinearRegressionModelData.getModelDataStream(modelDataTable);
         RowTypeInfo inputTypeInfo = TableUtils.getRowTypeInfo(inputs[0].getResolvedSchema());
         RowTypeInfo outputTypeInfo =
                 new RowTypeInfo(
                         ArrayUtils.addAll(
-                                inputTypeInfo.getFieldTypes(),
-                                BasicTypeInfo.DOUBLE_TYPE_INFO,
-                                TypeInformation.of(DenseVector.class)),
-                        ArrayUtils.addAll(
-                                inputTypeInfo.getFieldNames(),
-                                getPredictionCol(),
-                                getRawPredictionCol()));
+                                inputTypeInfo.getFieldTypes(), BasicTypeInfo.DOUBLE_TYPE_INFO),
+                        ArrayUtils.addAll(inputTypeInfo.getFieldNames(), getPredictionCol()));
         DataStream<Row> predictionResult =
                 BroadcastUtils.withBroadcastStream(
                         Collections.singletonList(inputStream),
@@ -93,7 +86,7 @@ public class LogisticRegressionModel
     }
 
     @Override
-    public LogisticRegressionModel setModelData(Table... inputs) {
+    public LinearRegressionModel setModelData(Table... inputs) {
         modelDataTable = inputs[0];
         return this;
     }
@@ -107,17 +100,17 @@ public class LogisticRegressionModel
     public void save(String path) throws IOException {
         ReadWriteUtils.saveMetadata(this, path);
         ReadWriteUtils.saveModelData(
-                LogisticRegressionModelData.getModelDataStream(modelDataTable),
+                LinearRegressionModelData.getModelDataStream(modelDataTable),
                 path,
-                new LogisticRegressionModelData.ModelDataEncoder());
+                new LinearRegressionModelData.ModelDataEncoder());
     }
 
-    public static LogisticRegressionModel load(StreamTableEnvironment tEnv, String path)
+    public static LinearRegressionModel load(StreamTableEnvironment tEnv, String path)
             throws IOException {
-        LogisticRegressionModel model = ReadWriteUtils.loadStageParam(path);
+        LinearRegressionModel model = ReadWriteUtils.loadStageParam(path);
         Table modelDataTable =
                 ReadWriteUtils.loadModelData(
-                        tEnv, path, new LogisticRegressionModelData.ModelDataDecoder());
+                        tEnv, path, new LinearRegressionModelData.ModelDataDecoder());
         return model.setModelData(modelDataTable);
     }
 
@@ -143,8 +136,8 @@ public class LogisticRegressionModel
         @Override
         public Row map(Row dataPoint) {
             if (coefficient == null) {
-                LogisticRegressionModelData modelData =
-                        (LogisticRegressionModelData)
+                LinearRegressionModelData modelData =
+                        (LinearRegressionModelData)
                                 getRuntimeContext().getBroadcastVariable(broadcastModelKey).get(0);
                 coefficient = modelData.coefficient;
             }
@@ -162,8 +155,6 @@ public class LogisticRegressionModel
      * @return The prediction label and the raw probabilities.
      */
     private static Row predictOneDataPoint(DenseVector feature, DenseVector coefficient) {
-        double dotValue = BLAS.dot(feature, coefficient);
-        double prob = 1 - 1.0 / (1.0 + Math.exp(dotValue));
-        return Row.of(dotValue >= 0 ? 1. : 0., Vectors.dense(1 - prob, prob));
+        return Row.of(BLAS.dot(feature, coefficient));
     }
 }
