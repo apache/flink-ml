@@ -18,6 +18,7 @@
 
 package org.apache.flink.ml.common.datastream;
 
+import org.apache.flink.annotation.Internal;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.functions.RichFlatMapFunction;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
@@ -49,6 +50,7 @@ import java.util.Map;
  * <li>All workers do reduce on all data it received and then broadcast partial results to others.
  * <li>All workers merge partial results into final result.
  */
+@Internal
 class AllReduceImpl {
 
     @VisibleForTesting static final int CHUNK_SIZE = 1024 * 4;

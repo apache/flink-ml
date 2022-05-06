@@ -16,13 +16,13 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.classification.logisticregression;
+package org.apache.flink.ml.regression.linearregression;
 
 import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.common.feature.LabeledPointWithWeight;
-import org.apache.flink.ml.common.lossfunc.BinaryLogisticLoss;
+import org.apache.flink.ml.common.lossfunc.LeastSquareLoss;
 import org.apache.flink.ml.common.optimizer.Optimizer;
 import org.apache.flink.ml.common.optimizer.SGD;
 import org.apache.flink.ml.linalg.DenseVector;
@@ -40,31 +40,26 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * An Estimator which implements the logistic regression algorithm.
+ * An Estimator which implements the linear regression algorithm.
  *
- * <p>See https://en.wikipedia.org/wiki/Logistic_regression.
+ * <p>See https://en.wikipedia.org/wiki/Linear_regression.
  */
-public class LogisticRegression
-        implements Estimator<LogisticRegression, LogisticRegressionModel>,
-                LogisticRegressionParams<LogisticRegression> {
+public class LinearRegression
+        implements Estimator<LinearRegression, LinearRegressionModel>,
+                LinearRegressionParams<LinearRegression> {
 
     private final Map<Param<?>, Object> paramMap = new HashMap<>();
 
-    public LogisticRegression() {
+    public LinearRegression() {
         ParamUtils.initializeMapWithDefaultValues(paramMap, this);
     }
 
     @Override
     @SuppressWarnings({"rawTypes", "ConstantConditions"})
-    public LogisticRegressionModel fit(Table... inputs) {
+    public LinearRegressionModel fit(Table... inputs) {
         Preconditions.checkArgument(inputs.length == 1);
-        String classificationType = getMultiClass();
-        Preconditions.checkArgument(
-                "auto".equals(classificationType) || "binomial".equals(classificationType),
-                "Multinomial classification is not supported yet. Supported options: [auto, binomial].");
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
-
         DataStream<LabeledPointWithWeight> trainData =
                 tEnv.toDataStream(inputs[0])
                         .map(
@@ -74,13 +69,6 @@ public class LogisticRegression
                                                     ? 1.0
                                                     : (Double) dataPoint.getField(getWeightCol());
                                     double label = (Double) dataPoint.getField(getLabelCol());
-                                    boolean isBinomial =
-                                            Double.compare(0., label) == 0
-                                                    || Double.compare(1., label) == 0;
-                                    if (!isBinomial) {
-                                        throw new RuntimeException(
-                                                "Multinomial classification is not supported yet. Supported options: [auto, binomial].");
-                                    }
                                     DenseVector features =
                                             (DenseVector) dataPoint.getField(getFeaturesCol());
                                     return new LabeledPointWithWeight(features, label, weight);
@@ -107,12 +95,12 @@ public class LogisticRegression
                         getReg(),
                         getElasticNet());
         DataStream<DenseVector> rawModelData =
-                optimizer.optimize(initModelData, trainData, BinaryLogisticLoss.INSTANCE);
+                optimizer.optimize(initModelData, trainData, LeastSquareLoss.INSTANCE);
 
-        DataStream<LogisticRegressionModelData> modelData =
-                rawModelData.map(LogisticRegressionModelData::new);
-        LogisticRegressionModel model =
-                new LogisticRegressionModel().setModelData(tEnv.fromDataStream(modelData));
+        DataStream<LinearRegressionModelData> modelData =
+                rawModelData.map(LinearRegressionModelData::new);
+        LinearRegressionModel model =
+                new LinearRegressionModel().setModelData(tEnv.fromDataStream(modelData));
         ReadWriteUtils.updateExistingParams(model, paramMap);
         return model;
     }
@@ -122,7 +110,7 @@ public class LogisticRegression
         ReadWriteUtils.saveMetadata(this, path);
     }
 
-    public static LogisticRegression load(StreamTableEnvironment tEnv, String path)
+    public static LinearRegression load(StreamTableEnvironment tEnv, String path)
             throws IOException {
         return ReadWriteUtils.loadStageParam(path);
     }
