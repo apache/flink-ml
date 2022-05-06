@@ -31,10 +31,6 @@ under the License.
     <artifactId>flink-ml-iteration_${scala.binary.version}</artifactId>
     <name>Flink ML : Iteration</name>
 
-    <properties>
-        <hadoop.version>2.4.1</hadoop.version>
-    </properties>
-
     <dependencies>
 
         <dependency>

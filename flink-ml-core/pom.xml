@@ -31,10 +31,6 @@ under the License.
   <artifactId>flink-ml-core_${scala.binary.version}</artifactId>
   <name>Flink ML : Core</name>
 
-  <properties>
-    <hadoop.version>2.4.1</hadoop.version>
-  </properties>
-
   <dependencies>
     <dependency>
       <groupId>org.apache.flink</groupId>
