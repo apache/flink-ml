@@ -82,6 +82,7 @@ public final class SparseVectorSerializer extends TypeSerializerSingleton<Sparse
         target.writeInt(vector.n);
         final int len = vector.values.length;
         target.writeInt(len);
+        // TODO: optimize the serialization/deserialization process of SparseVectorSerializer.
         for (int i = 0; i < len; i++) {
             target.writeInt(vector.indices[i]);
             target.writeDouble(vector.values[i]);

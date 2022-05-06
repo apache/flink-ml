@@ -26,25 +26,36 @@ import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeutils.base.IntSerializer;
+import org.apache.flink.api.dag.Transformation;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.TypeExtractor;
+import org.apache.flink.core.memory.ManagedMemoryUseCase;
+import org.apache.flink.iteration.datacache.nonkeyed.ListStateWithCache;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.functions.windowing.AllWindowFunction;
+import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator;
 import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.TimestampedCollector;
 import org.apache.flink.streaming.api.windowing.windows.GlobalWindow;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.table.api.TableException;
 import org.apache.flink.util.Collector;
 
 import org.apache.commons.collections.IteratorUtils;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
+import java.util.Random;
 
 /** Provides utility functions for {@link DataStream}. */
 @Internal
@@ -106,6 +117,56 @@ public class DataStreamUtils {
     }
 
     /**
+     * Performs a uniform sampling over the elements in a bounded data stream.
+     *
+     * <p>This method takes samples without replacement. If the number of elements in the stream is
+     * smaller than expected number of samples, all elements will be included in the sample.
+     *
+     * @param input The input data stream.
+     * @param numSamples The number of elements to be sampled.
+     * @param randomSeed The seed to randomly pick elements as sample.
+     * @return A data stream containing a list of the sampled elements.
+     */
+    public static <T> DataStream<T> sample(DataStream<T> input, int numSamples, long randomSeed) {
+        int inputParallelism = input.getParallelism();
+
+        return input.transform(
+                        "samplingOperator",
+                        input.getType(),
+                        new SamplingOperator<>(numSamples, randomSeed))
+                .setParallelism(inputParallelism)
+                .transform(
+                        "samplingOperator",
+                        input.getType(),
+                        new SamplingOperator<>(numSamples, randomSeed))
+                .setParallelism(1)
+                .map(x -> x, input.getType())
+                .setParallelism(inputParallelism);
+    }
+
+    /**
+     * Sets {Transformation#declareManagedMemoryUseCaseAtOperatorScope(ManagedMemoryUseCase, int)}
+     * using the given bytes for {@link ManagedMemoryUseCase#OPERATOR}.
+     *
+     * <p>This method is in reference to Flink's ExecNodeUtil.setManagedMemoryWeight. The provided
+     * bytes should be in the same scale as existing usage in Flink, for example,
+     * StreamExecWindowAggregate.WINDOW_AGG_MEMORY_RATIO.
+     */
+    public static <T> void setManagedMemoryWeight(
+            Transformation<T> transformation, long memoryBytes) {
+        if (memoryBytes > 0) {
+            final int weightInMebibyte = Math.max(1, (int) (memoryBytes >> 20));
+            final Optional<Integer> previousWeight =
+                    transformation.declareManagedMemoryUseCaseAtOperatorScope(
+                            ManagedMemoryUseCase.OPERATOR, weightInMebibyte);
+            if (previousWeight.isPresent()) {
+                throw new TableException(
+                        "Managed memory weight has been set, this should not happen.");
+            }
+        }
+    }
+
+    /**
      * A stream operator to apply {@link MapPartitionFunction} on each partition of the input
      * bounded data stream.
      */
@@ -113,7 +174,7 @@ public class DataStreamUtils {
             extends AbstractUdfStreamOperator<OUT, MapPartitionFunction<IN, OUT>>
             implements OneInputStreamOperator<IN, OUT>, BoundedOneInput {
 
-        private ListState<IN> valuesState;
+        private ListStateWithCache<IN> valuesState;
 
         public MapPartitionOperator(MapPartitionFunction<IN, OUT> mapPartitionFunc) {
             super(mapPartitionFunc);
@@ -122,23 +183,31 @@ public class DataStreamUtils {
         @Override
         public void initializeState(StateInitializationContext context) throws Exception {
             super.initializeState(context);
-            ListStateDescriptor<IN> descriptor =
-                    new ListStateDescriptor<>(
-                            "inputState",
-                            getOperatorConfig()
-                                    .getTypeSerializerIn(0, getClass().getClassLoader()));
-            valuesState = context.getOperatorStateStore().getListState(descriptor);
+
+            valuesState =
+                    new ListStateWithCache<>(
+                            getOperatorConfig().getTypeSerializerIn(0, getClass().getClassLoader()),
+                            getContainingTask(),
+                            getRuntimeContext(),
+                            context,
+                            config.getOperatorID());
+        }
+
+        @Override
+        public void snapshotState(StateSnapshotContext context) throws Exception {
+            super.snapshotState(context);
+            valuesState.snapshotState(context);
+        }
+
+        @Override
+        public void processElement(StreamRecord<IN> input) throws Exception {
+            valuesState.add(input.getValue());
         }
 
         @Override
         public void endInput() throws Exception {
             userFunction.mapPartition(valuesState.get(), new TimestampedCollector<>(output));
             valuesState.clear();
-        }
-
-        @Override
-        public void processElement(StreamRecord<IN> input) throws Exception {
-            valuesState.add(input.getValue());
         }
     }
 
@@ -176,7 +245,7 @@ public class DataStreamUtils {
             state =
                     context.getOperatorStateStore()
                             .getListState(
-                                    new ListStateDescriptor<T>(
+                                    new ListStateDescriptor<>(
                                             "state",
                                             getOperatorConfig()
                                                     .getTypeSerializerIn(
@@ -253,6 +322,82 @@ public class DataStreamUtils {
             for (; i < downStreamParallelism; i++) {
                 collector.collect(Tuple2.of(i, Arrays.copyOfRange(values, offset, offset + size)));
                 offset += size;
+            }
+        }
+    }
+
+    /*
+     * A stream operator that takes a randomly sampled subset of elements in a bounded data stream.
+     */
+    private static class SamplingOperator<T> extends AbstractStreamOperator<T>
+            implements OneInputStreamOperator<T, T>, BoundedOneInput {
+        private final int numSamples;
+
+        private final Random random;
+
+        private ListState<T> samplesState;
+
+        private List<T> samples;
+
+        private ListState<Integer> countState;
+
+        private int count;
+
+        SamplingOperator(int numSamples, long randomSeed) {
+            this.numSamples = numSamples;
+            this.random = new Random(randomSeed);
+        }
+
+        @Override
+        public void initializeState(StateInitializationContext context) throws Exception {
+            super.initializeState(context);
+
+            ListStateDescriptor<T> samplesDescriptor =
+                    new ListStateDescriptor<>(
+                            "samplesState",
+                            getOperatorConfig()
+                                    .getTypeSerializerIn(0, getClass().getClassLoader()));
+            samplesState = context.getOperatorStateStore().getListState(samplesDescriptor);
+            samples = new ArrayList<>(numSamples);
+            samplesState.get().forEach(samples::add);
+
+            ListStateDescriptor<Integer> countDescriptor =
+                    new ListStateDescriptor<>("countState", IntSerializer.INSTANCE);
+            countState = context.getOperatorStateStore().getListState(countDescriptor);
+            Iterator<Integer> countIterator = countState.get().iterator();
+            if (countIterator.hasNext()) {
+                count = countIterator.next();
+            } else {
+                count = 0;
+            }
+        }
+
+        @Override
+        public void snapshotState(StateSnapshotContext context) throws Exception {
+            super.snapshotState(context);
+            samplesState.update(samples);
+            countState.update(Collections.singletonList(count));
+        }
+
+        @Override
+        public void processElement(StreamRecord<T> streamRecord) throws Exception {
+            T value = streamRecord.getValue();
+            count++;
+
+            if (samples.size() < numSamples) {
+                samples.add(value);
+            } else {
+                int index = random.nextInt(count);
+                if (index < numSamples) {
+                    samples.set(index, value);
+                }
+            }
+        }
+
+        @Override
+        public void endInput() throws Exception {
+            for (T sample : samples) {
+                output.collect(new StreamRecord<>(sample));
             }
         }
     }

@@ -63,7 +63,7 @@ public class VectorTypeInfo extends TypeInformation<Vector> {
 
     @Override
     public TypeSerializer<Vector> createSerializer(ExecutionConfig executionConfig) {
-        return VectorSerializer.INSTANCE;
+        return new VectorSerializer();
     }
 
     @Override

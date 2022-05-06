@@ -108,14 +108,14 @@ public class LogisticRegressionModelData {
 
     /** Data encoder for {@link LogisticRegression} and {@link OnlineLogisticRegression}. */
     public static class ModelDataEncoder implements Encoder<LogisticRegressionModelData> {
+        private final DenseVectorSerializer serializer = new DenseVectorSerializer();
 
         @Override
         public void encode(LogisticRegressionModelData modelData, OutputStream outputStream)
                 throws IOException {
             DataOutputViewStreamWrapper dataOutputViewStreamWrapper =
                     new DataOutputViewStreamWrapper(outputStream);
-            DenseVectorSerializer.INSTANCE.serialize(
-                    modelData.coefficient, dataOutputViewStreamWrapper);
+            serializer.serialize(modelData.coefficient, dataOutputViewStreamWrapper);
             dataOutputViewStreamWrapper.writeLong(modelData.modelVersion);
         }
     }
@@ -127,6 +127,7 @@ public class LogisticRegressionModelData {
         public Reader<LogisticRegressionModelData> createReader(
                 Configuration configuration, FSDataInputStream inputStream) {
             return new Reader<LogisticRegressionModelData>() {
+                private final DenseVectorSerializer serializer = new DenseVectorSerializer();
 
                 @Override
                 public LogisticRegressionModelData read() throws IOException {
@@ -134,8 +135,7 @@ public class LogisticRegressionModelData {
                         DataInputViewStreamWrapper dataInputViewStreamWrapper =
                                 new DataInputViewStreamWrapper(inputStream);
                         DenseVector coefficient =
-                                DenseVectorSerializer.INSTANCE.deserialize(
-                                        dataInputViewStreamWrapper);
+                                serializer.deserialize(dataInputViewStreamWrapper);
                         long modelVersion = dataInputViewStreamWrapper.readLong();
                         return new LogisticRegressionModelData(coefficient, modelVersion);
                     } catch (EOFException e) {

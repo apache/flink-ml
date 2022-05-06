@@ -74,12 +74,14 @@ public class MinMaxScalerModelData {
 
     /** Encoder for {@link MinMaxScalerModelData}. */
     public static class ModelDataEncoder implements Encoder<MinMaxScalerModelData> {
+        private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+
         @Override
         public void encode(MinMaxScalerModelData modelData, OutputStream outputStream)
                 throws IOException {
             DataOutputView dataOutputView = new DataOutputViewStreamWrapper(outputStream);
-            DenseVectorSerializer.INSTANCE.serialize(modelData.minVector, dataOutputView);
-            DenseVectorSerializer.INSTANCE.serialize(modelData.maxVector, dataOutputView);
+            serializer.serialize(modelData.minVector, dataOutputView);
+            serializer.serialize(modelData.maxVector, dataOutputView);
         }
     }
 
@@ -89,13 +91,14 @@ public class MinMaxScalerModelData {
         public Reader<MinMaxScalerModelData> createReader(
                 Configuration config, FSDataInputStream stream) {
             return new Reader<MinMaxScalerModelData>() {
+                private final DenseVectorSerializer serializer = new DenseVectorSerializer();
 
                 @Override
                 public MinMaxScalerModelData read() throws IOException {
                     DataInputView source = new DataInputViewStreamWrapper(stream);
                     try {
-                        DenseVector minVector = DenseVectorSerializer.INSTANCE.deserialize(source);
-                        DenseVector maxVector = DenseVectorSerializer.INSTANCE.deserialize(source);
+                        DenseVector minVector = serializer.deserialize(source);
+                        DenseVector maxVector = serializer.deserialize(source);
                         return new MinMaxScalerModelData(minVector, maxVector);
                     } catch (EOFException e) {
                         return null;

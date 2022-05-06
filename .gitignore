@@ -17,5 +17,6 @@ target
 *.ipr
 *.iws
 *.pyc
+.vscode
 flink-ml-python/dist/
 flink-ml-python/apache_flink_ml.egg-info/

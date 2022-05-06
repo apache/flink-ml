@@ -389,14 +389,12 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
             ThrowingConsumer<StreamRecord, Exception> elementConsumer,
             ThrowingConsumer<Watermark, Exception> watermarkConsumer)
             throws Exception {
-        dataCacheWriters[inputIndex].finishCurrentSegment();
-        List<Segment> pendingSegments = dataCacheWriters[inputIndex].getFinishSegments();
+        List<Segment> pendingSegments = dataCacheWriters[inputIndex].getSegments();
         if (pendingSegments.size() != 0) {
             DataCacheReader dataCacheReader =
                     new DataCacheReader<>(
                             new CacheElementTypeInfo<>(inTypes[inputIndex])
                                     .createSerializer(containingTask.getExecutionConfig()),
-                            basePath.getFileSystem(),
                             pendingSegments);
             while (dataCacheReader.hasNext()) {
                 CacheElement cacheElement = (CacheElement) dataCacheReader.next();
@@ -565,12 +563,10 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
             dos.writeInt(numInputs);
         }
         for (int i = 0; i < numInputs; i++) {
-            dataCacheWriters[i].finishCurrentSegment();
+            dataCacheWriters[i].writeSegmentsToFiles();
             DataCacheSnapshot dataCacheSnapshot =
                     new DataCacheSnapshot(
-                            basePath.getFileSystem(),
-                            null,
-                            dataCacheWriters[i].getFinishSegments());
+                            basePath.getFileSystem(), null, dataCacheWriters[i].getSegments());
             dataCacheSnapshot.writeTo(checkpointOutputStream);
         }
     }

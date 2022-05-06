@@ -20,27 +20,34 @@
 package org.apache.flink.ml.linalg.typeinfo;
 
 import org.apache.flink.api.common.typeutils.SimpleTypeSerializerSnapshot;
+import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
-import org.apache.flink.api.common.typeutils.base.TypeSerializerSingleton;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.util.Bits;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Objects;
 
 /** Specialized serializer for {@link DenseVector}. */
-public final class DenseVectorSerializer extends TypeSerializerSingleton<DenseVector> {
+public final class DenseVectorSerializer extends TypeSerializer<DenseVector> {
 
     private static final long serialVersionUID = 1L;
 
     private static final double[] EMPTY = new double[0];
 
-    public static final DenseVectorSerializer INSTANCE = new DenseVectorSerializer();
+    private final byte[] buf = new byte[1024];
 
     @Override
     public boolean isImmutableType() {
         return false;
+    }
+
+    @Override
+    public TypeSerializer<DenseVector> duplicate() {
+        return new DenseVectorSerializer();
     }
 
     @Override
@@ -75,9 +82,14 @@ public final class DenseVectorSerializer extends TypeSerializerSingleton<DenseVe
 
         final int len = vector.values.length;
         target.writeInt(len);
+
         for (int i = 0; i < len; i++) {
-            target.writeDouble(vector.get(i));
+            Bits.putDouble(buf, i << 3, vector.values[i]);
+            if ((i & 127) == 127) {
+                target.write(buf);
+            }
         }
+        target.write(buf, 0, (len & 127) << 3);
     }
 
     @Override
@@ -89,10 +101,17 @@ public final class DenseVectorSerializer extends TypeSerializerSingleton<DenseVe
     }
 
     // Reads `len` double values from `source` into `dst`.
-    private static void readDoubleArray(double[] dst, DataInputView source, int len)
-            throws IOException {
-        for (int i = 0; i < len; i++) {
-            dst[i] = source.readDouble();
+    private void readDoubleArray(double[] dst, DataInputView source, int len) throws IOException {
+        int index = 0;
+        for (int i = 0; i < (len >> 7); i++) {
+            source.read(buf, 0, 1024);
+            for (int j = 0; j < 128; j++) {
+                dst[index++] = Bits.getDouble(buf, j << 3);
+            }
+        }
+        source.read(buf, 0, (len << 3) & 1023);
+        for (int j = 0; j < (len & 127); j++) {
+            dst[index++] = Bits.getDouble(buf, j << 3);
         }
     }
 
@@ -116,6 +135,16 @@ public final class DenseVectorSerializer extends TypeSerializerSingleton<DenseVe
         target.write(source, len * 8);
     }
 
+    @Override
+    public boolean equals(Object o) {
+        return o instanceof DenseVectorSerializer;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(DenseVectorSerializer.class);
+    }
+
     // ------------------------------------------------------------------------
 
     @Override
@@ -129,7 +158,7 @@ public final class DenseVectorSerializer extends TypeSerializerSingleton<DenseVe
             extends SimpleTypeSerializerSnapshot<DenseVector> {
 
         public DenseVectorSerializerSnapshot() {
-            super(() -> INSTANCE);
+            super(DenseVectorSerializer::new);
         }
     }
 }

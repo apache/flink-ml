@@ -67,11 +67,12 @@ public class LinearRegressionModelData {
 
     /** Data encoder for {@link LinearRegressionModel}. */
     public static class ModelDataEncoder implements Encoder<LinearRegressionModelData> {
+        private final DenseVectorSerializer serializer = new DenseVectorSerializer();
 
         @Override
         public void encode(LinearRegressionModelData modelData, OutputStream outputStream)
                 throws IOException {
-            DenseVectorSerializer.INSTANCE.serialize(
+            serializer.serialize(
                     modelData.coefficient, new DataOutputViewStreamWrapper(outputStream));
         }
     }
@@ -83,13 +84,13 @@ public class LinearRegressionModelData {
         public Reader<LinearRegressionModelData> createReader(
                 Configuration configuration, FSDataInputStream inputStream) {
             return new Reader<LinearRegressionModelData>() {
+                private final DenseVectorSerializer serializer = new DenseVectorSerializer();
 
                 @Override
                 public LinearRegressionModelData read() throws IOException {
                     try {
                         DenseVector coefficient =
-                                DenseVectorSerializer.INSTANCE.deserialize(
-                                        new DataInputViewStreamWrapper(inputStream));
+                                serializer.deserialize(new DataInputViewStreamWrapper(inputStream));
                         return new LinearRegressionModelData(coefficient);
                     } catch (EOFException e) {
                         return null;

@@ -138,6 +138,8 @@ public class KMeansModelData {
 
     /** Data encoder for {@link KMeansModelData}. */
     public static class ModelDataEncoder implements Encoder<KMeansModelData> {
+        private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+
         @Override
         public void encode(KMeansModelData modelData, OutputStream outputStream)
                 throws IOException {
@@ -145,11 +147,9 @@ public class KMeansModelData {
                     new DataOutputViewStreamWrapper(outputStream);
             IntSerializer.INSTANCE.serialize(modelData.centroids.length, outputViewStreamWrapper);
             for (DenseVector denseVector : modelData.centroids) {
-                DenseVectorSerializer.INSTANCE.serialize(
-                        denseVector, new DataOutputViewStreamWrapper(outputStream));
+                serializer.serialize(denseVector, new DataOutputViewStreamWrapper(outputStream));
             }
-            DenseVectorSerializer.INSTANCE.serialize(
-                    modelData.weights, new DataOutputViewStreamWrapper(outputStream));
+            serializer.serialize(modelData.weights, new DataOutputViewStreamWrapper(outputStream));
         }
     }
 
@@ -159,6 +159,7 @@ public class KMeansModelData {
         public Reader<KMeansModelData> createReader(
                 Configuration config, FSDataInputStream inputStream) {
             return new Reader<KMeansModelData>() {
+                private final DenseVectorSerializer serializer = new DenseVectorSerializer();
 
                 @Override
                 public KMeansModelData read() throws IOException {
@@ -169,12 +170,9 @@ public class KMeansModelData {
                                 IntSerializer.INSTANCE.deserialize(inputViewStreamWrapper);
                         DenseVector[] centroids = new DenseVector[numDenseVectors];
                         for (int i = 0; i < numDenseVectors; i++) {
-                            centroids[i] =
-                                    DenseVectorSerializer.INSTANCE.deserialize(
-                                            inputViewStreamWrapper);
+                            centroids[i] = serializer.deserialize(inputViewStreamWrapper);
                         }
-                        DenseVector weights =
-                                DenseVectorSerializer.INSTANCE.deserialize(inputViewStreamWrapper);
+                        DenseVector weights = serializer.deserialize(inputViewStreamWrapper);
                         return new KMeansModelData(centroids, weights);
                     } catch (EOFException e) {
                         return null;

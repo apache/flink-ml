@@ -256,7 +256,6 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
                 DataCacheSnapshot.replay(
                         rawStateInput.getStream(),
                         checkpoints.getTypeSerializer(),
-                        checkpoints.getFileSystem(),
                         (record) ->
                                 recordProcessor.processFeedbackElement(new StreamRecord<>(record)));
             }
