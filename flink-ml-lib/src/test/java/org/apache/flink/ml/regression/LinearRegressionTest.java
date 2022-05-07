@@ -118,15 +118,15 @@ public class LinearRegressionTest {
     @Test
     public void testParam() {
         LinearRegression linearRegression = new LinearRegression();
+        assertEquals("features", linearRegression.getFeaturesCol());
         assertEquals("label", linearRegression.getLabelCol());
         assertNull(linearRegression.getWeightCol());
         assertEquals(20, linearRegression.getMaxIter());
-        assertEquals(0, linearRegression.getReg(), TOLERANCE);
-        assertEquals(0, linearRegression.getElasticNet(), TOLERANCE);
+        assertEquals(1e-6, linearRegression.getTol(), TOLERANCE);
         assertEquals(0.1, linearRegression.getLearningRate(), TOLERANCE);
         assertEquals(32, linearRegression.getGlobalBatchSize());
-        assertEquals(1e-6, linearRegression.getTol(), TOLERANCE);
-        assertEquals("features", linearRegression.getFeaturesCol());
+        assertEquals(0, linearRegression.getReg(), TOLERANCE);
+        assertEquals(0, linearRegression.getElasticNet(), TOLERANCE);
         assertEquals("prediction", linearRegression.getPredictionCol());
 
         linearRegression
