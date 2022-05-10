@@ -110,13 +110,13 @@ public class Bucketizer implements Transformer<Bucketizer>, BucketizerParams<Buc
                 if (!Double.isNaN(feature)) {
                     int index = Arrays.binarySearch(splits, feature);
                     if (index >= 0) {
-                        if (index == inputCols.length - 1) {
+                        if (index == splits.length - 1) {
                             index--;
                         }
                         outputRow.setField(i, index);
                     } else {
                         index = -index - 1;
-                        if (index == 0 || index == inputCols.length) {
+                        if (index == 0 || index == splits.length) {
                             isInvalid = true;
                         } else {
                             outputRow.setField(i, index - 1);
