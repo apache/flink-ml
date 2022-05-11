@@ -16,7 +16,7 @@
 # limitations under the License.
 ################################################################################
 from abc import ABC
-from typing import List
+from typing import Tuple
 
 from pyflink.ml.core.param import WithParams, Param, ParamValidators, StringParam, IntParam, \
     StringArrayParam, FloatParam
@@ -113,24 +113,45 @@ class HasHandleInvalid(WithParams, ABC):
         return self.get_handle_invalid()
 
 
+class HasInputCol(WithParams, ABC):
+    """
+    Base class for the shared input col param.
+    """
+    INPUT_COL: Param[str] = StringParam(
+        "input_col",
+        "Input column name.",
+        "input",
+        ParamValidators.not_null())
+
+    def set_input_col(self, col: str):
+        return self.set(self.INPUT_COL, col)
+
+    def get_input_col(self) -> str:
+        return self.get(self.INPUT_COL)
+
+    @property
+    def input_col(self) -> str:
+        return self.get_input_col()
+
+
 class HasInputCols(WithParams, ABC):
     """
     Base class for the shared input cols param.
     """
-    INPUT_COLS: Param[List[str]] = StringArrayParam(
+    INPUT_COLS: Param[Tuple[str, ...]] = StringArrayParam(
         "input_cols",
         "Input column names.",
         None,
         ParamValidators.non_empty_array())
 
-    def set_input_cols(self, cols: List[str]):
+    def set_input_cols(self, *cols: str):
         return self.set(self.INPUT_COLS, cols)
 
-    def get_input_cols(self) -> List[str]:
+    def get_input_cols(self) -> Tuple[str, ...]:
         return self.get(self.INPUT_COLS)
 
     @property
-    def input_cols(self) -> List[str]:
+    def input_cols(self) -> Tuple[str, ...]:
         return self.get_input_cols()
 
 
@@ -226,24 +247,45 @@ class HasMultiClass(WithParams, ABC):
         return self.get_multi_class()
 
 
+class HasOutputCol(WithParams, ABC):
+    """
+    Base class for the shared output_col param.
+    """
+    OUTPUT_COL: Param[str] = StringParam(
+        "output_col",
+        "Output column name.",
+        "output",
+        ParamValidators.not_null())
+
+    def set_output_col(self, col: str):
+        return self.set(self.OUTPUT_COL, col)
+
+    def get_output_col(self) -> str:
+        return self.get(self.OUTPUT_COL)
+
+    @property
+    def output_col(self) -> str:
+        return self.get_output_col()
+
+
 class HasOutputCols(WithParams, ABC):
     """
     Base class for the shared output_cols param.
     """
-    OUTPUT_COLS: Param[List[str]] = StringArrayParam(
+    OUTPUT_COLS: Param[Tuple[str, ...]] = StringArrayParam(
         "output_cols",
         "Output column names.",
         None,
         ParamValidators.non_empty_array())
 
-    def set_output_cols(self, cols: List[str]):
+    def set_output_cols(self, *cols: str):
         return self.set(self.OUTPUT_COLS, cols)
 
-    def get_output_cols(self) -> List[str]:
+    def get_output_cols(self) -> Tuple[str, ...]:
         return self.get(self.OUTPUT_COLS)
 
     @property
-    def output_cols(self) -> List[str]:
+    def output_cols(self) -> Tuple[str, ...]:
         return self.get_output_cols()
 
 

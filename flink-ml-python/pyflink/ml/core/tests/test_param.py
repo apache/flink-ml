@@ -85,8 +85,8 @@ class ParamTests(unittest.TestCase):
         self.assertEqual(input_cols.description, "Input column names.")
         self.assertEqual(input_cols.default_value, None)
 
-        param.set_input_cols(['a', 'b', 'c'])
-        self.assertEqual(param.get_input_cols(), ['a', 'b', 'c'])
+        param.set_input_cols('a', 'b', 'c')
+        self.assertEqual(param.get_input_cols(), ('a', 'b', 'c'))
 
     def test_label_col_param(self):
         param = TestParams()
@@ -137,8 +137,8 @@ class ParamTests(unittest.TestCase):
         self.assertEqual(output_cols.description, "Output column names.")
         self.assertEqual(output_cols.default_value, None)
 
-        param.set_output_cols(['a', 'b'])
-        self.assertEqual(param.get_output_cols(), ['a', 'b'])
+        param.set_output_cols('a', 'b')
+        self.assertEqual(param.get_output_cols(), ('a', 'b'))
 
     def test_prediction_col_param(self):
         param = TestParams()

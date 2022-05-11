@@ -17,23 +17,49 @@
 ################################################################################
 from abc import ABC, abstractmethod
 
-from pyflink.ml.core.wrapper import JavaModel, JavaEstimator
+from pyflink.ml.core.wrapper import JavaModel, JavaEstimator, JavaTransformer
 
-JAVA_CLUSTERING_PACKAGE_NAME = "org.apache.flink.ml.clustering"
+JAVA_FEATURE_PACKAGE_NAME = "org.apache.flink.ml.feature"
 
 
-class JavaClusteringModel(JavaModel, ABC):
+class JavaFeatureTransformer(JavaTransformer, ABC):
     """
-    Wrapper class for a Java Clustering Model.
+    Wrapper class for a Java Feature Transformer.
     """
 
-    def __init__(self, java_model):
-        super(JavaClusteringModel, self).__init__(java_model)
+    def __init__(self, java_transformer):
+        super(JavaFeatureTransformer, self).__init__(java_transformer)
 
     @classmethod
     def _java_stage_path(cls) -> str:
         return ".".join(
-            [JAVA_CLUSTERING_PACKAGE_NAME,
+            [JAVA_FEATURE_PACKAGE_NAME,
+             cls._java_transformer_package_name(),
+             cls._java_transformer_class_name()])
+
+    @classmethod
+    @abstractmethod
+    def _java_transformer_package_name(cls) -> str:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def _java_transformer_class_name(cls) -> str:
+        pass
+
+
+class JavaFeatureModel(JavaModel, ABC):
+    """
+    Wrapper class for a Java Feature Model.
+    """
+
+    def __init__(self, java_model):
+        super(JavaFeatureModel, self).__init__(java_model)
+
+    @classmethod
+    def _java_stage_path(cls) -> str:
+        return ".".join(
+            [JAVA_FEATURE_PACKAGE_NAME,
              cls._java_model_package_name(),
              cls._java_model_class_name()])
 
@@ -48,18 +74,18 @@ class JavaClusteringModel(JavaModel, ABC):
         pass
 
 
-class JavaClusteringEstimator(JavaEstimator, ABC):
+class JavaFeatureEstimator(JavaEstimator, ABC):
     """
-    Wrapper class for a Java Clustering Estimator.
+    Wrapper class for a Java Feature Estimator.
     """
 
     def __init__(self):
-        super(JavaClusteringEstimator, self).__init__()
+        super(JavaFeatureEstimator, self).__init__()
 
     @classmethod
-    def _java_stage_path(cls):
+    def _java_stage_path(cls) -> str:
         return ".".join(
-            [JAVA_CLUSTERING_PACKAGE_NAME,
+            [JAVA_FEATURE_PACKAGE_NAME,
              cls._java_estimator_package_name(),
              cls._java_estimator_class_name()])
 

@@ -29,9 +29,9 @@ BOOLEAN_PARAM = BooleanParam("boolean_param", "Description", False)
 INT_PARAM = IntParam("int_param", "Description", 1, ParamValidators.lt(100))
 FLOAT_PARAM = FloatParam("float_param", "Description", 3.0, ParamValidators.lt(100))
 STRING_PARAM = StringParam('string_param', "Description", "5")
-INT_ARRAY_PARAM = IntArrayParam("int_array_param", "Description", [6, 7])
-FLOAT_ARRAY_PARAM = FloatArrayParam("float_array_param", "Description", [10.0, 11.0])
-STRING_ARRAY_PARAM = StringArrayParam("string_array_param", "Description", ["14", "15"])
+INT_ARRAY_PARAM = IntArrayParam("int_array_param", "Description", (6, 7))
+FLOAT_ARRAY_PARAM = FloatArrayParam("float_array_param", "Description", (10.0, 11.0))
+STRING_ARRAY_PARAM = StringArrayParam("string_array_param", "Description", ("14", "15"))
 EXTRA_INT_PARAM = IntParam("extra_int_param",
                            "Description",
                            20,
@@ -102,14 +102,14 @@ class StageTest(PyFlinkMLTestCase):
         stage.set(STRING_PARAM, "50")
         self.assertEqual("50", stage.get(STRING_PARAM))
 
-        stage.set(INT_ARRAY_PARAM, [50, 51])
-        self.assertEqual([50, 51], stage.get(INT_ARRAY_PARAM))
+        stage.set(INT_ARRAY_PARAM, (50, 51))
+        self.assertEqual((50, 51), stage.get(INT_ARRAY_PARAM))
 
-        stage.set(FLOAT_ARRAY_PARAM, [50.0, 51.0])
-        self.assertEqual([50.0, 51.0], stage.get(FLOAT_ARRAY_PARAM))
+        stage.set(FLOAT_ARRAY_PARAM, (50.0, 51.0))
+        self.assertEqual((50.0, 51.0), stage.get(FLOAT_ARRAY_PARAM))
 
-        stage.set(STRING_ARRAY_PARAM, ["50", "51"])
-        self.assertEqual(["50", "51"], stage.get(STRING_ARRAY_PARAM))
+        stage.set(STRING_ARRAY_PARAM, ("50", "51"))
+        self.assertEqual(("50", "51"), stage.get(STRING_ARRAY_PARAM))
 
     def test_stage_save_load(self):
         stage = MyStage()
