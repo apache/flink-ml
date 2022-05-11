@@ -217,13 +217,13 @@ class ParamValidators(object):
         return NotNull()
 
     @staticmethod
-    def non_empty_array() -> ParamValidator[List[T]]:
+    def non_empty_array() -> ParamValidator[Tuple[T]]:
         """
         Checks if the parameter value is not empty array.
         """
 
-        class NonEmptyArray(ParamValidator[List[T]]):
-            def validate(self, value: List[T]) -> bool:
+        class NonEmptyArray(ParamValidator[Tuple[T]]):
+            def validate(self, value: Tuple[T]) -> bool:
                 return value is not None and len(value) > 0
 
         return NonEmptyArray()
@@ -315,34 +315,48 @@ class StringParam(Param[str]):
         super(StringParam, self).__init__(name, str, "str", description, default_value, validator)
 
 
-class IntArrayParam(Param[List[int]]):
+class IntArrayParam(Param[Tuple[int, ...]]):
     """
-    Class for the string parameter.
+    Class for the int array parameter.
     """
 
-    def __init__(self, name: str, description: str, default_value: Optional[List[int]],
-                 validator: ParamValidator[List[int]] = ParamValidators.always_true()):
-        super(IntArrayParam, self).__init__(name, list, "list[int]", description, default_value,
+    def __init__(self, name: str, description: str, default_value: Optional[Tuple[int, ...]],
+                 validator: ParamValidator[Tuple[int, ...]] = ParamValidators.always_true()):
+        super(IntArrayParam, self).__init__(name, tuple, "Tuple[int]", description, default_value,
                                             validator)
 
 
-class FloatArrayParam(Param[List[float]]):
+class FloatArrayParam(Param[Tuple[float, ...]]):
     """
-    Class for the string parameter.
+    Class for the float array parameter.
     """
 
-    def __init__(self, name: str, description: str, default_value: Optional[List[float]],
-                 validator: ParamValidator[List[float]] = ParamValidators.always_true()):
-        super(FloatArrayParam, self).__init__(name, list, "list[float]", description, default_value,
-                                              validator)
+    def __init__(self, name: str, description: str, default_value: Optional[Tuple[float, ...]],
+                 validator: ParamValidator[Tuple[float, ...]] = ParamValidators.always_true()):
+        super(FloatArrayParam, self).__init__(name, tuple, "Tuple[float]", description,
+                                              default_value, validator)
 
 
-class StringArrayParam(Param[List[str]]):
+class FloatArrayArrayParam(Param[Tuple[Tuple[float, ...]]]):
+    """
+    Class for the array of float array parameter.
+    """
+
+    def __init__(self, name: str,
+                 description: str,
+                 default_value: Optional[Tuple[Tuple[float, ...]]],
+                 validator: ParamValidator[
+                     Tuple[Tuple[float, ...]]] = ParamValidators.always_true()):
+        super(FloatArrayArrayParam, self).__init__(name, tuple, "Tuple[Tuple[float]]", description,
+                                                   default_value, validator)
+
+
+class StringArrayParam(Param[Tuple[str, ...]]):
     """
     Class for the string array parameter.
     """
 
-    def __init__(self, name: str, description: str, default_value: Optional[List[str]],
-                 validator: ParamValidator[List[str]] = ParamValidators.always_true()):
-        super(StringArrayParam, self).__init__(name, list, "list[str]", description, default_value,
-                                               validator)
+    def __init__(self, name: str, description: str, default_value: Optional[Tuple[str, ...]],
+                 validator: ParamValidator[Tuple[str, ...]] = ParamValidators.always_true()):
+        super(StringArrayParam, self).__init__(name, tuple, "Tuple[str]", description,
+                                               default_value, validator)

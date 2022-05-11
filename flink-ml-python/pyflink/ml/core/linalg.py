@@ -38,12 +38,54 @@ def _from_java_type_wrapper(j_type_info: JavaObject) -> TypeInformation:
         JClass = j_type_info.getTypeClass()
         if JClass == get_java_class(gateway.jvm.org.apache.flink.ml.linalg.DenseVector):
             return DenseVectorTypeInfo()
+        elif JClass == get_java_class(gateway.jvm.org.apache.flink.ml.linalg.SparseVector):
+            return SparseVectorTypeInfo()
         elif JClass == get_java_class(gateway.jvm.org.apache.flink.ml.linalg.DenseMatrix):
             return DenseMatrixTypeInfo()
+        elif JClass == get_java_class(gateway.jvm.org.apache.flink.ml.linalg.Vector):
+            return VectorTypeInfo()
     return _from_java_type_alias(j_type_info)
 
 
 typeinfo._from_java_type = _from_java_type_wrapper
+
+
+class VectorTypeInfo(TypeInformation):
+    def __init__(self):
+        super(VectorTypeInfo, self).__init__()
+        self._dense_vector_type_info = DenseVectorTypeInfo()
+        self._sparse_vector_type_info = SparseVectorTypeInfo()
+
+    def need_conversion(self):
+        return True
+
+    def to_internal_type(self, obj):
+        if obj is None:
+            return None
+        if isinstance(obj, DenseVector):
+            return chr(0).encode('latin-1') + self._dense_vector_type_info.to_internal_type(obj)
+        else:
+            return chr(1).encode('latin-1') + self._sparse_vector_type_info.to_internal_type(obj)
+
+    def from_internal_type(self, obj):
+        if obj is not None:
+            if obj[0] == 0:
+                return self._dense_vector_type_info.from_internal_type(obj[1:])
+            else:
+                return self._sparse_vector_type_info.from_internal_type(obj[1:])
+
+    def get_java_type_info(self):
+        if not self._j_typeinfo:
+            self._j_typeinfo = get_gateway().jvm \
+                .org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo.INSTANCE
+
+        return self._j_typeinfo
+
+    def __eq__(self, o: object) -> bool:
+        return isinstance(o, VectorTypeInfo)
+
+    def __repr__(self):
+        return "VectorTypeInfo"
 
 
 class DenseVectorTypeInfo(TypeInformation):
@@ -56,6 +98,8 @@ class DenseVectorTypeInfo(TypeInformation):
         return True
 
     def to_internal_type(self, obj):
+        if obj is None:
+            return
         assert isinstance(obj, DenseVector)
         values = [float(v) for v in obj._values]
         stream = self._output_stream
@@ -91,6 +135,60 @@ class DenseVectorTypeInfo(TypeInformation):
         return "DenseVectorTypeInfo"
 
 
+class SparseVectorTypeInfo(TypeInformation):
+    def __init__(self):
+        super(SparseVectorTypeInfo, self).__init__()
+        self._output_stream = OutputStream()
+        self._input_stream = InputStream(None)
+
+    def need_conversion(self):
+        return True
+
+    def to_internal_type(self, obj):
+        if obj is None:
+            return
+        assert isinstance(obj, SparseVector)
+        stream = self._output_stream
+        stream.write_int32(obj.size())
+
+        l = len(obj._values)
+        stream.write_int32(l)
+        for i in range(l):
+            stream.write_int32(obj._indices[i])
+            stream.write_double(obj._values[i])
+        internal_data = bytearray(stream.get())
+        stream.clear()
+        return internal_data
+
+    def from_internal_type(self, obj):
+        if obj is not None:
+            assert isinstance(obj, bytearray)
+            # reset input stream
+            stream = self._input_stream
+            stream.data = bytes(obj)
+            stream.pos = 0
+
+            size = stream.read_int32()
+            values = {}
+            for i in range(stream.read_int32()):
+                k = stream.read_int32()
+                v = stream.read_double()
+                values[k] = v
+            return Vectors.sparse(size, values)
+
+    def get_java_type_info(self):
+        if not self._j_typeinfo:
+            self._j_typeinfo = get_gateway().jvm \
+                .org.apache.flink.ml.linalg.typeinfo.SparseVectorTypeInfo.INSTANCE
+        return self._j_typeinfo
+
+    def __eq__(self, o) -> bool:
+        return isinstance(o, SparseVectorTypeInfo)
+
+    def __repr__(self):
+        return "SparseVectorTypeInfo"
+
+
 class DenseMatrixTypeInfo(TypeInformation):
     def __init__(self):
         super(DenseMatrixTypeInfo, self).__init__()
@@ -101,6 +199,8 @@ class DenseMatrixTypeInfo(TypeInformation):
         return True
 
     def to_internal_type(self, matrix):
+        if matrix is None:
+            return
         assert isinstance(matrix, DenseMatrix)
         stream = self._output_stream
         stream.write_int32(matrix.num_rows())
@@ -545,7 +645,7 @@ class SparseVector(Vector):
         inds = self._indices
         vals = self._values
         entries = ", ".join(["{0}: {1}".format(inds[i], float(vals[i])) for i in range(len(inds))])
-        return "SparseVector({0}, {{{1}}})".format(self.size, entries)
+        return "SparseVector({0}, {{{1}}})".format(self._size, entries)
 
 
 class Vectors(object):

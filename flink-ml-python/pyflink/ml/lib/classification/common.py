@@ -31,7 +31,7 @@ class JavaClassificationModel(JavaModel, ABC):
         super(JavaClassificationModel, self).__init__(java_model)
 
     @classmethod
-    def _java_model_path(cls) -> str:
+    def _java_stage_path(cls) -> str:
         return ".".join(
             [JAVA_CLASSIFICATION_PACKAGE_NAME,
              cls._java_model_package_name(),
@@ -57,7 +57,7 @@ class JavaClassificationEstimator(JavaEstimator, ABC):
         super(JavaClassificationEstimator, self).__init__()
 
     @classmethod
-    def _java_estimator_path(cls):
+    def _java_stage_path(cls):
         return ".".join(
             [JAVA_CLASSIFICATION_PACKAGE_NAME,
              cls._java_estimator_package_name(),

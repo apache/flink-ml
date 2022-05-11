@@ -23,7 +23,8 @@ from pyflink.table import Table, StreamTableEnvironment
 from pyflink.util.java_utils import to_jarray
 
 from pyflink.ml.core.api import Model, Transformer, AlgoOperator, Stage, Estimator
-from pyflink.ml.core.param import Param, WithParams
+from pyflink.ml.core.param import Param, WithParams, StringArrayParam, IntArrayParam, \
+    FloatArrayParam, FloatArrayArrayParam
 
 
 class JavaWrapper(ABC):
@@ -39,53 +40,31 @@ class JavaWithParams(WithParams, JavaWrapper):
     """
     Wrapper class for a Java WithParams.
     """
-    PYTHON_PARAM_NAME_TO_JAVA_PARM_NAME = {
-        'distance_measure': 'distanceMeasure',
-        'features_col': 'featuresCol',
-        'global_batch_size': 'globalBatchSize',
-        'handle_invalid': 'handleInvalid',
-        'input_cols': 'inputCols',
-        'label_col': 'labelCol',
-        'learning_rate': 'learningRate',
-        'max_iter': 'maxIter',
-        'multi_class': 'multiClass',
-        'output_cols': 'outputCols',
-        'prediction_col': 'predictionCol',
-        'raw_prediction_col': 'rawPredictionCol',
-        'reg': 'reg',
-        'seed': 'seed',
-        'tol': 'tol',
-        'weight_col': 'weightCol',
-        'k': 'k',
-        'model_type': 'modelType',
-        'smoothing': 'smoothing',
-        'init_mode': 'initMode',
-        'batch_strategy': 'batchStrategy',
-        'decay_factor': 'decayFactor'
-    }
 
     def __init__(self, java_params):
         super(JavaWithParams, self).__init__(java_params)
 
     def set(self, param: Param, value) -> WithParams:
-        java_param_name = self._to_java_param_name(param.name)
+        if type(param) in _map_java_param_converter:
+            converter = _map_java_param_converter[type(param)]
+        else:
+            converter = default_converter
+        java_param_name = snake_to_camel(param.name)
         set_method_name = ''.join(['set', java_param_name[0].upper(), java_param_name[1:]])
-        getattr(self._java_obj, set_method_name)(value)
+        getattr(self._java_obj, set_method_name)(converter.to_java(value))
         return self
 
     def get(self, param: Param):
-        java_param_name = self._to_java_param_name(param.name)
+        if type(param) in _map_java_param_converter:
+            converter = _map_java_param_converter[type(param)]
+        else:
+            converter = default_converter
+        java_param_name = snake_to_camel(param.name)
         get_method_name = ''.join(['get', java_param_name[0].upper(), java_param_name[1:]])
-        return getattr(self._java_obj, get_method_name)()
+        return converter.to_python(getattr(self._java_obj, get_method_name)())
 
     def get_param_map(self) -> Dict[Param, Any]:
         return self._java_obj.getParamMap()
-
-    def _to_java_param_name(self, name):
-        if name in self.PYTHON_PARAM_NAME_TO_JAVA_PARM_NAME:
-            return self.PYTHON_PARAM_NAME_TO_JAVA_PARM_NAME[name]
-        else:
-            raise Exception('Unknown param exception %s' % name)
 
 
 class JavaStage(Stage, JavaWithParams, ABC):
@@ -98,6 +77,17 @@ class JavaStage(Stage, JavaWithParams, ABC):
 
     def save(self, path: str) -> None:
         self._java_obj.save(path)
+
+    @classmethod
+    def load(cls, t_env: StreamTableEnvironment, path: str):
+        java_model = _to_java_reference(cls._java_stage_path()).load(t_env._j_tenv, path)
+        instance = cls(java_model)
+        return instance
+
+    @classmethod
+    @abstractmethod
+    def _java_stage_path(cls) -> str:
+        pass
 
 
 class JavaAlgoOperator(AlgoOperator, JavaStage, ABC):
@@ -119,7 +109,10 @@ class JavaTransformer(Transformer, JavaAlgoOperator, ABC):
     """
 
     def __init__(self, java_transformer):
-        super(JavaTransformer, self).__init__(java_transformer)
+        if java_transformer is None:
+            super(JavaTransformer, self).__init__(_to_java_reference(self._java_stage_path())())
+        else:
+            super(JavaTransformer, self).__init__(java_transformer)
 
 
 class JavaModel(Model, JavaTransformer, ABC):
@@ -128,10 +121,7 @@ class JavaModel(Model, JavaTransformer, ABC):
     """
 
     def __init__(self, java_model):
-        if java_model is None:
-            super(JavaModel, self).__init__(_to_java_reference(self._java_model_path())())
-        else:
-            super(JavaModel, self).__init__(java_model)
+        super(JavaModel, self).__init__(java_model)
         self._t_env = None
 
     def set_model_data(self, *inputs: Table) -> Model:
@@ -142,17 +132,6 @@ class JavaModel(Model, JavaTransformer, ABC):
     def get_model_data(self) -> List[Table]:
         return [Table(t, self._t_env) for t in self._java_obj.getModelData()]
 
-    @classmethod
-    def load(cls, t_env: StreamTableEnvironment, path: str):
-        java_model = _to_java_reference(cls._java_model_path()).load(t_env._j_tenv, path)
-        instance = cls(java_model)
-        return instance
-
-    @classmethod
-    @abstractmethod
-    def _java_model_path(cls) -> str:
-        pass
-
 
 class JavaEstimator(Estimator, JavaStage, ABC):
     """
@@ -160,7 +139,7 @@ class JavaEstimator(Estimator, JavaStage, ABC):
     """
 
     def __init__(self):
-        super(JavaEstimator, self).__init__(_new_java_obj(self._java_estimator_path()))
+        super(JavaEstimator, self).__init__(_new_java_obj(self._java_stage_path()))
 
     def fit(self, *inputs: Table) -> Model:
         return self._create_model(self._java_obj.fit(_to_java_tables(*inputs)))
@@ -177,15 +156,90 @@ class JavaEstimator(Estimator, JavaStage, ABC):
         """
         Instantiates a new stage instance based on the data read from the given path.
         """
-        java_estimator = _to_java_reference(cls._java_estimator_path()).load(t_env._j_tenv, path)
+        java_estimator = _to_java_reference(cls._java_stage_path()).load(t_env._j_tenv, path)
         instance = cls()
         instance._java_obj = java_estimator
         return instance
 
-    @classmethod
+
+class JavaParamConverter(ABC):
     @abstractmethod
-    def _java_estimator_path(cls) -> str:
+    def to_java(self, value):
         pass
+
+    @abstractmethod
+    def to_python(self, value):
+        pass
+
+
+class DefaultJavaParamConverter(JavaParamConverter):
+    def to_java(self, value):
+        return value
+
+    def to_python(self, value):
+        return value
+
+
+class IntArrayJavaPramConverter(JavaParamConverter):
+    def to_java(self, value):
+        return to_jarray(get_gateway().jvm.java.lang.Integer, value)
+
+    def to_python(self, value):
+        return tuple(value[i] for i in range(len(value)))
+
+
+class FloatArrayJavaPramConverter(JavaParamConverter):
+    def to_java(self, value):
+        return to_jarray(get_gateway().jvm.java.lang.Double, value)
+
+    def to_python(self, value):
+        return tuple(value[i] for i in range(len(value)))
+
+
+class StringArrayJavaParamConverter(JavaParamConverter):
+    def to_java(self, value):
+        return to_jarray(get_gateway().jvm.java.lang.String, value)
+
+    def to_python(self, value):
+        return tuple(value[i] for i in range(len(value)))
+
+
+class FloatArrayArrayJavaPramConverter(JavaParamConverter):
+    def to_java(self, value):
+        n = len(value)
+        m = len(value[0])
+        j_arr = get_gateway().new_array(get_gateway().jvm.java.lang.Double, n, m)
+        for i in range(n):
+            for j in range(m):
+                j_arr[i][j] = value[i][j]
+        return j_arr
+
+    def to_python(self, value):
+        n = len(value)
+        m = len(value[0])
+        arr = []
+        for i in range(n):
+            l = []
+            for j in range(m):
+                l.append(value[i][j])
+            arr.append(tuple(l))
+        return tuple(arr)
+
+
+default_converter = DefaultJavaParamConverter()
+
+_map_java_param_converter = {
+    IntArrayParam: IntArrayJavaPramConverter(),
+    FloatArrayParam: FloatArrayJavaPramConverter(),
+    FloatArrayArrayParam: FloatArrayArrayJavaPramConverter(),
+    StringArrayParam: StringArrayJavaParamConverter(),
+    Param: default_converter
+}
+
+
+def snake_to_camel(method_name):
+    output = ''.join(x.capitalize() or '_' for x in method_name.split('_'))
+    return output[0].lower() + output[1:]
 
 
 def _to_java_reference(java_class: str):
