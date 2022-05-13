@@ -450,3 +450,24 @@ class HasDecayFactor(WithParams, ABC):
     @property
     def decay_factor(self):
         return self.get(self.DECAY_FACTOR)
+
+
+class HasElasticNet(WithParams, ABC):
+    """
+    Base class for the shared decay factor param.
+    """
+    ELASTIC_NET: Param[float] = FloatParam(
+        "elastic_net",
+        "ElasticNet parameter.",
+        0.,
+        ParamValidators.in_range(0.0, 1.0))
+
+    def set_elastic_net(self, value: float):
+        return self.set(self.ELASTIC_NET, value)
+
+    def get_elastic_net(self) -> float:
+        return self.get(self.ELASTIC_NET)
+
+    @property
+    def elastic_net(self):
+        return self.get(self.ELASTIC_NET)

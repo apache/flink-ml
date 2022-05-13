@@ -98,7 +98,7 @@ class NaiveBayesModel(JavaClassificationModel, _NaiveBayesModelParams):
 
     @classmethod
     def _java_model_class_name(cls) -> str:
-        return "NativeBayesModel"
+        return "NaiveBayesModel"
 
 
 class NaiveBayes(JavaClassificationEstimator, _NaiveBayesParams):
