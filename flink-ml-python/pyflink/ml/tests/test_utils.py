@@ -15,6 +15,7 @@
 #  See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
+import glob
 import os
 import shutil
 import tempfile
@@ -60,3 +61,12 @@ class PyFlinkMLTestCase(unittest.TestCase):
         for file in os.listdir(FLINK_ML_LIB_PATH):
             if file.endswith('.jar'):
                 self.env.add_classpaths("file://{0}/{1}".format(FLINK_ML_LIB_PATH, file))
+
+        # load flink-ml-lib/flink-ml-lib-*-tests.jar
+        FLINK_ML_LIB_SOURCE_PATH = os.path.abspath(os.path.join(
+            this_directory, "../../../../flink-ml-lib"))
+
+        ml_test_jar = glob.glob(os.path.join(
+            FLINK_ML_LIB_SOURCE_PATH, "target", "flink-ml-lib_*-tests.jar"))[0]
+
+        self.env.add_classpaths("file://{0}".format(ml_test_jar))

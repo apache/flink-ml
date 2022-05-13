@@ -15,17 +15,19 @@
 #  See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
+import typing
 from abc import ABC
 
+from pyflink.ml.core.param import Param, ParamValidators, FloatParam
 from pyflink.ml.core.wrapper import JavaWithParams
 from pyflink.ml.lib.classification.common import (JavaClassificationModel,
                                                   JavaClassificationEstimator)
-from pyflink.ml.lib.param import (HasWeightCol, HasMaxIter, HasReg, HasLearningRate,
-                                  HasGlobalBatchSize, HasTol, HasMultiClass, HasFeaturesCol,
-                                  HasPredictionCol, HasRawPredictionCol, HasLabelCol, HasElasticNet)
+from pyflink.ml.lib.param import (HasFeaturesCol, HasPredictionCol, HasLabelCol,
+                                  HasRawPredictionCol, HasWeightCol, HasMaxIter, HasReg,
+                                  HasElasticNet, HasLearningRate, HasGlobalBatchSize, HasTol)
 
 
-class _LogisticRegressionModelParams(
+class _LinearSVCModelParams(
     JavaWithParams,
     HasFeaturesCol,
     HasPredictionCol,
@@ -33,15 +35,31 @@ class _LogisticRegressionModelParams(
     ABC
 ):
     """
-    Params for :class:`LogisticRegressionModel`.
+    Params for :class:`LinearSVCModel`.
     """
 
+    THRESHOLD: Param[float] = FloatParam(
+        "threshold",
+        "Threshold in binary classification prediction applied to rawPrediction.",
+        0.0,
+        ParamValidators.not_null())
+
     def __init__(self, java_params):
-        super(_LogisticRegressionModelParams, self).__init__(java_params)
+        super(_LinearSVCModelParams, self).__init__(java_params)
+
+    def set_threshold(self, value: int):
+        return typing.cast(_LinearSVCModelParams, self.set(self.THRESHOLD, value))
+
+    def get_threshold(self) -> int:
+        return self.get(self.THRESHOLD)
+
+    @property
+    def threshold(self) -> int:
+        return self.get_threshold()
 
 
-class _LogisticRegressionParams(
-    _LogisticRegressionModelParams,
+class _LinearSVCParams(
+    _LinearSVCModelParams,
     HasLabelCol,
     HasWeightCol,
     HasMaxIter,
@@ -50,51 +68,50 @@ class _LogisticRegressionParams(
     HasLearningRate,
     HasGlobalBatchSize,
     HasTol,
-    HasMultiClass
 ):
     """
-    Params for :class:`LogisticRegression`.
+    Params for :class:`LinearSVC`.
     """
 
     def __init__(self, java_params):
-        super(_LogisticRegressionParams, self).__init__(java_params)
+        super(_LinearSVCParams, self).__init__(java_params)
 
 
-class LogisticRegressionModel(JavaClassificationModel, _LogisticRegressionModelParams):
+class LinearSVCModel(JavaClassificationModel, _LinearSVCModelParams):
     """
-    A Model which classifies data using the model data computed by :class:`LogisticRegression`.
+    A Model which classifies data using the model data computed by :class:`LinearSVC`.
     """
 
     def __init__(self, java_model=None):
-        super(LogisticRegressionModel, self).__init__(java_model)
+        super(LinearSVCModel, self).__init__(java_model)
 
     @classmethod
     def _java_model_package_name(cls) -> str:
-        return "logisticregression"
+        return "linearsvc"
 
     @classmethod
     def _java_model_class_name(cls) -> str:
-        return "LogisticRegressionModel"
+        return "LinearSVCModel"
 
 
-class LogisticRegression(JavaClassificationEstimator, _LogisticRegressionParams):
+class LinearSVC(JavaClassificationEstimator, _LinearSVCParams):
     """
-    An Estimator which implements the logistic regression algorithm.
+    An Estimator which implements the linear support vector classification.
 
-    See https://en.wikipedia.org/wiki/Logistic_regression.
+    See: https://en.wikipedia.org/wiki/Support-vector_machine#Linear_SVM.
     """
 
     def __init__(self):
-        super(LogisticRegression, self).__init__()
+        super(LinearSVC, self).__init__()
 
     @classmethod
-    def _create_model(cls, java_model) -> LogisticRegressionModel:
-        return LogisticRegressionModel(java_model)
+    def _create_model(cls, java_model) -> LinearSVCModel:
+        return LinearSVCModel(java_model)
 
     @classmethod
     def _java_estimator_package_name(cls) -> str:
-        return "logisticregression"
+        return "linearsvc"
 
     @classmethod
     def _java_estimator_class_name(cls) -> str:
-        return "LogisticRegression"
+        return "LinearSVC"
