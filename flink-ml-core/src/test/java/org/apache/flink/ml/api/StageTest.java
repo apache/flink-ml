@@ -31,6 +31,7 @@ import org.apache.flink.ml.param.LongParam;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.param.ParamValidator;
 import org.apache.flink.ml.param.ParamValidators;
+import org.apache.flink.ml.param.StringArrayArrayParam;
 import org.apache.flink.ml.param.StringArrayParam;
 import org.apache.flink.ml.param.StringParam;
 import org.apache.flink.ml.param.WithParams;
@@ -100,6 +101,12 @@ public class StageTest {
 
         Param<String[]> STRING_ARRAY_PARAM =
                 new StringArrayParam("stringArrayParam", "Description", new String[] {"14", "15"});
+
+        Param<String[][]> STRING_ARRAY_ARRAY_PARAM =
+                new StringArrayArrayParam(
+                        "stringArrayArrayParam",
+                        "Description",
+                        new String[][] {new String[] {"14", "15"}});
 
         Param<Double[][]> DOUBLE_ARRAY_ARRAY_PARAM =
                 new DoubleArrayArrayParam(
@@ -333,6 +340,18 @@ public class StageTest {
                 new Double[] {50.0, 51.0}, stage.get(MyParams.DOUBLE_ARRAY_ARRAY_PARAM)[0]);
         Assert.assertArrayEquals(
                 new Double[] {52.0, 53.0}, stage.get(MyParams.DOUBLE_ARRAY_ARRAY_PARAM)[1]);
+
+        stage.set(
+                MyParams.STRING_ARRAY_ARRAY_PARAM,
+                new String[][] {
+                    new String[] {"50", "51"},
+                    new String[] {"52", "53"}
+                });
+        Assert.assertEquals(2, stage.get(MyParams.STRING_ARRAY_ARRAY_PARAM).length);
+        Assert.assertArrayEquals(
+                new String[] {"50", "51"}, stage.get(MyParams.STRING_ARRAY_ARRAY_PARAM)[0]);
+        Assert.assertArrayEquals(
+                new String[] {"52", "53"}, stage.get(MyParams.STRING_ARRAY_ARRAY_PARAM)[1]);
     }
 
     @Test
@@ -357,6 +376,12 @@ public class StageTest {
         stage.set(
                 MyParams.DOUBLE_ARRAY_ARRAY_PARAM,
                 new Double[][] {new Double[] {50.0, 51.0}, new Double[] {52.0, 53.0}});
+        stage.set(
+                MyParams.STRING_ARRAY_ARRAY_PARAM,
+                new String[][] {
+                    new String[] {"50", "51"},
+                    new String[] {"52", "53"}
+                });
 
         Stage<?> loadedStage = validateStageSaveLoad(tEnv, stage, Collections.emptyMap());
 
@@ -381,6 +406,11 @@ public class StageTest {
                 new Double[] {50.0, 51.0}, stage.get(MyParams.DOUBLE_ARRAY_ARRAY_PARAM)[0]);
         Assert.assertArrayEquals(
                 new Double[] {52.0, 53.0}, stage.get(MyParams.DOUBLE_ARRAY_ARRAY_PARAM)[1]);
+        Assert.assertEquals(2, stage.get(MyParams.STRING_ARRAY_ARRAY_PARAM).length);
+        Assert.assertArrayEquals(
+                new String[] {"50", "51"}, stage.get(MyParams.STRING_ARRAY_ARRAY_PARAM)[0]);
+        Assert.assertArrayEquals(
+                new String[] {"52", "53"}, stage.get(MyParams.STRING_ARRAY_ARRAY_PARAM)[1]);
     }
 
     @Test

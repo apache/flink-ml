@@ -45,7 +45,7 @@ public class BenchmarkTest extends AbstractTestBase {
     public void testParseJsonFile() throws Exception {
         File configFile = new File(tempFolder.newFolder().getAbsolutePath() + "/test-conf.json");
         InputStream inputStream =
-                this.getClass().getClassLoader().getResourceAsStream("benchmark-conf.json");
+                this.getClass().getClassLoader().getResourceAsStream("benchmark-demo.json");
         FileUtils.copyInputStreamToFile(inputStream, configFile);
 
         Map<String, ?> benchmarks = BenchmarkUtils.parseJsonFile(configFile.getAbsolutePath());
@@ -79,7 +79,7 @@ public class BenchmarkTest extends AbstractTestBase {
                 "paramMap",
                 new HashMap<String, Object>() {
                     {
-                        put("colNames", new String[] {"test_feature"});
+                        put("colNames", new String[][] {new String[] {"test_feature"}});
                         put("numValues", 1000L);
                         put("vectorDim", 10);
                     }

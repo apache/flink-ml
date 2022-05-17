@@ -346,8 +346,6 @@ under the License.
             <exclude>**/LICENSE*</exclude>
             <!-- artifacts created during release process -->
             <exclude>release/**</exclude>
-            <!-- Test Data. -->
-            <exclude>flink-ml-benchmark/src/main/resources/*.json</exclude>
           </excludes>
         </configuration>
       </plugin>

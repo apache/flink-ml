@@ -63,7 +63,7 @@ Then in Flink ML's binary distribution's folder, execute the following command
 to run the default benchmarks.
 
 ```bash
-./bin/benchmark-run.sh conf/benchmark-conf.json --output-file results.json
+./bin/benchmark-run.sh conf/benchmark-demo.json --output-file results.json
 ```
 
 You will notice that some Flink jobs are submitted to your Flink cluster, and
@@ -97,7 +97,7 @@ added.
       "className" : "org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator",
       "paramMap" : {
         "seed" : 2,
-        "colNames" : [ "features" ],
+        "colNames" : [["features"]],
         "numValues" : 10000,
         "vectorDim" : 10
       }
@@ -129,7 +129,7 @@ If a benchmark failed, it would be saved in the file as follows.
       "className" : "org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator",
       "paramMap" : {
         "seed" : 2,
-        "colNames" : [ "non-features" ],
+        "colNames" : [["non-features"]],
         "numValues" : 10000,
         "vectorDim" : 10
       }
@@ -146,7 +146,7 @@ If a benchmark failed, it would be saved in the file as follows.
 ### Customize Benchmark Configuration
 
 `benchmark-run.sh` parses benchmarks to be executed according to the input
-configuration file, like `conf/benchmark-conf.json`. It can also parse your
+configuration file, like `conf/benchmark-demo.json`. It can also parse your
 custom configuration file so long as it contains a JSON object in the following
 format.
 
@@ -165,8 +165,9 @@ format.
   - `"className"`: The full classpath of a `WithParams` subclass. For `"stage"`,
     the class should be a subclass of `Stage`. For `"inputs"` or `"modelData"`,
     the class should be a subclass of `DataGenerator`.
-  - `"paramMap"`: A JSON object containing the parameters related to the
-    specific `Stage` or `DataGenerator`.
+  - `"paramMap"`: An optional JSON object containing the parameters related to
+    the specific `Stage` or `DataGenerator`, overriding default values for the
+    parameters.
 
 Combining the format requirements above, an example configuration is as follows.
 This configuration contains two benchmarks. The first benchmark name is
@@ -188,7 +189,7 @@ This configuration contains two benchmarks. The first benchmark name is
       "className": "org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator",
       "paramMap": {
         "seed": 2,
-        "colNames": ["features"],
+        "colNames": [["features"]],
         "numValues": 10000,
         "vectorDim": 10
       }
@@ -216,7 +217,7 @@ This configuration contains two benchmarks. The first benchmark name is
       "className": "org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator",
       "paramMap": {
         "seed": 2,
-        "colNames": ["features"],
+        "colNames": [["features"]],
         "numValues": 10000,
         "vectorDim": 10
       }
