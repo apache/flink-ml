@@ -28,22 +28,22 @@ public class ParamValidators {
         return (value) -> true;
     }
 
-    // Check if the parameter value is greater than lowerBound.
+    // Checks if the parameter value is greater than lowerBound.
     public static <T> ParamValidator<T> gt(double lowerBound) {
         return (value) -> value != null && ((Number) value).doubleValue() > lowerBound;
     }
 
-    // Check if the parameter value is greater than or equal to lowerBound.
+    // Checks if the parameter value is greater than or equal to lowerBound.
     public static <T> ParamValidator<T> gtEq(double lowerBound) {
         return (value) -> value != null && ((Number) value).doubleValue() >= lowerBound;
     }
 
-    // Check if the parameter value is less than upperBound.
+    // Checks if the parameter value is less than upperBound.
     public static <T> ParamValidator<T> lt(double upperBound) {
         return (value) -> value != null && ((Number) value).doubleValue() < upperBound;
     }
 
-    // Check if the parameter value is less than or equal to upperBound.
+    // Checks if the parameter value is less than or equal to upperBound.
     public static <T> ParamValidator<T> ltEq(double upperBound) {
         return (value) -> value != null && ((Number) value).doubleValue() <= upperBound;
     }
@@ -71,12 +71,12 @@ public class ParamValidators {
         };
     }
 
-    // Check if the parameter value is in the range [lowerBound, upperBound].
+    // Checks if the parameter value is in the range [lowerBound, upperBound].
     public static <T> ParamValidator<T> inRange(double lowerBound, double upperBound) {
         return inRange(lowerBound, upperBound, true, true);
     }
 
-    // Check if the parameter value is in the array of allowed values.
+    // Checks if the parameter value is in the array of allowed values.
     public static <T> ParamValidator<T> inArray(T... allowed) {
         return new ParamValidator<T>() {
             @Override
@@ -86,7 +86,7 @@ public class ParamValidators {
         };
     }
 
-    // Check if the parameter value is not null.
+    // Checks if the parameter value is not null.
     public static <T> ParamValidator<T> notNull() {
         return new ParamValidator<T>() {
             @Override
@@ -96,8 +96,27 @@ public class ParamValidators {
         };
     }
 
-    // Check if the parameter value array is not empty array.
+    // Checks if the parameter value array is not empty array.
     public static <T> ParamValidator<T[]> nonEmptyArray() {
         return value -> value != null && value.length > 0;
+    }
+
+    // Checks if every element in the array-typed parameter value is in the array of allowed values.
+    @SafeVarargs
+    public static <T> ParamValidator<T[]> isSubSet(T... allowed) {
+        return new ParamValidator<T[]>() {
+            @Override
+            public boolean validate(T[] value) {
+                if (value == null) {
+                    return false;
+                }
+                for (T t : value) {
+                    if (!ArrayUtils.contains(allowed, t)) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        };
     }
 }
