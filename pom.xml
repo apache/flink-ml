@@ -62,19 +62,20 @@ under the License.
   </modules>
 
   <properties>
-    <flink.shaded.version>12.0</flink.shaded.version>
-    <scala.binary.version>2.12</scala.binary.version>
-    <jackson.version>2.10.1</jackson.version>
+    <flink.shaded.version>15.0</flink.shaded.version>
+    <jackson.version>2.12.4</jackson.version>
+    <jackson-databind.version>2.12.4</jackson-databind.version>
     <target.java.version>1.8</target.java.version>
     <spotless.version>2.4.2</spotless.version>
-    <slf4j.version>1.7.15</slf4j.version>
-    <log4j.version>2.17.1</log4j.version>
-    <junit.version>4.13.1</junit.version>
+    <slf4j.version>1.7.36</slf4j.version>
+    <statefun.version>3.2.0</statefun.version>
+    <log4j.version>2.17.2</log4j.version>
+    <junit.version>4.13.2</junit.version>
     <flink.forkCount>1C</flink.forkCount>
     <flink.reuseForks>true</flink.reuseForks>
-    <flink.version>1.14.4</flink.version>
-    <zookeeper.version>3.4.14</zookeeper.version>
-    <hadoop.version>2.8.5</hadoop.version>
+    <flink.version>1.15.0</flink.version>
+    <zookeeper.version>3.6.3</zookeeper.version>
+    <hadoop.version>2.10.1</hadoop.version>
 
     <!-- Can be set to any value to reproduce a specific build. -->
     <test.randomization.seed/>
@@ -139,6 +140,11 @@ under the License.
         <groupId>org.apache.flink</groupId>
         <artifactId>flink-shaded-zookeeper-3</artifactId>
         <version>${zookeeper.version}-${flink.shaded.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.flink</groupId>
+        <artifactId>flink-connector-files</artifactId>
+        <version>${flink.version}</version>
       </dependency>
 
       <dependency>
@@ -209,6 +215,186 @@ under the License.
         <artifactId>flink-test-utils-junit</artifactId>
         <version>${flink.version}</version>
         <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.flink</groupId>
+        <artifactId>flink-table-runtime</artifactId>
+        <version>${flink.version}</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.flink</groupId>
+        <artifactId>flink-table-planner-loader</artifactId>
+        <version>${flink.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <!-- hdfs is required for the data cache test -->
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdfs</artifactId>
+        <scope>test</scope>
+        <version>${hadoop.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-common</artifactId>
+        <scope>test</scope>
+        <version>${hadoop.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-log4j12</artifactId>
+          </exclusion>
+          <exclusion>
+            <!-- This dependency is no longer shipped with the JDK since Java 9.-->
+            <groupId>jdk.tools</groupId>
+            <artifactId>jdk.tools</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdfs</artifactId>
+        <scope>test</scope>
+        <type>test-jar</type>
+        <version>${hadoop.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-common</artifactId>
+        <scope>test</scope>
+        <type>test-jar</type>
+        <version>${hadoop.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-log4j12</artifactId>
+          </exclusion>
+          <exclusion>
+            <!-- This dependency is no longer shipped with the JDK since Java 9.-->
+            <groupId>jdk.tools</groupId>
+            <artifactId>jdk.tools</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-minicluster</artifactId>
+        <scope>test</scope>
+        <version>${hadoop.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-log4j12</artifactId>
+          </exclusion>
+          <exclusion>
+            <!-- This dependency is no longer shipped with the JDK since Java 9.-->
+            <groupId>jdk.tools</groupId>
+            <artifactId>jdk.tools</artifactId>
+          </exclusion>
+
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+        <version>${jackson-databind.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-core</artifactId>
+        <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-annotations</artifactId>
+        <version>${jackson.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

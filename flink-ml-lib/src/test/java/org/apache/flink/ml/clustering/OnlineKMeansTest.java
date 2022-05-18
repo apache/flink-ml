@@ -18,6 +18,8 @@
 
 package org.apache.flink.ml.clustering;
 
+import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.JobSubmissionResult;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.configuration.Configuration;
@@ -34,6 +36,7 @@ import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.util.InMemorySinkFunction;
 import org.apache.flink.ml.util.InMemorySourceFunction;
+import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.minicluster.MiniClusterConfiguration;
 import org.apache.flink.runtime.testutils.InMemoryReporter;
@@ -58,6 +61,9 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static org.apache.flink.ml.clustering.KMeansTest.groupFeaturesByPrediction;
 import static org.junit.Assert.assertEquals;
@@ -195,24 +201,24 @@ public class OnlineKMeansTest extends TestLogger {
     }
 
     /** Blocks the thread until Model has set up init model data. */
-    private void waitInitModelDataSetup() throws InterruptedException {
-        while (reporter.findMetrics(OnlineKMeansModel.MODEL_DATA_VERSION_GAUGE_KEY).size()
+    private void waitInitModelDataSetup(JobID jobID) throws InterruptedException {
+        while (reporter.findMetrics(jobID, OnlineKMeansModel.MODEL_DATA_VERSION_GAUGE_KEY).size()
                 < defaultParallelism) {
             Thread.sleep(100);
         }
-        waitModelDataUpdate();
+        waitModelDataUpdate(jobID);
     }
 
     /** Blocks the thread until the Model has received the next model-data-update event. */
     @SuppressWarnings("unchecked")
-    private void waitModelDataUpdate() throws InterruptedException {
+    private void waitModelDataUpdate(JobID jobID) throws InterruptedException {
         do {
             int tmpModelDataVersion =
-                    reporter.findMetrics(OnlineKMeansModel.MODEL_DATA_VERSION_GAUGE_KEY).values()
-                            .stream()
+                    reporter.findMetrics(jobID, OnlineKMeansModel.MODEL_DATA_VERSION_GAUGE_KEY)
+                            .values().stream()
                             .map(x -> Integer.parseInt(((Gauge<String>) x).getValue()))
                             .min(Integer::compareTo)
-                            .get();
+                            .orElse(0);
             if (tmpModelDataVersion == currentModelDataVersion) {
                 Thread.sleep(100);
             } else {
@@ -238,6 +244,14 @@ public class OnlineKMeansTest extends TestLogger {
         List<Set<DenseVector>> actualGroups =
                 groupFeaturesByPrediction(rawResult, featuresCol, predictionCol);
         Assert.assertTrue(CollectionUtils.isEqualCollection(expectedGroups, actualGroups));
+    }
+
+    private JobID submitJob(JobGraph jobGraph)
+            throws ExecutionException, InterruptedException, TimeoutException {
+        return miniCluster
+                .submitJob(jobGraph)
+                .thenApply(JobSubmissionResult::getJobID)
+                .get(1, TimeUnit.SECONDS);
     }
 
     @Test
@@ -279,16 +293,16 @@ public class OnlineKMeansTest extends TestLogger {
         OnlineKMeansModel onlineModel = onlineKMeans.fit(onlineTrainTable);
         transformAndOutputData(onlineModel);
 
-        miniCluster.submitJob(env.getStreamGraph().getJobGraph());
-        waitInitModelDataSetup();
+        final JobID jobID = submitJob(env.getStreamGraph().getJobGraph());
+        waitInitModelDataSetup(jobID);
 
         trainSource.addAll(trainData1);
-        waitModelDataUpdate();
+        waitModelDataUpdate(jobID);
         predictAndAssert(
                 expectedGroups1, onlineKMeans.getFeaturesCol(), onlineKMeans.getPredictionCol());
 
         trainSource.addAll(trainData2);
-        waitModelDataUpdate();
+        waitModelDataUpdate(jobID);
         predictAndAssert(
                 expectedGroups2, onlineKMeans.getFeaturesCol(), onlineKMeans.getPredictionCol());
     }
@@ -308,13 +322,13 @@ public class OnlineKMeansTest extends TestLogger {
         OnlineKMeansModel onlineModel = onlineKMeans.fit(onlineTrainTable);
         transformAndOutputData(onlineModel);
 
-        miniCluster.submitJob(env.getStreamGraph().getJobGraph());
-        waitInitModelDataSetup();
+        final JobID jobID = submitJob(env.getStreamGraph().getJobGraph());
+        waitInitModelDataSetup(jobID);
         predictAndAssert(
                 expectedGroups1, onlineKMeans.getFeaturesCol(), onlineKMeans.getPredictionCol());
 
         trainSource.addAll(trainData2);
-        waitModelDataUpdate();
+        waitModelDataUpdate(jobID);
         predictAndAssert(
                 expectedGroups2, onlineKMeans.getFeaturesCol(), onlineKMeans.getPredictionCol());
     }
@@ -334,7 +348,7 @@ public class OnlineKMeansTest extends TestLogger {
         OnlineKMeansModel onlineModel = onlineKMeans.fit(onlineTrainTable);
         transformAndOutputData(onlineModel);
 
-        miniCluster.submitJob(env.getStreamGraph().getJobGraph());
+        submitJob(env.getStreamGraph().getJobGraph());
         modelDataSink.poll();
 
         trainSource.addAll(trainData2);
@@ -395,7 +409,8 @@ public class OnlineKMeansTest extends TestLogger {
 
         String savePath = tempFolder.newFolder().getAbsolutePath();
         onlineKMeans.save(savePath);
-        miniCluster.executeJobBlocking(env.getStreamGraph().getJobGraph());
+        final JobGraph jobGraph = env.getStreamGraph().getJobGraph();
+        miniCluster.executeJobBlocking(jobGraph);
         OnlineKMeans loadedOnlineKMeans = OnlineKMeans.load(tEnv, savePath);
 
         OnlineKMeansModel onlineModel = loadedOnlineKMeans.fit(onlineTrainTable);
@@ -407,13 +422,13 @@ public class OnlineKMeansTest extends TestLogger {
 
         transformAndOutputData(loadedOnlineModel);
 
-        miniCluster.submitJob(env.getStreamGraph().getJobGraph());
-        waitInitModelDataSetup();
+        final JobID jobID = submitJob(env.getStreamGraph().getJobGraph());
+        waitInitModelDataSetup(jobID);
         predictAndAssert(
                 expectedGroups1, onlineKMeans.getFeaturesCol(), onlineKMeans.getPredictionCol());
 
         trainSource.addAll(trainData2);
-        waitModelDataUpdate();
+        waitModelDataUpdate(jobID);
         predictAndAssert(
                 expectedGroups2, onlineKMeans.getFeaturesCol(), onlineKMeans.getPredictionCol());
     }
@@ -430,7 +445,7 @@ public class OnlineKMeansTest extends TestLogger {
         OnlineKMeansModel onlineModel = onlineKMeans.fit(onlineTrainTable);
         transformAndOutputData(onlineModel);
 
-        miniCluster.submitJob(env.getStreamGraph().getJobGraph());
+        submitJob(env.getStreamGraph().getJobGraph());
         modelDataSink.poll();
 
         trainSource.addAll(trainData1);
@@ -479,15 +494,15 @@ public class OnlineKMeansTest extends TestLogger {
                         .setPredictionCol("prediction");
         transformAndOutputData(onlineModel);
 
-        miniCluster.submitJob(env.getStreamGraph().getJobGraph());
+        final JobID jobID = submitJob(env.getStreamGraph().getJobGraph());
 
         modelDataSource.addAll(modelData1);
-        waitInitModelDataSetup();
+        waitInitModelDataSetup(jobID);
         predictAndAssert(
                 expectedGroups1, onlineModel.getFeaturesCol(), onlineModel.getPredictionCol());
 
         modelDataSource.addAll(modelData2);
-        waitModelDataUpdate();
+        waitModelDataUpdate(jobID);
         predictAndAssert(
                 expectedGroups2, onlineModel.getFeaturesCol(), onlineModel.getPredictionCol());
     }

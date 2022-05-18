@@ -28,28 +28,28 @@ under the License.
         <version>2.1-SNAPSHOT</version>
     </parent>
 
-    <artifactId>flink-ml-tests_${scala.binary.version}</artifactId>
+    <artifactId>flink-ml-tests</artifactId>
     <name>Flink ML : Tests</name>
 
     <dependencies>
 
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-ml-iteration_${scala.binary.version}</artifactId>
+            <artifactId>flink-ml-iteration</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
 
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-ml-core_${scala.binary.version}</artifactId>
+            <artifactId>flink-ml-core</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
 
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-streaming-java_${scala.binary.version}</artifactId>
+            <artifactId>flink-streaming-java</artifactId>
             <version>${flink.version}</version>
             <scope>test</scope>
         </dependency>

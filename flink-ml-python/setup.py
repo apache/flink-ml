@@ -103,7 +103,7 @@ try:
         author='Apache Software Foundation',
         author_email='dev@flink.apache.org',
         python_requires='>=3.6',
-        install_requires=['apache-flink==1.14.4', 'pandas>=1.0,<1.2.0', 'jsonpickle==2.0.0',
+        install_requires=['apache-flink==1.15.0', 'pandas>=1.0,<1.2.0', 'jsonpickle==2.0.0',
                           'cloudpickle==1.2.2', 'numpy>=1.14.3,<1.20'],
         tests_require=['pytest==4.4.1'],
         description='Apache Flink ML Python API',

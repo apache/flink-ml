@@ -31,6 +31,7 @@ import org.apache.flink.util.CloseableIterator;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /** Tests data generators. */
@@ -52,6 +53,7 @@ public class DataGeneratorTest {
             Row row = it.next();
             assertEquals(row.getArity(), 1);
             DenseVector vector = (DenseVector) row.getField(generator.getColNames()[0][0]);
+            assertNotNull(vector);
             assertEquals(vector.size(), generator.getVectorDim());
             count++;
         }
@@ -107,6 +109,7 @@ public class DataGeneratorTest {
             Row row = it.next();
             count++;
             DenseVector features = (DenseVector) row.getField(featuresCol);
+            assertNotNull(features);
             for (double value : features.values) {
                 assertTrue(value >= 0);
                 assertTrue(value <= generator.getFeatureArity() - 1);
