@@ -26,7 +26,7 @@ import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.runtime.util.NonClosingInputStreamDecorator;
-import org.apache.flink.runtime.util.NonClosingOutpusStreamDecorator;
+import org.apache.flink.runtime.util.NonClosingOutputStreamDecorator;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackConsumer;
 import org.apache.flink.util.IOUtils;
 import org.apache.flink.util.function.SupplierWithException;
@@ -81,7 +81,7 @@ public class DataCacheSnapshot {
 
     public void writeTo(OutputStream checkpointOutputStream) throws IOException {
         try (DataOutputStream dos =
-                new DataOutputStream(new NonClosingOutpusStreamDecorator(checkpointOutputStream))) {
+                new DataOutputStream(new NonClosingOutputStreamDecorator(checkpointOutputStream))) {
             dos.writeInt(CURRENT_VERSION);
             dos.writeBoolean(readerPosition != null);
             if (readerPosition != null) {

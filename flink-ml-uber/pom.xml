@@ -26,7 +26,7 @@ under the License.
     <version>2.1-SNAPSHOT</version>
   </parent>
 
-  <artifactId>flink-ml-uber_${scala.binary.version}</artifactId>
+  <artifactId>flink-ml-uber</artifactId>
   <name>Flink ML : Uber</name>
   <description>
     This module contains the basic modules for writing Flink ML programs.
@@ -37,25 +37,25 @@ under the License.
   <dependencies>
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-ml-core_${scala.binary.version}</artifactId>
+      <artifactId>flink-ml-core</artifactId>
       <version>${project.version}</version>
     </dependency>
 
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-ml-iteration_${scala.binary.version}</artifactId>
+      <artifactId>flink-ml-iteration</artifactId>
       <version>${project.version}</version>
     </dependency>
 
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-ml-lib_${scala.binary.version}</artifactId>
+      <artifactId>flink-ml-lib</artifactId>
       <version>${project.version}</version>
     </dependency>
 
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-ml-benchmark_${scala.binary.version}</artifactId>
+      <artifactId>flink-ml-benchmark</artifactId>
       <version>${project.version}</version>
     </dependency>
   </dependencies>
@@ -75,10 +75,10 @@ under the License.
             <configuration>
               <artifactSet>
                 <includes combine.children="append">
-                  <include>org.apache.flink:flink-ml-core_${scala.binary.version}</include>
-                  <include>org.apache.flink:flink-ml-iteration_${scala.binary.version}</include>
-                  <include>org.apache.flink:flink-ml-lib_${scala.binary.version}</include>
-                  <include>org.apache.flink:flink-ml-benchmark_${scala.binary.version}</include>
+                  <include>org.apache.flink:flink-ml-core</include>
+                  <include>org.apache.flink:flink-ml-iteration</include>
+                  <include>org.apache.flink:flink-ml-lib</include>
+                  <include>org.apache.flink:flink-ml-benchmark</include>
                   <include>dev.ludovic.netlib:blas</include>
                 </includes>
               </artifactSet>

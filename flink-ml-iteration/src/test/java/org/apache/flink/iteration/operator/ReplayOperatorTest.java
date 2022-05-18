@@ -278,7 +278,7 @@ public class ReplayOperatorTest extends TestLogger {
                     .getConfiguration()
                     .set(
                             IterationOptions.DATA_CACHE_PATH,
-                            "file://" + tempFolder.newFolder().getAbsolutePath());
+                            tempFolder.newFolder().toPath().toAbsolutePath().toUri().toString());
             harness.getStreamTask().restore();
             return runnable.apply(harness);
         }

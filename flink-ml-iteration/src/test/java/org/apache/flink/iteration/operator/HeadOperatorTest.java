@@ -33,6 +33,7 @@ import org.apache.flink.runtime.checkpoint.CheckpointType;
 import org.apache.flink.runtime.checkpoint.TaskStateSnapshot;
 import org.apache.flink.runtime.io.network.api.CheckpointBarrier;
 import org.apache.flink.runtime.io.network.api.EndOfData;
+import org.apache.flink.runtime.io.network.api.StopMode;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.runtime.operators.coordination.OperatorEventGateway;
@@ -187,7 +188,7 @@ public class HeadOperatorTest extends TestLogger {
                                     });
 
                     // Mark the input as finished.
-                    harness.processEvent(EndOfData.INSTANCE);
+                    harness.processEvent(new EndOfData(StopMode.DRAIN));
 
                     // There should be no exception
                     taskExecuteResult.get();
@@ -703,7 +704,7 @@ public class HeadOperatorTest extends TestLogger {
                             iterationId,
                             IterationRecord.newEpochWatermark(Integer.MAX_VALUE + 1, "tail"),
                             null);
-                    harness.processEvent(EndOfData.INSTANCE);
+                    harness.processEvent(new EndOfData(StopMode.DRAIN));
                     harness.finishProcessing();
 
                     return null;

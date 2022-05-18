@@ -35,6 +35,7 @@ import org.apache.flink.runtime.checkpoint.CheckpointOptions;
 import org.apache.flink.runtime.checkpoint.CheckpointType;
 import org.apache.flink.runtime.checkpoint.TaskStateSnapshot;
 import org.apache.flink.runtime.io.network.api.EndOfData;
+import org.apache.flink.runtime.io.network.api.StopMode;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.state.CheckpointStorageLocationReference;
 import org.apache.flink.runtime.state.OperatorStateCheckpointOutputStream;
@@ -142,7 +143,7 @@ public class OneInputPerRoundWrapperOperatorTest extends TestLogger {
                                             OperatorUtils.getUniqueSenderId(operatorId, 0)))),
                     new ArrayList<>(harness.getOutput()));
 
-            harness.processEvent(EndOfData.INSTANCE, 0);
+            harness.processEvent(new EndOfData(StopMode.DRAIN), 0);
             harness.endInput();
             harness.finishProcessing();
 
