@@ -27,10 +27,10 @@ import org.apache.flink.api.common.functions.RichMapPartitionFunction;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
-import org.apache.flink.api.scala.typeutils.Types;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.api.AlgoOperator;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
@@ -200,7 +200,7 @@ public class BinaryClassificationEvaluator
 
         final String[] metricsNames = getMetricsNames();
         TypeInformation<?>[] metricTypes = new TypeInformation[metricsNames.length];
-        Arrays.fill(metricTypes, Types.DOUBLE());
+        Arrays.fill(metricTypes, Types.DOUBLE);
         RowTypeInfo outputTypeInfo = new RowTypeInfo(metricTypes, metricsNames);
 
         DataStream<Row> evalResult =

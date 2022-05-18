@@ -37,6 +37,7 @@ import org.apache.flink.util.function.SupplierWithException;
 import org.apache.flink.util.function.ThrowingConsumer;
 
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Random;
 import java.util.UUID;
@@ -110,9 +111,9 @@ public class OperatorUtils {
         String pathStr = configuration.get(IterationOptions.DATA_CACHE_PATH);
         if (pathStr == null) {
             Random random = new Random();
-            pathStr = "file://" + localSpillPaths[random.nextInt(localSpillPaths.length)];
+            final String localSpillPath = localSpillPaths[random.nextInt(localSpillPaths.length)];
+            pathStr = Paths.get(localSpillPath).toUri().toString();
         }
-
         return new Path(pathStr);
     }
 

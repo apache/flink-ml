@@ -26,7 +26,7 @@ under the License.
         <version>2.1-SNAPSHOT</version>
     </parent>
 
-    <artifactId>flink-ml-dist_${scala.binary.version}</artifactId>
+    <artifactId>flink-ml-dist</artifactId>
     <name>Flink ML : Dist</name>
     <packaging>jar</packaging>
 
@@ -36,7 +36,7 @@ under the License.
 
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-ml-uber_${scala.binary.version}</artifactId>
+            <artifactId>flink-ml-uber</artifactId>
             <version>${project.version}</version>
         </dependency>
 
@@ -45,11 +45,11 @@ under the License.
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>statefun-flink-core</artifactId>
-            <version>3.1.0</version>
+            <version>${statefun.version}</version>
             <exclusions>
                 <exclusion>
                     <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-streaming-java_2.12</artifactId>
+                    <artifactId>flink-streaming-java</artifactId>
                 </exclusion>
             </exclusions>
             <scope>compile</scope>

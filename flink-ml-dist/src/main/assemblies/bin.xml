@@ -35,7 +35,7 @@ under the License.
 
             <includes>
                 <include>org.apache.flink:statefun-flink-core</include>
-                <include>org.apache.flink:flink-ml-uber_${scala.binary.version}</include>
+                <include>org.apache.flink:flink-ml-uber</include>
             </includes>
         </dependencySet>
     </dependencySets>

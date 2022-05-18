@@ -46,7 +46,7 @@ import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StatePartitionStreamProvider;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.runtime.util.NonClosingInputStreamDecorator;
-import org.apache.flink.runtime.util.NonClosingOutpusStreamDecorator;
+import org.apache.flink.runtime.util.NonClosingOutputStreamDecorator;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator;
 import org.apache.flink.streaming.api.operators.InternalTimeServiceManager;
@@ -137,7 +137,7 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
      * path of the file used to stored the cached records. It could be local file system or remote
      * file system.
      */
-    private Path basePath;
+    private final Path basePath;
 
     /** DataCacheWriter for each input. */
     @SuppressWarnings("rawtypes")
@@ -561,7 +561,7 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
                 stateSnapshotContext.getRawOperatorStateOutput();
         checkpointOutputStream.startNewPartition();
         try (DataOutputStream dos =
-                new DataOutputStream(new NonClosingOutpusStreamDecorator(checkpointOutputStream))) {
+                new DataOutputStream(new NonClosingOutputStreamDecorator(checkpointOutputStream))) {
             dos.writeInt(numInputs);
         }
         for (int i = 0; i < numInputs; i++) {
