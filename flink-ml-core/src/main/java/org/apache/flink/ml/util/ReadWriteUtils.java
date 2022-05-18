@@ -43,6 +43,7 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.util.InstantiationUtil;
 import org.apache.flink.util.Preconditions;
 
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonParser;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.BufferedReader;
@@ -62,7 +63,8 @@ import java.util.Set;
 
 /** Utility methods for reading and writing stages. */
 public class ReadWriteUtils {
-    public static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    public static final ObjectMapper OBJECT_MAPPER =
+            new ObjectMapper().enable(JsonParser.Feature.ALLOW_COMMENTS);
 
     // A helper method that calls encodes the given parameter value to a json string. We can not
     // call param.jsonEncode(value) directly because Param::jsonEncode(...) needs the actual type
@@ -382,10 +384,12 @@ public class ReadWriteUtils {
             nameToParam.put(param.name, param);
         }
 
-        Map<String, Object> paramMap = (Map<String, Object>) jsonMap.get("paramMap");
-        for (Map.Entry<String, Object> entry : paramMap.entrySet()) {
-            Param<?> param = nameToParam.get(entry.getKey());
-            setParam(instance, param, param.jsonDecode(entry.getValue()));
+        if (jsonMap.containsKey("paramMap")) {
+            Map<String, Object> paramMap = (Map<String, Object>) jsonMap.get("paramMap");
+            for (Map.Entry<String, Object> entry : paramMap.entrySet()) {
+                Param<?> param = nameToParam.get(entry.getKey());
+                setParam(instance, param, param.jsonDecode(entry.getValue()));
+            }
         }
 
         return instance;

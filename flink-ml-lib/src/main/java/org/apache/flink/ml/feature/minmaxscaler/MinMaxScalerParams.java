@@ -37,6 +37,13 @@ public interface MinMaxScalerParams<T> extends HasInputCol<T>, HasOutputCol<T> {
                     0.0,
                     ParamValidators.notNull());
 
+    Param<Double> MAX =
+            new DoubleParam(
+                    "max",
+                    "Upper bound of the output feature range.",
+                    1.0,
+                    ParamValidators.notNull());
+
     default Double getMin() {
         return get(MIN);
     }
@@ -44,13 +51,6 @@ public interface MinMaxScalerParams<T> extends HasInputCol<T>, HasOutputCol<T> {
     default T setMin(Double value) {
         return set(MIN, value);
     }
-
-    Param<Double> MAX =
-            new DoubleParam(
-                    "max",
-                    "Upper bound of the output feature range.",
-                    1.0,
-                    ParamValidators.notNull());
 
     default Double getMax() {
         return get(MAX);

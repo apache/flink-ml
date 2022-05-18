@@ -68,8 +68,9 @@ public class DenseVectorArrayGenerator
         Schema schema = Schema.newBuilder().column("f0", DataTypes.of(DenseVector[].class)).build();
         Table dataTable = tEnv.fromDataStream(dataStream, schema);
         if (getColNames() != null) {
-            Preconditions.checkState(getColNames().length > 0);
-            dataTable = dataTable.as(getColNames()[0]);
+            Preconditions.checkState(getColNames().length == 1);
+            Preconditions.checkState(getColNames()[0].length == 1);
+            dataTable = dataTable.as(getColNames()[0][0]);
         }
 
         return new Table[] {dataTable};
