@@ -21,33 +21,9 @@ from abc import ABC, abstractmethod
 from typing import Union, Sized
 
 import numpy as np
-from py4j.java_gateway import JavaObject, get_java_class
 from pyflink.common import TypeInformation
-from pyflink.common import typeinfo
-from pyflink.common.typeinfo import _from_java_type, _is_instance_of
 from pyflink.fn_execution.stream_slow import OutputStream, InputStream
 from pyflink.java_gateway import get_gateway
-
-_from_java_type_alias = _from_java_type
-
-
-def _from_java_type_wrapper(j_type_info: JavaObject) -> TypeInformation:
-    gateway = get_gateway()
-    JGenericTypeInfo = gateway.jvm.org.apache.flink.api.java.typeutils.GenericTypeInfo
-    if _is_instance_of(j_type_info, JGenericTypeInfo):
-        JClass = j_type_info.getTypeClass()
-        if JClass == get_java_class(gateway.jvm.org.apache.flink.ml.linalg.DenseVector):
-            return DenseVectorTypeInfo()
-        elif JClass == get_java_class(gateway.jvm.org.apache.flink.ml.linalg.SparseVector):
-            return SparseVectorTypeInfo()
-        elif JClass == get_java_class(gateway.jvm.org.apache.flink.ml.linalg.DenseMatrix):
-            return DenseMatrixTypeInfo()
-        elif JClass == get_java_class(gateway.jvm.org.apache.flink.ml.linalg.Vector):
-            return VectorTypeInfo()
-    return _from_java_type_alias(j_type_info)
-
-
-typeinfo._from_java_type = _from_java_type_wrapper
 
 
 class VectorTypeInfo(TypeInformation):
