@@ -67,7 +67,9 @@ Below are parameters required by `LogisticRegressionModel`.
 | multiClass      | `"auto"`  | String  | no       | Classification type. Supported values: "auto", "binomial", "multinomial" |
 
 ## Examples
+{{< tabs logisticregression >}}
 
+{{< tab "Java">}}
 ```java
 import org.apache.flink.ml.classification.logisticregression.LogisticRegression;
 import org.apache.flink.ml.linalg.DenseVector;
@@ -105,4 +107,64 @@ Table output = model.transform(binomialDataTable)[0];
 
 output.execute().print();
 ```
+{{< /tab>}}
 
+{{< tab "Python">}}
+```python
+from pyflink.common import Types
+from pyflink.table import StreamTableEnvironment
+
+from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
+from pyflink.ml.lib.classification.logisticregression import LogisticRegression
+
+# create a new StreamExecutionEnvironment
+env = StreamExecutionEnvironment.get_execution_environment()
+
+# load flink ml jar
+env.add_jars("file:///{path}/statefun-flink-core-3.1.0.jar;file:///{path}/flink-ml-uber-{version}.jar")
+
+# create a StreamTableEnvironment
+t_env = StreamTableEnvironment.create(env)
+
+binomial_data_table = t_env.from_data_stream(
+    env.from_collection([
+        (Vectors.dense([1, 2, 3, 4]), 0., 1.),
+        (Vectors.dense([2, 2, 3, 4]), 0., 2.),
+        (Vectors.dense([3, 2, 3, 4]), 0., 3.),
+        (Vectors.dense([4, 2, 3, 4]), 0., 4.),
+        (Vectors.dense([5, 2, 3, 4]), 0., 5.),
+        (Vectors.dense([11, 2, 3, 4]), 1., 1.),
+        (Vectors.dense([12, 2, 3, 4]), 1., 2.),
+        (Vectors.dense([13, 2, 3, 4]), 1., 3.),
+        (Vectors.dense([14, 2, 3, 4]), 1., 4.),
+        (Vectors.dense([15, 2, 3, 4]), 1., 5.),
+    ],
+        type_info=Types.ROW_NAMED(
+            ['features', 'label', 'weight'],
+            [DenseVectorTypeInfo(), Types.DOUBLE(), Types.DOUBLE()])
+    ))
+
+logistic_regression = LogisticRegression().set_weight_col('weight')
+model = logistic_regression.fit(binomial_data_table)
+output = model.transform(binomial_data_table)[0]
+
+output.execute().print()
+
+# output
+# +----+--------------------------------+--------------------------------+--------------------------------+--------------------------------+--------------------------------+
+# | op |                       features |                          label |                         weight |                     prediction |                  rawPrediction |
+# +----+--------------------------------+--------------------------------+--------------------------------+--------------------------------+--------------------------------+
+# | +I |           [1.0, 2.0, 3.0, 4.0] |                            0.0 |                            1.0 |                            0.0 | [0.9731815427669942, 0.0268... |
+# | +I |           [5.0, 2.0, 3.0, 4.0] |                            0.0 |                            5.0 |                            0.0 | [0.8158018538556746, 0.1841... |
+# | +I |          [14.0, 2.0, 3.0, 4.0] |                            1.0 |                            4.0 |                            1.0 | [0.03753179912156068, 0.962... |
+# | +I |           [3.0, 2.0, 3.0, 4.0] |                            0.0 |                            3.0 |                            0.0 | [0.926886620226911, 0.07311... |
+# | +I |          [12.0, 2.0, 3.0, 4.0] |                            1.0 |                            2.0 |                            1.0 | [0.10041228069167174, 0.899... |
+# | +I |           [4.0, 2.0, 3.0, 4.0] |                            0.0 |                            4.0 |                            0.0 | [0.8822580948141717, 0.1177... |
+# | +I |          [13.0, 2.0, 3.0, 4.0] |                            1.0 |                            3.0 |                            1.0 | [0.061891528893188164, 0.93... |
+# | +I |           [2.0, 2.0, 3.0, 4.0] |                            0.0 |                            2.0 |                            0.0 | [0.9554533965544176, 0.0445... |
+# | +I |          [11.0, 2.0, 3.0, 4.0] |                            1.0 |                            1.0 |                            1.0 | [0.15884837044317868, 0.841... |
+# | +I |          [15.0, 2.0, 3.0, 4.0] |                            1.0 |                            5.0 |                            1.0 | [0.022529496926532833, 0.97... |
+# +----+--------------------------------+--------------------------------+--------------------------------+--------------------------------+--------------------------------+
+```
+{{< /tab>}}
+{{< /tabs>}}

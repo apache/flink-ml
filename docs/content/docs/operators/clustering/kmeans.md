@@ -60,6 +60,9 @@ Below are parameters required by `KMeansModel`.
 
 ## Examples
 
+{{< tabs kmeans >}}
+
+{{< tab "Java">}}
 ```java
 import org.apache.flink.ml.clustering.kmeans.KMeans;
 import org.apache.flink.ml.clustering.kmeans.KMeansModel;
@@ -96,3 +99,57 @@ for (CloseableIterator<Row> it = output.execute().collect(); it.hasNext(); ) {
   System.out.println("Vector: " + vector + "\tCluster ID: " + clusterId);
 }
 ```
+{{< /tab>}}
+
+{{< tab "Python">}}
+```python
+from pyflink.common import Types
+from pyflink.table import StreamTableEnvironment
+
+from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
+from pyflink.ml.lib.clustering.kmeans import KMeans
+
+# create a new StreamExecutionEnvironment
+env = StreamExecutionEnvironment.get_execution_environment()
+
+# load flink ml jar
+env.add_jars("file:///{path}/statefun-flink-core-3.1.0.jar;file:///{path}/flink-ml-uber-{version}.jar")
+
+# create a StreamTableEnvironment
+t_env = StreamTableEnvironment.create(env)
+
+data_table = t_env.from_data_stream(
+    env.from_collection([
+        (Vectors.dense([0.0, 0.0]),),
+        (Vectors.dense([0.0, 0.3]),),
+        (Vectors.dense([0.3, 3.0]),),
+        (Vectors.dense([9.0, 0.0]),),
+        (Vectors.dense([9.0, 0.6]),),
+        (Vectors.dense([9.6, 0.0]),),
+    ],
+        type_info=Types.ROW_NAMED(
+            ['features'],
+            [DenseVectorTypeInfo()])))
+
+kmeans = KMeans().set_k(2).set_seed(1)
+
+model = kmeans.fit(data_table)
+
+output = model.transform(data_table)[0]
+
+output.execute().print()
+
+# output
+# +----+--------------------------------+-------------+
+# | op |                       features |  prediction |
+# +----+--------------------------------+-------------+
+# | +I |                     [9.0, 0.0] |           1 |
+# | +I |                     [0.0, 0.0] |           0 |
+# | +I |                     [9.0, 0.6] |           1 |
+# | +I |                     [0.3, 3.0] |           0 |
+# | +I |                     [0.0, 0.3] |           0 |
+# | +I |                     [9.6, 0.0] |           1 |
+# +----+--------------------------------+-------------+
+```
+{{< /tab>}}
+{{< /tabs>}}
