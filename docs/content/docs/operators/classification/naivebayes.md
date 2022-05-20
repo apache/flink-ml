@@ -60,6 +60,9 @@ Below are parameters required by `NaiveBayesModel`.
 
 ## Examples
 
+{{< tabs naivebayes >}}
+
+{{< tab "Java">}}
 ```java
 import org.apache.flink.ml.classification.naivebayes.NaiveBayes;
 import org.apache.flink.ml.classification.naivebayes.NaiveBayesModel;
@@ -95,6 +98,69 @@ Table outputTable = model.transform(predictTable)[0];
 
 outputTable.execute().print();
 ```
+{{< /tab>}}
 
 
+{{< tab "Python">}}
+```python
+from pyflink.common import Types
+from pyflink.table import StreamTableEnvironment
 
+from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
+from pyflink.ml.lib.classification.naivebayes import NaiveBayes
+
+# create a new StreamExecutionEnvironment
+env = StreamExecutionEnvironment.get_execution_environment()
+
+# load flink ml jar
+env.add_jars("file:///{path}/statefun-flink-core-3.1.0.jar", "file:///{path}/flink-ml-uber-{version}.jar")
+
+# create a StreamTableEnvironment
+t_env = StreamTableEnvironment.create(env)
+
+train_table = t_env.from_data_stream(
+    env.from_collection([
+        (Vectors.dense([0, 0.]), 11.),
+        (Vectors.dense([1, 0]), 10.),
+        (Vectors.dense([1, 1.]), 10.),
+    ],
+        type_info=Types.ROW_NAMED(
+            ['features', 'label'],
+            [DenseVectorTypeInfo(), Types.DOUBLE()])))
+
+predict_table = t_env.from_data_stream(
+    env.from_collection([
+        (Vectors.dense([0, 1.]),),
+        (Vectors.dense([0, 0.]),),
+        (Vectors.dense([1, 0]),),
+        (Vectors.dense([1, 1.]),),
+    ],
+        type_info=Types.ROW_NAMED(
+            ['features'],
+            [DenseVectorTypeInfo()])))
+
+estimator = (NaiveBayes()
+             .set_smoothing(1.0)
+             .set_features_col('features')
+             .set_label_col('label')
+             .set_prediction_col('prediction')
+             .set_model_type('multinomial'))
+
+model = estimator.fit(train_table)
+output = model.transform(predict_table)[0]
+
+output.execute().print()
+
+# output
+# +----+--------------------------------+--------------------------------+
+# | op |                       features |                     prediction |
+# +----+--------------------------------+--------------------------------+
+# | +I |                     [0.0, 1.0] |                           11.0 |
+# | +I |                     [0.0, 0.0] |                           11.0 |
+# | +I |                     [1.0, 0.0] |                           10.0 |
+# | +I |                     [1.0, 1.0] |                           10.0 |
+# +----+--------------------------------+--------------------------------+
+
+```
+{{< /tab>}}
+{{< /tabs>}}

@@ -40,6 +40,9 @@ location in the vector.
 Flink ML also has a class named `Vectors` providing utility methods for
 instantiating vectors.
 
+{{< tabs vector >}}
+
+{{< tab "Java">}}
 ```java
 int n = 4;
 int[] indices = new int[] {0, 2, 3};
@@ -47,3 +50,25 @@ double[] values = new double[] {0.1, 0.3, 0.4};
 
 SparseVector vector = Vectors.sparse(n, indices, values);
 ```
+{{< /tab>}}
+
+{{< tab "Python">}}
+```python
+# Create a dense vector of 64-bit floats from a Python list or numbers.
+>>> Vectors.dense([1, 2, 3])
+DenseVector([1.0, 2.0, 3.0])
+>>> Vectors.dense(1.0, 2.0)
+DenseVector([1.0, 2.0])
+
+# Create a sparse vector, using either a dict, a list of (index, value) pairs, or two separate
+# arrays of indices and values.
+
+>>> Vectors.sparse(4, {1: 1.0, 3: 5.5})
+SparseVector(4, {1: 1.0, 3: 5.5})
+>>> Vectors.sparse(4, [(1, 1.0), (3, 5.5)])
+SparseVector(4, {1: 1.0, 3: 5.5})
+>>> Vectors.sparse(4, [1, 3], [1.0, 5.5])
+SparseVector(4, {1: 1.0, 3: 5.5})
+```
+{{< /tab>}}
+{{< /tabs>}}

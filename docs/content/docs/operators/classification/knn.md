@@ -61,6 +61,9 @@ Below are parameters required by `KnnModel`.
 
 ## Examples
 
+{{< tabs knn >}}
+
+{{< tab "Java">}}
 ```java
 import org.apache.flink.ml.classification.knn.Knn;
 import org.apache.flink.ml.classification.knn.KnnModel;
@@ -113,4 +116,75 @@ Table output = knnModel.transform(predictData)[0];
 
 output.execute().print();
 ```
+{{< /tab>}}
+
+{{< tab "Python">}}
+```python
+from pyflink.common import Types
+from pyflink.table import StreamTableEnvironment
+
+from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
+from pyflink.ml.lib.classification.knn import KNN
+
+# create a new StreamExecutionEnvironment
+env = StreamExecutionEnvironment.get_execution_environment()
+
+# load flink ml jar
+env.add_jars("file:///{path}/statefun-flink-core-3.1.0.jar", "file:///{path}/flink-ml-uber-{version}.jar")
+
+# create a StreamTableEnvironment
+t_env = StreamTableEnvironment.create(env)
+
+train_data = t_env.from_data_stream(
+    env.from_collection([
+        (Vectors.dense([2.0, 3.0]), 1.0),
+        (Vectors.dense([2.1, 3.1]), 1.0),
+        (Vectors.dense([200.1, 300.1]), 2.0),
+        (Vectors.dense([200.2, 300.2]), 2.0),
+        (Vectors.dense([200.3, 300.3]), 2.0),
+        (Vectors.dense([200.4, 300.4]), 2.0),
+        (Vectors.dense([200.4, 300.4]), 2.0),
+        (Vectors.dense([200.6, 300.6]), 2.0),
+        (Vectors.dense([2.1, 3.1]), 1.0),
+        (Vectors.dense([2.1, 3.1]), 1.0),
+        (Vectors.dense([2.1, 3.1]), 1.0),
+        (Vectors.dense([2.1, 3.1]), 1.0),
+        (Vectors.dense([2.3, 3.2]), 1.0),
+        (Vectors.dense([2.3, 3.2]), 1.0),
+        (Vectors.dense([2.8, 3.2]), 3.0),
+        (Vectors.dense([300., 3.2]), 4.0),
+        (Vectors.dense([2.2, 3.2]), 1.0),
+        (Vectors.dense([2.4, 3.2]), 5.0),
+        (Vectors.dense([2.5, 3.2]), 5.0),
+        (Vectors.dense([2.5, 3.2]), 5.0),
+        (Vectors.dense([2.1, 3.1]), 1.0)
+    ],
+        type_info=Types.ROW_NAMED(
+            ['features', 'label'],
+            [DenseVectorTypeInfo(), Types.DOUBLE()])))
+
+predict_data = t_env.from_data_stream(
+    env.from_collection([
+        (Vectors.dense([4.0, 4.1]), 5.0),
+        (Vectors.dense([300, 42]), 2.0),
+    ],
+        type_info=Types.ROW_NAMED(
+            ['features', 'label'],
+            [DenseVectorTypeInfo(), Types.DOUBLE()])))
+
+knn = KNN()
+model = knn.fit(train_data)
+output = model.transform(predict_data)[0]
+output.execute().print()
+
+# output
+# +----+--------------------------------+--------------------------------+--------------------------------+
+# | op |                       features |                          label |                     prediction |
+# +----+--------------------------------+--------------------------------+--------------------------------+
+# | +I |                     [4.0, 4.1] |                            5.0 |                            5.0 |
+# | +I |                  [300.0, 42.0] |                            2.0 |                            2.0 |
+# +----+--------------------------------+--------------------------------+--------------------------------+
+```
+{{< /tab>}}
+{{< /tabs>}}
 

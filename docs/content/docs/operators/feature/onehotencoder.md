@@ -58,6 +58,9 @@ output vector column for each input column.
 
 ## Examples
 
+{{< tabs onehotencoder >}}
+
+{{< tab "Java">}}
 ```java
 import org.apache.flink.ml.feature.onehotencoder.OneHotEncoder;
 import org.apache.flink.ml.feature.onehotencoder.OneHotEncoderModel;
@@ -74,6 +77,54 @@ Table outputTable = model.transform(predictTable)[0];
 
 outputTable.execute().print();
 ```
+{{< /tab>}}
+
+{{< tab "Python">}}
+```python
+from pyflink.common import Types, Row
+from pyflink.table import StreamTableEnvironment, Table, DataTypes
+
+from pyflink.ml.lib.feature.onehotencoder import OneHotEncoder, OneHotEncoderModel
+
+# create a new StreamExecutionEnvironment
+env = StreamExecutionEnvironment.get_execution_environment()
+
+# load flink ml jar
+env.add_jars("file:///{path}/statefun-flink-core-3.1.0.jar", "file:///{path}/flink-ml-uber-{version}.jar")
+
+# create a StreamTableEnvironment
+t_env = StreamTableEnvironment.create(env)
+
+train_table = t_env.from_elements(
+    [Row(0.0), Row(1.0), Row(2.0), Row(0.0)],
+    DataTypes.ROW([
+        DataTypes.FIELD("input", DataTypes.DOUBLE())
+    ]))
+
+predict_table = t_env.from_elements(
+    [Row(0.0), Row(1.0), Row(2.0)],
+    DataTypes.ROW([
+        DataTypes.FIELD("input", DataTypes.DOUBLE())
+    ]))
+
+estimator = OneHotEncoder().set_input_cols('input').set_output_cols('output')
+model = estimator.fit(train_table)
+output_table = model.transform(predict_table)[0]
+
+output_table.execute().print()
+
+# output
+# +----+--------------------------------+--------------------------------+
+# | op |                          input |                         output |
+# +----+--------------------------------+--------------------------------+
+# | +I |                            0.0 |                (2, [0], [1.0]) |
+# | +I |                            1.0 |                (2, [1], [1.0]) |
+# | +I |                            2.0 |                    (2, [], []) |
+# +----+--------------------------------+--------------------------------+
+
+```
+{{< /tab>}}
+{{< /tabs>}}
 
 
 
