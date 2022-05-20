@@ -113,7 +113,7 @@ from pyflink.ml.lib.clustering.kmeans import KMeans
 env = StreamExecutionEnvironment.get_execution_environment()
 
 # load flink ml jar
-env.add_jars("file:///{path}/statefun-flink-core-3.1.0.jar;file:///{path}/flink-ml-uber-{version}.jar")
+env.add_jars("file:///{path}/statefun-flink-core-3.1.0.jar", "file:///{path}/flink-ml-uber-{version}.jar")
 
 # create a StreamTableEnvironment
 t_env = StreamTableEnvironment.create(env)
