@@ -20,8 +20,8 @@ package org.apache.flink.ml.evaluation;
 
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.ml.evaluation.binaryclassfication.BinaryClassificationEvaluator;
-import org.apache.flink.ml.evaluation.binaryclassfication.BinaryClassificationEvaluatorParams;
+import org.apache.flink.ml.evaluation.binaryclassification.BinaryClassificationEvaluator;
+import org.apache.flink.ml.evaluation.binaryclassification.BinaryClassificationEvaluatorParams;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.StageTestUtils;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;

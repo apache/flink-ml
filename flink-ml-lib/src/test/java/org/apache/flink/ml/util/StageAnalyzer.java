@@ -20,7 +20,7 @@ package org.apache.flink.ml.util;
 
 import org.apache.flink.client.ClientUtils;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.ml.api.Transformer;
+import org.apache.flink.ml.api.Stage;
 import org.apache.flink.util.JarUtils;
 
 import java.io.File;
@@ -38,7 +38,7 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
 /** Utils to analyze the stage defined in the jar. */
-public class TransformerAnalyzer {
+public class StageAnalyzer {
 
     private static final String CLASS_EXTENSION = ".class";
 
@@ -52,10 +52,10 @@ public class TransformerAnalyzer {
                 ClientUtils.buildUserCodeClassLoader(
                         Collections.singletonList(jarURL),
                         Collections.emptyList(),
-                        TransformerAnalyzer.class.getClassLoader(),
+                        StageAnalyzer.class.getClassLoader(),
                         new Configuration());
 
-        List<String> transformers = new ArrayList<>();
+        List<String> stages = new ArrayList<>();
         while (entries.hasMoreElements()) {
             JarEntry jarEntry = entries.nextElement();
 
@@ -65,14 +65,14 @@ public class TransformerAnalyzer {
 
             Optional<Class<?>> optionalClass = loadClass(jarEntry, loader);
 
-            if (!optionalClass.map(TransformerAnalyzer::isInstantiableTransformer).orElse(false)) {
+            if (!optionalClass.map(StageAnalyzer::isInstantiableStage).orElse(false)) {
                 continue;
             }
 
             Class<?> clazz = optionalClass.get();
-            transformers.add(clazz.getName());
+            stages.add(clazz.getName());
         }
-        return transformers;
+        return stages;
     }
 
     private static boolean isNotClass(JarEntry jarEntry) {
@@ -95,8 +95,8 @@ public class TransformerAnalyzer {
         }
     }
 
-    private static boolean isInstantiableTransformer(Class<?> clazz) {
-        if (!Transformer.class.isAssignableFrom(clazz)) {
+    private static boolean isInstantiableStage(Class<?> clazz) {
+        if (!Stage.class.isAssignableFrom(clazz)) {
             return false;
         }
         // check that class is non-abstract and public

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.evaluation.binaryclassfication;
+package org.apache.flink.ml.evaluation.binaryclassification;
 
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.MapPartitionFunction;
@@ -70,7 +70,7 @@ import java.util.Map;
 import java.util.Random;
 
 /**
- * An Estimator which calculates the evaluation metrics for binary classification. The input data
+ * An AlgoOperator which calculates the evaluation metrics for binary classification. The input data
  * has columns rawPrediction, label and an optional weight column. The rawPrediction can be of type
  * double (binary 0/1 prediction, or probability of label 1) or of type vector (length-2 vector of
  * raw predictions, scores, or label probabilities). The output may contain different metrics which

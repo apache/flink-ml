@@ -19,3 +19,4 @@ target
 *.pyc
 flink-ml-python/dist/
 flink-ml-python/apache_flink_ml.egg-info/
+flink-ml-python/venv/

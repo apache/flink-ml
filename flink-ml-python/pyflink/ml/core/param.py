@@ -228,6 +228,24 @@ class ParamValidators(object):
 
         return NonEmptyArray()
 
+    @staticmethod
+    def is_sub_set(allowed: Union[Tuple[T], List[T]]) -> ParamValidator[List[T]]:
+        """
+        Checks if every element in the array-typed parameter value is in the array of allowed
+        values.
+        """
+
+        class IsSubSet(ParamValidator[List[T]]):
+            def validate(self, value: List[T]) -> bool:
+                if value is None:
+                    return False
+                for t in value:
+                    if t not in allowed:
+                        return False
+                return True
+
+        return IsSubSet()
+
 
 class Param(Generic[T]):
     """
