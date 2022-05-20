@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.evaluation.binaryclassfication;
+package org.apache.flink.ml.evaluation.binaryclassification;
 
 import org.apache.flink.ml.common.param.HasLabelCol;
 import org.apache.flink.ml.common.param.HasRawPredictionCol;

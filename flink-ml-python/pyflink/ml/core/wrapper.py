@@ -122,7 +122,10 @@ class JavaAlgoOperator(AlgoOperator, JavaStage, ABC):
     """
 
     def __init__(self, java_algo_operator):
-        super(JavaAlgoOperator, self).__init__(java_algo_operator)
+        if java_algo_operator is None:
+            super(JavaAlgoOperator, self).__init__(_to_java_reference(self._java_stage_path())())
+        else:
+            super(JavaAlgoOperator, self).__init__(java_algo_operator)
 
     def transform(self, *inputs: Table) -> List[Table]:
         results = self._java_obj.transform(_to_java_tables(*inputs))
@@ -135,10 +138,7 @@ class JavaTransformer(Transformer, JavaAlgoOperator, ABC):
     """
 
     def __init__(self, java_transformer):
-        if java_transformer is None:
-            super(JavaTransformer, self).__init__(_to_java_reference(self._java_stage_path())())
-        else:
-            super(JavaTransformer, self).__init__(java_transformer)
+        super(JavaTransformer, self).__init__(java_transformer)
 
 
 class JavaModel(Model, JavaTransformer, ABC):

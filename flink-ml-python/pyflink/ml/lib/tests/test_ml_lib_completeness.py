@@ -30,20 +30,20 @@ from pyflink.java_gateway import get_gateway
 class CompletenessTest(object):
     def test_completeness(self):
         self.assertEqual(
-            self._java_transformers,
-            self._python_transformers,
+            self._java_stages,
+            self._python_stages,
             'java algorithms {0} does not match aligned python algorithms {1}'.format(
-                self._java_transformers,
-                self._python_transformers))
+                self._java_stages,
+                self._python_stages))
 
 
 class MLLibTest(PyFlinkMLTestCase):
     def setUp(self) -> None:
         super(MLLibTest, self).setUp()
-        self._java_transformers = self._load_java_transformers()
-        self._python_transformers = self._load_python_transformers()
+        self._java_stages = self._load_java_stages()
+        self._python_stages = self._load_python_stages()
 
-    def _load_java_transformers(self):
+    def _load_java_stages(self):
         this_directory = os.path.abspath(os.path.dirname(__file__))
         FLINK_ML_LIB_SOURCE_PATH = os.path.abspath(os.path.join(
             this_directory, "../../../../../flink-ml-lib"))
@@ -51,24 +51,26 @@ class MLLibTest(PyFlinkMLTestCase):
         ml_lib_jar = glob.glob(os.path.join(
             FLINK_ML_LIB_SOURCE_PATH, "target", "flink-ml-lib_*-SNAPSHOT.jar"))[0]
 
-        TransformerAnalyzer = get_gateway().jvm.org.apache.flink.ml.util.TransformerAnalyzer
-        return sorted([transformer for transformer in TransformerAnalyzer.analyzeLibJars(ml_lib_jar)
-                       if 'org.apache.flink.ml.{0}.'.format(self.module_name()) in transformer])
+        StageAnalyzer = get_gateway().jvm.org.apache.flink.ml.util.StageAnalyzer
+        return sorted([stage for stage in StageAnalyzer.analyzeLibJars(ml_lib_jar)
+                       if 'org.apache.flink.ml.{0}.'.format(self.module_name()) in stage])
 
-    def _load_python_transformers(self):
+    def _load_python_stages(self):
         modules = [importlib.import_module('.'.join([self.module().__name__, file_name]))
                    for _, file_name, _ in pkgutil.walk_packages(self.module().__path__)
                    if 'tests' not in file_name and 'common' not in file_name]
-        return sorted([transformer._java_stage_path() for name, transformer in
-                       sum([self._load_transformers_from_module(module) for module in modules],
+        return sorted([stage._java_stage_path() for name, stage in
+                       sum([self._load_stages_from_module(module) for module in modules],
                            [])])
 
     @classmethod
-    def _load_transformers_from_module(cls, module):
+    def _load_stages_from_module(cls, module):
         return [(name, obj) for name, obj in module.__dict__.items()
-                if hasattr(obj, 'transform') and name not in (
-                    'JavaClassificationModel', 'JavaClusteringModel', 'JavaFeatureTransformer',
-                    'JavaFeatureModel')]
+                if hasattr(obj, '_java_stage_path') and name not in (
+                    'JavaClassificationEstimator', 'JavaClassificationModel',
+                    'JavaClusteringEstimator', 'JavaClusteringModel',
+                    'JavaEvaluationAlgoOperator', 'JavaFeatureTransformer',
+                    'JavaFeatureEstimator', 'JavaFeatureModel')]
 
     @abstractmethod
     def module_name(self):
@@ -96,6 +98,16 @@ class ClusteringCompletenessTest(CompletenessTest, MLLibTest):
     def module(self):
         from pyflink.ml.lib import clustering
         return clustering
+
+
+class EvaluationCompletenessTest(CompletenessTest, MLLibTest):
+
+    def module_name(self):
+        return "evaluation"
+
+    def module(self):
+        from pyflink.ml.lib import evaluation
+        return evaluation
 
 
 class FeatureCompletenessTest(CompletenessTest, MLLibTest):
