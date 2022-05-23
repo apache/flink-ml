@@ -26,6 +26,7 @@ import org.apache.flink.ml.common.lossfunc.BinaryLogisticLoss;
 import org.apache.flink.ml.common.optimizer.Optimizer;
 import org.apache.flink.ml.common.optimizer.SGD;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -72,8 +73,11 @@ public class LogisticRegression
                                     double weight =
                                             getWeightCol() == null
                                                     ? 1.0
-                                                    : (Double) dataPoint.getField(getWeightCol());
-                                    double label = (Double) dataPoint.getField(getLabelCol());
+                                                    : ((Number) dataPoint.getField(getWeightCol()))
+                                                            .doubleValue();
+                                    double label =
+                                            ((Number) dataPoint.getField(getLabelCol()))
+                                                    .doubleValue();
                                     boolean isBinomial =
                                             Double.compare(0., label) == 0
                                                     || Double.compare(1., label) == 0;
@@ -82,7 +86,8 @@ public class LogisticRegression
                                                 "Multinomial classification is not supported yet. Supported options: [auto, binomial].");
                                     }
                                     DenseVector features =
-                                            (DenseVector) dataPoint.getField(getFeaturesCol());
+                                            ((Vector) dataPoint.getField(getFeaturesCol()))
+                                                    .toDense();
                                     return new LabeledPointWithWeight(features, label, weight);
                                 });
 

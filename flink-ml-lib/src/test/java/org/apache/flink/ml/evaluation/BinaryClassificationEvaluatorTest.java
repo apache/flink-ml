@@ -22,8 +22,9 @@ import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.ml.evaluation.binaryclassification.BinaryClassificationEvaluator;
 import org.apache.flink.ml.evaluation.binaryclassification.BinaryClassificationEvaluatorParams;
+import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.util.StageTestUtils;
+import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
@@ -194,6 +195,34 @@ public class BinaryClassificationEvaluatorTest {
     }
 
     @Test
+    public void testInputTypeConversion() {
+        inputDataTable = TestUtils.convertDataTypesToSparseInt(inputDataTable);
+        assertArrayEquals(
+                new Class<?>[] {Integer.class, SparseVector.class},
+                TestUtils.getColumnDataTypes(inputDataTable));
+
+        BinaryClassificationEvaluator eval =
+                new BinaryClassificationEvaluator()
+                        .setMetricsNames(
+                                BinaryClassificationEvaluatorParams.AREA_UNDER_PR,
+                                BinaryClassificationEvaluatorParams.KS,
+                                BinaryClassificationEvaluatorParams.AREA_UNDER_ROC);
+        Table evalResult = eval.transform(inputDataTable)[0];
+        List<Row> results = IteratorUtils.toList(evalResult.execute().collect());
+        assertArrayEquals(
+                new String[] {
+                    BinaryClassificationEvaluatorParams.AREA_UNDER_PR,
+                    BinaryClassificationEvaluatorParams.KS,
+                    BinaryClassificationEvaluatorParams.AREA_UNDER_ROC
+                },
+                evalResult.getResolvedSchema().getColumnNames().toArray());
+        Row result = results.get(0);
+        for (int i = 0; i < EXPECTED_DATA.length; ++i) {
+            assertEquals(EXPECTED_DATA[i], result.getFieldAs(i), EPS);
+        }
+    }
+
+    @Test
     public void testEvaluateWithDoubleRaw() {
         BinaryClassificationEvaluator eval =
                 new BinaryClassificationEvaluator()
@@ -288,7 +317,7 @@ public class BinaryClassificationEvaluatorTest {
                                 BinaryClassificationEvaluatorParams.KS,
                                 BinaryClassificationEvaluatorParams.AREA_UNDER_ROC);
         BinaryClassificationEvaluator loadedEval =
-                StageTestUtils.saveAndReload(tEnv, eval, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(tEnv, eval, tempFolder.newFolder().getAbsolutePath());
         Table evalResult = loadedEval.transform(inputDataTable)[0];
         assertArrayEquals(
                 new String[] {

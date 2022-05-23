@@ -44,6 +44,7 @@ import org.apache.flink.ml.common.distance.DistanceMeasure;
 import org.apache.flink.ml.common.iteration.ForwardInputsOfLastRound;
 import org.apache.flink.ml.common.iteration.TerminateOnMaxIter;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -92,7 +93,7 @@ public class KMeans implements Estimator<KMeans, KMeansModel>, KMeansParams<KMea
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
         DataStream<DenseVector> points =
                 tEnv.toDataStream(inputs[0])
-                        .map(row -> (DenseVector) row.getField(getFeaturesCol()));
+                        .map(row -> ((Vector) row.getField(getFeaturesCol())).toDense());
 
         DataStream<DenseVector[]> initCentroids = selectRandomCentroids(points, getK(), getSeed());
 

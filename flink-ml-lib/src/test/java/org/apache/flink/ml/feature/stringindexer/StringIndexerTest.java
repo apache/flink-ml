@@ -22,7 +22,7 @@ import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.ml.common.param.HasHandleInvalid;
 import org.apache.flink.ml.util.ReadWriteUtils;
-import org.apache.flink.ml.util.StageTestUtils;
+import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
@@ -59,13 +59,25 @@ public class StringIndexerTest extends AbstractTestBase {
     private final String[][] expectedAlphabeticAscModelData =
             new String[][] {{"a", "b", "c", "d"}, {"-1.0", "0.0", "1.0", "2.0"}};
     private final List<Row> expectedAlphabeticAscPredictData =
-            Arrays.asList(Row.of("a", 2.0, 0, 3), Row.of("b", 1.0, 1, 2), Row.of("e", 2.0, 4, 3));
+            Arrays.asList(
+                    Row.of("a", 2.0, 0.0, 3.0),
+                    Row.of("b", 1.0, 1.0, 2.0),
+                    Row.of("e", 2.0, 4.0, 3.0));
     private final List<Row> expectedAlphabeticDescPredictData =
-            Arrays.asList(Row.of("a", 2.0, 3, 0), Row.of("b", 1.0, 2, 1), Row.of("e", 2.0, 4, 0));
+            Arrays.asList(
+                    Row.of("a", 2.0, 3.0, 0.0),
+                    Row.of("b", 1.0, 2.0, 1.0),
+                    Row.of("e", 2.0, 4.0, 0.0));
     private final List<Row> expectedFreqAscPredictData =
-            Arrays.asList(Row.of("a", 2.0, 2, 3), Row.of("b", 1.0, 3, 1), Row.of("e", 2.0, 4, 3));
+            Arrays.asList(
+                    Row.of("a", 2.0, 2.0, 3.0),
+                    Row.of("b", 1.0, 3.0, 1.0),
+                    Row.of("e", 2.0, 4.0, 3.0));
     private final List<Row> expectedFreqDescPredictData =
-            Arrays.asList(Row.of("a", 2.0, 1, 0), Row.of("b", 1.0, 0, 2), Row.of("e", 2.0, 4, 0));
+            Arrays.asList(
+                    Row.of("a", 2.0, 1.0, 0.0),
+                    Row.of("b", 1.0, 0.0, 2.0),
+                    Row.of("e", 2.0, 4.0, 0.0));
 
     @Before
     public void before() {
@@ -170,14 +182,14 @@ public class StringIndexerTest extends AbstractTestBase {
         output = stringIndexer.fit(trainTable).transform(predictTable)[0];
         predictedResult = IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect());
 
-        Set<Integer> distinctStringsCol1 = new HashSet<>();
-        Set<Integer> distinctStringsCol2 = new HashSet<>();
-        int index;
+        Set<Double> distinctStringsCol1 = new HashSet<>();
+        Set<Double> distinctStringsCol2 = new HashSet<>();
+        double index;
         for (Row r : predictedResult) {
-            index = (Integer) r.getField(2);
+            index = (Double) r.getField(2);
             distinctStringsCol1.add(index);
             assertTrue(index >= 0 && index <= 4);
-            index = (Integer) r.getField(3);
+            index = (Double) r.getField(3);
             assertTrue(index >= 0 && index <= 3);
             distinctStringsCol2.add(index);
         }
@@ -209,7 +221,7 @@ public class StringIndexerTest extends AbstractTestBase {
         stringIndexer.setHandleInvalid(StringIndexerParams.SKIP_INVALID);
         output = stringIndexer.fit(trainTable).transform(predictTable)[0];
         predictedResult = IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect());
-        expectedResult = Arrays.asList(Row.of("a", 2.0, 0, 3), Row.of("b", 1.0, 1, 2));
+        expectedResult = Arrays.asList(Row.of("a", 2.0, 0.0, 3.0), Row.of("b", 1.0, 1.0, 2.0));
         verifyPredictionResult(expectedResult, predictedResult);
 
         // Throws an exception on invalid data.
@@ -254,11 +266,11 @@ public class StringIndexerTest extends AbstractTestBase {
                         .setStringOrderType(StringIndexerParams.ALPHABET_ASC_ORDER)
                         .setHandleInvalid(StringIndexerParams.KEEP_INVALID);
         stringIndexer =
-                StageTestUtils.saveAndReload(
+                TestUtils.saveAndReload(
                         tEnv, stringIndexer, tempFolder.newFolder().getAbsolutePath());
 
         StringIndexerModel model = stringIndexer.fit(trainTable);
-        model = StageTestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+        model = TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
 
         assertEquals(
                 Collections.singletonList("stringArrays"),

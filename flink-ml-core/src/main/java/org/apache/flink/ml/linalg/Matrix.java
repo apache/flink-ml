@@ -31,4 +31,7 @@ public interface Matrix extends Serializable {
 
     /** Gets value of the (i,j) element. */
     double get(int i, int j);
+
+    /** Converts the instance to a dense matrix. */
+    DenseMatrix toDense();
 }

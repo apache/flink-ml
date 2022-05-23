@@ -26,6 +26,7 @@ import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
@@ -62,7 +63,7 @@ public class LogisticRegressionModelData {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) modelData).getTableEnvironment();
         return tEnv.toDataStream(modelData)
-                .map(x -> new LogisticRegressionModelData((DenseVector) x.getField(0)));
+                .map(x -> new LogisticRegressionModelData(((Vector) x.getField(0)).toDense()));
     }
 
     /** Data encoder for {@link LogisticRegressionModel}. */

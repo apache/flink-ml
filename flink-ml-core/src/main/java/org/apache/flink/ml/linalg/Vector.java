@@ -33,9 +33,10 @@ public interface Vector extends Serializable {
     double[] toArray();
 
     /** Converts the instance to a dense vector. */
-    default DenseVector toDense() {
-        return new DenseVector(toArray());
-    }
+    DenseVector toDense();
+
+    /** Converts the instance to a sparse vector. */
+    SparseVector toSparse();
 
     /** Makes a deep copy of the vector. */
     Vector clone();

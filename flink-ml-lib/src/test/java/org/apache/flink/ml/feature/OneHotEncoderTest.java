@@ -28,7 +28,7 @@ import org.apache.flink.ml.feature.onehotencoder.OneHotEncoderModelData;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.ReadWriteUtils;
-import org.apache.flink.ml.util.StageTestUtils;
+import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
@@ -156,6 +156,21 @@ public class OneHotEncoderTest {
     }
 
     @Test
+    public void testInputTypeConversion() throws Exception {
+        trainTable = TestUtils.convertDataTypesToSparseInt(trainTable);
+        predictTable = TestUtils.convertDataTypesToSparseInt(predictTable);
+        assertArrayEquals(new Class<?>[] {Integer.class}, TestUtils.getColumnDataTypes(trainTable));
+        assertArrayEquals(
+                new Class<?>[] {Integer.class}, TestUtils.getColumnDataTypes(predictTable));
+
+        OneHotEncoderModel model = estimator.fit(trainTable);
+        Table outputTable = model.transform(predictTable)[0];
+        Map<Double, Vector>[] actualOutput =
+                executeAndCollect(outputTable, model.getInputCols(), model.getOutputCols());
+        assertArrayEquals(expectedOutput, actualOutput);
+    }
+
+    @Test
     public void testDropLast() {
         estimator.setDropLast(false);
 
@@ -255,10 +270,9 @@ public class OneHotEncoderTest {
     @Test
     public void testSaveLoad() throws Exception {
         estimator =
-                StageTestUtils.saveAndReload(
-                        tEnv, estimator, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(tEnv, estimator, tempFolder.newFolder().getAbsolutePath());
         OneHotEncoderModel model = estimator.fit(trainTable);
-        model = StageTestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+        model = TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
         Table outputTable = model.transform(predictTable)[0];
         Map<Double, Vector>[] actualOutput =
                 executeAndCollect(outputTable, model.getInputCols(), model.getOutputCols());

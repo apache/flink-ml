@@ -29,6 +29,7 @@ import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -129,8 +130,10 @@ public class KMeansModelData {
                 .map(
                         x ->
                                 new KMeansModelData(
-                                        (DenseVector[]) x.getField(0),
-                                        (DenseVector) x.getField(1)));
+                                        Arrays.stream(((Vector[]) x.getField(0)))
+                                                .map(Vector::toDense)
+                                                .toArray(DenseVector[]::new),
+                                        ((Vector) x.getField(1)).toDense()));
     }
 
     /** Data encoder for {@link KMeansModelData}. */

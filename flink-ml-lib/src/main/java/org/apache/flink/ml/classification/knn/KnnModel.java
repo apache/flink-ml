@@ -27,6 +27,7 @@ import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.BLAS;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -145,7 +146,7 @@ public class KnnModel implements Model<KnnModel>, KnnModelParams<KnnModel> {
                                 getRuntimeContext().getBroadcastVariable(broadcastKey).get(0);
                 distanceVector = new DenseVector(knnModelData.labels.size());
             }
-            DenseVector feature = (DenseVector) row.getField(featureCol);
+            DenseVector feature = ((Vector) row.getField(featureCol)).toDense();
             double prediction = predictLabel(feature);
             return Row.join(row, Row.of(prediction));
         }

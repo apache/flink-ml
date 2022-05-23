@@ -29,6 +29,7 @@ import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
@@ -85,8 +86,8 @@ public class NaiveBayesModelData {
                                 row ->
                                         new NaiveBayesModelData(
                                                 (Map<Double, Double>[][]) row.getField(0),
-                                                (DenseVector) row.getField(1),
-                                                (DenseVector) row.getField(2)));
+                                                ((Vector) row.getField(1)).toDense(),
+                                                ((Vector) row.getField(2)).toDense()));
     }
 
     /** Data encoder for the {@link NaiveBayesModelData}. */

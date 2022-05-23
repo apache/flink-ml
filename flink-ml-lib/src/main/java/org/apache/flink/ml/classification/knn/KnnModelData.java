@@ -29,6 +29,8 @@ import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.ml.linalg.DenseMatrix;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.Matrix;
+import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.typeinfo.DenseMatrixSerializer;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -74,9 +76,9 @@ public class KnnModelData {
                 .map(
                         x ->
                                 new KnnModelData(
-                                        (DenseMatrix) x.getField(0),
-                                        (DenseVector) x.getField(1),
-                                        (DenseVector) x.getField(2)));
+                                        ((Matrix) x.getField(0)).toDense(),
+                                        ((Vector) x.getField(1)).toDense(),
+                                        ((Vector) x.getField(2)).toDense()));
     }
 
     /** Encoder for {@link KnnModelData}. */

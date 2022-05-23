@@ -82,4 +82,9 @@ public class DenseMatrix implements Matrix {
         Preconditions.checkArgument(i >= 0 && i < numRows && j >= 0 && j < numCols);
         return values[numRows * j + i];
     }
+
+    @Override
+    public DenseMatrix toDense() {
+        return this;
+    }
 }

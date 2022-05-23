@@ -52,6 +52,35 @@ public class DenseVector implements Vector {
     }
 
     @Override
+    public DenseVector toDense() {
+        return this;
+    }
+
+    @Override
+    public SparseVector toSparse() {
+        int numNonZeros = 0;
+        for (double value : values) {
+            if (value != 0.0) {
+                numNonZeros++;
+            }
+        }
+
+        int[] nonZeroIndices = new int[numNonZeros];
+        double[] numZeroValues = new double[numNonZeros];
+        int k = 0;
+        for (int i = 0; i < values.length; i++) {
+            if (values[i] == 0.0) {
+                continue;
+            }
+            nonZeroIndices[k] = i;
+            numZeroValues[k] = values[i];
+            k++;
+        }
+
+        return new SparseVector(size(), nonZeroIndices, numZeroValues);
+    }
+
+    @Override
     public String toString() {
         return Arrays.toString(values);
     }

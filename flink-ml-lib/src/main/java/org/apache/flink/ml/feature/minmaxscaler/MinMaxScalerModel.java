@@ -25,6 +25,7 @@ import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -166,7 +167,7 @@ public class MinMaxScalerModel
                     }
                 }
             }
-            DenseVector inputVec = (DenseVector) row.getField(inputCol);
+            DenseVector inputVec = ((Vector) row.getField(inputCol)).toDense();
             DenseVector outputVec = new DenseVector(scaleVector.size());
             for (int i = 0; i < scaleVector.size(); ++i) {
                 outputVec.values[i] =

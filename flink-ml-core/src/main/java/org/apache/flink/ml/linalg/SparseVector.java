@@ -66,6 +66,16 @@ public class SparseVector implements Vector {
     }
 
     @Override
+    public DenseVector toDense() {
+        return new DenseVector(toArray());
+    }
+
+    @Override
+    public SparseVector toSparse() {
+        return this;
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;

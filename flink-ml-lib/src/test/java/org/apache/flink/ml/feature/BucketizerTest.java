@@ -22,7 +22,7 @@ import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.ml.common.param.HasHandleInvalid;
 import org.apache.flink.ml.feature.bucketizer.Bucketizer;
-import org.apache.flink.ml.util.StageTestUtils;
+import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
@@ -68,9 +68,13 @@ public class BucketizerTest extends AbstractTestBase {
             };
 
     private final List<Row> expectedKeepResult =
-            Arrays.asList(Row.of(1, 0, 1, 0, 0), Row.of(2, 2, 1, 1, 0), Row.of(3, 2, 0, 0, 1));
+            Arrays.asList(
+                    Row.of(1, 0.0, 1.0, 0.0, 0.0),
+                    Row.of(2, 2.0, 1.0, 1.0, 0.0),
+                    Row.of(3, 2.0, 0.0, 0.0, 1.0));
 
-    private final List<Row> expectedSkipResult = Collections.singletonList(Row.of(1, 0, 1, 0, 0));
+    private final List<Row> expectedSkipResult =
+            Collections.singletonList(Row.of(1, 0.0, 1.0, 0.0, 0.0));
 
     @Before
     public void before() {
@@ -176,6 +180,29 @@ public class BucketizerTest extends AbstractTestBase {
     }
 
     @Test
+    public void testInputTypeConversion() throws Exception {
+        inputTable = TestUtils.convertDataTypesToSparseInt(inputTable);
+        assertArrayEquals(
+                new Class<?>[] {
+                    Integer.class, Integer.class, Integer.class, Integer.class, Integer.class
+                },
+                TestUtils.getColumnDataTypes(inputTable));
+
+        Bucketizer bucketizer =
+                new Bucketizer()
+                        .setInputCols("f1", "f2", "f3", "f4")
+                        .setOutputCols("o1", "o2", "o3", "o4")
+                        .setSplitsArray(splitsArray);
+
+        bucketizer.setHandleInvalid(HasHandleInvalid.SKIP_INVALID);
+        Table output = bucketizer.transform(inputTable)[0];
+
+        List<Row> expectedResult =
+                Arrays.asList(Row.of(1, 1.0, 1.0, 0.0, 0.0), Row.of(3, 1.0, 1.0, 0.0, 1.0));
+        verifyOutputResult(output, bucketizer.getOutputCols(), expectedResult);
+    }
+
+    @Test
     public void testSaveLoadAndTransform() throws Exception {
         Bucketizer bucketizer =
                 new Bucketizer()
@@ -184,8 +211,7 @@ public class BucketizerTest extends AbstractTestBase {
                         .setHandleInvalid(HasHandleInvalid.KEEP_INVALID)
                         .setSplitsArray(splitsArray);
         Bucketizer loadedBucketizer =
-                StageTestUtils.saveAndReload(
-                        tEnv, bucketizer, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(tEnv, bucketizer, tempFolder.newFolder().getAbsolutePath());
         Table output = loadedBucketizer.transform(inputTable)[0];
         verifyOutputResult(output, loadedBucketizer.getOutputCols(), expectedKeepResult);
     }

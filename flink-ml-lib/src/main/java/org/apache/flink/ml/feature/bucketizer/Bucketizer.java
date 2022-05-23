@@ -71,7 +71,7 @@ public class Bucketizer implements Transformer<Bucketizer>, BucketizerParams<Buc
 
         RowTypeInfo inputTypeInfo = TableUtils.getRowTypeInfo(inputs[0].getResolvedSchema());
         TypeInformation<?>[] outputTypes = new TypeInformation[outputCols.length];
-        Arrays.fill(outputTypes, BasicTypeInfo.INT_TYPE_INFO);
+        Arrays.fill(outputTypes, BasicTypeInfo.DOUBLE_TYPE_INFO);
         RowTypeInfo outputTypeInfo =
                 new RowTypeInfo(
                         ArrayUtils.addAll(inputTypeInfo.getFieldTypes(), outputTypes),
@@ -108,7 +108,7 @@ public class Bucketizer implements Transformer<Bucketizer>, BucketizerParams<Buc
                 boolean isInvalid = false;
 
                 if (!Double.isNaN(feature)) {
-                    int index = Arrays.binarySearch(splits, feature);
+                    double index = Arrays.binarySearch(splits, feature);
                     if (index >= 0) {
                         if (index == splits.length - 1) {
                             index--;
@@ -136,7 +136,7 @@ public class Bucketizer implements Transformer<Bucketizer>, BucketizerParams<Buc
                         case SKIP_INVALID:
                             return;
                         case KEEP_INVALID:
-                            outputRow.setField(i, splits.length - 1);
+                            outputRow.setField(i, (double) splits.length - 1);
                             break;
                         default:
                             throw new UnsupportedOperationException(

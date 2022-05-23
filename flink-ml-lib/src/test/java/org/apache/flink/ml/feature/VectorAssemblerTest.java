@@ -25,7 +25,7 @@ import org.apache.flink.ml.feature.vectorassembler.VectorAssembler;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.util.StageTestUtils;
+import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -170,7 +170,28 @@ public class VectorAssemblerTest extends AbstractTestBase {
                         .setOutputCol("assembledVec")
                         .setHandleInvalid(HasHandleInvalid.SKIP_INVALID);
         VectorAssembler loadedVectorAssembler =
-                StageTestUtils.saveAndReload(
+                TestUtils.saveAndReload(
+                        tEnv, vectorAssembler, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+        Table output = loadedVectorAssembler.transform(inputDataTable)[0];
+        verifyOutputResult(output, loadedVectorAssembler.getOutputCol(), 2);
+    }
+
+    @Test
+    public void testInputTypeConversion() throws Exception {
+        inputDataTable = TestUtils.convertDataTypesToSparseInt(inputDataTable);
+        assertArrayEquals(
+                new Class<?>[] {
+                    Integer.class, SparseVector.class, Integer.class, SparseVector.class
+                },
+                TestUtils.getColumnDataTypes(inputDataTable));
+
+        VectorAssembler vectorAssembler =
+                new VectorAssembler()
+                        .setInputCols("vec", "num", "sparseVec")
+                        .setOutputCol("assembledVec")
+                        .setHandleInvalid(HasHandleInvalid.SKIP_INVALID);
+        VectorAssembler loadedVectorAssembler =
+                TestUtils.saveAndReload(
                         tEnv, vectorAssembler, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
         Table output = loadedVectorAssembler.transform(inputDataTable)[0];
         verifyOutputResult(output, loadedVectorAssembler.getOutputCol(), 2);

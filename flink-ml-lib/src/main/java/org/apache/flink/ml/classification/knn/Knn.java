@@ -26,6 +26,7 @@ import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.linalg.BLAS;
 import org.apache.flink.ml.linalg.DenseMatrix;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -147,8 +148,8 @@ public class Knn implements Estimator<Knn, KnnModel>, KnnParams<Knn> {
                 new MapFunction<Row, Tuple3<DenseVector, Double, Double>>() {
                     @Override
                     public Tuple3<DenseVector, Double, Double> map(Row value) {
-                        Double label = (Double) value.getField(getLabelCol());
-                        DenseVector feature = (DenseVector) value.getField(getFeaturesCol());
+                        Double label = ((Number) value.getField(getLabelCol())).doubleValue();
+                        DenseVector feature = ((Vector) value.getField(getFeaturesCol())).toDense();
                         return Tuple3.of(feature, label, Math.pow(BLAS.norm2(feature), 2));
                     }
                 });
