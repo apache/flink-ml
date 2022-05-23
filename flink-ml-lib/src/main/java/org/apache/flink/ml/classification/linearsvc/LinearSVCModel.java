@@ -26,6 +26,7 @@ import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.BLAS;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.param.Param;
@@ -152,7 +153,7 @@ public class LinearSVCModel implements Model<LinearSVCModel>, LinearSVCModelPara
                                 getRuntimeContext().getBroadcastVariable(broadcastModelKey).get(0);
                 coefficient = modelData.coefficient;
             }
-            DenseVector features = (DenseVector) dataPoint.getField(featuresCol);
+            DenseVector features = ((Vector) dataPoint.getField(featuresCol)).toDense();
             Row predictionResult = predictOneDataPoint(features, coefficient, threshold);
             return Row.join(dataPoint, predictionResult);
         }

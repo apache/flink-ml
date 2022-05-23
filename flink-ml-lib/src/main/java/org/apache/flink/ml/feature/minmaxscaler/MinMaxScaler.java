@@ -27,6 +27,7 @@ import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -81,7 +82,7 @@ public class MinMaxScaler
                 tEnv.toDataStream(inputs[0])
                         .map(
                                 (MapFunction<Row, DenseVector>)
-                                        value -> (DenseVector) value.getField(inputCol));
+                                        value -> ((Vector) value.getField(inputCol)).toDense());
         DataStream<DenseVector> minMaxValues =
                 inputData
                         .transform(

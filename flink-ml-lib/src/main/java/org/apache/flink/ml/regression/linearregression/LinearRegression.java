@@ -26,6 +26,7 @@ import org.apache.flink.ml.common.lossfunc.LeastSquareLoss;
 import org.apache.flink.ml.common.optimizer.Optimizer;
 import org.apache.flink.ml.common.optimizer.SGD;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -67,10 +68,14 @@ public class LinearRegression
                                     double weight =
                                             getWeightCol() == null
                                                     ? 1.0
-                                                    : (Double) dataPoint.getField(getWeightCol());
-                                    double label = (Double) dataPoint.getField(getLabelCol());
+                                                    : ((Number) dataPoint.getField(getWeightCol()))
+                                                            .doubleValue();
+                                    double label =
+                                            ((Number) dataPoint.getField(getLabelCol()))
+                                                    .doubleValue();
                                     DenseVector features =
-                                            (DenseVector) dataPoint.getField(getFeaturesCol());
+                                            ((Vector) dataPoint.getField(getFeaturesCol()))
+                                                    .toDense();
                                     return new LabeledPointWithWeight(features, label, weight);
                                 });
 

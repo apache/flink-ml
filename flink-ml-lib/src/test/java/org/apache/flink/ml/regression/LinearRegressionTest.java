@@ -23,13 +23,14 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.regression.linearregression.LinearRegression;
 import org.apache.flink.ml.regression.linearregression.LinearRegressionModel;
 import org.apache.flink.ml.regression.linearregression.LinearRegressionModelData;
 import org.apache.flink.ml.util.ReadWriteUtils;
-import org.apache.flink.ml.util.StageTestUtils;
+import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
@@ -109,7 +110,7 @@ public class LinearRegressionTest {
             throws Exception {
         List<Row> predResult = IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect());
         for (Row predictionRow : predResult) {
-            double label = (double) predictionRow.getField(labelCol);
+            double label = ((Number) predictionRow.getField(labelCol)).doubleValue();
             double prediction = (double) predictionRow.getField(predictionCol);
             assertTrue(Math.abs(prediction - label) / label < PREDICTION_TOLERANCE);
         }
@@ -176,13 +177,26 @@ public class LinearRegressionTest {
     }
 
     @Test
+    public void testInputTypeConversion() throws Exception {
+        trainDataTable = TestUtils.convertDataTypesToSparseInt(tEnv, trainDataTable);
+        assertArrayEquals(
+                new Class<?>[] {SparseVector.class, Integer.class, Integer.class},
+                TestUtils.getColumnDataTypes(trainDataTable));
+
+        LinearRegression linearRegression = new LinearRegression().setWeightCol("weight");
+        Table output = linearRegression.fit(trainDataTable).transform(trainDataTable)[0];
+        verifyPredictionResult(
+                output, linearRegression.getLabelCol(), linearRegression.getPredictionCol());
+    }
+
+    @Test
     public void testSaveLoadAndPredict() throws Exception {
         LinearRegression linearRegression = new LinearRegression().setWeightCol("weight");
         linearRegression =
-                StageTestUtils.saveAndReload(
+                TestUtils.saveAndReload(
                         tEnv, linearRegression, tempFolder.newFolder().getAbsolutePath());
         LinearRegressionModel model = linearRegression.fit(trainDataTable);
-        model = StageTestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+        model = TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
         assertEquals(
                 Collections.singletonList("coefficient"),
                 model.getModelData()[0].getResolvedSchema().getColumnNames());

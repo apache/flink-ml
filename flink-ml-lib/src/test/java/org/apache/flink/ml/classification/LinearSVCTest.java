@@ -27,10 +27,12 @@ import org.apache.flink.ml.classification.linearsvc.LinearSVC;
 import org.apache.flink.ml.classification.linearsvc.LinearSVCModel;
 import org.apache.flink.ml.classification.linearsvc.LinearSVCModelData;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.util.ReadWriteUtils;
-import org.apache.flink.ml.util.StageTestUtils;
+import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
@@ -109,8 +111,8 @@ public class LinearSVCTest {
             throws Exception {
         List<Row> predResult = IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect());
         for (Row predictionRow : predResult) {
-            DenseVector feature = (DenseVector) predictionRow.getField(featuresCol);
-            double prediction = (double) predictionRow.getField(predictionCol);
+            DenseVector feature = ((Vector) predictionRow.getField(featuresCol)).toDense();
+            double prediction = (Double) predictionRow.getField(predictionCol);
             DenseVector rawPrediction = (DenseVector) predictionRow.getField(rawPredictionCol);
             if (feature.get(0) <= 5) {
                 assertEquals(0, prediction, TOLERANCE);
@@ -198,13 +200,28 @@ public class LinearSVCTest {
     }
 
     @Test
+    public void testInputTypeConversion() throws Exception {
+        trainDataTable = TestUtils.convertDataTypesToSparseInt(tEnv, trainDataTable);
+        assertArrayEquals(
+                new Class<?>[] {SparseVector.class, Integer.class, Integer.class},
+                TestUtils.getColumnDataTypes(trainDataTable));
+
+        LinearSVC linearSVC = new LinearSVC().setWeightCol("weight");
+        Table output = linearSVC.fit(trainDataTable).transform(trainDataTable)[0];
+        verifyPredictionResult(
+                output,
+                linearSVC.getFeaturesCol(),
+                linearSVC.getPredictionCol(),
+                linearSVC.getRawPredictionCol());
+    }
+
+    @Test
     public void testSaveLoadAndPredict() throws Exception {
         LinearSVC linearSVC = new LinearSVC().setWeightCol("weight");
         linearSVC =
-                StageTestUtils.saveAndReload(
-                        tEnv, linearSVC, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(tEnv, linearSVC, tempFolder.newFolder().getAbsolutePath());
         LinearSVCModel model = linearSVC.fit(trainDataTable);
-        model = StageTestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+        model = TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
         assertEquals(
                 Collections.singletonList("coefficient"),
                 model.getModelData()[0].getResolvedSchema().getColumnNames());

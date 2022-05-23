@@ -27,9 +27,10 @@ import org.apache.flink.ml.classification.knn.KnnModel;
 import org.apache.flink.ml.classification.knn.KnnModelData;
 import org.apache.flink.ml.linalg.DenseMatrix;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.ReadWriteUtils;
-import org.apache.flink.ml.util.StageTestUtils;
+import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -51,6 +52,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
 /** Tests {@link Knn} and {@link KnnModel}. */
@@ -121,7 +123,7 @@ public class KnnTest {
                                     @Override
                                     public Tuple2<Double, Double> map(Row row) {
                                         return Tuple2.of(
-                                                (Double) row.getField(labelCol),
+                                                ((Number) row.getField(labelCol)).doubleValue(),
                                                 (Double) row.getField(predictionCol));
                                     }
                                 });
@@ -180,14 +182,30 @@ public class KnnTest {
     }
 
     @Test
+    public void testInputTypeConversion() throws Exception {
+        trainData = TestUtils.convertDataTypesToSparseInt(tEnv, trainData);
+        predictData = TestUtils.convertDataTypesToSparseInt(tEnv, predictData);
+        assertArrayEquals(
+                new Class<?>[] {SparseVector.class, Integer.class},
+                TestUtils.getColumnDataTypes(trainData));
+        assertArrayEquals(
+                new Class<?>[] {SparseVector.class, Integer.class},
+                TestUtils.getColumnDataTypes(predictData));
+
+        Knn knn = new Knn();
+        KnnModel knnModel = knn.fit(trainData);
+        Table output = knnModel.transform(predictData)[0];
+        verifyPredictionResult(output, knn.getLabelCol(), knn.getPredictionCol());
+    }
+
+    @Test
     public void testSaveLoadAndPredict() throws Exception {
         Knn knn = new Knn();
         Knn loadedKnn =
-                StageTestUtils.saveAndReload(tEnv, knn, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(tEnv, knn, tempFolder.newFolder().getAbsolutePath());
         KnnModel knnModel = loadedKnn.fit(trainData);
         knnModel =
-                StageTestUtils.saveAndReload(
-                        tEnv, knnModel, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(tEnv, knnModel, tempFolder.newFolder().getAbsolutePath());
         assertEquals(
                 Arrays.asList("packedFeatures", "featureNormSquares", "labels"),
                 knnModel.getModelData()[0].getResolvedSchema().getColumnNames());
@@ -200,8 +218,7 @@ public class KnnTest {
         Knn knn = new Knn();
         KnnModel knnModel = knn.fit(trainData);
         KnnModel newModel =
-                StageTestUtils.saveAndReload(
-                        tEnv, knnModel, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(tEnv, knnModel, tempFolder.newFolder().getAbsolutePath());
         Table output = newModel.transform(predictData)[0];
         verifyPredictionResult(output, knn.getLabelCol(), knn.getPredictionCol());
     }

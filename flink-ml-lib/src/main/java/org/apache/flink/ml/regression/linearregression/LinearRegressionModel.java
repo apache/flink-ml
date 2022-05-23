@@ -26,6 +26,7 @@ import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.BLAS;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -141,7 +142,7 @@ public class LinearRegressionModel
                                 getRuntimeContext().getBroadcastVariable(broadcastModelKey).get(0);
                 coefficient = modelData.coefficient;
             }
-            DenseVector features = (DenseVector) dataPoint.getField(featuresCol);
+            DenseVector features = ((Vector) dataPoint.getField(featuresCol)).toDense();
             Row predictionResult = predictOneDataPoint(features, coefficient);
             return Row.join(dataPoint, predictionResult);
         }

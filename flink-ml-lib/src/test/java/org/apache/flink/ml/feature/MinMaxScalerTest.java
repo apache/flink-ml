@@ -24,9 +24,10 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.ml.feature.minmaxscaler.MinMaxScaler;
 import org.apache.flink.ml.feature.minmaxscaler.MinMaxScalerModel;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.ReadWriteUtils;
-import org.apache.flink.ml.util.StageTestUtils;
+import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -46,6 +47,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
 /** Tests {@link MinMaxScaler} and {@link MinMaxScalerModel}. */
@@ -171,14 +173,30 @@ public class MinMaxScalerTest {
     }
 
     @Test
+    public void testInputTypeConversion() throws Exception {
+        trainDataTable = TestUtils.convertDataTypesToSparseInt(tEnv, trainDataTable);
+        predictDataTable = TestUtils.convertDataTypesToSparseInt(tEnv, predictDataTable);
+        assertArrayEquals(
+                new Class<?>[] {SparseVector.class}, TestUtils.getColumnDataTypes(trainDataTable));
+        assertArrayEquals(
+                new Class<?>[] {SparseVector.class},
+                TestUtils.getColumnDataTypes(predictDataTable));
+
+        MinMaxScaler minMaxScaler = new MinMaxScaler();
+        MinMaxScalerModel minMaxScalerModel = minMaxScaler.fit(trainDataTable);
+        Table output = minMaxScalerModel.transform(predictDataTable)[0];
+        verifyPredictionResult(output, minMaxScaler.getOutputCol(), EXPECTED_DATA);
+    }
+
+    @Test
     public void testSaveLoadAndPredict() throws Exception {
         MinMaxScaler minMaxScaler = new MinMaxScaler();
         MinMaxScaler loadedMinMaxScaler =
-                StageTestUtils.saveAndReload(
+                TestUtils.saveAndReload(
                         tEnv, minMaxScaler, tempFolder.newFolder().getAbsolutePath());
         MinMaxScalerModel model = loadedMinMaxScaler.fit(trainDataTable);
         MinMaxScalerModel loadedModel =
-                StageTestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
         assertEquals(
                 Arrays.asList("minVector", "maxVector"),
                 model.getModelData()[0].getResolvedSchema().getColumnNames());

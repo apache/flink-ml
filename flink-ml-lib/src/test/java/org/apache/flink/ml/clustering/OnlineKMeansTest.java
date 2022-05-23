@@ -32,10 +32,12 @@ import org.apache.flink.ml.clustering.kmeans.OnlineKMeans;
 import org.apache.flink.ml.clustering.kmeans.OnlineKMeansModel;
 import org.apache.flink.ml.common.distance.EuclideanDistanceMeasure;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.util.InMemorySinkFunction;
 import org.apache.flink.ml.util.InMemorySourceFunction;
+import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.minicluster.MiniClusterConfiguration;
@@ -66,6 +68,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.flink.ml.clustering.KMeansTest.groupFeaturesByPrediction;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
 /** Tests {@link OnlineKMeans} and {@link OnlineKMeansModel}. */
@@ -308,6 +311,46 @@ public class OnlineKMeansTest extends TestLogger {
     }
 
     @Test
+    public void testInputTypeConversion() throws Exception {
+        offlineTrainTable = TestUtils.convertDataTypesToSparseInt(tEnv, offlineTrainTable);
+        onlineTrainTable = TestUtils.convertDataTypesToSparseInt(tEnv, onlineTrainTable);
+        onlinePredictTable = TestUtils.convertDataTypesToSparseInt(tEnv, onlinePredictTable);
+
+        assertArrayEquals(
+                new Class<?>[] {SparseVector.class},
+                TestUtils.getColumnDataTypes(offlineTrainTable));
+        assertArrayEquals(
+                new Class<?>[] {SparseVector.class},
+                TestUtils.getColumnDataTypes(onlineTrainTable));
+        assertArrayEquals(
+                new Class<?>[] {SparseVector.class},
+                TestUtils.getColumnDataTypes(onlinePredictTable));
+
+        OnlineKMeans onlineKMeans =
+                new OnlineKMeans()
+                        .setFeaturesCol("features")
+                        .setPredictionCol("prediction")
+                        .setGlobalBatchSize(6)
+                        .setInitialModelData(
+                                KMeansModelData.generateRandomModelData(tEnv, 2, 2, 0.0, 0));
+        OnlineKMeansModel onlineModel = onlineKMeans.fit(onlineTrainTable);
+        transformAndOutputData(onlineModel);
+
+        final JobID jobID = submitJob(env.getStreamGraph().getJobGraph());
+        waitInitModelDataSetup(jobID);
+
+        trainSource.addAll(trainData1);
+        waitModelDataUpdate(jobID);
+        predictAndAssert(
+                expectedGroups1, onlineKMeans.getFeaturesCol(), onlineKMeans.getPredictionCol());
+
+        trainSource.addAll(trainData2);
+        waitModelDataUpdate(jobID);
+        predictAndAssert(
+                expectedGroups2, onlineKMeans.getFeaturesCol(), onlineKMeans.getPredictionCol());
+    }
+
+    @Test
     public void testInitWithKMeans() throws Exception {
         KMeans kMeans = new KMeans().setFeaturesCol("features").setPredictionCol("prediction");
         KMeansModel model = kMeans.fit(offlineTrainTable);
@@ -361,12 +404,11 @@ public class OnlineKMeansTest extends TestLogger {
                         },
                         Vectors.dense(4.5, 4.5));
 
-        Assert.assertArrayEquals(
-                expectedModelData.weights.values, actualModelData.weights.values, 1e-5);
+        assertArrayEquals(expectedModelData.weights.values, actualModelData.weights.values, 1e-5);
         Assert.assertEquals(expectedModelData.centroids.length, actualModelData.centroids.length);
         Arrays.sort(actualModelData.centroids, Comparator.comparingDouble(vector -> vector.get(0)));
         for (int i = 0; i < expectedModelData.centroids.length; i++) {
-            Assert.assertArrayEquals(
+            assertArrayEquals(
                     expectedModelData.centroids[i].values,
                     actualModelData.centroids[i].values,
                     1e-5);
@@ -456,12 +498,11 @@ public class OnlineKMeansTest extends TestLogger {
                         new DenseVector[] {Vectors.dense(-10.2, 0.2), Vectors.dense(10.1, 0.1)},
                         Vectors.dense(3, 3));
 
-        Assert.assertArrayEquals(
-                expectedModelData.weights.values, actualModelData.weights.values, 1e-5);
+        assertArrayEquals(expectedModelData.weights.values, actualModelData.weights.values, 1e-5);
         Assert.assertEquals(expectedModelData.centroids.length, actualModelData.centroids.length);
         Arrays.sort(actualModelData.centroids, Comparator.comparingDouble(vector -> vector.get(0)));
         for (int i = 0; i < expectedModelData.centroids.length; i++) {
-            Assert.assertArrayEquals(
+            assertArrayEquals(
                     expectedModelData.centroids[i].values,
                     actualModelData.centroids[i].values,
                     1e-5);

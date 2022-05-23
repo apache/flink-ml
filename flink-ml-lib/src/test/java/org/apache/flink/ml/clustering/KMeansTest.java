@@ -25,9 +25,11 @@ import org.apache.flink.ml.clustering.kmeans.KMeansModel;
 import org.apache.flink.ml.clustering.kmeans.KMeansModelData;
 import org.apache.flink.ml.common.distance.EuclideanDistanceMeasure;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.ReadWriteUtils;
-import org.apache.flink.ml.util.StageTestUtils;
+import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -97,8 +99,7 @@ public class KMeansTest extends AbstractTestBase {
         env.setRestartStrategy(RestartStrategies.noRestart());
         tEnv = StreamTableEnvironment.create(env);
 
-        Schema schema = Schema.newBuilder().column("f0", DataTypes.of(DenseVector.class)).build();
-        dataTable = tEnv.fromDataStream(env.fromCollection(DATA), schema).as("features");
+        dataTable = tEnv.fromDataStream(env.fromCollection(DATA)).as("features");
     }
 
     /**
@@ -114,7 +115,7 @@ public class KMeansTest extends AbstractTestBase {
             List<Row> rows, String featuresCol, String predictionCol) {
         Map<Integer, Set<DenseVector>> map = new HashMap<>();
         for (Row row : rows) {
-            DenseVector vector = (DenseVector) row.getField(featuresCol);
+            DenseVector vector = ((Vector) row.getField(featuresCol)).toDense();
             int predict = (Integer) row.getField(predictionCol);
             map.putIfAbsent(predict, new HashSet<>());
             map.get(predict).add(vector);
@@ -204,14 +205,33 @@ public class KMeansTest extends AbstractTestBase {
     }
 
     @Test
+    public void testInputTypeConversion() {
+        dataTable = TestUtils.convertDataTypesToSparseInt(tEnv, dataTable);
+        assertArrayEquals(
+                new Class<?>[] {SparseVector.class}, TestUtils.getColumnDataTypes(dataTable));
+
+        KMeans kmeans = new KMeans().setMaxIter(2).setK(2);
+        KMeansModel model = kmeans.fit(dataTable);
+        Table output = model.transform(dataTable)[0];
+
+        assertEquals(
+                Arrays.asList("features", "prediction"),
+                output.getResolvedSchema().getColumnNames());
+        List<Row> results = IteratorUtils.toList(output.execute().collect());
+        List<Set<DenseVector>> actualGroups =
+                groupFeaturesByPrediction(
+                        results, kmeans.getFeaturesCol(), kmeans.getPredictionCol());
+        assertTrue(CollectionUtils.isEqualCollection(expectedGroups, actualGroups));
+    }
+
+    @Test
     public void testSaveLoadAndPredict() throws Exception {
         KMeans kmeans = new KMeans().setMaxIter(2).setK(2);
         KMeans loadedKmeans =
-                StageTestUtils.saveAndReload(
-                        tEnv, kmeans, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(tEnv, kmeans, tempFolder.newFolder().getAbsolutePath());
         KMeansModel model = loadedKmeans.fit(dataTable);
         KMeansModel loadedModel =
-                StageTestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
         Table output = loadedModel.transform(dataTable)[0];
         assertEquals(
                 Arrays.asList("centroids", "weights"),

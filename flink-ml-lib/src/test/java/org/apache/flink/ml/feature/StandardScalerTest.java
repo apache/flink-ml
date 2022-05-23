@@ -24,10 +24,11 @@ import org.apache.flink.ml.feature.standardscaler.StandardScaler;
 import org.apache.flink.ml.feature.standardscaler.StandardScalerModel;
 import org.apache.flink.ml.feature.standardscaler.StandardScalerModelData;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.ReadWriteUtils;
-import org.apache.flink.ml.util.StageTestUtils;
+import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
@@ -183,14 +184,25 @@ public class StandardScalerTest extends AbstractTestBase {
     }
 
     @Test
+    public void testInputTypeConversion() throws Exception {
+        denseTable = TestUtils.convertDataTypesToSparseInt(tEnv, denseTable);
+        assertArrayEquals(
+                new Class<?>[] {SparseVector.class}, TestUtils.getColumnDataTypes(denseTable));
+
+        StandardScaler standardScaler = new StandardScaler().setWithMean(true);
+        Table output = standardScaler.fit(denseTable).transform(denseTable)[0];
+        verifyPredictionResult(expectedResWithMeanAndStd, output, standardScaler.getOutputCol());
+    }
+
+    @Test
     public void testSaveLoadAndPredict() throws Exception {
         StandardScaler standardScaler = new StandardScaler();
         standardScaler =
-                StageTestUtils.saveAndReload(
+                TestUtils.saveAndReload(
                         tEnv, standardScaler, tempFolder.newFolder().getAbsolutePath());
 
         StandardScalerModel model = standardScaler.fit(denseTable);
-        model = StageTestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+        model = TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
 
         assertEquals(
                 Arrays.asList("mean", "std"),

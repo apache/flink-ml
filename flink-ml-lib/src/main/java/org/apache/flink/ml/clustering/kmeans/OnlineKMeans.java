@@ -34,6 +34,7 @@ import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.distance.DistanceMeasure;
 import org.apache.flink.ml.linalg.BLAS;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -335,7 +336,7 @@ public class OnlineKMeans
 
         @Override
         public DenseVector map(Row row) {
-            return (DenseVector) row.getField(featuresCol);
+            return ((Vector) row.getField(featuresCol)).toDense();
         }
     }
 
