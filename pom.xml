@@ -75,7 +75,7 @@ under the License.
     <flink.reuseForks>true</flink.reuseForks>
     <flink.version>1.15.0</flink.version>
     <zookeeper.version>3.6.3</zookeeper.version>
-    <hadoop.version>2.10.1</hadoop.version>
+    <hadoop.version>3.2.3</hadoop.version>
 
     <!-- Can be set to any value to reproduce a specific build. -->
     <test.randomization.seed/>
