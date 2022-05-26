@@ -18,8 +18,6 @@
 import os
 from typing import Dict, Any, List
 
-import pandas as pd
-from pandas._testing import assert_frame_equal
 from pyflink.table import Table, StreamTableEnvironment
 
 from pyflink.ml.core.api import Model
@@ -39,8 +37,9 @@ class PipelineTest(PyFlinkMLTestCase):
         model = PipelineModel([model_a, model_b, model_c])
         output_table = model.transform(input_table)[0]
 
-        assert_frame_equal(output_table.to_pandas(),
-                           pd.DataFrame([[31], [32], [33]], columns=['a']))
+        predicted_results = [result[0] for result in
+                             self.t_env.to_data_stream(output_table).execute_and_collect()]
+        self.assertEqual(predicted_results, [31, 32, 33])
 
         # Saves and loads the PipelineModel.
         path = os.path.join(self.temp_dir, "test_pipeline_model")
@@ -48,8 +47,9 @@ class PipelineTest(PyFlinkMLTestCase):
         loaded_model = PipelineModel.load(self.t_env, path)
 
         output_table2 = loaded_model.transform(input_table)[0]
-        assert_frame_equal(output_table2.to_pandas(),
-                           pd.DataFrame([[31], [32], [33]], columns=['a']))
+        predicted_results = [result[0] for result in
+                             self.t_env.to_data_stream(output_table2).execute_and_collect()]
+        self.assertEqual(predicted_results, [31, 32, 33])
 
     def test_pipeline(self):
         input_table = self.t_env.from_elements([(1,), (2,), (3,)], ['a'])
@@ -60,8 +60,9 @@ class PipelineTest(PyFlinkMLTestCase):
         model = estimator.fit(input_table)
         output_table = model.transform(input_table)[0]
 
-        assert_frame_equal(output_table.to_pandas(),
-                           pd.DataFrame([[21], [22], [23]], columns=['a']))
+        predicted_results = [result[0] for result in
+                             self.t_env.to_data_stream(output_table).execute_and_collect()]
+        self.assertEqual(predicted_results, [21, 22, 23])
 
         # Saves and loads the PipelineModel.
         path = os.path.join(self.temp_dir, "test_pipeline")
@@ -70,8 +71,10 @@ class PipelineTest(PyFlinkMLTestCase):
 
         model = loaded_estimator.fit(input_table)
         output_table = model.transform(input_table)[0]
-        assert_frame_equal(output_table.to_pandas(),
-                           pd.DataFrame([[21], [22], [23]], columns=['a']))
+
+        predicted_results = [result[0] for result in
+                             self.t_env.to_data_stream(output_table).execute_and_collect()]
+        self.assertEqual(predicted_results, [21, 22, 23])
 
 
 class Add10Model(Model):
