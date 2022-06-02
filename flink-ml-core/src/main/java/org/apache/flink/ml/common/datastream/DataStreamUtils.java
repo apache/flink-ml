@@ -19,21 +19,32 @@
 package org.apache.flink.ml.common.datastream;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.api.common.functions.FlatMapFunction;
+import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.MapPartitionFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.TypeExtractor;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.functions.windowing.AllWindowFunction;
 import org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator;
 import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.TimestampedCollector;
+import org.apache.flink.streaming.api.windowing.windows.GlobalWindow;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.util.Collector;
+
+import org.apache.commons.collections.IteratorUtils;
+
+import java.util.Arrays;
+import java.util.List;
 
 /** Provides utility functions for {@link DataStream}. */
 @Internal
@@ -179,6 +190,69 @@ public class DataStreamUtils {
             state.clear();
             if (result != null) {
                 state.add(result);
+            }
+        }
+    }
+
+    /**
+     * Splits the input data into global batches of batchSize. After splitting, each global batch is
+     * further split into local batches for downstream operators with each worker has one batch.
+     */
+    public static <T> DataStream<T[]> generateBatchData(
+            DataStream<T> inputData, final int downStreamParallelism, int batchSize) {
+        return inputData
+                .countWindowAll(batchSize)
+                .apply(new GlobalBatchCreator<>())
+                .flatMap(new GlobalBatchSplitter<>(downStreamParallelism))
+                .partitionCustom((chunkId, numPartitions) -> chunkId, x -> x.f0)
+                .map(
+                        new MapFunction<Tuple2<Integer, T[]>, T[]>() {
+                            @Override
+                            public T[] map(Tuple2<Integer, T[]> integerTuple2) throws Exception {
+                                return integerTuple2.f1;
+                            }
+                        });
+    }
+
+    /** Splits the input data into global batches. */
+    private static class GlobalBatchCreator<T> implements AllWindowFunction<T, T[], GlobalWindow> {
+        @Override
+        public void apply(GlobalWindow timeWindow, Iterable<T> iterable, Collector<T[]> collector) {
+            List<T> points = IteratorUtils.toList(iterable.iterator());
+            collector.collect(points.toArray((T[]) new Object[0]));
+        }
+    }
+
+    /**
+     * An operator that splits a global batch into evenly-sized local batches, and distributes them
+     * to downstream operator.
+     */
+    private static class GlobalBatchSplitter<T>
+            implements FlatMapFunction<T[], Tuple2<Integer, T[]>> {
+        private final int downStreamParallelism;
+
+        public GlobalBatchSplitter(int downStreamParallelism) {
+            this.downStreamParallelism = downStreamParallelism;
+        }
+
+        @Override
+        public void flatMap(T[] values, Collector<Tuple2<Integer, T[]>> collector) {
+            int div = values.length / downStreamParallelism;
+            int mod = values.length % downStreamParallelism;
+
+            int offset = 0;
+            int i = 0;
+
+            int size = div + 1;
+            for (; i < mod; i++) {
+                collector.collect(Tuple2.of(i, Arrays.copyOfRange(values, offset, offset + size)));
+                offset += size;
+            }
+
+            size = div;
+            for (; i < downStreamParallelism; i++) {
+                collector.collect(Tuple2.of(i, Arrays.copyOfRange(values, offset, offset + size)));
+                offset += size;
             }
         }
     }

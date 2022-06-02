@@ -18,6 +18,7 @@
 
 package org.apache.flink.ml.classification.logisticregression;
 
+import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.serialization.Encoder;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.configuration.Configuration;
@@ -25,10 +26,11 @@ import org.apache.flink.connector.file.src.reader.SimpleStreamFormat;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
+import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
@@ -36,9 +38,10 @@ import org.apache.flink.table.api.internal.TableImpl;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Random;
 
 /**
- * Model data of {@link LogisticRegressionModel}.
+ * Model data of {@link LogisticRegressionModel} and {@link OnlineLogisticRegressionModel}.
  *
  * <p>This class also provides methods to convert model data from Table to Datastream, and classes
  * to save/load model data.
@@ -46,12 +49,49 @@ import java.io.OutputStream;
 public class LogisticRegressionModelData {
 
     public DenseVector coefficient;
-
-    public LogisticRegressionModelData(DenseVector coefficient) {
-        this.coefficient = coefficient;
-    }
+    public long modelVersion;
 
     public LogisticRegressionModelData() {}
+
+    public LogisticRegressionModelData(DenseVector coefficient, long modelVersion) {
+        this.coefficient = coefficient;
+        this.modelVersion = modelVersion;
+    }
+
+    /**
+     * Generates a Table containing a {@link LogisticRegressionModelData} instance with randomly
+     * generated coefficient.
+     *
+     * @param tEnv The environment where to create the table.
+     * @param dim The size of generated coefficient.
+     * @param seed Random seed.
+     */
+    public static Table generateRandomModelData(StreamTableEnvironment tEnv, int dim, int seed) {
+        StreamExecutionEnvironment env = TableUtils.getExecutionEnvironment(tEnv);
+        return tEnv.fromDataStream(
+                env.fromElements(1).map(new RandomModelDataGenerator(dim, seed)));
+    }
+
+    private static class RandomModelDataGenerator
+            implements MapFunction<Integer, LogisticRegressionModelData> {
+        private final int dim;
+        private final int seed;
+
+        public RandomModelDataGenerator(int dim, int seed) {
+            this.dim = dim;
+            this.seed = seed;
+        }
+
+        @Override
+        public LogisticRegressionModelData map(Integer integer) throws Exception {
+            DenseVector vector = new DenseVector(dim);
+            Random random = new Random(seed);
+            for (int j = 0; j < dim; j++) {
+                vector.values[j] = random.nextDouble();
+            }
+            return new LogisticRegressionModelData(vector, 0L);
+        }
+    }
 
     /**
      * Converts the table model to a data stream.
@@ -63,21 +103,24 @@ public class LogisticRegressionModelData {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) modelData).getTableEnvironment();
         return tEnv.toDataStream(modelData)
-                .map(x -> new LogisticRegressionModelData(((Vector) x.getField(0)).toDense()));
+                .map(x -> new LogisticRegressionModelData(x.getFieldAs(0), x.getFieldAs(1)));
     }
 
-    /** Data encoder for {@link LogisticRegressionModel}. */
+    /** Data encoder for {@link LogisticRegression} and {@link OnlineLogisticRegression}. */
     public static class ModelDataEncoder implements Encoder<LogisticRegressionModelData> {
 
         @Override
         public void encode(LogisticRegressionModelData modelData, OutputStream outputStream)
                 throws IOException {
+            DataOutputViewStreamWrapper dataOutputViewStreamWrapper =
+                    new DataOutputViewStreamWrapper(outputStream);
             DenseVectorSerializer.INSTANCE.serialize(
-                    modelData.coefficient, new DataOutputViewStreamWrapper(outputStream));
+                    modelData.coefficient, dataOutputViewStreamWrapper);
+            dataOutputViewStreamWrapper.writeLong(modelData.modelVersion);
         }
     }
 
-    /** Data decoder for {@link LogisticRegressionModel}. */
+    /** Data decoder for {@link LogisticRegression} and {@link OnlineLogisticRegression}. */
     public static class ModelDataDecoder extends SimpleStreamFormat<LogisticRegressionModelData> {
 
         @Override
@@ -88,10 +131,13 @@ public class LogisticRegressionModelData {
                 @Override
                 public LogisticRegressionModelData read() throws IOException {
                     try {
+                        DataInputViewStreamWrapper dataInputViewStreamWrapper =
+                                new DataInputViewStreamWrapper(inputStream);
                         DenseVector coefficient =
                                 DenseVectorSerializer.INSTANCE.deserialize(
-                                        new DataInputViewStreamWrapper(inputStream));
-                        return new LogisticRegressionModelData(coefficient);
+                                        dataInputViewStreamWrapper);
+                        long modelVersion = dataInputViewStreamWrapper.readLong();
+                        return new LogisticRegressionModelData(coefficient, modelVersion);
                     } catch (EOFException e) {
                         return null;
                     }

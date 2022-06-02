@@ -47,6 +47,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import static org.apache.flink.test.util.TestBaseUtils.compareResultCollections;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
@@ -79,17 +80,6 @@ public class MinMaxScalerTest {
                             Vectors.dense(0.5, 0.125),
                             Vectors.dense(0.75, 0.225)));
 
-    /** Note: this comparator imposes orderings that are inconsistent with equals. */
-    private static int compare(DenseVector first, DenseVector second) {
-        for (int i = 0; i < first.size(); i++) {
-            int cmp = Double.compare(first.get(i), second.get(i));
-            if (cmp != 0) {
-                return cmp;
-            }
-        }
-        return 0;
-    }
-
     @Before
     public void before() {
         Configuration config = new Configuration();
@@ -113,8 +103,7 @@ public class MinMaxScalerTest {
                                 (MapFunction<Row, DenseVector>)
                                         row -> (DenseVector) row.getField(outputCol));
         List<DenseVector> result = IteratorUtils.toList(stream.executeAndCollect());
-        result.sort(MinMaxScalerTest::compare);
-        assertEquals(expected, result);
+        compareResultCollections(expected, result, TestUtils::compare);
     }
 
     @Test

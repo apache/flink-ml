@@ -37,6 +37,7 @@ import org.junit.Test;
 import java.util.List;
 
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
 /** Tests the {@link DataStreamUtils}. */
@@ -72,6 +73,18 @@ public class DataStreamUtilsTest {
                 DataStreamUtils.reduce(dataStream, (ReduceFunction<Long>) Long::sum);
         List<Long> sum = IteratorUtils.toList(result.executeAndCollect());
         assertArrayEquals(new long[] {190L}, sum.stream().mapToLong(Long::longValue).toArray());
+    }
+
+    @Test
+    public void testGenerateBatchData() throws Exception {
+        DataStream<Long> dataStream =
+                env.fromParallelCollection(new NumberSequenceIterator(0L, 19L), Types.LONG);
+        DataStream<Long[]> result = DataStreamUtils.generateBatchData(dataStream, 2, 4);
+        List<Long[]> batches = IteratorUtils.toList(result.executeAndCollect());
+        for (Long[] batch : batches) {
+            assertEquals(2, batch.length);
+        }
+        assertEquals(10, batches.size());
     }
 
     /** A simple implementation for a {@link MapPartitionFunction}. */

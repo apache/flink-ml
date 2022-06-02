@@ -115,7 +115,7 @@ public class LogisticRegression
                 optimizer.optimize(initModelData, trainData, BinaryLogisticLoss.INSTANCE);
 
         DataStream<LogisticRegressionModelData> modelData =
-                rawModelData.map(LogisticRegressionModelData::new);
+                rawModelData.map(vector -> new LogisticRegressionModelData(vector, 0));
         LogisticRegressionModel model =
                 new LogisticRegressionModel().setModelData(tEnv.fromDataStream(modelData));
         ReadWriteUtils.updateExistingParams(model, paramMap);

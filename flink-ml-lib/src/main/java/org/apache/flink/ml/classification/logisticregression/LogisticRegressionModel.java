@@ -162,7 +162,7 @@ public class LogisticRegressionModel
      * @param coefficient The model parameters.
      * @return The prediction label and the raw probabilities.
      */
-    private static Row predictOneDataPoint(DenseVector feature, DenseVector coefficient) {
+    protected static Row predictOneDataPoint(Vector feature, DenseVector coefficient) {
         double dotValue = BLAS.dot(feature, coefficient);
         double prob = 1 - 1.0 / (1.0 + Math.exp(dotValue));
         return Row.of(dotValue >= 0 ? 1. : 0., Vectors.dense(1 - prob, prob));

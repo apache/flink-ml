@@ -70,7 +70,18 @@ public class BLASTest {
     @Test
     public void testDot() {
         DenseVector anotherDenseVec = Vectors.dense(1, 2, 3, 4, 5);
+        SparseVector sparseVector1 =
+                Vectors.sparse(5, new int[] {1, 2, 4}, new double[] {1., 1., 4.});
+        SparseVector sparseVector2 =
+                Vectors.sparse(5, new int[] {1, 3, 4}, new double[] {1., 2., 1.});
+        // Tests dot(dense, dense).
         assertEquals(-3, BLAS.dot(inputDenseVec, anotherDenseVec), TOLERANCE);
+        // Tests dot(dense, sparse).
+        assertEquals(-19, BLAS.dot(inputDenseVec, sparseVector1), TOLERANCE);
+        // Tests dot(sparse, dense).
+        assertEquals(1, BLAS.dot(sparseVector2, inputDenseVec), TOLERANCE);
+        // Tests dot(sparse, sparse).
+        assertEquals(5, BLAS.dot(sparseVector1, sparseVector2), TOLERANCE);
     }
 
     @Test
