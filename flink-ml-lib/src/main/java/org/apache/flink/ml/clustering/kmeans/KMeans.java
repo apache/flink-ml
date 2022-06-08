@@ -36,6 +36,7 @@ import org.apache.flink.iteration.IterationConfig;
 import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.Iterations;
 import org.apache.flink.iteration.ReplayableDataStreamList;
+import org.apache.flink.iteration.datacache.nonkeyed.ListStateWithCache;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
@@ -45,11 +46,13 @@ import org.apache.flink.ml.common.iteration.ForwardInputsOfLastRound;
 import org.apache.flink.ml.common.iteration.TerminateOnMaxIter;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.runtime.state.StateInitializationContext;
+import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.functions.windowing.AllWindowFunction;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
@@ -66,12 +69,10 @@ import org.apache.commons.collections.IteratorUtils;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Random;
 
 /**
  * An Estimator which implements the k-means clustering algorithm.
@@ -160,6 +161,8 @@ public class KMeans implements Estimator<KMeans, KMeansModel>, KMeansParams<KMea
                                             BasicTypeInfo.INT_TYPE_INFO,
                                             DenseVectorTypeInfo.INSTANCE),
                                     new SelectNearestCentroidOperator(distanceMeasure));
+
+            DataStreamUtils.setManagedMemoryWeight(centroidIdAndPoints.getTransformation(), 100);
 
             PerRoundSubBody perRoundSubBody =
                     new PerRoundSubBody() {
@@ -253,26 +256,42 @@ public class KMeans implements Estimator<KMeans, KMeansModel>, KMeansParams<KMea
             implements TwoInputStreamOperator<
                             DenseVector, DenseVector[], Tuple2<Integer, DenseVector>>,
                     IterationListener<Tuple2<Integer, DenseVector>> {
+
         private final DistanceMeasure distanceMeasure;
-        private ListState<DenseVector> points;
+
         private ListState<DenseVector[]> centroids;
 
+        private ListStateWithCache<DenseVector> points;
+
         public SelectNearestCentroidOperator(DistanceMeasure distanceMeasure) {
+            super();
             this.distanceMeasure = distanceMeasure;
         }
 
         @Override
         public void initializeState(StateInitializationContext context) throws Exception {
             super.initializeState(context);
-            points =
-                    context.getOperatorStateStore()
-                            .getListState(new ListStateDescriptor<>("points", DenseVector.class));
 
             TypeInformation<DenseVector[]> type =
                     ObjectArrayTypeInfo.getInfoFor(DenseVectorTypeInfo.INSTANCE);
+
             centroids =
                     context.getOperatorStateStore()
                             .getListState(new ListStateDescriptor<>("centroids", type));
+
+            points =
+                    new ListStateWithCache<>(
+                            new DenseVectorSerializer(),
+                            getContainingTask(),
+                            getRuntimeContext(),
+                            context,
+                            config.getOperatorID());
+        }
+
+        @Override
+        public void snapshotState(StateSnapshotContext context) throws Exception {
+            super.snapshotState(context);
+            points.snapshotState(context);
         }
 
         @Override
@@ -282,6 +301,7 @@ public class KMeans implements Estimator<KMeans, KMeansModel>, KMeansParams<KMea
 
         @Override
         public void processElement2(StreamRecord<DenseVector[]> streamRecord) throws Exception {
+            Preconditions.checkState(!centroids.get().iterator().hasNext());
             centroids.add(streamRecord.getValue());
         }
 
@@ -293,18 +313,19 @@ public class KMeans implements Estimator<KMeans, KMeansModel>, KMeansParams<KMea
                     Objects.requireNonNull(
                             OperatorStateUtils.getUniqueElement(centroids, "centroids")
                                     .orElse(null));
-
             for (DenseVector point : points.get()) {
                 int closestCentroidId =
                         findClosestCentroidId(centroidValues, point, distanceMeasure);
                 output.collect(new StreamRecord<>(Tuple2.of(closestCentroidId, point)));
             }
+
             centroids.clear();
         }
 
         @Override
         public void onIterationTerminated(
                 Context context, Collector<Tuple2<Integer, DenseVector>> collector) {
+            centroids.clear();
             points.clear();
         }
     }
@@ -328,17 +349,15 @@ public class KMeans implements Estimator<KMeans, KMeansModel>, KMeansParams<KMea
             DataStream<DenseVector> data, int k, long seed) {
         DataStream<DenseVector[]> resultStream =
                 DataStreamUtils.mapPartition(
-                        data,
+                        DataStreamUtils.sample(data, k, seed),
                         new MapPartitionFunction<DenseVector, DenseVector[]>() {
                             @Override
                             public void mapPartition(
-                                    Iterable<DenseVector> iterable, Collector<DenseVector[]> out) {
-                                List<DenseVector> vectors = new ArrayList<>();
-                                for (DenseVector vector : iterable) {
-                                    vectors.add(vector);
-                                }
-                                Collections.shuffle(vectors, new Random(seed));
-                                out.collect(vectors.subList(0, k).toArray(new DenseVector[0]));
+                                    Iterable<DenseVector> iterable,
+                                    Collector<DenseVector[]> collector) {
+                                List<DenseVector> list = new ArrayList<>();
+                                iterable.iterator().forEachRemaining(list::add);
+                                collector.collect(list.toArray(new DenseVector[0]));
                             }
                         });
         resultStream.getTransformation().setParallelism(1);

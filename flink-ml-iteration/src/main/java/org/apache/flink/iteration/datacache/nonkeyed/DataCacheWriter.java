@@ -19,38 +19,59 @@
 package org.apache.flink.iteration.datacache.nonkeyed;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
-import org.apache.flink.core.fs.FSDataOutputStream;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
-import org.apache.flink.core.memory.DataOutputView;
-import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
+import org.apache.flink.runtime.memory.MemoryAllocationException;
+import org.apache.flink.table.runtime.util.MemorySegmentPool;
+import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.function.SupplierWithException;
+
+import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 
-/** Records the data received and replayed them on required. */
+/** Records the data received and replayed them when required. */
 public class DataCacheWriter<T> {
 
+    /** A soft limit on the max allowed size of a single segment. */
+    static final long MAX_SEGMENT_SIZE = 1L << 30; // 1GB
+
+    /** The tool to serialize received records into bytes. */
     private final TypeSerializer<T> serializer;
 
+    /** The file system that contains the cache files. */
     private final FileSystem fileSystem;
 
+    /** A generator to generate paths of cache files. */
     private final SupplierWithException<Path, IOException> pathGenerator;
 
-    private final List<Segment> finishSegments;
+    /** An optional pool that provide memory segments to hold cached records in memory. */
+    @Nullable private final MemorySegmentPool segmentPool;
 
-    private SegmentWriter currentSegment;
+    /** The segments that contain previously added records. */
+    private final List<Segment> finishedSegments;
+
+    /** The current writer for new records. */
+    @Nullable private SegmentWriter<T> currentSegmentWriter;
 
     public DataCacheWriter(
             TypeSerializer<T> serializer,
             FileSystem fileSystem,
             SupplierWithException<Path, IOException> pathGenerator)
             throws IOException {
-        this(serializer, fileSystem, pathGenerator, Collections.emptyList());
+        this(serializer, fileSystem, pathGenerator, null, Collections.emptyList());
+    }
+
+    public DataCacheWriter(
+            TypeSerializer<T> serializer,
+            FileSystem fileSystem,
+            SupplierWithException<Path, IOException> pathGenerator,
+            MemorySegmentPool segmentPool)
+            throws IOException {
+        this(serializer, fileSystem, pathGenerator, segmentPool, Collections.emptyList());
     }
 
     public DataCacheWriter(
@@ -59,87 +80,100 @@ public class DataCacheWriter<T> {
             SupplierWithException<Path, IOException> pathGenerator,
             List<Segment> priorFinishedSegments)
             throws IOException {
-        this.serializer = serializer;
+        this(serializer, fileSystem, pathGenerator, null, priorFinishedSegments);
+    }
+
+    public DataCacheWriter(
+            TypeSerializer<T> serializer,
+            FileSystem fileSystem,
+            SupplierWithException<Path, IOException> pathGenerator,
+            @Nullable MemorySegmentPool segmentPool,
+            List<Segment> priorFinishedSegments)
+            throws IOException {
         this.fileSystem = fileSystem;
         this.pathGenerator = pathGenerator;
-
-        this.finishSegments = new ArrayList<>(priorFinishedSegments);
-
-        this.currentSegment = new SegmentWriter(pathGenerator.get());
+        this.segmentPool = segmentPool;
+        this.serializer = serializer;
+        this.finishedSegments = new ArrayList<>(priorFinishedSegments);
+        this.currentSegmentWriter = createSegmentWriter();
     }
 
     public void addRecord(T record) throws IOException {
-        currentSegment.addRecord(record);
+        if (!currentSegmentWriter.addRecord(record)) {
+            currentSegmentWriter.finish().ifPresent(finishedSegments::add);
+            currentSegmentWriter = new FileSegmentWriter<>(serializer, pathGenerator.get());
+            Preconditions.checkState(currentSegmentWriter.addRecord(record));
+        }
     }
 
-    public void finishCurrentSegment() throws IOException {
-        finishCurrentSegment(true);
-    }
-
+    /** Finishes adding records and closes resources occupied for adding records. */
     public List<Segment> finish() throws IOException {
-        finishCurrentSegment(false);
-        return finishSegments;
-    }
-
-    public FileSystem getFileSystem() {
-        return fileSystem;
-    }
-
-    public List<Segment> getFinishSegments() {
-        return finishSegments;
-    }
-
-    private void finishCurrentSegment(boolean newSegment) throws IOException {
-        if (currentSegment != null) {
-            currentSegment.finish().ifPresent(finishSegments::add);
-            currentSegment = null;
+        if (currentSegmentWriter == null) {
+            return finishedSegments;
         }
 
-        if (newSegment) {
-            currentSegment = new SegmentWriter(pathGenerator.get());
-        }
+        currentSegmentWriter.finish().ifPresent(finishedSegments::add);
+        currentSegmentWriter = null;
+        return finishedSegments;
     }
 
-    private class SegmentWriter {
+    /**
+     * Flushes all added records to segments and returns a list of segments containing all cached
+     * records.
+     */
+    public List<Segment> getSegments() throws IOException {
+        finishCurrentSegmentIfExists();
+        return finishedSegments;
+    }
 
-        private final Path path;
-
-        private final FSDataOutputStream outputStream;
-
-        private final DataOutputView outputView;
-
-        private int currentSegmentCount;
-
-        public SegmentWriter(Path path) throws IOException {
-            this.path = path;
-            this.outputStream = fileSystem.create(path, FileSystem.WriteMode.NO_OVERWRITE);
-            this.outputView = new DataOutputViewStreamWrapper(outputStream);
+    private void finishCurrentSegmentIfExists() throws IOException {
+        if (currentSegmentWriter == null) {
+            return;
         }
 
-        public void addRecord(T record) throws IOException {
-            serializer.serialize(record, outputView);
-            currentSegmentCount += 1;
-        }
+        currentSegmentWriter.finish().ifPresent(finishedSegments::add);
+        currentSegmentWriter = createSegmentWriter();
+    }
 
-        public Optional<Segment> finish() throws IOException {
-            this.outputStream.flush();
-            long size = outputStream.getPos();
-            this.outputStream.close();
-
-            if (currentSegmentCount > 0) {
-                return Optional.of(new Segment(path, currentSegmentCount, size));
-            } else {
-                // If there are no records, we tend to directly delete this file
-                fileSystem.delete(path, false);
-                return Optional.empty();
+    /** Removes all previously added records. */
+    public void clear() throws IOException {
+        finishCurrentSegmentIfExists();
+        for (Segment segment : finishedSegments) {
+            if (segment.getFsSize() > 0) {
+                fileSystem.delete(segment.getPath(), false);
+            }
+            if (!segment.getCache().isEmpty()) {
+                segmentPool.returnAll(segment.getCache());
             }
         }
+        finishedSegments.clear();
     }
 
-    public void cleanup() throws IOException {
-        finishCurrentSegment();
-        for (Segment segment : finishSegments) {
-            fileSystem.delete(segment.getPath(), false);
+    /** Write the segments in this writer to files on disk. */
+    public void writeSegmentsToFiles() throws IOException {
+        finishCurrentSegmentIfExists();
+        for (Segment segment : finishedSegments) {
+            if (segment.getFsSize() > 0) {
+                continue;
+            }
+
+            SegmentReader<T> reader = new MemorySegmentReader<>(serializer, segment, 0);
+            SegmentWriter<T> writer = new FileSegmentWriter<>(serializer, segment.getPath());
+            while (reader.hasNext()) {
+                writer.addRecord(reader.next());
+            }
+            segment.setFsSize(writer.finish().get().getFsSize());
         }
+    }
+
+    private SegmentWriter<T> createSegmentWriter() throws IOException {
+        if (segmentPool != null) {
+            try {
+                return new MemorySegmentWriter<>(serializer, pathGenerator.get(), segmentPool, 0L);
+            } catch (MemoryAllocationException ignored) {
+                // ignore MemoryAllocationException and create FileSegmentWriter instead.
+            }
+        }
+        return new FileSegmentWriter<>(serializer, pathGenerator.get());
     }
 }

@@ -68,11 +68,12 @@ public class LinearSVCModelData {
 
     /** Data encoder for {@link LinearSVCModel}. */
     public static class ModelDataEncoder implements Encoder<LinearSVCModelData> {
+        private final DenseVectorSerializer serializer = new DenseVectorSerializer();
 
         @Override
         public void encode(LinearSVCModelData modelData, OutputStream outputStream)
                 throws IOException {
-            DenseVectorSerializer.INSTANCE.serialize(
+            serializer.serialize(
                     modelData.coefficient, new DataOutputViewStreamWrapper(outputStream));
         }
     }
@@ -84,13 +85,13 @@ public class LinearSVCModelData {
         public Reader<LinearSVCModelData> createReader(
                 Configuration configuration, FSDataInputStream inputStream) {
             return new Reader<LinearSVCModelData>() {
+                private final DenseVectorSerializer serializer = new DenseVectorSerializer();
 
                 @Override
                 public LinearSVCModelData read() throws IOException {
                     try {
                         DenseVector coefficient =
-                                DenseVectorSerializer.INSTANCE.deserialize(
-                                        new DataInputViewStreamWrapper(inputStream));
+                                serializer.deserialize(new DataInputViewStreamWrapper(inputStream));
                         return new LinearSVCModelData(coefficient);
                     } catch (EOFException e) {
                         return null;

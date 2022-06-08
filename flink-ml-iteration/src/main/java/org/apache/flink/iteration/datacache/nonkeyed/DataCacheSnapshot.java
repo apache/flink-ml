@@ -25,10 +25,13 @@ import org.apache.flink.core.fs.FSDataOutputStream;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
+import org.apache.flink.runtime.memory.MemoryAllocationException;
 import org.apache.flink.runtime.util.NonClosingInputStreamDecorator;
 import org.apache.flink.runtime.util.NonClosingOutputStreamDecorator;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackConsumer;
+import org.apache.flink.table.runtime.util.MemorySegmentPool;
 import org.apache.flink.util.IOUtils;
+import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.function.SupplierWithException;
 
 import org.apache.commons.io.input.BoundedInputStream;
@@ -41,20 +44,26 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import static org.apache.flink.util.Preconditions.checkState;
 
-/** The snapshot of a data cache. It could be written out or read from an external stream.O */
+/** The snapshot of a data cache. It could be written out or read from an external stream. */
 public class DataCacheSnapshot {
 
+    /** The version of DataCacheSnapshot format. */
     private static final int CURRENT_VERSION = 1;
 
+    /** The file system that contains the cache files. */
     private final FileSystem fileSystem;
 
+    /**
+     * An optional position of DataCacheReader. If not set, recovered readers would read the
+     * segments from the beginning.
+     */
     @Nullable private final Tuple2<Integer, Integer> readerPosition;
 
+    /** The segments to be snapshot or recovered from. */
     private final List<Segment> segments;
 
     public DataCacheSnapshot(
@@ -64,6 +73,9 @@ public class DataCacheSnapshot {
         this.fileSystem = fileSystem;
         this.readerPosition = readerPosition;
         this.segments = segments;
+        for (Segment segment : segments) {
+            Preconditions.checkArgument(segment.getFsSize() > 0);
+        }
     }
 
     public FileSystem getFileSystem() {
@@ -79,6 +91,7 @@ public class DataCacheSnapshot {
         return segments;
     }
 
+    /** Writes the information about this data cache to an output stream. */
     public void writeTo(OutputStream checkpointOutputStream) throws IOException {
         try (DataOutputStream dos =
                 new DataOutputStream(new NonClosingOutputStreamDecorator(checkpointOutputStream))) {
@@ -95,13 +108,10 @@ public class DataCacheSnapshot {
                 serializeSegments(segments, dos);
             } else {
                 // We have to copy the whole streams.
-                int totalRecords = segments.stream().mapToInt(Segment::getCount).sum();
-                long totalSize = segments.stream().mapToLong(Segment::getSize).sum();
-                checkState(totalRecords >= 0, "overflowed: " + totalRecords);
-                dos.writeInt(totalRecords);
-                dos.writeLong(totalSize);
-
+                dos.writeInt(segments.size());
                 for (Segment segment : segments) {
+                    dos.writeInt(segment.getCount());
+                    dos.writeLong(segment.getFsSize());
                     try (FSDataInputStream inputStream = fileSystem.open(segment.getPath())) {
                         IOUtils.copyBytes(inputStream, checkpointOutputStream, false);
                     }
@@ -110,10 +120,13 @@ public class DataCacheSnapshot {
         }
     }
 
+    /**
+     * Replays cached records in the data cache from the input stream into the target feedback
+     * consumer.
+     */
     public static <T> void replay(
             InputStream checkpointInputStream,
             TypeSerializer<T> serializer,
-            FileSystem fileSystem,
             FeedbackConsumer<T> feedbackConsumer)
             throws Exception {
         try (DataInputStream dis =
@@ -127,23 +140,27 @@ public class DataCacheSnapshot {
             boolean isDistributedFS = dis.readBoolean();
             if (isDistributedFS) {
                 List<Segment> segments = deserializeSegments(dis);
-                DataCacheReader<T> dataCacheReader =
-                        new DataCacheReader<>(serializer, fileSystem, segments);
+
+                DataCacheReader<T> dataCacheReader = new DataCacheReader<>(serializer, segments);
+
                 while (dataCacheReader.hasNext()) {
                     feedbackConsumer.processFeedback(dataCacheReader.next());
                 }
             } else {
                 DataInputViewStreamWrapper dataInputView = new DataInputViewStreamWrapper(dis);
-                int totalRecords = dis.readInt();
-                // Ignore the total size.
-                dis.readLong();
-                for (int i = 0; i < totalRecords; ++i) {
-                    feedbackConsumer.processFeedback(serializer.deserialize(dataInputView));
+                int segmentNum = dis.readInt();
+                for (int i = 0; i < segmentNum; i++) {
+                    int count = dis.readInt();
+                    dis.readLong();
+                    for (int j = 0; j < count; j++) {
+                        feedbackConsumer.processFeedback(serializer.deserialize(dataInputView));
+                    }
                 }
             }
         }
     }
 
+    /** Recovers a data cache instance from the input stream. */
     public static DataCacheSnapshot recover(
             InputStream checkpointInputStream,
             FileSystem fileSystem,
@@ -167,23 +184,66 @@ public class DataCacheSnapshot {
             if (isDistributedFS) {
                 segments = deserializeSegments(dis);
             } else {
-                int totalRecords = dis.readInt();
-                long totalSize = dis.readLong();
+                int segmentNum = dis.readInt();
+                segments = new ArrayList<>(segmentNum);
+                for (int i = 0; i < segmentNum; i++) {
+                    int count = dis.readInt();
+                    long fsSize = dis.readLong();
+                    Path path = pathGenerator.get();
+                    try (FSDataOutputStream outputStream =
+                            fileSystem.create(path, FileSystem.WriteMode.NO_OVERWRITE)) {
 
-                Path path = pathGenerator.get();
-                try (FSDataOutputStream outputStream =
-                        fileSystem.create(path, FileSystem.WriteMode.NO_OVERWRITE)) {
-
-                    BoundedInputStream inputStream =
-                            new BoundedInputStream(checkpointInputStream, totalSize);
-                    inputStream.setPropagateClose(false);
-                    IOUtils.copyBytes(inputStream, outputStream, false);
-                    inputStream.close();
+                        BoundedInputStream boundedInputStream =
+                                new BoundedInputStream(checkpointInputStream, fsSize);
+                        boundedInputStream.setPropagateClose(false);
+                        IOUtils.copyBytes(boundedInputStream, outputStream, false);
+                        boundedInputStream.close();
+                    }
+                    segments.add(new Segment(path, count, fsSize));
                 }
-                segments = Collections.singletonList(new Segment(path, totalRecords, totalSize));
             }
 
             return new DataCacheSnapshot(fileSystem, readerPosition, segments);
+        }
+    }
+
+    /**
+     * Attempts to cache the segments in memory.
+     *
+     * <p>The attempt is made at segment granularity, which means there might be only part of the
+     * segments are cached.
+     *
+     * <p>This method does not throw exceptions if there is not enough memory space for caching a
+     * segment.
+     */
+    public <T> void tryReadSegmentsToMemory(
+            TypeSerializer<T> serializer, MemorySegmentPool segmentPool) throws IOException {
+        boolean cacheSuccess;
+        for (Segment segment : segments) {
+            if (!segment.getCache().isEmpty()) {
+                continue;
+            }
+
+            SegmentReader<T> reader = new FileSegmentReader<>(serializer, segment, 0);
+            SegmentWriter<T> writer;
+            try {
+                writer =
+                        new MemorySegmentWriter<>(
+                                serializer, segment.getPath(), segmentPool, segment.getFsSize());
+            } catch (MemoryAllocationException e) {
+                break;
+            }
+
+            cacheSuccess = true;
+            while (cacheSuccess && reader.hasNext()) {
+                if (!writer.addRecord(reader.next())) {
+                    writer.finish().ifPresent(x -> segmentPool.returnAll(x.getCache()));
+                    cacheSuccess = false;
+                }
+            }
+            if (cacheSuccess) {
+                segment.setCache(writer.finish().get().getCache());
+            }
         }
     }
 
@@ -201,10 +261,10 @@ public class DataCacheSnapshot {
     private static void serializeSegments(List<Segment> segments, DataOutputStream dataOutputStream)
             throws IOException {
         dataOutputStream.writeInt(segments.size());
-        for (int i = 0; i < segments.size(); ++i) {
-            dataOutputStream.writeUTF(segments.get(i).getPath().toString());
-            dataOutputStream.writeInt(segments.get(i).getCount());
-            dataOutputStream.writeLong(segments.get(i).getSize());
+        for (Segment segment : segments) {
+            dataOutputStream.writeUTF(segment.getPath().toString());
+            dataOutputStream.writeInt(segment.getCount());
+            dataOutputStream.writeLong(segment.getFsSize());
         }
     }
 

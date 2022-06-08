@@ -78,14 +78,16 @@ public class StandardScalerModelData {
 
     /** Data encoder for the {@link StandardScalerModel} model data. */
     public static class ModelDataEncoder implements Encoder<StandardScalerModelData> {
+        private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+
         @Override
         public void encode(StandardScalerModelData modelData, OutputStream outputStream)
                 throws IOException {
             DataOutputViewStreamWrapper outputViewStreamWrapper =
                     new DataOutputViewStreamWrapper(outputStream);
 
-            DenseVectorSerializer.INSTANCE.serialize(modelData.mean, outputViewStreamWrapper);
-            DenseVectorSerializer.INSTANCE.serialize(modelData.std, outputViewStreamWrapper);
+            serializer.serialize(modelData.mean, outputViewStreamWrapper);
+            serializer.serialize(modelData.std, outputViewStreamWrapper);
         }
     }
 
@@ -95,6 +97,7 @@ public class StandardScalerModelData {
         public Reader<StandardScalerModelData> createReader(
                 Configuration configuration, FSDataInputStream inputStream) {
             return new Reader<StandardScalerModelData>() {
+                private final DenseVectorSerializer serializer = new DenseVectorSerializer();
 
                 @Override
                 public StandardScalerModelData read() throws IOException {
@@ -102,10 +105,8 @@ public class StandardScalerModelData {
                             new DataInputViewStreamWrapper(inputStream);
 
                     try {
-                        DenseVector mean =
-                                DenseVectorSerializer.INSTANCE.deserialize(inputViewStreamWrapper);
-                        DenseVector std =
-                                DenseVectorSerializer.INSTANCE.deserialize(inputViewStreamWrapper);
+                        DenseVector mean = serializer.deserialize(inputViewStreamWrapper);
+                        DenseVector std = serializer.deserialize(inputViewStreamWrapper);
                         return new StandardScalerModelData(mean, std);
                     } catch (EOFException e) {
                         return null;

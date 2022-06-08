@@ -153,18 +153,18 @@ public class Checkpoints<T> implements AutoCloseable {
                         pendingCheckpoint -> {
                             try {
                                 pendingCheckpoint.dataCacheWriter.finish();
+                                pendingCheckpoint.dataCacheWriter.writeSegmentsToFiles();
                                 DataCacheSnapshot snapshot =
                                         new DataCacheSnapshot(
                                                 fileSystem,
                                                 null,
-                                                pendingCheckpoint.dataCacheWriter
-                                                        .getFinishSegments());
+                                                pendingCheckpoint.dataCacheWriter.getSegments());
                                 pendingCheckpoint.checkpointOutputStream.startNewPartition();
                                 snapshot.writeTo(pendingCheckpoint.checkpointOutputStream);
 
                                 // Directly cleanup all the files since we are using the local fs.
                                 // TODO: support of the remote fs.
-                                pendingCheckpoint.dataCacheWriter.cleanup();
+                                pendingCheckpoint.dataCacheWriter.clear();
                             } catch (Exception e) {
                                 LOG.error("Failed to commit checkpoint until " + checkpointId, e);
                                 throw new FlinkRuntimeException(e);
@@ -182,7 +182,7 @@ public class Checkpoints<T> implements AutoCloseable {
                 (checkpointId, pendingCheckpoint) -> {
                     pendingCheckpoint.snapshotLease.close();
                     try {
-                        pendingCheckpoint.dataCacheWriter.cleanup();
+                        pendingCheckpoint.dataCacheWriter.clear();
                     } catch (IOException e) {
                         LOG.error("Failed to cleanup " + checkpointId, e);
                     }

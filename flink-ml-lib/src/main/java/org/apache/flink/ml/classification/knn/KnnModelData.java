@@ -83,12 +83,14 @@ public class KnnModelData {
 
     /** Encoder for {@link KnnModelData}. */
     public static class ModelDataEncoder implements Encoder<KnnModelData> {
+        private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+
         @Override
         public void encode(KnnModelData modelData, OutputStream outputStream) throws IOException {
             DataOutputView dataOutputView = new DataOutputViewStreamWrapper(outputStream);
             DenseMatrixSerializer.INSTANCE.serialize(modelData.packedFeatures, dataOutputView);
-            DenseVectorSerializer.INSTANCE.serialize(modelData.featureNormSquares, dataOutputView);
-            DenseVectorSerializer.INSTANCE.serialize(modelData.labels, dataOutputView);
+            serializer.serialize(modelData.featureNormSquares, dataOutputView);
+            serializer.serialize(modelData.labels, dataOutputView);
         }
     }
 
@@ -100,13 +102,14 @@ public class KnnModelData {
 
                 private final DataInputView source = new DataInputViewStreamWrapper(stream);
 
+                private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+
                 @Override
                 public KnnModelData read() throws IOException {
                     try {
                         DenseMatrix matrix = DenseMatrixSerializer.INSTANCE.deserialize(source);
-                        DenseVector normSquares =
-                                DenseVectorSerializer.INSTANCE.deserialize(source);
-                        DenseVector labels = DenseVectorSerializer.INSTANCE.deserialize(source);
+                        DenseVector normSquares = serializer.deserialize(source);
+                        DenseVector labels = serializer.deserialize(source);
                         return new KnnModelData(matrix, normSquares, labels);
                     } catch (EOFException e) {
                         return null;

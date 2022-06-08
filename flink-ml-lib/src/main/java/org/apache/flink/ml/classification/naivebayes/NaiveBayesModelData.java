@@ -92,6 +92,8 @@ public class NaiveBayesModelData {
 
     /** Data encoder for the {@link NaiveBayesModelData}. */
     public static class ModelDataEncoder implements Encoder<NaiveBayesModelData> {
+        private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+
         @Override
         public void encode(NaiveBayesModelData modelData, OutputStream outputStream)
                 throws IOException {
@@ -101,9 +103,9 @@ public class NaiveBayesModelData {
             MapSerializer<Double, Double> mapSerializer =
                     new MapSerializer<>(DoubleSerializer.INSTANCE, DoubleSerializer.INSTANCE);
 
-            DenseVectorSerializer.INSTANCE.serialize(modelData.labels, outputViewStreamWrapper);
+            serializer.serialize(modelData.labels, outputViewStreamWrapper);
 
-            DenseVectorSerializer.INSTANCE.serialize(modelData.piArray, outputViewStreamWrapper);
+            serializer.serialize(modelData.piArray, outputViewStreamWrapper);
 
             outputViewStreamWrapper.writeInt(modelData.theta.length);
             outputViewStreamWrapper.writeInt(modelData.theta[0].length);
@@ -121,6 +123,7 @@ public class NaiveBayesModelData {
         public Reader<NaiveBayesModelData> createReader(
                 Configuration config, FSDataInputStream inputStream) {
             return new Reader<NaiveBayesModelData>() {
+                private final DenseVectorSerializer serializer = new DenseVectorSerializer();
 
                 @Override
                 public NaiveBayesModelData read() throws IOException {
@@ -131,11 +134,9 @@ public class NaiveBayesModelData {
                                 new MapSerializer<>(
                                         DoubleSerializer.INSTANCE, DoubleSerializer.INSTANCE);
 
-                        DenseVector labels =
-                                DenseVectorSerializer.INSTANCE.deserialize(inputViewStreamWrapper);
+                        DenseVector labels = serializer.deserialize(inputViewStreamWrapper);
 
-                        DenseVector piArray =
-                                DenseVectorSerializer.INSTANCE.deserialize(inputViewStreamWrapper);
+                        DenseVector piArray = serializer.deserialize(inputViewStreamWrapper);
 
                         int featureSize = inputViewStreamWrapper.readInt();
                         int numLabels = inputViewStreamWrapper.readInt();
