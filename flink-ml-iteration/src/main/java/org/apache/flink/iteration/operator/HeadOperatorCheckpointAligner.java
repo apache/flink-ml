@@ -23,6 +23,7 @@ import org.apache.flink.iteration.operator.event.GloballyAlignedEvent;
 import org.apache.flink.util.function.RunnableWithException;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -109,10 +110,13 @@ class HeadOperatorCheckpointAligner {
     }
 
     List<GloballyAlignedEvent> onCheckpointAborted(long checkpointId) {
-        // Here we need to abort all the checkpoints <= notified checkpoint id.
-        checkState(checkpointId > latestAbortedCheckpoint);
+        if (checkpointId <= latestAbortedCheckpoint) {
+            return Collections.emptyList();
+        }
+
         latestAbortedCheckpoint = checkpointId;
 
+        // Here we need to abort all the checkpoints <= notified checkpoint id.
         Map<Long, CheckpointAlignment> abortedAlignments =
                 checkpointAlignmments.headMap(latestAbortedCheckpoint, true);
         List<GloballyAlignedEvent> events = new ArrayList<>();
