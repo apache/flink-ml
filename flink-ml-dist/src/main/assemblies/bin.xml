@@ -35,6 +35,7 @@ under the License.
 
             <includes>
                 <include>org.apache.flink:statefun-flink-core</include>
+                <include>org.openjdk.jol:jol-core</include>
                 <include>org.apache.flink:flink-ml-uber</include>
             </includes>
         </dependencySet>

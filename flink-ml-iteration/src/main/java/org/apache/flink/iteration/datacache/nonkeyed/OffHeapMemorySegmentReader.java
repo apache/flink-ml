@@ -28,9 +28,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 
-/** A class that reads data cached in memory. */
+/** A class that reads data cached in off-heap memory. */
 @Internal
-class MemorySegmentReader<T> implements SegmentReader<T> {
+class OffHeapMemorySegmentReader<T> implements SegmentReader<T> {
 
     /** The tool to deserialize bytes into records. */
     private final TypeSerializer<T> serializer;
@@ -44,9 +44,10 @@ class MemorySegmentReader<T> implements SegmentReader<T> {
     /** The number of records that have been read so far. */
     private int count;
 
-    MemorySegmentReader(TypeSerializer<T> serializer, Segment segment, int startOffset)
+    OffHeapMemorySegmentReader(TypeSerializer<T> serializer, Segment segment, int startOffset)
             throws IOException {
-        ManagedMemoryInputStream inputStream = new ManagedMemoryInputStream(segment.getCache());
+        ManagedMemoryInputStream inputStream =
+                new ManagedMemoryInputStream(segment.getOffHeapCache());
         this.inputView = new DataInputViewStreamWrapper(inputStream);
         this.serializer = serializer;
         this.totalCount = segment.getCount();
@@ -68,9 +69,6 @@ class MemorySegmentReader<T> implements SegmentReader<T> {
         count++;
         return value;
     }
-
-    @Override
-    public void close() {}
 
     /** An input stream subclass that reads bytes from memory segments. */
     private static class ManagedMemoryInputStream extends InputStream {

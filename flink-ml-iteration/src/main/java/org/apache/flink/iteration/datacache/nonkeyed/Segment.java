@@ -49,10 +49,16 @@ public class Segment {
     private long fsSize = 0L;
 
     /**
-     * The memory segments containing cached records. This list is empty iff the segment has not
-     * been cached in memory.
+     * The off-heap memory segments containing cached records. This list is empty iff the segment
+     * has not been cached in off-heap memory.
      */
-    private List<MemorySegment> cache = new ArrayList<>();
+    private List<MemorySegment> offHeapCache = new ArrayList<>();
+
+    /**
+     * The on-heap cached records. This list is empty iff the segment has not been cached in heap
+     * memory.
+     */
+    private List<Object> onHeapCache = new ArrayList<>();
 
     Segment(Path path, int count, long fsSize) {
         this.path = path;
@@ -64,17 +70,32 @@ public class Segment {
         checkArgument(fsSize > 0);
     }
 
-    Segment(Path path, int count, List<MemorySegment> cache) {
+    Segment(Path path, int count, List<MemorySegment> offHeapCache) {
         this.path = path;
         this.count = count;
-        this.cache = cache;
+        this.offHeapCache = offHeapCache;
 
         checkNotNull(path);
         checkArgument(count > 0);
     }
 
-    void setCache(List<MemorySegment> cache) {
-        this.cache = cache;
+    @SuppressWarnings("unchecked")
+    <T> Segment(Path path, List<T> onHeapCache) {
+        this.path = path;
+        this.count = onHeapCache.size();
+        this.onHeapCache = (List<Object>) onHeapCache;
+
+        checkNotNull(path);
+        checkArgument(count > 0);
+    }
+
+    void setOffHeapCache(List<MemorySegment> offHeapCache) {
+        this.offHeapCache = offHeapCache;
+    }
+
+    @SuppressWarnings("unchecked")
+    <T> void setOnHeapCache(List<T> onHeapCache) {
+        this.onHeapCache = (List<Object>) onHeapCache;
     }
 
     void setFsSize(long fsSize) {
@@ -94,8 +115,13 @@ public class Segment {
         return fsSize;
     }
 
-    List<MemorySegment> getCache() {
-        return cache;
+    List<MemorySegment> getOffHeapCache() {
+        return offHeapCache;
+    }
+
+    @SuppressWarnings("unchecked")
+    <T> List<T> getOnHeapCache() {
+        return (List<T>) onHeapCache;
     }
 
     @Override

@@ -18,19 +18,30 @@
 
 package org.apache.flink.iteration.datacache.nonkeyed;
 
-import org.apache.flink.annotation.Internal;
-
 import java.io.IOException;
+import java.util.List;
 
-/** Reader for the cached data in a segment. */
-@Internal
-interface SegmentReader<T> {
-    /** Checks whether the reader has next record. */
-    boolean hasNext();
+/** A class that reads data cached in heap memory. */
+public class OnHeapMemorySegmentReader<T> implements SegmentReader<T> {
 
-    /** Gets the next record from the reader. */
-    T next() throws IOException;
+    /** The cached data. */
+    private final List<T> list;
 
-    /** Closes resources used by the reader. */
-    default void close() throws IOException {}
+    /** The number of records that have been read so far. */
+    private int count;
+
+    public OnHeapMemorySegmentReader(Segment segment, int startOffset) {
+        this.list = segment.getOnHeapCache();
+        this.count = startOffset;
+    }
+
+    @Override
+    public boolean hasNext() {
+        return count < list.size();
+    }
+
+    @Override
+    public T next() throws IOException {
+        return list.get(count++);
+    }
 }

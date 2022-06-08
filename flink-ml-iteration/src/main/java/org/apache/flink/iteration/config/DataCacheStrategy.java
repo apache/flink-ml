@@ -16,21 +16,22 @@
  * limitations under the License.
  */
 
-package org.apache.flink.iteration.datacache.nonkeyed;
+package org.apache.flink.iteration.config;
 
-import org.apache.flink.annotation.Internal;
+/** The strategy to store cache data. */
+public enum DataCacheStrategy {
+    ON_HEAP_AND_DISK(true, false),
+    OFF_HEAP_AND_DISK(false, true),
+    DISK_ONLY(false, false);
 
-import java.io.IOException;
+    /** Whether to use on-heap memory for cache. */
+    public final boolean useOnHeap;
 
-/** Reader for the cached data in a segment. */
-@Internal
-interface SegmentReader<T> {
-    /** Checks whether the reader has next record. */
-    boolean hasNext();
+    /** Whether to use off-heap memory for cache. */
+    public final boolean useOffHeap;
 
-    /** Gets the next record from the reader. */
-    T next() throws IOException;
-
-    /** Closes resources used by the reader. */
-    default void close() throws IOException {}
+    DataCacheStrategy(boolean useOnHeap, boolean useOffHeap) {
+        this.useOnHeap = useOnHeap;
+        this.useOffHeap = useOffHeap;
+    }
 }

@@ -20,18 +20,36 @@ package org.apache.flink.iteration.config;
 
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.CoreOptions;
+import org.apache.flink.configuration.description.Description;
 
 import static org.apache.flink.configuration.ConfigOptions.key;
 
 /** The options for the iteration. */
 public class IterationOptions {
-
+    // TODO: create configuration section in Flink ML's document and add these.
     public static final ConfigOption<String> DATA_CACHE_PATH =
             key("iteration.data-cache.path")
                     .stringType()
                     .noDefaultValue()
                     .withDescription(
-                            "The base path of the data cached used inside the iteration. "
-                                    + "If not specified, it will use local path randomly chosen from "
-                                    + CoreOptions.TMP_DIRS.key());
+                            Description.builder()
+                                    .text(
+                                            "The base path of the data cached used inside the iteration. ")
+                                    .text(
+                                            "If not specified, it will use local path randomly chosen from ")
+                                    .text(CoreOptions.TMP_DIRS.key())
+                                    .build());
+
+    public static final ConfigOption<DataCacheStrategy> DATA_CACHE_STRATEGY =
+            key("iteration.data-cache.strategy")
+                    .enumType(DataCacheStrategy.class)
+                    .defaultValue(DataCacheStrategy.OFF_HEAP_AND_DISK)
+                    .withDescription("The strategy to store cache data.");
+
+    public static final ConfigOption<Double> DATA_CACHE_HEAP_MEMORY_FRACTION =
+            key("iteration.data-cache.heap.memory.fraction")
+                    .doubleType()
+                    .defaultValue(0.3)
+                    .withDescription(
+                            "Fraction of total task heap memory reserved for storing cache data.");
 }

@@ -35,9 +35,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/** A class that writes cache data to memory segments. */
+/** A class that writes cache data to off-heap memory segments. */
 @Internal
-class MemorySegmentWriter<T> implements SegmentWriter<T> {
+class OffHeapMemorySegmentWriter<T> implements SegmentWriter<T> {
 
     /** The tool to serialize received records into bytes. */
     private final TypeSerializer<T> serializer;
@@ -57,7 +57,7 @@ class MemorySegmentWriter<T> implements SegmentWriter<T> {
     /** The number of records added so far. */
     private int count;
 
-    MemorySegmentWriter(
+    OffHeapMemorySegmentWriter(
             TypeSerializer<T> serializer,
             Path path,
             MemorySegmentPool segmentPool,

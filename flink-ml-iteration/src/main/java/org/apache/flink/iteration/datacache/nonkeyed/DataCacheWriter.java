@@ -26,6 +26,8 @@ import org.apache.flink.table.runtime.util.MemorySegmentPool;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.function.SupplierWithException;
 
+import org.openjdk.jol.info.GraphLayout;
+
 import javax.annotation.Nullable;
 
 import java.io.IOException;
@@ -51,18 +53,23 @@ public class DataCacheWriter<T> {
     /** An optional pool that provide memory segments to hold cached records in memory. */
     @Nullable private final MemorySegmentPool segmentPool;
 
+    @Nullable private final OnHeapMemoryPool onHeapMemoryPool;
+
     /** The segments that contain previously added records. */
     private final List<Segment> finishedSegments;
 
     /** The current writer for new records. */
     @Nullable private SegmentWriter<T> currentSegmentWriter;
 
+    /** Whether this object should try to cache records in memory. */
+    private boolean tryCacheInMemory = true;
+
     public DataCacheWriter(
             TypeSerializer<T> serializer,
             FileSystem fileSystem,
             SupplierWithException<Path, IOException> pathGenerator)
             throws IOException {
-        this(serializer, fileSystem, pathGenerator, null, Collections.emptyList());
+        this(serializer, fileSystem, pathGenerator, null, null, Collections.emptyList());
     }
 
     public DataCacheWriter(
@@ -71,7 +78,7 @@ public class DataCacheWriter<T> {
             SupplierWithException<Path, IOException> pathGenerator,
             MemorySegmentPool segmentPool)
             throws IOException {
-        this(serializer, fileSystem, pathGenerator, segmentPool, Collections.emptyList());
+        this(serializer, fileSystem, pathGenerator, segmentPool, null, Collections.emptyList());
     }
 
     public DataCacheWriter(
@@ -80,7 +87,22 @@ public class DataCacheWriter<T> {
             SupplierWithException<Path, IOException> pathGenerator,
             List<Segment> priorFinishedSegments)
             throws IOException {
-        this(serializer, fileSystem, pathGenerator, null, priorFinishedSegments);
+        this(serializer, fileSystem, pathGenerator, null, null, priorFinishedSegments);
+    }
+
+    public DataCacheWriter(
+            TypeSerializer<T> serializer,
+            FileSystem fileSystem,
+            SupplierWithException<Path, IOException> pathGenerator,
+            @Nullable OnHeapMemoryPool onHeapMemoryPool)
+            throws IOException {
+        this(
+                serializer,
+                fileSystem,
+                pathGenerator,
+                null,
+                onHeapMemoryPool,
+                Collections.emptyList());
     }
 
     public DataCacheWriter(
@@ -88,12 +110,14 @@ public class DataCacheWriter<T> {
             FileSystem fileSystem,
             SupplierWithException<Path, IOException> pathGenerator,
             @Nullable MemorySegmentPool segmentPool,
+            @Nullable OnHeapMemoryPool onHeapMemoryPool,
             List<Segment> priorFinishedSegments)
             throws IOException {
+        this.serializer = serializer;
         this.fileSystem = fileSystem;
         this.pathGenerator = pathGenerator;
         this.segmentPool = segmentPool;
-        this.serializer = serializer;
+        this.onHeapMemoryPool = onHeapMemoryPool;
         this.finishedSegments = new ArrayList<>(priorFinishedSegments);
         this.currentSegmentWriter = createSegmentWriter();
     }
@@ -101,7 +125,8 @@ public class DataCacheWriter<T> {
     public void addRecord(T record) throws IOException {
         if (!currentSegmentWriter.addRecord(record)) {
             currentSegmentWriter.finish().ifPresent(finishedSegments::add);
-            currentSegmentWriter = new FileSegmentWriter<>(serializer, pathGenerator.get());
+            tryCacheInMemory = false;
+            this.currentSegmentWriter = createSegmentWriter();
             Preconditions.checkState(currentSegmentWriter.addRecord(record));
         }
     }
@@ -139,11 +164,18 @@ public class DataCacheWriter<T> {
     public void clear() throws IOException {
         finishCurrentSegmentIfExists();
         for (Segment segment : finishedSegments) {
+            if (!segment.getOnHeapCache().isEmpty()) {
+                long deserializedCacheSize = 0;
+                for (Object obj : segment.getOnHeapCache()) {
+                    deserializedCacheSize += GraphLayout.parseInstance(obj).totalSize();
+                }
+                onHeapMemoryPool.releaseMemory(deserializedCacheSize);
+            }
+            if (!segment.getOffHeapCache().isEmpty()) {
+                segmentPool.returnAll(segment.getOffHeapCache());
+            }
             if (segment.getFsSize() > 0) {
                 fileSystem.delete(segment.getPath(), false);
-            }
-            if (!segment.getCache().isEmpty()) {
-                segmentPool.returnAll(segment.getCache());
             }
         }
         finishedSegments.clear();
@@ -157,7 +189,13 @@ public class DataCacheWriter<T> {
                 continue;
             }
 
-            SegmentReader<T> reader = new MemorySegmentReader<>(serializer, segment, 0);
+            SegmentReader<T> reader;
+            if (!segment.getOnHeapCache().isEmpty()) {
+                reader = new OnHeapMemorySegmentReader<>(segment, 0);
+            } else {
+                reader = new OffHeapMemorySegmentReader<>(serializer, segment, 0);
+            }
+
             SegmentWriter<T> writer = new FileSegmentWriter<>(serializer, segment.getPath());
             while (reader.hasNext()) {
                 writer.addRecord(reader.next());
@@ -167,9 +205,13 @@ public class DataCacheWriter<T> {
     }
 
     private SegmentWriter<T> createSegmentWriter() throws IOException {
-        if (segmentPool != null) {
+        if (tryCacheInMemory && onHeapMemoryPool != null) {
+            return new OnHeapMemorySegmentWriter<>(pathGenerator.get(), onHeapMemoryPool);
+        }
+        if (tryCacheInMemory && segmentPool != null) {
             try {
-                return new MemorySegmentWriter<>(serializer, pathGenerator.get(), segmentPool, 0L);
+                return new OffHeapMemorySegmentWriter<>(
+                        serializer, pathGenerator.get(), segmentPool, 0L);
             } catch (MemoryAllocationException ignored) {
                 // ignore MemoryAllocationException and create FileSegmentWriter instead.
             }

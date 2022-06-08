@@ -35,6 +35,7 @@ import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.function.SupplierWithException;
 
 import org.apache.commons.io.input.BoundedInputStream;
+import org.openjdk.jol.info.GraphLayout;
 
 import javax.annotation.Nullable;
 
@@ -208,7 +209,7 @@ public class DataCacheSnapshot {
     }
 
     /**
-     * Attempts to cache the segments in memory.
+     * Attempts to cache the segments in heap memory.
      *
      * <p>The attempt is made at segment granularity, which means there might be only part of the
      * segments are cached.
@@ -216,11 +217,56 @@ public class DataCacheSnapshot {
      * <p>This method does not throw exceptions if there is not enough memory space for caching a
      * segment.
      */
-    public <T> void tryReadSegmentsToMemory(
+    public <T> void tryReadSegmentsToOnHeapMemory(
+            TypeSerializer<T> serializer, OnHeapMemoryPool memoryPool) throws IOException {
+        boolean cacheSuccess;
+        for (Segment segment : segments) {
+            if (!segment.getOffHeapCache().isEmpty() || !segment.getOnHeapCache().isEmpty()) {
+                continue;
+            }
+
+            SegmentReader<T> reader = new FileSegmentReader<>(serializer, segment, 0);
+            SegmentWriter<T> writer =
+                    new OnHeapMemorySegmentWriter<>(segment.getPath(), memoryPool);
+
+            cacheSuccess = true;
+            while (cacheSuccess && reader.hasNext()) {
+                if (!writer.addRecord(reader.next())) {
+                    writer.finish()
+                            .ifPresent(
+                                    x -> {
+                                        long deserializedCacheSize = 0;
+                                        for (Object obj : segment.getOnHeapCache()) {
+                                            deserializedCacheSize +=
+                                                    GraphLayout.parseInstance(obj).totalSize();
+                                        }
+                                        memoryPool.releaseMemory(deserializedCacheSize);
+                                    });
+                    cacheSuccess = false;
+                }
+            }
+            if (cacheSuccess) {
+                segment.setOnHeapCache(writer.finish().get().getOnHeapCache());
+            } else {
+                break;
+            }
+        }
+    }
+
+    /**
+     * Attempts to cache the segments in off-heap memory.
+     *
+     * <p>The attempt is made at segment granularity, which means there might be only part of the
+     * segments are cached.
+     *
+     * <p>This method does not throw exceptions if there is not enough memory space for caching a
+     * segment.
+     */
+    public <T> void tryReadSegmentsToOffHeapMemory(
             TypeSerializer<T> serializer, MemorySegmentPool segmentPool) throws IOException {
         boolean cacheSuccess;
         for (Segment segment : segments) {
-            if (!segment.getCache().isEmpty()) {
+            if (!segment.getOffHeapCache().isEmpty() || !segment.getOnHeapCache().isEmpty()) {
                 continue;
             }
 
@@ -228,7 +274,7 @@ public class DataCacheSnapshot {
             SegmentWriter<T> writer;
             try {
                 writer =
-                        new MemorySegmentWriter<>(
+                        new OffHeapMemorySegmentWriter<>(
                                 serializer, segment.getPath(), segmentPool, segment.getFsSize());
             } catch (MemoryAllocationException e) {
                 break;
@@ -237,12 +283,14 @@ public class DataCacheSnapshot {
             cacheSuccess = true;
             while (cacheSuccess && reader.hasNext()) {
                 if (!writer.addRecord(reader.next())) {
-                    writer.finish().ifPresent(x -> segmentPool.returnAll(x.getCache()));
+                    writer.finish().ifPresent(x -> segmentPool.returnAll(x.getOffHeapCache()));
                     cacheSuccess = false;
                 }
             }
             if (cacheSuccess) {
-                segment.setCache(writer.finish().get().getCache());
+                segment.setOffHeapCache(writer.finish().get().getOffHeapCache());
+            } else {
+                break;
             }
         }
     }

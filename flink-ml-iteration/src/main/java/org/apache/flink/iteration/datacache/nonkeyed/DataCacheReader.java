@@ -97,8 +97,11 @@ public class DataCacheReader<T> implements Iterator<T> {
             }
 
             Segment segment = segments.get(currentSegmentIndex);
-            if (!segment.getCache().isEmpty()) {
-                currentSegmentReader = new MemorySegmentReader<>(serializer, segment, startOffset);
+            if (!segment.getOnHeapCache().isEmpty()) {
+                currentSegmentReader = new OnHeapMemorySegmentReader<>(segment, startOffset);
+            } else if (!segment.getOffHeapCache().isEmpty()) {
+                currentSegmentReader =
+                        new OffHeapMemorySegmentReader<>(serializer, segment, startOffset);
             } else {
                 currentSegmentReader = new FileSegmentReader<>(serializer, segment, startOffset);
             }

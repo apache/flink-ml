@@ -84,7 +84,7 @@ public final class DenseVectorSerializer extends TypeSerializer<DenseVector> {
         target.writeInt(len);
 
         for (int i = 0; i < len; i++) {
-            Bits.putDouble(buf, i << 3, vector.values[i]);
+            Bits.putDouble(buf, (i & 127) << 3, vector.values[i]);
             if ((i & 127) == 127) {
                 target.write(buf);
             }

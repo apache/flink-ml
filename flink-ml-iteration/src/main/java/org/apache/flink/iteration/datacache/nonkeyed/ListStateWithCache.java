@@ -20,8 +20,11 @@ package org.apache.flink.iteration.datacache.nonkeyed;
 
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.core.memory.ManagedMemoryUseCase;
+import org.apache.flink.iteration.config.DataCacheStrategy;
+import org.apache.flink.iteration.config.IterationOptions;
 import org.apache.flink.iteration.operator.OperatorUtils;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.memory.MemoryManager;
@@ -72,21 +75,33 @@ public class ListStateWithCache<T> implements ListState<T> {
             throws IOException {
         this.serializer = serializer;
 
-        MemorySegmentPool segmentPool = null;
-        double fraction =
-                containingTask
-                        .getConfiguration()
-                        .getManagedMemoryFractionOperatorUseCaseOfSlot(
-                                ManagedMemoryUseCase.OPERATOR,
-                                runtimeContext.getTaskManagerRuntimeInfo().getConfiguration(),
-                                runtimeContext.getUserCodeClassLoader());
-        if (fraction > 0) {
-            MemoryManager memoryManager = containingTask.getEnvironment().getMemoryManager();
-            segmentPool =
-                    new LazyMemorySegmentPool(
-                            containingTask,
-                            memoryManager,
-                            memoryManager.computeNumberOfPages(fraction));
+        Configuration configuration =
+                containingTask.getEnvironment().getTaskManagerInfo().getConfiguration();
+        DataCacheStrategy dataCacheStrategy =
+                configuration.get(IterationOptions.DATA_CACHE_STRATEGY);
+
+        OnHeapMemoryPool onHeapMemoryPool = null;
+        if (dataCacheStrategy.useOnHeap) {
+            onHeapMemoryPool = OnHeapMemoryPool.getOrCreate(configuration);
+        }
+
+        MemorySegmentPool offHeapMemorySegmentPool = null;
+        if (dataCacheStrategy.useOffHeap) {
+            double fraction =
+                    containingTask
+                            .getConfiguration()
+                            .getManagedMemoryFractionOperatorUseCaseOfSlot(
+                                    ManagedMemoryUseCase.OPERATOR,
+                                    runtimeContext.getTaskManagerRuntimeInfo().getConfiguration(),
+                                    runtimeContext.getUserCodeClassLoader());
+            if (fraction > 0) {
+                MemoryManager memoryManager = containingTask.getEnvironment().getMemoryManager();
+                offHeapMemorySegmentPool =
+                        new LazyMemorySegmentPool(
+                                containingTask,
+                                memoryManager,
+                                memoryManager.computeNumberOfPages(fraction));
+            }
         }
 
         basePath =
@@ -111,9 +126,12 @@ public class ListStateWithCache<T> implements ListState<T> {
                             basePath.getFileSystem(),
                             OperatorUtils.createDataCacheFileGenerator(
                                     basePath, "cache", operatorID));
-
-            if (segmentPool != null) {
-                dataCacheSnapshot.tryReadSegmentsToMemory(serializer, segmentPool);
+            if (onHeapMemoryPool != null) {
+                dataCacheSnapshot.tryReadSegmentsToOnHeapMemory(serializer, onHeapMemoryPool);
+            }
+            if (offHeapMemorySegmentPool != null) {
+                dataCacheSnapshot.tryReadSegmentsToOffHeapMemory(
+                        serializer, offHeapMemorySegmentPool);
             }
 
             priorFinishedSegments = dataCacheSnapshot.getSegments();
@@ -124,7 +142,8 @@ public class ListStateWithCache<T> implements ListState<T> {
                         serializer,
                         basePath.getFileSystem(),
                         OperatorUtils.createDataCacheFileGenerator(basePath, "cache", operatorID),
-                        segmentPool,
+                        offHeapMemorySegmentPool,
+                        onHeapMemoryPool,
                         priorFinishedSegments);
     }
 
