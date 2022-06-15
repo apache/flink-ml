@@ -86,8 +86,10 @@ public class BLASTest {
 
     @Test
     public void testNorm2() {
-        double expectedResult = Math.sqrt(55);
-        assertEquals(expectedResult, BLAS.norm2(inputDenseVec), TOLERANCE);
+        assertEquals(Math.sqrt(55), BLAS.norm2(inputDenseVec), TOLERANCE);
+
+        SparseVector sparseVector = Vectors.sparse(5, new int[] {0, 2, 4}, new double[] {1, 3, 5});
+        assertEquals(Math.sqrt(35), BLAS.norm2(sparseVector), TOLERANCE);
     }
 
     @Test

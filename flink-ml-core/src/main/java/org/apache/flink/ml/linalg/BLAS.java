@@ -114,8 +114,19 @@ public class BLAS {
     }
 
     /** \sqrt(\sum_i x_i * x_i) . */
-    public static double norm2(DenseVector x) {
+    public static double norm2(Vector x) {
+        if (x instanceof DenseVector) {
+            return norm2((DenseVector) x);
+        }
+        return norm2((SparseVector) x);
+    }
+
+    private static double norm2(DenseVector x) {
         return JAVA_BLAS.dnrm2(x.size(), x.values, 1);
+    }
+
+    private static double norm2(SparseVector x) {
+        return JAVA_BLAS.dnrm2(x.values.length, x.values, 1);
     }
 
     /** x = x * a . */

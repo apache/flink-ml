@@ -35,6 +35,7 @@ import org.apache.flink.ml.common.distance.DistanceMeasure;
 import org.apache.flink.ml.linalg.BLAS;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.VectorWithNorm;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -276,6 +277,10 @@ public class OnlineKMeans
             KMeansModelData modelData =
                     OperatorStateUtils.getUniqueElement(modelDataState, "modelData").get();
             DenseVector[] centroids = modelData.centroids;
+            VectorWithNorm[] centroidsWithNorm = new VectorWithNorm[modelData.centroids.length];
+            for (int i = 0; i < centroidsWithNorm.length; i++) {
+                centroidsWithNorm[i] = new VectorWithNorm(modelData.centroids[i]);
+            }
             DenseVector weights = modelData.weights;
             modelDataState.clear();
 
@@ -296,7 +301,7 @@ public class OnlineKMeans
             }
             for (DenseVector point : points) {
                 int closestCentroidId =
-                        KMeans.findClosestCentroidId(centroids, point, distanceMeasure);
+                        distanceMeasure.findClosest(centroidsWithNorm, new VectorWithNorm(point));
                 counts[closestCentroidId]++;
                 BLAS.axpy(1.0, point, sums[closestCentroidId]);
             }
