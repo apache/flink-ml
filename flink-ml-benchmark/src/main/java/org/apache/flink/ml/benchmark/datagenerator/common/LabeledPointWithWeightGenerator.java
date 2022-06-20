@@ -18,33 +18,18 @@
 
 package org.apache.flink.ml.benchmark.datagenerator.common;
 
-import org.apache.flink.api.common.functions.RichMapFunction;
-import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
-import org.apache.flink.configuration.Configuration;
-import org.apache.flink.ml.benchmark.datagenerator.InputDataGenerator;
 import org.apache.flink.ml.benchmark.datagenerator.param.HasVectorDim;
-import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.param.IntParam;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.param.ParamValidators;
 import org.apache.flink.ml.util.ParamUtils;
-import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.table.api.Table;
-import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
-import org.apache.flink.util.NumberSequenceIterator;
 import org.apache.flink.util.Preconditions;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
 
 /**
  * A DataGenerator which creates a table of features, label and weight.
@@ -58,8 +43,8 @@ import java.util.Random;
  * </ul>
  */
 public class LabeledPointWithWeightGenerator
-        implements InputDataGenerator<LabeledPointWithWeightGenerator>,
-                HasVectorDim<LabeledPointWithWeightGenerator> {
+        extends InputTableGenerator<LabeledPointWithWeightGenerator>
+        implements HasVectorDim<LabeledPointWithWeightGenerator> {
 
     public static final Param<Integer> FEATURE_ARITY =
             new IntParam(
@@ -78,8 +63,6 @@ public class LabeledPointWithWeightGenerator
                             + "If set to zero, the label would be a continuous double in range [0, 1).",
                     2,
                     ParamValidators.gtEq(0));
-
-    private final Map<Param<?>, Object> paramMap = new HashMap<>();
 
     public LabeledPointWithWeightGenerator() {
         ParamUtils.initializeMapWithDefaultValues(paramMap, this);
@@ -102,79 +85,46 @@ public class LabeledPointWithWeightGenerator
     }
 
     @Override
-    public Table[] getData(StreamTableEnvironment tEnv) {
-        Preconditions.checkState(getColNames().length == 1);
-        Preconditions.checkState(getColNames()[0].length == 3);
+    protected RowGenerator[] getRowGenerators() {
+        String[][] colNames = getColNames();
+        Preconditions.checkState(colNames.length == 1);
+        Preconditions.checkState(colNames[0].length == 3);
+        int vectorDim = getVectorDim();
+        int featureArity = getFeatureArity();
+        int labelArity = getLabelArity();
 
-        StreamExecutionEnvironment env = TableUtils.getExecutionEnvironment(tEnv);
+        return new RowGenerator[] {
+            new RowGenerator(getNumValues(), getSeed()) {
+                @Override
+                protected Row nextRow() {
+                    double[] features = new double[vectorDim];
+                    for (int i = 0; i < vectorDim; i++) {
+                        features[i] = getValue(featureArity);
+                    }
 
-        DataStream<Row> dataStream =
-                env.fromParallelCollection(
-                                new NumberSequenceIterator(1L, getNumValues()),
-                                BasicTypeInfo.LONG_TYPE_INFO)
-                        .map(
-                                new RandomLabeledPointWithWeightGenerator(
-                                        getSeed(),
-                                        getVectorDim(),
-                                        getFeatureArity(),
-                                        getLabelArity()),
-                                new RowTypeInfo(
-                                        new TypeInformation[] {
-                                            DenseVectorTypeInfo.INSTANCE, Types.DOUBLE, Types.DOUBLE
-                                        },
-                                        getColNames()[0]));
+                    double label = getValue(labelArity);
 
-        Table dataTable = tEnv.fromDataStream(dataStream);
+                    double weight = random.nextDouble();
 
-        return new Table[] {dataTable};
-    }
+                    return Row.of(Vectors.dense(features), label, weight);
+                }
 
-    @Override
-    public Map<Param<?>, Object> getParamMap() {
-        return paramMap;
-    }
+                @Override
+                protected RowTypeInfo getRowTypeInfo() {
+                    return new RowTypeInfo(
+                            new TypeInformation[] {
+                                DenseVectorTypeInfo.INSTANCE, Types.DOUBLE, Types.DOUBLE
+                            },
+                            colNames[0]);
+                }
 
-    private static class RandomLabeledPointWithWeightGenerator extends RichMapFunction<Long, Row> {
-        private final long initSeed;
-        private final int vectorDim;
-        private final int featureArity;
-        private final int labelArity;
-        private Random random;
-
-        private RandomLabeledPointWithWeightGenerator(
-                long initSeed, int vectorDim, int featureArity, int labelArity) {
-            this.initSeed = initSeed;
-            this.vectorDim = vectorDim;
-            this.featureArity = featureArity;
-            this.labelArity = labelArity;
-        }
-
-        @Override
-        public void open(Configuration parameters) throws Exception {
-            super.open(parameters);
-            int index = getRuntimeContext().getIndexOfThisSubtask();
-            random = new Random(Tuple2.of(initSeed, index).hashCode());
-        }
-
-        @Override
-        public Row map(Long ignored) {
-            double[] features = new double[vectorDim];
-            for (int i = 0; i < vectorDim; i++) {
-                features[i] = getValue(featureArity);
+                private double getValue(int arity) {
+                    if (arity > 0) {
+                        return random.nextInt(arity);
+                    }
+                    return random.nextDouble();
+                }
             }
-
-            double label = getValue(labelArity);
-
-            double weight = random.nextDouble();
-
-            return Row.of(Vectors.dense(features), label, weight);
-        }
-
-        private double getValue(int arity) {
-            if (arity > 0) {
-                return random.nextInt(arity);
-            }
-            return random.nextDouble();
-        }
+        };
     }
 }
