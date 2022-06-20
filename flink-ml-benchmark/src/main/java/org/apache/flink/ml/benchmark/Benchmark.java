@@ -77,6 +77,7 @@ public class Benchmark {
         String saveFile = commandLine.getOptionValue(OUTPUT_FILE_OPTION.getLongOpt());
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.getConfig().enableObjectReuse();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         int index = 0;
