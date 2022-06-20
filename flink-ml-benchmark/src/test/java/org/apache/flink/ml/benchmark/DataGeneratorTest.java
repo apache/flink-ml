@@ -18,17 +18,22 @@
 
 package org.apache.flink.ml.benchmark;
 
+import org.apache.flink.api.common.restartstrategy.RestartStrategies;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorArrayGenerator;
 import org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator;
 import org.apache.flink.ml.benchmark.datagenerator.common.LabeledPointWithWeightGenerator;
 import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
+import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -36,11 +41,22 @@ import static org.junit.Assert.assertTrue;
 
 /** Tests data generators. */
 public class DataGeneratorTest {
+    @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
+    private StreamTableEnvironment tEnv;
+
+    @Before
+    public void before() {
+        Configuration config = new Configuration();
+        config.set(ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment(config);
+        env.setParallelism(4);
+        env.enableCheckpointing(100);
+        env.setRestartStrategy(RestartStrategies.noRestart());
+        tEnv = StreamTableEnvironment.create(env);
+    }
+
     @Test
     public void testDenseVectorGenerator() {
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
-
         DenseVectorGenerator generator =
                 new DenseVectorGenerator()
                         .setColNames(new String[] {"denseVector"})
@@ -51,7 +67,7 @@ public class DataGeneratorTest {
         for (CloseableIterator<Row> it = generator.getData(tEnv)[0].execute().collect();
                 it.hasNext(); ) {
             Row row = it.next();
-            assertEquals(row.getArity(), 1);
+            assertEquals(1, row.getArity());
             DenseVector vector = (DenseVector) row.getField(generator.getColNames()[0][0]);
             assertNotNull(vector);
             assertEquals(vector.size(), generator.getVectorDim());
@@ -61,10 +77,7 @@ public class DataGeneratorTest {
     }
 
     @Test
-    public void testDenseVectorArrayGenerator() throws Exception {
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
-
+    public void testDenseVectorArrayGenerator() {
         DenseVectorArrayGenerator generator =
                 new DenseVectorArrayGenerator()
                         .setColNames(new String[] {"denseVectors"})
@@ -72,12 +85,13 @@ public class DataGeneratorTest {
                         .setVectorDim(10)
                         .setArraySize(20);
 
-        DataStream<DenseVector[]> stream =
-                tEnv.toDataStream(generator.getData(tEnv)[0], DenseVector[].class);
-
         int count = 0;
-        for (CloseableIterator<DenseVector[]> it = stream.executeAndCollect(); it.hasNext(); ) {
-            DenseVector[] vectors = it.next();
+        for (CloseableIterator<Row> it = generator.getData(tEnv)[0].execute().collect();
+                it.hasNext(); ) {
+            Row row = it.next();
+            assertEquals(1, row.getArity());
+            DenseVector[] vectors = (DenseVector[]) row.getField(generator.getColNames()[0][0]);
+            assertNotNull(vectors);
             assertEquals(generator.getArraySize(), vectors.length);
             for (DenseVector vector : vectors) {
                 assertEquals(vector.size(), generator.getVectorDim());
@@ -89,9 +103,6 @@ public class DataGeneratorTest {
 
     @Test
     public void testLabeledPointWithWeightGenerator() {
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
-
         String featuresCol = "features";
         String labelCol = "label";
         String weightCol = "weight";
