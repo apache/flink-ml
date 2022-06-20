@@ -22,7 +22,9 @@ import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorArrayGenerator;
 import org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator;
+import org.apache.flink.ml.benchmark.datagenerator.common.DoubleGenerator;
 import org.apache.flink.ml.benchmark.datagenerator.common.LabeledPointWithWeightGenerator;
+import org.apache.flink.ml.benchmark.datagenerator.common.RandomStringGenerator;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -133,6 +135,55 @@ public class DataGeneratorTest {
             double weight = (double) row.getField(weightCol);
             assertTrue(weight >= 0);
             assertTrue(weight < 1);
+        }
+        assertEquals(generator.getNumValues(), count);
+    }
+
+    @Test
+    public void testRandomStringGenerator() {
+        String col1 = "col1";
+        String col2 = "col2";
+
+        RandomStringGenerator generator =
+                new RandomStringGenerator()
+                        .setColNames(new String[] {col1, col2})
+                        .setSeed(2L)
+                        .setNumValues(5)
+                        .setNumDistinctValue(2);
+
+        int count = 0;
+        for (CloseableIterator<Row> it = generator.getData(tEnv)[0].execute().collect();
+                it.hasNext(); ) {
+            Row row = it.next();
+            count++;
+            String value1 = (String) row.getField(col1);
+            String value2 = (String) row.getField(col2);
+            assertTrue(Integer.parseInt(value1) < generator.getNumDistinctValue());
+            assertTrue(Integer.parseInt(value2) < generator.getNumDistinctValue());
+        }
+        assertEquals(generator.getNumValues(), count);
+    }
+
+    @Test
+    public void testDoubleGenerator() {
+        String col1 = "col1";
+        String col2 = "col2";
+
+        DoubleGenerator generator =
+                new DoubleGenerator()
+                        .setColNames(new String[] {"col1", "col2"})
+                        .setSeed(2L)
+                        .setNumValues(5);
+
+        int count = 0;
+        for (CloseableIterator<Row> it = generator.getData(tEnv)[0].execute().collect();
+                it.hasNext(); ) {
+            Row row = it.next();
+            count++;
+            double value1 = (Double) row.getField(col1);
+            double value2 = (Double) row.getField(col2);
+            assertTrue(value1 <= 1 && value1 >= 0);
+            assertTrue(value2 <= 1 && value2 >= 0);
         }
         assertEquals(generator.getNumValues(), count);
     }
