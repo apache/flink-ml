@@ -18,6 +18,7 @@
 package org.apache.flink.iteration.broadcast;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.runtime.io.network.api.writer.RecordWriter;
 import org.apache.flink.runtime.plugable.SerializationDelegate;
 import org.apache.flink.streaming.runtime.streamrecord.StreamElement;
@@ -42,5 +43,16 @@ public class RecordWriterBroadcastOutput<OUT> implements BroadcastOutput<OUT> {
     public void broadcastEmit(StreamRecord<OUT> record) throws IOException {
         serializationDelegate.setInstance(record);
         recordWriter.broadcastEmit(serializationDelegate);
+        if (isIterationEpochWatermark(record)) {
+            recordWriter.flushAll();
+        }
+    }
+
+    private static <T> boolean isIterationEpochWatermark(StreamRecord<T> record) {
+        if (!(record.getValue() instanceof IterationRecord)) {
+            return false;
+        }
+        IterationRecord<?> iterationRecord = (IterationRecord<?>) record.getValue();
+        return iterationRecord.getType().equals(IterationRecord.Type.EPOCH_WATERMARK);
     }
 }
