@@ -84,7 +84,7 @@ public final class DenseVectorSerializer extends TypeSerializer<DenseVector> {
         target.writeInt(len);
 
         for (int i = 0; i < len; i++) {
-            Bits.putDouble(buf, i << 3, vector.values[i]);
+            Bits.putDouble(buf, (i & 127) << 3, vector.values[i]);
             if ((i & 127) == 127) {
                 target.write(buf);
             }
@@ -104,12 +104,12 @@ public final class DenseVectorSerializer extends TypeSerializer<DenseVector> {
     private void readDoubleArray(double[] dst, DataInputView source, int len) throws IOException {
         int index = 0;
         for (int i = 0; i < (len >> 7); i++) {
-            source.read(buf, 0, 1024);
+            source.readFully(buf, 0, 1024);
             for (int j = 0; j < 128; j++) {
                 dst[index++] = Bits.getDouble(buf, j << 3);
             }
         }
-        source.read(buf, 0, (len << 3) & 1023);
+        source.readFully(buf, 0, (len << 3) & 1023);
         for (int j = 0; j < (len & 127); j++) {
             dst[index++] = Bits.getDouble(buf, j << 3);
         }

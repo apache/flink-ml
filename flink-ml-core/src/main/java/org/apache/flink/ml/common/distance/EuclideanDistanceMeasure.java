@@ -18,8 +18,8 @@
 
 package org.apache.flink.ml.common.distance;
 
-import org.apache.flink.ml.linalg.Vector;
-import org.apache.flink.util.Preconditions;
+import org.apache.flink.ml.linalg.BLAS;
+import org.apache.flink.ml.linalg.VectorWithNorm;
 
 /** Interface for measuring the Euclidean distance between two vectors. */
 public class EuclideanDistanceMeasure implements DistanceMeasure {
@@ -33,16 +33,35 @@ public class EuclideanDistanceMeasure implements DistanceMeasure {
         return instance;
     }
 
-    // TODO: Improve distance calculation with BLAS.
     @Override
-    public double distance(Vector v1, Vector v2) {
-        Preconditions.checkArgument(v1.size() == v2.size());
-        double squaredDistance = 0.0;
+    public double distance(VectorWithNorm v1, VectorWithNorm v2) {
+        return Math.sqrt(distanceSquare(v1, v2));
+    }
 
-        for (int i = 0; i < v1.size(); i++) {
-            double diff = v1.get(i) - v2.get(i);
-            squaredDistance += diff * diff;
+    private double distanceSquare(VectorWithNorm v1, VectorWithNorm v2) {
+        return v1.l2Norm * v1.l2Norm + v2.l2Norm * v2.l2Norm - 2.0 * BLAS.dot(v1.vector, v2.vector);
+    }
+
+    @Override
+    public int findClosest(VectorWithNorm[] centroids, VectorWithNorm point) {
+        double bestL2DistanceSquare = Double.POSITIVE_INFINITY;
+        int bestIndex = 0;
+        for (int i = 0; i < centroids.length; i++) {
+            VectorWithNorm centroid = centroids[i];
+
+            double lowerBoundSqrt = point.l2Norm - centroid.l2Norm;
+            double lowerBound = lowerBoundSqrt * lowerBoundSqrt;
+            if (lowerBound >= bestL2DistanceSquare) {
+                continue;
+            }
+
+            double l2DistanceSquare = distanceSquare(point, centroid);
+            if (l2DistanceSquare < bestL2DistanceSquare) {
+                bestL2DistanceSquare = l2DistanceSquare;
+                bestIndex = i;
+            }
         }
-        return Math.sqrt(squaredDistance);
+
+        return bestIndex;
     }
 }

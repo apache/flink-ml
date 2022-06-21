@@ -28,6 +28,7 @@ import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.common.distance.DistanceMeasure;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.VectorWithNorm;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -114,7 +115,7 @@ public class OnlineKMeansModel
 
         private final int k;
 
-        private DenseVector[] centroids;
+        private VectorWithNorm[] centroids;
 
         // TODO: replace this with a complete solution of reading first model data from unbounded
         // model data stream before processing the first predict data.
@@ -173,7 +174,8 @@ public class OnlineKMeansModel
                 return;
             }
             DenseVector point = ((Vector) dataPoint.getField(featuresCol)).toDense();
-            int closestCentroidId = KMeans.findClosestCentroidId(centroids, point, distanceMeasure);
+            int closestCentroidId =
+                    distanceMeasure.findClosest(centroids, new VectorWithNorm(point));
             output.collect(new StreamRecord<>(Row.join(dataPoint, Row.of(closestCentroidId))));
         }
 
@@ -181,7 +183,10 @@ public class OnlineKMeansModel
         public void processElement2(StreamRecord<KMeansModelData> streamRecord) throws Exception {
             KMeansModelData modelData = streamRecord.getValue();
             Preconditions.checkArgument(modelData.centroids.length <= k);
-            centroids = modelData.centroids;
+            centroids = new VectorWithNorm[modelData.centroids.length];
+            for (int i = 0; i < centroids.length; i++) {
+                centroids[i] = new VectorWithNorm(modelData.centroids[i]);
+            }
             modelDataVersion++;
             for (Row dataPoint : bufferedPointsState.get()) {
                 processElement1(new StreamRecord<>(dataPoint));
