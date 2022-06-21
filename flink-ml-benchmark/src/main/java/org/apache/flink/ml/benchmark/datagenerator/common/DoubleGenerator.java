@@ -21,6 +21,9 @@ package org.apache.flink.ml.benchmark.datagenerator.common;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
+import org.apache.flink.ml.param.IntParam;
+import org.apache.flink.ml.param.Param;
+import org.apache.flink.ml.param.ParamValidators;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.Preconditions;
 
@@ -29,11 +32,29 @@ import java.util.Arrays;
 /** A DataGenerator which creates a table of doubles. */
 public class DoubleGenerator extends InputTableGenerator<DoubleGenerator> {
 
+    public static final Param<Integer> ARITY =
+            new IntParam(
+                    "arity",
+                    "Arity of the generated double values. "
+                            + "If set to positive value, each feature would be an integer in range [0, arity - 1]. "
+                            + "If set to zero, each feature would be a continuous double in range [0, 1).",
+                    0,
+                    ParamValidators.gtEq(0));
+
+    public int getArity() {
+        return get(ARITY);
+    }
+
+    public DoubleGenerator setArity(int value) {
+        return set(ARITY, value);
+    }
+
     @Override
     protected RowGenerator[] getRowGenerators() {
         String[][] colNames = getColNames();
         Preconditions.checkState(colNames.length == 1);
         int numOutputCols = colNames[0].length;
+        int arity = getArity();
 
         return new RowGenerator[] {
             new RowGenerator(getNumValues(), getSeed()) {
@@ -41,7 +62,11 @@ public class DoubleGenerator extends InputTableGenerator<DoubleGenerator> {
                 public Row nextRow() {
                     Row r = new Row(numOutputCols);
                     for (int i = 0; i < numOutputCols; i++) {
-                        r.setField(i, random.nextDouble());
+                        if (arity > 0) {
+                            r.setField(i, (double) random.nextInt(arity));
+                        } else {
+                            r.setField(i, random.nextDouble());
+                        }
                     }
                     return r;
                 }

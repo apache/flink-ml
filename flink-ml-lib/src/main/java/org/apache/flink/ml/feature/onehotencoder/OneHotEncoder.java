@@ -18,24 +18,35 @@
 
 package org.apache.flink.ml.feature.onehotencoder;
 
-import org.apache.flink.api.common.functions.FlatMapFunction;
-import org.apache.flink.api.common.functions.MapPartitionFunction;
+import org.apache.flink.api.common.state.ListState;
+import org.apache.flink.api.common.state.ListStateDescriptor;
+import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.typeutils.ObjectArrayTypeInfo;
+import org.apache.flink.api.java.typeutils.TupleTypeInfo;
+import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.api.Estimator;
-import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.common.param.HasHandleInvalid;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.runtime.state.StateInitializationContext;
+import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
+import org.apache.flink.streaming.api.operators.BoundedOneInput;
+import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
+import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
 import org.apache.flink.types.Row;
-import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -68,13 +79,20 @@ public class OneHotEncoder
 
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
-        DataStream<Tuple2<Integer, Integer>> columnsAndValues =
-                tEnv.toDataStream(inputs[0]).flatMap(new ExtractInputColsValueFunction(inputCols));
+        DataStream<Integer[]> localMaxIndices =
+                tEnv.toDataStream(inputs[0])
+                        .transform(
+                                "ExtractInputValueAndFindMaxIndexOperator",
+                                ObjectArrayTypeInfo.getInfoFor(BasicTypeInfo.INT_TYPE_INFO),
+                                new ExtractInputValueAndFindMaxIndexOperator(inputCols));
 
         DataStream<Tuple2<Integer, Integer>> modelData =
-                DataStreamUtils.mapPartition(
-                        columnsAndValues.keyBy(columnIdAndValue -> columnIdAndValue.f0),
-                        new FindMaxIndexFunction());
+                localMaxIndices
+                        .transform(
+                                "GenerateModelDataOperator",
+                                TupleTypeInfo.getBasicTupleTypeInfo(Integer.class, Integer.class),
+                                new GenerateModelDataOperator())
+                        .setParallelism(1);
 
         OneHotEncoderModel model =
                 new OneHotEncoderModel().setModelData(tEnv.fromDataStream(modelData));
@@ -97,50 +115,129 @@ public class OneHotEncoder
     }
 
     /**
-     * Extract values of input columns of input data.
-     *
-     * <p>Input: rows of input data containing designated input columns
-     *
-     * <p>Output: Pairs of column index and value stored in those columns
+     * Operator to extract the integer values from input columns and to find the max index value for
+     * each column.
      */
-    private static class ExtractInputColsValueFunction
-            implements FlatMapFunction<Row, Tuple2<Integer, Integer>> {
+    private static class ExtractInputValueAndFindMaxIndexOperator
+            extends AbstractStreamOperator<Integer[]>
+            implements OneInputStreamOperator<Row, Integer[]>, BoundedOneInput {
+
         private final String[] inputCols;
 
-        private ExtractInputColsValueFunction(String[] inputCols) {
+        private ListState<Integer[]> maxIndicesState;
+
+        private Integer[] maxIndices;
+
+        private ExtractInputValueAndFindMaxIndexOperator(String[] inputCols) {
             this.inputCols = inputCols;
         }
 
         @Override
-        public void flatMap(Row row, Collector<Tuple2<Integer, Integer>> collector) {
+        public void initializeState(StateInitializationContext context) throws Exception {
+            super.initializeState(context);
+
+            TypeInformation<Integer[]> type =
+                    ObjectArrayTypeInfo.getInfoFor(BasicTypeInfo.INT_TYPE_INFO);
+
+            maxIndicesState =
+                    context.getOperatorStateStore()
+                            .getListState(new ListStateDescriptor<>("maxIndices", type));
+
+            maxIndices =
+                    OperatorStateUtils.getUniqueElement(maxIndicesState, "maxIndices")
+                            .orElse(initMaxIndices());
+        }
+
+        private Integer[] initMaxIndices() {
+            Integer[] indices = new Integer[inputCols.length];
+            Arrays.fill(indices, Integer.MIN_VALUE);
+            return indices;
+        }
+
+        @Override
+        public void snapshotState(StateSnapshotContext context) throws Exception {
+            super.snapshotState(context);
+            maxIndicesState.update(Collections.singletonList(maxIndices));
+        }
+
+        @Override
+        public void processElement(StreamRecord<Row> streamRecord) {
+            Row row = streamRecord.getValue();
             for (int i = 0; i < inputCols.length; i++) {
                 Number number = (Number) row.getField(inputCols[i]);
-                Preconditions.checkArgument(
-                        number.intValue() == number.doubleValue(),
-                        String.format("Value %s cannot be parsed as indexed integer.", number));
-                Preconditions.checkArgument(
-                        number.intValue() >= 0, "Negative value not supported.");
-                collector.collect(new Tuple2<>(i, number.intValue()));
+                int value = number.intValue();
+
+                if (value != number.doubleValue()) {
+                    throw new IllegalArgumentException(
+                            String.format("Value %s cannot be parsed as indexed integer.", number));
+                }
+                Preconditions.checkArgument(value >= 0, "Negative value not supported.");
+
+                if (value > maxIndices[i]) {
+                    maxIndices[i] = value;
+                }
             }
+        }
+
+        @Override
+        public void endInput() {
+            output.collect(new StreamRecord<>(maxIndices));
         }
     }
 
-    /** Function to find the max index value for each column. */
-    private static class FindMaxIndexFunction
-            implements MapPartitionFunction<Tuple2<Integer, Integer>, Tuple2<Integer, Integer>> {
+    /**
+     * Collects and reduces the max index value in each column and produces the model data.
+     *
+     * <p>Output: Pairs of column index and max index value in this column.
+     */
+    private static class GenerateModelDataOperator
+            extends AbstractStreamOperator<Tuple2<Integer, Integer>>
+            implements OneInputStreamOperator<Integer[], Tuple2<Integer, Integer>>,
+                    BoundedOneInput {
+
+        private ListState<Integer[]> maxIndicesState;
+
+        private Integer[] maxIndices;
 
         @Override
-        public void mapPartition(
-                Iterable<Tuple2<Integer, Integer>> iterable,
-                Collector<Tuple2<Integer, Integer>> collector) {
-            Map<Integer, Integer> map = new HashMap<>();
-            for (Tuple2<Integer, Integer> value : iterable) {
-                map.put(
-                        value.f0,
-                        Math.max(map.getOrDefault(value.f0, Integer.MIN_VALUE), value.f1));
+        public void initializeState(StateInitializationContext context) throws Exception {
+            super.initializeState(context);
+
+            TypeInformation<Integer[]> type =
+                    ObjectArrayTypeInfo.getInfoFor(BasicTypeInfo.INT_TYPE_INFO);
+
+            maxIndicesState =
+                    context.getOperatorStateStore()
+                            .getListState(new ListStateDescriptor<>("maxIndices", type));
+
+            maxIndices =
+                    OperatorStateUtils.getUniqueElement(maxIndicesState, "maxIndices").orElse(null);
+        }
+
+        @Override
+        public void snapshotState(StateSnapshotContext context) throws Exception {
+            super.snapshotState(context);
+            maxIndicesState.update(Collections.singletonList(maxIndices));
+        }
+
+        @Override
+        public void processElement(StreamRecord<Integer[]> streamRecord) {
+            if (maxIndices == null) {
+                maxIndices = streamRecord.getValue();
+            } else {
+                Integer[] indices = streamRecord.getValue();
+                for (int i = 0; i < maxIndices.length; i++) {
+                    if (indices[i] > maxIndices[i]) {
+                        maxIndices[i] = indices[i];
+                    }
+                }
             }
-            for (Map.Entry<Integer, Integer> entry : map.entrySet()) {
-                collector.collect(new Tuple2<>(entry.getKey(), entry.getValue()));
+        }
+
+        @Override
+        public void endInput() {
+            for (int i = 0; i < maxIndices.length; i++) {
+                output.collect(new StreamRecord<>(Tuple2.of(i, maxIndices[i])));
             }
         }
     }
