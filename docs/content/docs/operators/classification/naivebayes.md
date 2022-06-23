@@ -23,25 +23,25 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Naive Bayes
+## Naive Bayes
 
 Naive Bayes is a multiclass classifier. Based on Bayes’ theorem, it assumes that
 there is strong (naive) independence between every pair of features. 
 
-## Input Columns
+### Input Columns
 
 | Param name  | Type    | Default      | Description      |
 | :---------- | :------ | :----------- | :--------------- |
 | featuresCol | Vector  | `"features"` | Feature vector   |
 | labelCol    | Integer | `"label"`    | Label to predict |
 
-## Output Columns
+### Output Columns
 
 | Param name    | Type    | Default        | Description     |
 | :------------ | :------ | :------------- | :-------------- |
 | predictionCol | Integer | `"prediction"` | Predicted label |
 
-## Parameters
+### Parameters
 
 Below are parameters required by `NaiveBayesModel`.
 
@@ -58,67 +58,98 @@ Below are parameters required by `NaiveBayesModel`.
 | labelCol  | `"label"` | String | no       | Label column name.       |
 | smoothing | `1.0`     | Double | no       | The smoothing parameter. |
 
-## Examples
+### Examples
 
-{{< tabs naivebayes >}}
+{{< tabs examples >}}
 
 {{< tab "Java">}}
 ```java
 import org.apache.flink.ml.classification.naivebayes.NaiveBayes;
 import org.apache.flink.ml.classification.naivebayes.NaiveBayesModel;
+import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vectors;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.table.api.Table;
+import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
+import org.apache.flink.types.Row;
+import org.apache.flink.util.CloseableIterator;
 
-List<Row> trainData =
-  Arrays.asList(
-  Row.of(Vectors.dense(0, 0.), 11),
-  Row.of(Vectors.dense(1, 0), 10),
-  Row.of(Vectors.dense(1, 1.), 10));
+/** Simple program that trains a NaiveBayes model and uses it for classification. */
+public class NaiveBayesExample {
+    public static void main(String[] args) {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
-Table trainTable = tEnv.fromDataStream(env.fromCollection(trainData)).as("features", "label");
+        // Generates input training and prediction data.
+        DataStream<Row> trainStream =
+                env.fromElements(
+                        Row.of(Vectors.dense(0, 0.), 11),
+                        Row.of(Vectors.dense(1, 0), 10),
+                        Row.of(Vectors.dense(1, 1.), 10));
+        Table trainTable = tEnv.fromDataStream(trainStream).as("features", "label");
 
-List<Row> predictData =
-  Arrays.asList(
-  Row.of(Vectors.dense(0, 1.)),
-  Row.of(Vectors.dense(0, 0.)),
-  Row.of(Vectors.dense(1, 0)),
-  Row.of(Vectors.dense(1, 1.)));
+        DataStream<Row> predictStream =
+                env.fromElements(
+                        Row.of(Vectors.dense(0, 1.)),
+                        Row.of(Vectors.dense(0, 0.)),
+                        Row.of(Vectors.dense(1, 0)),
+                        Row.of(Vectors.dense(1, 1.)));
+        Table predictTable = tEnv.fromDataStream(predictStream).as("features");
 
-Table predictTable = tEnv.fromDataStream(env.fromCollection(predictData)).as("features");
+        // Creates a NaiveBayes object and initializes its parameters.
+        NaiveBayes naiveBayes =
+                new NaiveBayes()
+                        .setSmoothing(1.0)
+                        .setFeaturesCol("features")
+                        .setLabelCol("label")
+                        .setPredictionCol("prediction")
+                        .setModelType("multinomial");
 
-NaiveBayes estimator =
-  new NaiveBayes()
-  .setSmoothing(1.0)
-  .setFeaturesCol("features")
-  .setLabelCol("label")
-  .setPredictionCol("prediction")
-  .setModelType("multinomial");
+        // Trains the NaiveBayes Model.
+        NaiveBayesModel naiveBayesModel = naiveBayes.fit(trainTable);
 
-NaiveBayesModel model = estimator.fit(trainTable);
-Table outputTable = model.transform(predictTable)[0];
+        // Uses the NaiveBayes Model for predictions.
+        Table outputTable = naiveBayesModel.transform(predictTable)[0];
 
-outputTable.execute().print();
+        // Extracts and displays the results.
+        for (CloseableIterator<Row> it = outputTable.execute().collect(); it.hasNext(); ) {
+            Row row = it.next();
+            DenseVector features = (DenseVector) row.getField(naiveBayes.getFeaturesCol());
+            double predictionResult = (Double) row.getField(naiveBayes.getPredictionCol());
+            System.out.printf("Features: %s \tPrediction Result: %s\n", features, predictionResult);
+        }
+    }
+}
+
 ```
 {{< /tab>}}
 
 
 {{< tab "Python">}}
 ```python
+
+# Simple program that trains a NaiveBayes model and uses it for classification.
+#
+# Before executing this program, please make sure you have followed Flink ML's
+# quick start guideline to set up Flink ML and Flink environment. The guideline
+# can be found at
+#
+# https://nightlies.apache.org/flink/flink-ml-docs-master/docs/try-flink-ml/quick-start/
+
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.table import StreamTableEnvironment
-
 from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
 from pyflink.ml.lib.classification.naivebayes import NaiveBayes
+from pyflink.table import StreamTableEnvironment
 
 # create a new StreamExecutionEnvironment
 env = StreamExecutionEnvironment.get_execution_environment()
 
-# load flink ml jar
-env.add_jars("file:///{path}/statefun-flink-core-3.1.0.jar", "file:///{path}/flink-ml-uber-{version}.jar")
-
 # create a StreamTableEnvironment
 t_env = StreamTableEnvironment.create(env)
 
+# generate input training and prediction data
 train_table = t_env.from_data_stream(
     env.from_collection([
         (Vectors.dense([0, 0.]), 11.),
@@ -140,28 +171,28 @@ predict_table = t_env.from_data_stream(
             ['features'],
             [DenseVectorTypeInfo()])))
 
-estimator = (NaiveBayes()
-             .set_smoothing(1.0)
-             .set_features_col('features')
-             .set_label_col('label')
-             .set_prediction_col('prediction')
-             .set_model_type('multinomial'))
+# create a naive bayes object and initialize its parameters
+naive_bayes = NaiveBayes() \
+    .set_smoothing(1.0) \
+    .set_features_col('features') \
+    .set_label_col('label') \
+    .set_prediction_col('prediction') \
+    .set_model_type('multinomial')
 
-model = estimator.fit(train_table)
+# train the naive bayes model
+model = naive_bayes.fit(train_table)
+
+# use the naive bayes model for predictions
 output = model.transform(predict_table)[0]
 
-output.execute().print()
-
-# output
-# +----+--------------------------------+--------------------------------+
-# | op |                       features |                     prediction |
-# +----+--------------------------------+--------------------------------+
-# | +I |                     [0.0, 1.0] |                           11.0 |
-# | +I |                     [0.0, 0.0] |                           11.0 |
-# | +I |                     [1.0, 0.0] |                           10.0 |
-# | +I |                     [1.0, 1.0] |                           10.0 |
-# +----+--------------------------------+--------------------------------+
+# extract and display the results
+field_names = output.get_schema().get_field_names()
+for result in t_env.to_data_stream(output).execute_and_collect():
+    features = result[field_names.index(naive_bayes.get_features_col())]
+    prediction_result = result[field_names.index(naive_bayes.get_prediction_col())]
+    print('Features: ' + str(features) + ' \tPrediction Result: ' + str(prediction_result))
 
 ```
 {{< /tab>}}
+
 {{< /tabs>}}
