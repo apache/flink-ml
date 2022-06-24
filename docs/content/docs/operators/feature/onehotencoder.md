@@ -82,6 +82,7 @@ outputTable.execute().print();
 {{< tab "Python">}}
 ```python
 from pyflink.common import Types, Row
+from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.table import StreamTableEnvironment, Table, DataTypes
 
 from pyflink.ml.lib.feature.onehotencoder import OneHotEncoder, OneHotEncoderModel

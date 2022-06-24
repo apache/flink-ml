@@ -104,6 +104,7 @@ outputTable.execute().print();
 {{< tab "Python">}}
 ```python
 from pyflink.common import Types
+from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.table import StreamTableEnvironment
 
 from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
