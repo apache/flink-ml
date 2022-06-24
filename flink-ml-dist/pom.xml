@@ -40,6 +40,12 @@ under the License.
             <version>${project.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-ml-examples</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Stateful Functions Dependencies -->
 
         <dependency>
