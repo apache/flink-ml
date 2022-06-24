@@ -82,6 +82,11 @@ try:
                 'pyflink.ml',
                 'pyflink.ml.core',
                 'pyflink.ml.lib',
+                'pyflink.ml.lib.classification',
+                'pyflink.ml.lib.clustering',
+                'pyflink.ml.lib.evaluation',
+                'pyflink.ml.lib.feature',
+                'pyflink.ml.lib',
                 'pyflink.ml.util',
                 'pyflink.examples']
 
