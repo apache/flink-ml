@@ -104,6 +104,7 @@ for (CloseableIterator<Row> it = output.execute().collect(); it.hasNext(); ) {
 {{< tab "Python">}}
 ```python
 from pyflink.common import Types
+from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.table import StreamTableEnvironment
 
 from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
@@ -137,19 +138,10 @@ model = kmeans.fit(data_table)
 
 output = model.transform(data_table)[0]
 
-output.execute().print()
+print([result for result in t_env.to_data_stream(output).execute_and_collect()])
 
 # output
-# +----+--------------------------------+-------------+
-# | op |                       features |  prediction |
-# +----+--------------------------------+-------------+
-# | +I |                     [9.0, 0.0] |           1 |
-# | +I |                     [0.0, 0.0] |           0 |
-# | +I |                     [9.0, 0.6] |           1 |
-# | +I |                     [0.3, 3.0] |           0 |
-# | +I |                     [0.0, 0.3] |           0 |
-# | +I |                     [9.6, 0.0] |           1 |
-# +----+--------------------------------+-------------+
+# [<Row(DenseVector([9.0, 0.0]), 0)>, <Row(DenseVector([0.3, 3.0]), 1)>, <Row(DenseVector([9.0, 0.6]), 0)>, <Row(DenseVector([9.6, 0.0]), 0)>, <Row(DenseVector([0.0, 0.3]), 1)>, <Row(DenseVector([0.0, 0.0]), 1)>]
 ```
 {{< /tab>}}
 {{< /tabs>}}

@@ -104,6 +104,7 @@ outputTable.execute().print();
 {{< tab "Python">}}
 ```python
 from pyflink.common import Types
+from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.table import StreamTableEnvironment
 
 from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
@@ -149,17 +150,10 @@ estimator = (NaiveBayes()
 model = estimator.fit(train_table)
 output = model.transform(predict_table)[0]
 
-output.execute().print()
+print([result for result in t_env.to_data_stream(output).execute_and_collect()])
 
 # output
-# +----+--------------------------------+--------------------------------+
-# | op |                       features |                     prediction |
-# +----+--------------------------------+--------------------------------+
-# | +I |                     [0.0, 1.0] |                           11.0 |
-# | +I |                     [0.0, 0.0] |                           11.0 |
-# | +I |                     [1.0, 0.0] |                           10.0 |
-# | +I |                     [1.0, 1.0] |                           10.0 |
-# +----+--------------------------------+--------------------------------+
+# [<Row(DenseVector([0.0, 0.0]), 11.0)>, <Row(DenseVector([1.0, 0.0]), 10.0)>, <Row(DenseVector([0.0, 1.0]), 11.0)>, <Row(DenseVector([1.0, 1.0]), 10.0)>]
 
 ```
 {{< /tab>}}

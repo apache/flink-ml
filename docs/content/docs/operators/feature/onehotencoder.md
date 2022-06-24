@@ -82,6 +82,7 @@ outputTable.execute().print();
 {{< tab "Python">}}
 ```python
 from pyflink.common import Types, Row
+from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.table import StreamTableEnvironment, Table, DataTypes
 
 from pyflink.ml.lib.feature.onehotencoder import OneHotEncoder, OneHotEncoderModel
@@ -111,16 +112,10 @@ estimator = OneHotEncoder().set_input_cols('input').set_output_cols('output')
 model = estimator.fit(train_table)
 output_table = model.transform(predict_table)[0]
 
-output_table.execute().print()
+print([result for result in t_env.to_data_stream(output_table).execute_and_collect()])
 
 # output
-# +----+--------------------------------+--------------------------------+
-# | op |                          input |                         output |
-# +----+--------------------------------+--------------------------------+
-# | +I |                            0.0 |                (2, [0], [1.0]) |
-# | +I |                            1.0 |                (2, [1], [1.0]) |
-# | +I |                            2.0 |                    (2, [], []) |
-# +----+--------------------------------+--------------------------------+
+# [<Row(0.0, SparseVector(2, {0: 1.0}))>, <Row(1.0, SparseVector(2, {1: 1.0}))>, <Row(2.0, SparseVector(2, {}))>]
 
 ```
 {{< /tab>}}

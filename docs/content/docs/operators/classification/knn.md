@@ -121,6 +121,7 @@ output.execute().print();
 {{< tab "Python">}}
 ```python
 from pyflink.common import Types
+from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.table import StreamTableEnvironment
 
 from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
@@ -175,15 +176,10 @@ predict_data = t_env.from_data_stream(
 knn = KNN()
 model = knn.fit(train_data)
 output = model.transform(predict_data)[0]
-output.execute().print()
+print([result for result in t_env.to_data_stream(output).execute_and_collect()])
 
 # output
-# +----+--------------------------------+--------------------------------+--------------------------------+
-# | op |                       features |                          label |                     prediction |
-# +----+--------------------------------+--------------------------------+--------------------------------+
-# | +I |                     [4.0, 4.1] |                            5.0 |                            5.0 |
-# | +I |                  [300.0, 42.0] |                            2.0 |                            2.0 |
-# +----+--------------------------------+--------------------------------+--------------------------------+
+# [<Row(DenseVector([4.0, 4.1]), 5.0, 5.0)>, <Row(DenseVector([300.0, 42.0]), 2.0, 2.0)>]
 ```
 {{< /tab>}}
 {{< /tabs>}}
