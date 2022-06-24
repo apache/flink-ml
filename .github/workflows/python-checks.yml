@@ -41,6 +41,8 @@ jobs:
         run: python -m mypy --config=setup.cfg
       - name: Test the source code
         working-directory: flink-ml-python
-        run: pytest
+        run: |
+          pytest pyflink/ml
+          pytest pyflink/examples
 
 

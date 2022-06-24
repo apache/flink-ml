@@ -21,6 +21,7 @@ from pyflink.util import java_utils
 from pyflink.util.java_utils import to_jarray, load_java_class
 
 
+# TODO: Remove custom jar loader after FLINK-15635 and FLINK-28002 are fixed and released.
 def add_jars_to_context_class_loader(jar_urls):
     """
     Add jars to Python gateway server for local compilation and local execution (i.e. minicluster).

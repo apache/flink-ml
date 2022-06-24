@@ -615,7 +615,7 @@ class SparseVector(Vector):
     def __str__(self):
         inds = "[" + ",".join([str(i) for i in self._indices]) + "]"
         vals = "[" + ",".join([str(v) for v in self._values]) + "]"
-        return "(" + ",".join((str(self.size), inds, vals)) + ")"
+        return "(" + ",".join((str(self.size()), inds, vals)) + ")"
 
     def __repr__(self):
         inds = self._indices
