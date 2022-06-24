@@ -27,213 +27,87 @@ under the License.
 # Quick Start
 
 This document provides a quick introduction to using Flink ML. Readers of this
-document will be guided to create a simple Flink job that trains a Machine
+document will be guided to submit a simple Flink job that trains a Machine
 Learning Model and use it to provide prediction service.
 
-## Maven Setup
+## Prerequisites
 
-In order to use Flink ML in a Maven project, add the following dependencies to
-`pom.xml`.
+### Install Flink
 
-{{< artifact flink-ml-core >}}
+Please make sure Flink 1.15 or higher version has been installed in your local
+environment. You can refer to the [local
+installation](https://nightlies.apache.org/flink/flink-docs-master/docs/try-flink/local_installation/)
+instruction on Flink's document website for how to achieve this.
 
-{{< artifact flink-ml-iteration >}}
+### Set Up Flink Environment Variables
 
-{{< artifact flink-ml-lib >}}
+After having installed Flink, please register `$FLINK_HOME` as an environment
+variable into your local environment.
 
-The example code provided in this document requires additional dependencies on
-the Flink Table API. In order to execute the example code successfully, please
-make sure the following dependencies also exist in `pom.xml`.
-
-```xml
-<dependency>
-  <groupId>org.apache.flink</groupId>
-  <artifactId>flink-clients</artifactId>
-  <version>1.15.0</version>
-</dependency>
+```bash
+cd ${path_to_flink}
+export FLINK_HOME=`pwd`
 ```
 
-```xml
-<dependency>
-  <groupId>org.apache.flink</groupId>
-  <artifactId>flink-table-planner-loader</artifactId>
-  <version>1.15.0</version>
-</dependency>
+
+[//]: # (TODO: Add instructions to download binary distribution when release is
+    available)
+### Build Flink ML library
+
+In order to use Flink ML's CLI you need to have the latest binary distribution
+of Flink ML. You can acquire the distribution by building Flink ML's source code
+locally with the following command.
+
+```bash
+cd ${path_to_flink_ml}
+mvn clean package -DskipTests
+cd ./flink-ml-dist/target/flink-ml-*-bin/flink-ml*/
 ```
 
-## Flink ML Example
+### Add Flink ML binaries to Flink
 
-Kmeans is a widely-used clustering algorithm and has been supported by Flink ML.
-The example code below creates a Flink job with Flink ML that initializes and
-trains a Kmeans model, and finally uses it to predict the cluster id of certain
-data points.
+You need to copy Flink ML's binary distribution files to Flink's folder for
+proper initialization. Please run the following command from Flink ML's binary
+distribution's folder.
 
-```java
-import org.apache.flink.ml.clustering.kmeans.KMeans;
-import org.apache.flink.ml.clustering.kmeans.KMeansModel;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.table.api.Table;
-import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
-import org.apache.flink.types.Row;
-import org.apache.flink.util.CloseableIterator;
-
-public class QuickStart {
-    public static void main(String[] args) {
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
-
-        String featuresCol = "features";
-        String predictionCol = "prediction";
-
-        // Generate train data and predict data as DataStream.
-        DataStream<DenseVector> inputStream = env.fromElements(
-                Vectors.dense(0.0, 0.0),
-                Vectors.dense(0.0, 0.3),
-                Vectors.dense(0.3, 0.0),
-                Vectors.dense(9.0, 0.0),
-                Vectors.dense(9.0, 0.6),
-                Vectors.dense(9.6, 0.0)
-        );
-
-        // Convert data from DataStream to Table, as Flink ML uses Table API.
-        Table input = tEnv.fromDataStream(inputStream).as(featuresCol);
-
-        // Creates a K-means object and initialize its parameters.
-        KMeans kmeans = new KMeans()
-                .setK(2)
-                .setSeed(1L)
-                .setFeaturesCol(featuresCol)
-                .setPredictionCol(predictionCol);
-
-        // Trains the K-means Model.
-        KMeansModel model = kmeans.fit(input);
-
-        // Use the K-means Model for predictions.
-        Table output = model.transform(input)[0];
-
-        // Extracts and displays prediction result.
-        for (CloseableIterator<Row> it = output.execute().collect(); it.hasNext(); ) {
-            Row row = it.next();
-            DenseVector vector = (DenseVector) row.getField(featuresCol);
-            int clusterId = (Integer) row.getField(predictionCol);
-            System.out.println("Vector: " + vector + "\tCluster ID: " + clusterId);
-        }
-    }
-}
+```bash
+cp ./lib/*.jar $FLINK_HOME/lib/
 ```
 
-After placing the code above into your Maven project and executing it,
-information like below will be printed out to your terminal window.
+## Run Flink ML example job
 
-```
-Vector: [0.3, 0.0]	Cluster ID: 1
-Vector: [9.6, 0.0]	Cluster ID: 0
-Vector: [9.0, 0.6]	Cluster ID: 0
-Vector: [0.0, 0.0]	Cluster ID: 1
-Vector: [0.0, 0.3]	Cluster ID: 1
-Vector: [9.0, 0.0]	Cluster ID: 0
+Please start a Flink standalone cluster in your local environment with the
+following command.
+
+```bash
+$FLINK_HOME/bin/start-cluster.sh
 ```
 
-## Breaking Down The Code
+You should be able to navigate to the web UI at
+[localhost:8081](http://localhost:8081/) to view the Flink dashboard and see
+that the cluster is up and running.
 
-### The Execution Environment
+Then you may submit Flink ML examples to the cluster as follows.
 
-The first lines set up the `StreamExecutionEnvironment` to execute the Flink ML
-job. You would have been familiar with this concept if you have experience using
-Flink. For the example program in this document, a simple
-`StreamExecutionEnvironment` without specific configurations would be enough. 
-
-Given that Flink ML uses Flink's Table API, a `StreamTableEnvironment` would
-also be necessary for the following program.
-
-```java
-StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+```
+$FLINK_HOME/bin/flink run -c org.apache.flink.ml.examples.clustering.KMeansExample $FLINK_HOME/lib/flink-ml-examples*.jar
 ```
 
-### Creating Training & Inference Data Table
+The command above would submit and execute Flink ML's `KMeansExample` job. There
+are also example jobs for other Flink ML algorithms, and you can find them in
+`flink-ml-examples` module.
 
-Then the program creates the Table containing data for the training and
-prediction process of the following Kmeans algorithm. Flink ML operators
-search the names of the columns of the input table for input data, and produce
-prediction results to designated column of the output Table.
+A sample output in your terminal is as follows.
 
-```java
-DataStream<DenseVector> inputStream = env.fromElements(
-        Vectors.dense(0.0, 0.0),
-        Vectors.dense(0.0, 0.3),
-        Vectors.dense(0.3, 0.0),
-        Vectors.dense(9.0, 0.0),
-        Vectors.dense(9.0, 0.6),
-        Vectors.dense(9.6, 0.0)
-);
-
-Table input = tEnv.fromDataStream(inputStream).as(featuresCol);
 ```
-
-### Creating, Configuring, Training & Using Kmeans
-
-Flink ML classes for Kmeans algorithm include `KMeans` and `KMeansModel`.
-`KMeans` implements the training process of Kmeans algorithm based on the
-provided training data, and finally generates a `KMeansModel`.
-`KmeansModel.transform()` method encodes the Transformation logic of this
-algorithm and is used for predictions. 
-
-Both `KMeans` and `KMeansModel` provides getter/setter methods for Kmeans
-algorithm's configuration parameters. The example program explicitly sets the
-following parameters, and other configuration parameters will have their default
-values used.
-
-- `K`, the number of clusters to create
-- `seed`, the random seed to initialize cluster centers
-- `featuresCol`, name of the column containing input feature vectors
-- `predictionCol`, name of the column to output prediction results
-
-When the program invokes `KMeans.fit()` to generate a `KMeansModel`, the
-`KMeansModel` will inherit the `KMeans` object's configuration parameters. Thus
-it is supported to set `KMeansModel`'s parameters directly in `KMeans` object.
-
-```java
-KMeans kmeans = new KMeans()
-        .setK(2)
-        .setSeed(1L)
-        .setFeaturesCol(featuresCol)
-        .setPredictionCol(predictionCol);
-
-KMeansModel model = kmeans.fit(input);
-
-Table output = model.transform(input)[0];
+Features: [9.0, 0.0]    Cluster ID: 1
+Features: [0.3, 0.0]    Cluster ID: 0
+Features: [0.0, 0.3]    Cluster ID: 0
+Features: [9.6, 0.0]    Cluster ID: 1
+Features: [0.0, 0.0]    Cluster ID: 0
+Features: [9.0, 0.6]    Cluster ID: 1
 
 ```
 
-### Collecting Prediction Result
+Now you have successfully run a Flink ML job.
 
-Like all other Flink programs, the codes described in the sections above only
-configures the computation graph of a Flink job, and the program only evaluates
-the computation logic and collects outputs after the `execute()` method is
-invoked. Collected outputs from the output table would be `Row`s in which
-`featuresCol` contains input feature vectors, and `predictionCol` contains
-output prediction results, i.e., cluster IDs.
-
-```java
-for (CloseableIterator<Row> it = output.execute().collect(); it.hasNext(); ) {
-    Row row = it.next();
-    DenseVector vector = (DenseVector) row.getField(featuresCol);
-    int clusterId = (Integer) row.getField(predictionCol);
-    System.out.println("Vector: " + vector + "\tCluster ID: " + clusterId);
-}
-```
-
-```
-Vector: [0.3, 0.0]	Cluster ID: 1
-Vector: [9.6, 0.0]	Cluster ID: 0
-Vector: [9.0, 0.6]	Cluster ID: 0
-Vector: [0.0, 0.0]	Cluster ID: 1
-Vector: [0.0, 0.3]	Cluster ID: 1
-Vector: [9.0, 0.0]	Cluster ID: 0
-```
-
-<!-- TODO: Add sections like "Next Steps` with guidance to other pages of this document. -->

@@ -52,7 +52,7 @@ import java.util.Map;
 
 /**
  * An Estimator which implements the MinMaxScaler algorithm. This algorithm rescales feature values
- * to a common range [min, max] which defined by user.
+ * to a common range [min, max] defined by user.
  *
  * <blockquote>
  *

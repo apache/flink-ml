@@ -6,6 +6,12 @@ build ML pipelines for both training and inference jobs.
 Flink ML is developed under the umbrella of [Apache
 Flink](https://flink.apache.org/).
 
+## <a name="start"></a>Getting Started
+
+You can follow this [quick
+start](https://nightlies.apache.org/flink/flink-ml-docs-master/docs/try-flink-ml/quick-start/)
+guideline to get hands-on experience with Flink ML.
+
 ## <a name="build"></a>Building the Project
 
 Run the `mvn clean package` command.
@@ -17,8 +23,8 @@ that you may have added as dependencies to the application:
 ## <a name="benchmark"></a>Benchmark
 
 Flink ML provides functionalities to benchmark its machine learning algorithms.
-For detailed information, please check the [Benchmark
-Getting Started](./flink-ml-benchmark/README.md).
+For detailed information, please check the [Benchmark Getting
+Started](./flink-ml-benchmark/README.md).
 
 ## <a name="documentation"></a>Documentation
 
