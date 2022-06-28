@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-baseURL = '//nightlies.apache.org/flink/flink-ml-docs-2.1'
+baseURL = '//nightlies.apache.org/flink/flink-ml-docs-release-2.1'
 languageCode = 'en-us'
 title = 'Apache Flink Machine Learning Library'
 enableGitInfo = false
