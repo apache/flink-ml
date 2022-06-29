@@ -147,15 +147,8 @@ public class IndexToStringModel
             }
 
             Row outputStrings = new Row(inputCols.length);
-            int stringId;
             for (int i = 0; i < inputCols.length; i++) {
-                try {
-                    stringId = (Integer) input.getField(inputCols[i]);
-                } catch (Exception e) {
-                    throw new RuntimeException(
-                            "The input contains non-integer value: "
-                                    + input.getField(inputCols[i] + "."));
-                }
+                int stringId = (Integer) input.getField(inputCols[i]);
                 if (stringId < stringArrays[i].length && stringId >= 0) {
                     outputStrings.setField(i, stringArrays[i][stringId]);
                 } else {
