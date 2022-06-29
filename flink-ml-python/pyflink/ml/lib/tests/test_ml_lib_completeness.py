@@ -22,9 +22,8 @@ import pkgutil
 import unittest
 from abc import abstractmethod
 
-from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
-
 from pyflink.java_gateway import get_gateway
+from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
 
 
 class CompletenessTest(object):
@@ -70,7 +69,8 @@ class MLLibTest(PyFlinkMLTestCase):
                     'JavaClassificationEstimator', 'JavaClassificationModel',
                     'JavaClusteringEstimator', 'JavaClusteringModel',
                     'JavaEvaluationAlgoOperator', 'JavaFeatureTransformer',
-                    'JavaFeatureEstimator', 'JavaFeatureModel')]
+                    'JavaFeatureEstimator', 'JavaFeatureModel',
+                    'JavaRegressionEstimator', 'JavaRegressionModel')]
 
     @abstractmethod
     def module_name(self):
@@ -118,6 +118,16 @@ class FeatureCompletenessTest(CompletenessTest, MLLibTest):
     def module(self):
         from pyflink.ml.lib import feature
         return feature
+
+
+class RegressionCompletenessTest(CompletenessTest, MLLibTest):
+
+    def module_name(self):
+        return "regression"
+
+    def module(self):
+        from pyflink.ml.lib import regression
+        return regression
 
 
 if __name__ == "__main__":

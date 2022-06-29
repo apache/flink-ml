@@ -85,23 +85,6 @@ class LogisticRegressionTest(PyFlinkMLTestCase):
         self.assertEqual(regression.prediction_col, 'test_prediction_col')
         self.assertEqual(regression.raw_prediction_col, 'test_raw_prediction_col')
 
-    def test_feature_prediction_param(self):
-        temp_table = self.binomial_data_table.alias("test_features", "test_label", "test_weight")
-        regression = LogisticRegression() \
-            .set_features_col("test_features") \
-            .set_label_col("test_label") \
-            .set_weight_col("test_weight") \
-            .set_prediction_col("test_prediction_col") \
-            .set_raw_prediction_col("test_raw_prediction_col")
-        output = regression.fit(self.binomial_data_table).transform(temp_table)[0]
-
-        self.assertEqual(output.get_schema().get_field_names(),
-                         ['test_features',
-                          'test_label',
-                          'test_weight',
-                          'test_prediction_col',
-                          'test_raw_prediction_col'])
-
     def test_output_schema(self):
         temp_table = self.binomial_data_table.alias("test_features", "test_label", "test_weight")
         regression = LogisticRegression() \
