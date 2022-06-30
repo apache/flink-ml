@@ -19,7 +19,7 @@
 # Simple program that trains a Knn model and uses it for classification.
 #
 # Before executing this program, please make sure you have followed Flink ML's
-# quick start guideline to setup Flink ML and Flink environment. The guideline
+# quick start guideline to set up Flink ML and Flink environment. The guideline
 # can be found at
 #
 # https://nightlies.apache.org/flink/flink-ml-docs-master/docs/try-flink-ml/quick-start/

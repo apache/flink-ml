@@ -1,9 +1,9 @@
 ---
-title: Classification
+title: Evaluation
 bookCollapseSection: true
 weight: 1
 aliases:
-  - /operators/feature/
+  - /operators/evaluation/
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

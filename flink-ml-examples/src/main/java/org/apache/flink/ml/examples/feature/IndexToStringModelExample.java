@@ -30,7 +30,7 @@ import org.apache.flink.util.CloseableIterator;
 import java.util.Arrays;
 
 /**
- * Simple program that creates a IndexToStringModelExample instance and uses it for feature
+ * Simple program that creates an IndexToStringModelExample instance and uses it for feature
  * engineering.
  */
 public class IndexToStringModelExample {
