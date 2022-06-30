@@ -23,9 +23,13 @@ from pyflink.ml.lib.feature.common import JavaFeatureModel, JavaFeatureEstimator
 from pyflink.ml.lib.param import HasInputCols, HasOutputCols, HasHandleInvalid
 
 
-class _IndexToStringModelParams(JavaWithParams):
+class _IndexToStringModelParams(
+    JavaWithParams,
+    HasInputCols,
+    HasOutputCols
+):
     """
-    Params for :class:`IndexToString`.
+    Params for :class:`IndexToStringModel`.
     """
 
     def __init__(self, java_params):
