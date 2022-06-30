@@ -35,11 +35,7 @@ Learning Model and use it to provide prediction service.
 In order to use Flink ML in a Maven project, add the following dependencies to
 `pom.xml`.
 
-{{< artifact flink-ml-core >}}
-
-{{< artifact flink-ml-iteration >}}
-
-{{< artifact flink-ml-lib >}}
+{{< artifact flink-ml-uber >}}
 
 The example code provided in this document requires additional dependencies on
 the Flink Table API. In order to execute the example code successfully, please
