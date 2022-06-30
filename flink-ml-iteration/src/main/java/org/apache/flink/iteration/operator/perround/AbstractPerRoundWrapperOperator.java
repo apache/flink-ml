@@ -158,7 +158,8 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
         // We need to clone the operator factory to also support SimpleOperatorFactory.
         try {
             StreamOperatorFactory<T> clonedOperatorFactory =
-                    InstantiationUtil.clone(operatorFactory);
+                    InstantiationUtil.clone(
+                            operatorFactory, containingTask.getUserCodeClassLoader());
             wrappedOperator =
                     (S)
                             StreamOperatorFactoryUtil.<T, S>createOperator(
