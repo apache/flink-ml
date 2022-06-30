@@ -1,7 +1,7 @@
 ---
 title: Clustering
 bookCollapseSection: true
-weight: 3
+weight: 1
 aliases:
   - /operators/clustering/
 ---
