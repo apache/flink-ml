@@ -64,6 +64,16 @@ mvn clean package -DskipTests
 cd ./flink-ml-dist/target/flink-ml-*-bin/flink-ml*/
 ```
 
+### Add Flink ML binaries to Flink
+
+You need to copy Flink ML's binary distribution files to Flink's folder for
+proper initialization. Please run the following command from Flink ML's binary
+distribution's folder.
+
+```bash
+cp ./lib/*.jar $FLINK_HOME/lib/
+```
+
 ## Run Flink ML example job
 
 Please start a Flink standalone cluster in your local environment with the
@@ -79,8 +89,8 @@ that the cluster is up and running.
 
 Then you may submit Flink ML examples to the cluster as follows.
 
-```
-$FLINK_HOME/bin/flink run -c org.apache.flink.ml.examples.clustering.KMeansExample -C file://`pwd`/lib/flink-ml-uber-2.2-SNAPSHOT.jar -C file://`pwd`/lib/statefun-flink-core-3.2.0.jar lib/flink-ml-examples-2.2-SNAPSHOT.jar
+```bash
+$FLINK_HOME/bin/flink run -c org.apache.flink.ml.examples.clustering.KMeansExample $FLINK_HOME/lib/flink-ml-examples*.jar
 ```
 
 The command above would submit and execute Flink ML's `KMeansExample` job. There
