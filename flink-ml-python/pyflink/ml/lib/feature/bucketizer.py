@@ -31,7 +31,7 @@ class _BucketizerParams(
     HasHandleInvalid
 ):
     """
-    Params for :class:`StandardScaler`.
+    Params for :class:`Bucketizer`.
     """
 
     SPLITS_ARRAY: Param[Tuple[float, ...]] = FloatArrayArrayParam(
@@ -55,7 +55,7 @@ class _BucketizerParams(
 
 class Bucketizer(JavaFeatureTransformer, _BucketizerParams):
     """
-    Bucketizer is a transformer that maps multiple columns of continuous features to multiple
+    A Transformer that maps multiple columns of continuous features to multiple
     columns of discrete features, i.e., buckets indices. The indices are in
     [0, numSplitsInThisColumn - 1].
 

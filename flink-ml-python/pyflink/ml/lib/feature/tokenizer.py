@@ -18,39 +18,34 @@
 
 from pyflink.ml.core.wrapper import JavaWithParams
 from pyflink.ml.lib.feature.common import JavaFeatureTransformer
-from pyflink.ml.lib.param import HasInputCols, HasOutputCol, HasHandleInvalid
+from pyflink.ml.lib.param import HasInputCol, HasOutputCol
 
 
-class _VectorAssemblerParams(
+class _TokenizerParams(
     JavaWithParams,
-    HasInputCols,
-    HasOutputCol,
-    HasHandleInvalid
+    HasInputCol,
+    HasOutputCol
 ):
     """
-    Params for :class:`VectorAssembler`.
+    Params for :class:`Tokenizer`.
     """
 
     def __init__(self, java_params):
-        super(_VectorAssemblerParams, self).__init__(java_params)
+        super(_TokenizerParams, self).__init__(java_params)
 
 
-class VectorAssembler(JavaFeatureTransformer, _VectorAssemblerParams):
+class Tokenizer(JavaFeatureTransformer, _TokenizerParams):
     """
-    A Transformer which combines a given list of input columns into a vector column. Types of
-    input columns must be either vector or numerical value.
-
-    The `keep` option of :class:HasHandleInvalid means that we output bad rows with output column
-    set to null.
+    A Transformer that converts the input string to lowercase and then splits it by white spaces.
     """
 
     def __init__(self, java_model=None):
-        super(VectorAssembler, self).__init__(java_model)
+        super(Tokenizer, self).__init__(java_model)
 
     @classmethod
     def _java_transformer_package_name(cls) -> str:
-        return "vectorassembler"
+        return "tokenizer"
 
     @classmethod
     def _java_transformer_class_name(cls) -> str:
-        return "VectorAssembler"
+        return "Tokenizer"

@@ -44,8 +44,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Bucketizer is a transformer that maps multiple columns of continuous features to multiple columns
- * of discrete features, i.e., buckets indices. The indices are in [0, numSplitsInThisColumn - 1].
+ * A Transformer that maps multiple columns of continuous features to multiple columns of discrete
+ * features, i.e., buckets indices. The indices are in [0, numSplitsInThisColumn - 1].
  *
  * <p>The `keep` option of {@link HasHandleInvalid} means that we put the invalid data in the last
  * bucket of the splits, whose index is the number of the buckets.
