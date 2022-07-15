@@ -39,6 +39,8 @@ package org.apache.flink.ml.param;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.ml.util.ParamUtils;
 
+import org.apache.commons.lang3.ArrayUtils;
+
 import java.util.Map;
 import java.util.Optional;
 
@@ -97,7 +99,9 @@ public interface WithParams<T> {
                         "Parameter "
                                 + param.name
                                 + " is given an invalid value "
-                                + value.toString());
+                                + (value.getClass().isArray()
+                                        ? ArrayUtils.toString(value)
+                                        : value));
             }
         }
         getParamMap().put(param, value);
