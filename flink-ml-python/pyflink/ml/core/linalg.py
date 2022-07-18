@@ -305,6 +305,9 @@ class DenseVector(Vector):
     def get(self, i: int):
         return self._values[i]
 
+    def set(self, i: int, value: np.float64):
+        self._values[i] = value
+
     def to_array(self) -> np.ndarray:
         return self._values
 
@@ -481,7 +484,29 @@ class SparseVector(Vector):
         return self._size
 
     def get(self, i: int):
-        return self._values[self._indices.searchsorted(i)]
+        idx = self._indices.searchsorted(i)
+        if idx < len(self._indices) and self._indices[idx] == i:
+            return self._values[idx]
+        else:
+            return 0.0
+
+    def set(self, i: int, value: np.float64):
+        idx = self._indices.searchsorted(i)
+        if idx < len(self._indices) and self._indices[idx] == i:
+            self._values[idx] = value
+        elif value != 0:
+            assert i < self._size
+            cur_len = len(self._indices)
+            indices = np.zeros(cur_len + 1, dtype=np.int32)
+            values = np.zeros(cur_len + 1, dtype=np.float64)
+            indices[0:idx] = self._indices[0:idx]
+            values[0:idx] = self._values[0:idx]
+            indices[idx] = i
+            values[idx] = value
+            indices[idx + 1:] = self._indices[idx:]
+            values[idx + 1:] = self._values[idx]
+            self._indices = indices
+            self._values = values
 
     def to_array(self) -> np.ndarray:
         """

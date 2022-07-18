@@ -16,31 +16,16 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.linalg;
+package org.apache.flink.ml.feature.vectorindexer;
 
-import java.io.Serializable;
+import org.apache.flink.ml.common.param.HasHandleInvalid;
+import org.apache.flink.ml.common.param.HasInputCol;
+import org.apache.flink.ml.common.param.HasOutputCol;
 
-/** A vector of double values. */
-public interface Vector extends Serializable {
-
-    /** Gets the size of the vector. */
-    int size();
-
-    /** Gets the value of the ith element. */
-    double get(int i);
-
-    /** Sets the value of the ith element. */
-    void set(int i, double value);
-
-    /** Converts the instance to a double array. */
-    double[] toArray();
-
-    /** Converts the instance to a dense vector. */
-    DenseVector toDense();
-
-    /** Converts the instance to a sparse vector. */
-    SparseVector toSparse();
-
-    /** Makes a deep copy of the vector. */
-    Vector clone();
-}
+/**
+ * Params for {@link VectorIndexerModel}.
+ *
+ * @param <T> The class type of this instance.
+ */
+public interface VectorIndexerModelParams<T>
+        extends HasInputCol<T>, HasOutputCol<T>, HasHandleInvalid<T> {}

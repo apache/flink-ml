@@ -29,8 +29,8 @@ import java.util.Objects;
 @TypeInfo(SparseVectorTypeInfoFactory.class)
 public class SparseVector implements Vector {
     public final int n;
-    public final int[] indices;
-    public final double[] values;
+    public int[] indices;
+    public double[] values;
 
     public SparseVector(int n, int[] indices, double[] values) {
         this.n = n;
@@ -54,6 +54,26 @@ public class SparseVector implements Vector {
             return values[pos];
         }
         return 0.;
+    }
+
+    @Override
+    public void set(int i, double value) {
+        int pos = Arrays.binarySearch(indices, i);
+        if (pos >= 0) {
+            values[pos] = value;
+        } else if (value != 0.0) {
+            Preconditions.checkArgument(i < n, "Index out of bounds: " + i);
+            int[] indices = new int[this.indices.length + 1];
+            double[] values = new double[this.indices.length + 1];
+            System.arraycopy(this.indices, 0, indices, 0, -pos - 1);
+            System.arraycopy(this.values, 0, values, 0, -pos - 1);
+            indices[-pos - 1] = i;
+            values[-pos - 1] = value;
+            System.arraycopy(this.indices, -pos - 1, indices, -pos, this.indices.length + pos + 1);
+            System.arraycopy(this.values, -pos - 1, values, -pos, this.indices.length + pos + 1);
+            this.indices = indices;
+            this.values = values;
+        }
     }
 
     @Override
