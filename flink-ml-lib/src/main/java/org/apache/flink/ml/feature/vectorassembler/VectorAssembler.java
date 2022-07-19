@@ -46,8 +46,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * A feature transformer that combines a given list of input columns into a vector column. Types of
- * input columns must be either vector or numerical value.
+ * A Transformer which combines a given list of input columns into a vector column. Types of input
+ * columns must be either vector or numerical value.
  *
  * <p>The `keep` option of {@link HasHandleInvalid} means that we output bad rows with output column
  * set to null.
