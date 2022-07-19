@@ -27,8 +27,8 @@ from pyflink.util.java_utils import to_jarray
 
 from pyflink.ml.core.api import Model, Transformer, AlgoOperator, Stage, Estimator
 from pyflink.ml.core.linalg import DenseVectorTypeInfo, SparseVectorTypeInfo, DenseMatrixTypeInfo, \
-    VectorTypeInfo
-from pyflink.ml.core.param import Param, WithParams, StringArrayParam, IntArrayParam, \
+    VectorTypeInfo, DenseVector
+from pyflink.ml.core.param import Param, WithParams, StringArrayParam, IntArrayParam, VectorParam, \
     FloatArrayParam, FloatArrayArrayParam
 
 _from_java_type_alias = _from_java_type
@@ -222,6 +222,15 @@ class FloatArrayJavaPramConverter(JavaParamConverter):
         return tuple(value[i] for i in range(len(value)))
 
 
+class VectorJavaParamConverter(JavaParamConverter):
+    def to_java(self, value):
+        jarray = to_jarray(get_gateway().jvm.double, value.to_array())
+        return get_gateway().jvm.org.apache.flink.ml.linalg.DenseVector(jarray)
+
+    def to_python(self, value):
+        return DenseVector(tuple(value.get(i) for i in range(value.size())))
+
+
 class StringArrayJavaParamConverter(JavaParamConverter):
     def to_java(self, value):
         return to_jarray(get_gateway().jvm.java.lang.String, value)
@@ -259,6 +268,7 @@ _map_java_param_converter = {
     FloatArrayParam: FloatArrayJavaPramConverter(),
     FloatArrayArrayParam: FloatArrayArrayJavaPramConverter(),
     StringArrayParam: StringArrayJavaParamConverter(),
+    VectorParam: VectorJavaParamConverter(),
     Param: default_converter
 }
 
