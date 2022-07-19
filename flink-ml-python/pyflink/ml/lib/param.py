@@ -155,6 +155,48 @@ class HasInputCols(WithParams, ABC):
         return self.get_input_cols()
 
 
+class HasCategoricalCols(WithParams, ABC):
+    """
+    Base class for the shared categorical cols param.
+    """
+    CATEGORICAL_COLS: Param[Tuple[str, ...]] = StringArrayParam(
+        "categorical_cols",
+        "Categorical column names.",
+        [],
+        ParamValidators.not_null())
+
+    def set_categorical_cols(self, *cols: str):
+        return self.set(self.CATEGORICAL_COLS, cols)
+
+    def get_categorical_cols(self) -> Tuple[str, ...]:
+        return self.get(self.CATEGORICAL_COLS)
+
+    @property
+    def categorical_cols(self) -> Tuple[str, ...]:
+        return self.get_categorical_cols()
+
+
+class HasNumFeatures(WithParams, ABC):
+    """
+    Base class for the shared numFeatures param.
+    """
+    NUM_FEATURES: Param[int] = IntParam(
+        "num_features",
+        "Number of features.",
+        262144,
+        ParamValidators.gt(0))
+
+    def set_num_features(self, num_features: int):
+        return self.set(self.NUM_FEATURES, num_features)
+
+    def get_num_features(self) -> int:
+        return self.get(self.NUM_FEATURES)
+
+    @property
+    def num_features(self) -> int:
+        return self.get_num_features()
+
+
 class HasLabelCol(WithParams, ABC):
     """
     Base class for the shared label column param.
