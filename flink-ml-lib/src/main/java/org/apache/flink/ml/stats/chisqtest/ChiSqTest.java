@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.feature.chisqtest;
+package org.apache.flink.ml.stats.chisqtest;
 
 import org.apache.flink.api.common.functions.MapPartitionFunction;
 import org.apache.flink.api.common.functions.RichFlatMapFunction;
@@ -28,11 +28,9 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
-import org.apache.flink.ml.api.Transformer;
+import org.apache.flink.ml.api.AlgoOperator;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
-import org.apache.flink.ml.common.param.HasInputCols;
-import org.apache.flink.ml.common.param.HasLabelCol;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -72,17 +70,14 @@ import java.util.stream.Collectors;
  *
  * <p>See: http://en.wikipedia.org/wiki/Chi-squared_test.
  */
-public class ChiSqTestTransformer
-        implements Transformer<ChiSqTestTransformer>,
-                HasInputCols<ChiSqTestTransformer>,
-                HasLabelCol<ChiSqTestTransformer> {
+public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSqTest> {
 
     final String bcCategoricalMarginsKey = "bcCategoricalMarginsKey";
     final String bcLabelMarginsKey = "bcLabelMarginsKey";
 
     private final Map<Param<?>, Object> paramMap = new HashMap<>();
 
-    public ChiSqTestTransformer() {
+    public ChiSqTest() {
         ParamUtils.initializeMapWithDefaultValues(paramMap, this);
     }
 
@@ -95,24 +90,24 @@ public class ChiSqTestTransformer
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
 
-        SingleOutputStreamOperator<Tuple3<String, Object, Double>> colAndFeatureAndLabel =
+        SingleOutputStreamOperator<Tuple3<String, Object, Object>> colAndFeatureAndLabel =
                 tEnv.toDataStream(inputs[0])
                         .flatMap(new ExtractColAndFeatureAndLabel(inputCols, labelCol));
 
         // compute the observed frequencies
-        DataStream<Tuple4<String, Object, Double, Long>> observedFreq =
+        DataStream<Tuple4<String, Object, Object, Long>> observedFreq =
                 DataStreamUtils.mapPartition(
                         colAndFeatureAndLabel.keyBy(Tuple3::hashCode),
                         new GenerateObservedFrequencies());
 
-        SingleOutputStreamOperator<Tuple4<String, Object, Double, Long>> filledObservedFreq =
+        SingleOutputStreamOperator<Tuple4<String, Object, Object, Long>> filledObservedFreq =
                 observedFreq
                         .transform(
                                 "filledObservedFreq",
                                 Types.TUPLE(
                                         Types.STRING,
                                         Types.GENERIC(Object.class),
-                                        Types.DOUBLE,
+                                        Types.GENERIC(Object.class),
                                         Types.LONG),
                                 new FillZeroFunc())
                         .setParallelism(1);
@@ -122,15 +117,15 @@ public class ChiSqTestTransformer
                 DataStreamUtils.mapPartition(
                         observedFreq.keyBy(tuple -> new Tuple2<>(tuple.f0, tuple.f1).hashCode()),
                         new MapPartitionFunction<
-                                Tuple4<String, Object, Double, Long>,
+                                Tuple4<String, Object, Object, Long>,
                                 Tuple3<String, Object, Long>>() {
                             @Override
                             public void mapPartition(
-                                    Iterable<Tuple4<String, Object, Double, Long>> iterable,
+                                    Iterable<Tuple4<String, Object, Object, Long>> iterable,
                                     Collector<Tuple3<String, Object, Long>> out) {
                                 HashMap<Tuple2<String, Object>, Long> map = new HashMap<>();
 
-                                for (Tuple4<String, Object, Double, Long> tuple : iterable) {
+                                for (Tuple4<String, Object, Object, Long> tuple : iterable) {
                                     Long observedFreq = tuple.f3;
                                     Tuple2<String, Object> key = new Tuple2<>(tuple.f0, tuple.f1);
 
@@ -150,23 +145,23 @@ public class ChiSqTestTransformer
                         });
 
         // return a DataStream of the marginal sums of the labels
-        DataStream<Tuple3<String, Double, Long>> labelMargins =
+        DataStream<Tuple3<String, Object, Long>> labelMargins =
                 DataStreamUtils.mapPartition(
                         observedFreq.keyBy(tuple -> new Tuple2<>(tuple.f0, tuple.f2).hashCode()),
                         new MapPartitionFunction<
-                                Tuple4<String, Object, Double, Long>,
-                                Tuple3<String, Double, Long>>() {
+                                Tuple4<String, Object, Object, Long>,
+                                Tuple3<String, Object, Long>>() {
                             @Override
                             public void mapPartition(
-                                    Iterable<Tuple4<String, Object, Double, Long>> iterable,
-                                    Collector<Tuple3<String, Double, Long>> out) {
+                                    Iterable<Tuple4<String, Object, Object, Long>> iterable,
+                                    Collector<Tuple3<String, Object, Long>> out) {
 
-                                HashMap<Tuple2<String, Double>, Long> map = new HashMap<>();
+                                HashMap<Tuple2<String, Object>, Long> map = new HashMap<>();
 
-                                for (Tuple4<String, Object, Double, Long>
+                                for (Tuple4<String, Object, Object, Long>
                                         colAndFeatureAndLabelAndCount : iterable) {
                                     Long observedFreq = colAndFeatureAndLabelAndCount.f3;
-                                    Tuple2<String, Double> key =
+                                    Tuple2<String, Object> key =
                                             new Tuple2<>(
                                                     colAndFeatureAndLabelAndCount.f0,
                                                     colAndFeatureAndLabelAndCount.f2);
@@ -179,7 +174,7 @@ public class ChiSqTestTransformer
                                     }
                                 }
 
-                                for (Tuple2<String, Double> key : map.keySet()) {
+                                for (Tuple2<String, Object> key : map.keySet()) {
                                     Long labelMargin = map.get(key);
                                     out.collect(new Tuple3<>(key.f0, key.f1, labelMargin));
                                 }
@@ -226,8 +221,7 @@ public class ChiSqTestTransformer
         ReadWriteUtils.saveMetadata(this, path);
     }
 
-    public static ChiSqTestTransformer load(StreamTableEnvironment tEnv, String path)
-            throws IOException {
+    public static ChiSqTest load(StreamTableEnvironment tEnv, String path) throws IOException {
         return ReadWriteUtils.loadStageParam(path);
     }
 
@@ -237,7 +231,7 @@ public class ChiSqTestTransformer
     }
 
     private static class ExtractColAndFeatureAndLabel
-            extends RichFlatMapFunction<Row, Tuple3<String, Object, Double>> {
+            extends RichFlatMapFunction<Row, Tuple3<String, Object, Object>> {
         private final String[] inputCols;
         private final String labelCol;
 
@@ -247,9 +241,9 @@ public class ChiSqTestTransformer
         }
 
         @Override
-        public void flatMap(Row row, Collector<Tuple3<String, Object, Double>> collector) {
+        public void flatMap(Row row, Collector<Tuple3<String, Object, Object>> collector) {
 
-            Double label = row.getFieldAs(labelCol);
+            Object label = row.getFieldAs(labelCol);
 
             for (String colName : inputCols) {
                 Object value = row.getField(colName);
@@ -264,16 +258,16 @@ public class ChiSqTestTransformer
      */
     private static class GenerateObservedFrequencies
             extends RichMapPartitionFunction<
-                    Tuple3<String, Object, Double>, Tuple4<String, Object, Double, Long>> {
+                    Tuple3<String, Object, Object>, Tuple4<String, Object, Object, Long>> {
 
         @Override
         public void mapPartition(
-                Iterable<Tuple3<String, Object, Double>> iterable,
-                Collector<Tuple4<String, Object, Double, Long>> out) {
+                Iterable<Tuple3<String, Object, Object>> iterable,
+                Collector<Tuple4<String, Object, Object, Long>> out) {
 
-            HashMap<Tuple3<String, Object, Double>, Long> map = new HashMap<>();
+            HashMap<Tuple3<String, Object, Object>, Long> map = new HashMap<>();
 
-            for (Tuple3<String, Object, Double> key : iterable) {
+            for (Tuple3<String, Object, Object> key : iterable) {
                 if (map.containsKey(key)) {
                     Long count = map.get(key);
                     map.put(key, count + 1);
@@ -282,7 +276,7 @@ public class ChiSqTestTransformer
                 }
             }
 
-            for (Tuple3<String, Object, Double> key : map.keySet()) {
+            for (Tuple3<String, Object, Object> key : map.keySet()) {
                 Long count = map.get(key);
                 out.collect(new Tuple4<>(key.f0, key.f1, key.f2, count));
             }
@@ -291,34 +285,34 @@ public class ChiSqTestTransformer
 
     /** Fill the factors which frequencies are zero in frequency table. */
     private static class FillZeroFunc
-            extends AbstractStreamOperator<Tuple4<String, Object, Double, Long>>
+            extends AbstractStreamOperator<Tuple4<String, Object, Object, Long>>
             implements OneInputStreamOperator<
-                            Tuple4<String, Object, Double, Long>,
-                            Tuple4<String, Object, Double, Long>>,
+                            Tuple4<String, Object, Object, Long>,
+                            Tuple4<String, Object, Object, Long>>,
                     BoundedOneInput {
 
-        HashMap<Tuple2<String, Object>, ArrayList<Tuple2<Double, Long>>> values = new HashMap<>();
-        HashSet<Double> numLabels = new HashSet<>();
+        HashMap<Tuple2<String, Object>, ArrayList<Tuple2<Object, Long>>> values = new HashMap<>();
+        HashSet<Object> numLabels = new HashSet<>();
 
         @Override
         public void endInput() {
 
-            for (Map.Entry<Tuple2<String, Object>, ArrayList<Tuple2<Double, Long>>> entry :
+            for (Map.Entry<Tuple2<String, Object>, ArrayList<Tuple2<Object, Long>>> entry :
                     values.entrySet()) {
-                ArrayList<Tuple2<Double, Long>> labelAndCountList = entry.getValue();
+                ArrayList<Tuple2<Object, Long>> labelAndCountList = entry.getValue();
                 Tuple2<String, Object> categoricalKey = entry.getKey();
 
-                List<Double> existingLabels =
+                List<Object> existingLabels =
                         labelAndCountList.stream().map(v -> v.f0).collect(Collectors.toList());
 
-                for (Double label : numLabels) {
+                for (Object label : numLabels) {
                     if (!existingLabels.contains(label)) {
-                        Tuple2<Double, Long> generatedLabelCount = new Tuple2<>(label, 0L);
+                        Tuple2<Object, Long> generatedLabelCount = new Tuple2<>(label, 0L);
                         labelAndCountList.add(generatedLabelCount);
                     }
                 }
 
-                for (Tuple2<Double, Long> labelAndCount : labelAndCountList) {
+                for (Tuple2<Object, Long> labelAndCount : labelAndCountList) {
                     output.collect(
                             new StreamRecord<>(
                                     new Tuple4<>(
@@ -331,19 +325,19 @@ public class ChiSqTestTransformer
         }
 
         @Override
-        public void processElement(StreamRecord<Tuple4<String, Object, Double, Long>> element) {
-            Tuple4<String, Object, Double, Long> colAndCategoryAndLabelAndCount =
+        public void processElement(StreamRecord<Tuple4<String, Object, Object, Long>> element) {
+            Tuple4<String, Object, Object, Long> colAndCategoryAndLabelAndCount =
                     element.getValue();
             Tuple2<String, Object> key =
                     new Tuple2<>(
                             colAndCategoryAndLabelAndCount.f0, colAndCategoryAndLabelAndCount.f1);
-            Tuple2<Double, Long> labelAndCount =
+            Tuple2<Object, Long> labelAndCount =
                     new Tuple2<>(
                             colAndCategoryAndLabelAndCount.f2, colAndCategoryAndLabelAndCount.f3);
-            ArrayList<Tuple2<Double, Long>> labelAndCountList = values.get(key);
+            ArrayList<Tuple2<Object, Long>> labelAndCountList = values.get(key);
 
             if (labelAndCountList == null) {
-                ArrayList<Tuple2<Double, Long>> value = new ArrayList<>();
+                ArrayList<Tuple2<Object, Long>> value = new ArrayList<>();
                 value.add(labelAndCount);
                 values.put(key, value);
             } else {
@@ -360,12 +354,12 @@ public class ChiSqTestTransformer
      */
     private static class ChiSqFunc
             extends RichMapFunction<
-                    Tuple4<String, Object, Double, Long>, Tuple3<String, Double, Integer>> {
+                    Tuple4<String, Object, Object, Long>, Tuple3<String, Double, Integer>> {
 
         private final String bcCategoricalMarginsKey;
         private final String bcLabelMarginsKey;
         private final Map<Tuple2<String, Object>, Long> categoricalMargins = new HashMap<>();
-        private final Map<Tuple2<String, Double>, Long> labelMargins = new HashMap<>();
+        private final Map<Tuple2<String, Object>, Long> labelMargins = new HashMap<>();
 
         double sampleSize = 0;
         int numLabels = 0;
@@ -377,11 +371,11 @@ public class ChiSqTestTransformer
         }
 
         @Override
-        public Tuple3<String, Double, Integer> map(Tuple4<String, Object, Double, Long> v) {
+        public Tuple3<String, Double, Integer> map(Tuple4<String, Object, Object, Long> v) {
             if (categoricalMargins.isEmpty()) {
                 List<Tuple3<String, Object, Long>> categoricalMarginList =
                         getRuntimeContext().getBroadcastVariable(bcCategoricalMarginsKey);
-                List<Tuple3<String, Double, Long>> labelMarginList =
+                List<Tuple3<String, Object, Long>> labelMarginList =
                         getRuntimeContext().getBroadcastVariable(bcLabelMarginsKey);
 
                 for (Tuple3<String, Object, Long> colAndFeatureAndCount : categoricalMarginList) {
@@ -400,7 +394,7 @@ public class ChiSqTestTransformer
                 Map<String, Double> sampleSizeCount = new HashMap<>();
                 String tmpKey = null;
 
-                for (Tuple3<String, Double, Long> colAndLabelAndCount : labelMarginList) {
+                for (Tuple3<String, Object, Long> colAndLabelAndCount : labelMarginList) {
                     String col = colAndLabelAndCount.f0;
 
                     if (tmpKey == null) {
@@ -426,7 +420,7 @@ public class ChiSqTestTransformer
 
             Tuple2<String, Object> category = new Tuple2<>(v.f0, v.f1);
 
-            Tuple2<String, Double> colAndLabelKey = new Tuple2<>(v.f0, v.f2);
+            Tuple2<String, Object> colAndLabelKey = new Tuple2<>(v.f0, v.f2);
             Long theCategoricalMargin = categoricalMargins.get(category);
             Long theLabelMargin = labelMargins.get(colAndLabelKey);
             Long observed = v.f3;
