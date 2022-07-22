@@ -63,10 +63,10 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Chi-square test of independence of variables in a contingency table. This Transformer computes
- * the chi-square statistic,p-value,and dof(number of degrees of freedom) for every feature in the
- * contingency table, which constructed from the `observed` for each categorical values. All label
- * and feature values must be categorical.
+ * Chi-square test of independence of variables in a contingency table. This function computes the
+ * chi-square statistic and p-value and dof(number of degrees of freedom) for every feature in the
+ * contingency table. The contingency table is constructed from the observed of categorical values.
+ * All label and feature values must be categorical.
  *
  * <p>See: http://en.wikipedia.org/wiki/Chi-squared_test.
  */
@@ -348,10 +348,7 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
         }
     }
 
-    /**
-     * Conduct Pearson's independence test in a contingency table that constructed from the input
-     * `observed` for each categorical values.
-     */
+    /** Conduct Pearson's independence test on the input contingency table. */
     private static class ChiSqFunc
             extends RichMapFunction<
                     Tuple4<String, Object, Object, Long>, Tuple3<String, Double, Integer>> {
@@ -439,7 +436,7 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
     }
 
     /**
-     * This function computes the Pearson's chi-squared statistic , p-value ,and the number of
+     * This function computes the Pearson's chi-squared statistic and p-value and the number of
      * degrees of freedom for every feature across the input DataStream.
      */
     private static class AggregateChiSqFunc extends AbstractStreamOperator<Row>

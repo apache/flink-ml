@@ -156,11 +156,11 @@ public class ChiSqTestTest extends AbstractTestBase {
     @Test
     public void testParam() {
         ChiSqTest chiSqTest = new ChiSqTest();
-
-        chiSqTest.setInputCols("f1", "f2").setLabelCol("label");
-
-        assertArrayEquals(new String[] {"f1", "f2"}, chiSqTest.getInputCols());
         assertEquals("label", chiSqTest.getLabelCol());
+
+        chiSqTest.setInputCols("f1", "f2").setLabelCol("click");
+        assertArrayEquals(new String[] {"f1", "f2"}, chiSqTest.getInputCols());
+        assertEquals("click", chiSqTest.getLabelCol());
     }
 
     @Test
