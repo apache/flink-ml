@@ -147,4 +147,17 @@ public class SparseVectorTest {
         assertArrayEquals(clonedSparseVec.indices, new int[] {0, 2});
         assertArrayEquals(clonedSparseVec.values, new double[] {-1, 3}, TOLERANCE);
     }
+
+    @Test
+    public void testGetAndSet() {
+        SparseVector sparseVec = Vectors.sparse(4, new int[] {2}, new double[] {0.3});
+        assertEquals(0, sparseVec.get(0), TOLERANCE);
+        assertEquals(0.3, sparseVec.get(2), TOLERANCE);
+
+        sparseVec.set(2, 0.5);
+        assertEquals(0.5, sparseVec.get(2), TOLERANCE);
+
+        sparseVec.set(0, 0.1);
+        assertEquals(0.1, sparseVec.get(0), TOLERANCE);
+    }
 }

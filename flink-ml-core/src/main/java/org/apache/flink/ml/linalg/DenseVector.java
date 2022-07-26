@@ -47,6 +47,11 @@ public class DenseVector implements Vector {
     }
 
     @Override
+    public void set(int i, double value) {
+        values[i] = value;
+    }
+
+    @Override
     public double[] toArray() {
         return values;
     }
