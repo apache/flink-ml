@@ -91,7 +91,7 @@ public class OneHotEncoder
                         .transform(
                                 "GenerateModelDataOperator",
                                 TupleTypeInfo.getBasicTupleTypeInfo(Integer.class, Integer.class),
-                                new GenerateModelDataOperator())
+                                new GenerateModelDataOperator(inputCols.length))
                         .setParallelism(1);
 
         OneHotEncoderModel model =
@@ -145,13 +145,7 @@ public class OneHotEncoder
 
             maxIndices =
                     OperatorStateUtils.getUniqueElement(maxIndicesState, "maxIndices")
-                            .orElse(initMaxIndices());
-        }
-
-        private Integer[] initMaxIndices() {
-            Integer[] indices = new Integer[inputCols.length];
-            Arrays.fill(indices, Integer.MIN_VALUE);
-            return indices;
+                            .orElse(initMaxIndices(inputCols.length));
         }
 
         @Override
@@ -194,10 +188,15 @@ public class OneHotEncoder
             extends AbstractStreamOperator<Tuple2<Integer, Integer>>
             implements OneInputStreamOperator<Integer[], Tuple2<Integer, Integer>>,
                     BoundedOneInput {
+        private final int inputColsNum;
 
         private ListState<Integer[]> maxIndicesState;
 
         private Integer[] maxIndices;
+
+        private GenerateModelDataOperator(int inputColsNum) {
+            this.inputColsNum = inputColsNum;
+        }
 
         @Override
         public void initializeState(StateInitializationContext context) throws Exception {
@@ -211,7 +210,8 @@ public class OneHotEncoder
                             .getListState(new ListStateDescriptor<>("maxIndices", type));
 
             maxIndices =
-                    OperatorStateUtils.getUniqueElement(maxIndicesState, "maxIndices").orElse(null);
+                    OperatorStateUtils.getUniqueElement(maxIndicesState, "maxIndices")
+                            .orElse(initMaxIndices(inputColsNum));
         }
 
         @Override
@@ -222,14 +222,10 @@ public class OneHotEncoder
 
         @Override
         public void processElement(StreamRecord<Integer[]> streamRecord) {
-            if (maxIndices == null) {
-                maxIndices = streamRecord.getValue();
-            } else {
-                Integer[] indices = streamRecord.getValue();
-                for (int i = 0; i < maxIndices.length; i++) {
-                    if (indices[i] > maxIndices[i]) {
-                        maxIndices[i] = indices[i];
-                    }
+            Integer[] indices = streamRecord.getValue();
+            for (int i = 0; i < maxIndices.length; i++) {
+                if (indices[i] > maxIndices[i]) {
+                    maxIndices[i] = indices[i];
                 }
             }
         }
@@ -240,5 +236,11 @@ public class OneHotEncoder
                 output.collect(new StreamRecord<>(Tuple2.of(i, maxIndices[i])));
             }
         }
+    }
+
+    private static Integer[] initMaxIndices(int length) {
+        Integer[] indices = new Integer[length];
+        Arrays.fill(indices, Integer.MIN_VALUE);
+        return indices;
     }
 }
