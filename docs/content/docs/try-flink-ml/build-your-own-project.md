@@ -45,7 +45,7 @@ make sure the following dependencies also exist in `pom.xml`.
 <dependency>
   <groupId>org.apache.flink</groupId>
   <artifactId>flink-clients</artifactId>
-  <version>1.15.0</version>
+  <version>1.15.1</version>
 </dependency>
 ```
 
@@ -53,7 +53,7 @@ make sure the following dependencies also exist in `pom.xml`.
 <dependency>
   <groupId>org.apache.flink</groupId>
   <artifactId>flink-table-planner-loader</artifactId>
-  <version>1.15.0</version>
+  <version>1.15.1</version>
 </dependency>
 ```
 
