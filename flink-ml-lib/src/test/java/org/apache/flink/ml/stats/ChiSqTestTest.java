@@ -43,7 +43,7 @@ import java.util.List;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
-/** Tests {@link ChiSqTestTest}. */
+/** Tests the {@link ChiSqTest}. */
 public class ChiSqTestTest extends AbstractTestBase {
     @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
     private StreamTableEnvironment tEnv;
@@ -191,15 +191,9 @@ public class ChiSqTestTest extends AbstractTestBase {
     public void testSaveLoadAndTransform() throws Exception {
         ChiSqTest chiSqTest = new ChiSqTest().setInputCols("f1", "f2").setLabelCol("label");
 
-        ChiSqTest loadedBucketizer =
+        ChiSqTest loadedChiSqTest =
                 TestUtils.saveAndReload(tEnv, chiSqTest, tempFolder.newFolder().getAbsolutePath());
-        Table output1 = loadedBucketizer.transform(inputTableWithDoubleLabel)[0];
+        Table output1 = loadedChiSqTest.transform(inputTableWithDoubleLabel)[0];
         verifyPredictionResult(output1, expectedChiSqTestResultWithDoubleLabel);
-
-        Table output2 = loadedBucketizer.transform(inputTableWithIntegerLabel)[0];
-        verifyPredictionResult(output2, expectedChiSqTestResultWithIntegerLabel);
-
-        Table output3 = loadedBucketizer.transform(inputTableWithStringLabel)[0];
-        verifyPredictionResult(output3, expectedChiSqTestResultWithStringLabel);
     }
 }

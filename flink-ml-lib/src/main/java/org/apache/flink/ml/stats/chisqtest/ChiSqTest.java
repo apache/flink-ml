@@ -18,22 +18,25 @@
 
 package org.apache.flink.ml.stats.chisqtest;
 
-import org.apache.flink.api.common.functions.MapPartitionFunction;
 import org.apache.flink.api.common.functions.RichFlatMapFunction;
 import org.apache.flink.api.common.functions.RichMapFunction;
-import org.apache.flink.api.common.functions.RichMapPartitionFunction;
+import org.apache.flink.api.common.state.ListState;
+import org.apache.flink.api.common.state.ListStateDescriptor;
+import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
+import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.api.AlgoOperator;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
-import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.runtime.state.StateInitializationContext;
+import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
@@ -63,17 +66,16 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Chi-square test of independence of variables in a contingency table. This function computes the
- * chi-square statistic and p-value and dof(number of degrees of freedom) for every feature in the
- * contingency table. The contingency table is constructed from the observed of categorical values.
- * All label and feature values must be categorical.
+ * An AlgoOperator which implements the Chi-square test algorithm.
+ *
+ * <p>Chi-square test of independence of variables in a contingency table. This function computes
+ * the chi-square statistic and p-value and dof(number of degrees of freedom) for every feature in
+ * the contingency table. The contingency table is constructed from the observed of categorical
+ * values.
  *
  * <p>See: http://en.wikipedia.org/wiki/Chi-squared_test.
  */
 public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSqTest> {
-
-    final String bcCategoricalMarginsKey = "bcCategoricalMarginsKey";
-    final String bcLabelMarginsKey = "bcLabelMarginsKey";
 
     private final Map<Param<?>, Object> paramMap = new HashMap<>();
 
@@ -83,6 +85,10 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
 
     @Override
     public Table[] transform(Table... inputs) {
+        Preconditions.checkArgument(inputs.length == 1);
+
+        final String bcCategoricalMarginsKey = "bcCategoricalMarginsKey";
+        final String bcLabelMarginsKey = "bcLabelMarginsKey";
 
         final String[] inputCols = getInputCols();
         String labelCol = getLabelCol();
@@ -96,9 +102,13 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
 
         // compute the observed frequencies
         DataStream<Tuple4<String, Object, Object, Long>> observedFreq =
-                DataStreamUtils.mapPartition(
-                        colAndFeatureAndLabel.keyBy(Tuple3::hashCode),
-                        new GenerateObservedFrequencies());
+                colAndFeatureAndLabel
+                        .keyBy(Tuple3::hashCode)
+                        .transform(
+                                "GenerateObservedFrequencies",
+                                TypeInformation.of(
+                                        new TypeHint<Tuple4<String, Object, Object, Long>>() {}),
+                                new GenerateObservedFrequencies());
 
         SingleOutputStreamOperator<Tuple4<String, Object, Object, Long>> filledObservedFreq =
                 observedFreq
@@ -112,74 +122,21 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
                                 new FillZeroFunc())
                         .setParallelism(1);
 
-        // return a DataStream of the marginal sums of the factors
         DataStream<Tuple3<String, Object, Long>> categoricalMargins =
-                DataStreamUtils.mapPartition(
-                        observedFreq.keyBy(tuple -> new Tuple2<>(tuple.f0, tuple.f1).hashCode()),
-                        new MapPartitionFunction<
-                                Tuple4<String, Object, Object, Long>,
-                                Tuple3<String, Object, Long>>() {
-                            @Override
-                            public void mapPartition(
-                                    Iterable<Tuple4<String, Object, Object, Long>> iterable,
-                                    Collector<Tuple3<String, Object, Long>> out) {
-                                HashMap<Tuple2<String, Object>, Long> map = new HashMap<>();
+                observedFreq
+                        .keyBy(tuple -> new Tuple2<>(tuple.f0, tuple.f1).hashCode())
+                        .transform(
+                                "AggregateCategoricalMargins",
+                                TypeInformation.of(new TypeHint<Tuple3<String, Object, Long>>() {}),
+                                new AggregateCategoricalMargins());
 
-                                for (Tuple4<String, Object, Object, Long> tuple : iterable) {
-                                    Long observedFreq = tuple.f3;
-                                    Tuple2<String, Object> key = new Tuple2<>(tuple.f0, tuple.f1);
-
-                                    if (map.containsKey(key)) {
-                                        Long count = map.get(key);
-                                        map.put(key, count + observedFreq);
-                                    } else {
-                                        map.put(key, observedFreq);
-                                    }
-                                }
-
-                                for (Tuple2<String, Object> key : map.keySet()) {
-                                    Long categoricalMargin = map.get(key);
-                                    out.collect(new Tuple3<>(key.f0, key.f1, categoricalMargin));
-                                }
-                            }
-                        });
-
-        // return a DataStream of the marginal sums of the labels
         DataStream<Tuple3<String, Object, Long>> labelMargins =
-                DataStreamUtils.mapPartition(
-                        observedFreq.keyBy(tuple -> new Tuple2<>(tuple.f0, tuple.f2).hashCode()),
-                        new MapPartitionFunction<
-                                Tuple4<String, Object, Object, Long>,
-                                Tuple3<String, Object, Long>>() {
-                            @Override
-                            public void mapPartition(
-                                    Iterable<Tuple4<String, Object, Object, Long>> iterable,
-                                    Collector<Tuple3<String, Object, Long>> out) {
-
-                                HashMap<Tuple2<String, Object>, Long> map = new HashMap<>();
-
-                                for (Tuple4<String, Object, Object, Long>
-                                        colAndFeatureAndLabelAndCount : iterable) {
-                                    Long observedFreq = colAndFeatureAndLabelAndCount.f3;
-                                    Tuple2<String, Object> key =
-                                            new Tuple2<>(
-                                                    colAndFeatureAndLabelAndCount.f0,
-                                                    colAndFeatureAndLabelAndCount.f2);
-
-                                    if (map.containsKey(key)) {
-                                        Long count = map.get(key);
-                                        map.put(key, count + observedFreq);
-                                    } else {
-                                        map.put(key, observedFreq);
-                                    }
-                                }
-
-                                for (Tuple2<String, Object> key : map.keySet()) {
-                                    Long labelMargin = map.get(key);
-                                    out.collect(new Tuple3<>(key.f0, key.f1, labelMargin));
-                                }
-                            }
-                        });
+                observedFreq
+                        .keyBy(tuple -> new Tuple2<>(tuple.f0, tuple.f2).hashCode())
+                        .transform(
+                                "AggregateLabelMargins",
+                                TypeInformation.of(new TypeHint<Tuple3<String, Object, Long>>() {}),
+                                new AggregateLabelMargins());
 
         Function<List<DataStream<?>>, DataStream<Tuple3<String, Double, Integer>>> function =
                 dataStreams -> {
@@ -257,29 +214,52 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
      * DataStream contains the observed frequencies (i.e. number of occurrences) in each category.
      */
     private static class GenerateObservedFrequencies
-            extends RichMapPartitionFunction<
-                    Tuple3<String, Object, Object>, Tuple4<String, Object, Object, Long>> {
+            extends AbstractStreamOperator<Tuple4<String, Object, Object, Long>>
+            implements OneInputStreamOperator<
+                            Tuple3<String, Object, Object>, Tuple4<String, Object, Object, Long>>,
+                    BoundedOneInput {
+
+        private HashMap<Tuple3<String, Object, Object>, Long> cntMap = new HashMap<>();
+        private ListState<HashMap<Tuple3<String, Object, Object>, Long>> cntMapState;
 
         @Override
-        public void mapPartition(
-                Iterable<Tuple3<String, Object, Object>> iterable,
-                Collector<Tuple4<String, Object, Object, Long>> out) {
-
-            HashMap<Tuple3<String, Object, Object>, Long> map = new HashMap<>();
-
-            for (Tuple3<String, Object, Object> key : iterable) {
-                if (map.containsKey(key)) {
-                    Long count = map.get(key);
-                    map.put(key, count + 1);
-                } else {
-                    map.put(key, 1L);
-                }
+        public void endInput() {
+            for (Tuple3<String, Object, Object> key : cntMap.keySet()) {
+                Long count = cntMap.get(key);
+                output.collect(new StreamRecord<>(new Tuple4<>(key.f0, key.f1, key.f2, count)));
             }
+            cntMapState.clear();
+        }
 
-            for (Tuple3<String, Object, Object> key : map.keySet()) {
-                Long count = map.get(key);
-                out.collect(new Tuple4<>(key.f0, key.f1, key.f2, count));
-            }
+        @Override
+        public void processElement(StreamRecord<Tuple3<String, Object, Object>> element) {
+
+            Tuple3<String, Object, Object> colAndCategoryAndLabel = element.getValue();
+            cntMap.compute(colAndCategoryAndLabel, (k, v) -> (v == null ? 1 : v + 1));
+        }
+
+        @Override
+        public void initializeState(StateInitializationContext context) throws Exception {
+            super.initializeState(context);
+            cntMapState =
+                    context.getOperatorStateStore()
+                            .getListState(
+                                    new ListStateDescriptor<>(
+                                            "cntMapState",
+                                            TypeInformation.of(
+                                                    new TypeHint<
+                                                            HashMap<
+                                                                    Tuple3<String, Object, Object>,
+                                                                    Long>>() {})));
+
+            OperatorStateUtils.getUniqueElement(cntMapState, "cntMapState")
+                    .ifPresent(x -> cntMap = x);
+        }
+
+        @Override
+        public void snapshotState(StateSnapshotContext context) throws Exception {
+            super.snapshotState(context);
+            cntMapState.update(Collections.singletonList(cntMap));
         }
     }
 
@@ -291,21 +271,26 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
                             Tuple4<String, Object, Object, Long>>,
                     BoundedOneInput {
 
-        HashMap<Tuple2<String, Object>, ArrayList<Tuple2<Object, Long>>> values = new HashMap<>();
-        HashSet<Object> numLabels = new HashSet<>();
+        private HashMap<Tuple2<String, Object>, ArrayList<Tuple2<Object, Long>>> valuesMap =
+                new HashMap<>();
+        private HashSet<Object> distinctLabels = new HashSet<>();
+
+        private ListState<HashMap<Tuple2<String, Object>, ArrayList<Tuple2<Object, Long>>>>
+                valuesMapState;
+        private ListState<HashSet<Object>> distinctLabelsState;
 
         @Override
         public void endInput() {
 
             for (Map.Entry<Tuple2<String, Object>, ArrayList<Tuple2<Object, Long>>> entry :
-                    values.entrySet()) {
+                    valuesMap.entrySet()) {
                 ArrayList<Tuple2<Object, Long>> labelAndCountList = entry.getValue();
                 Tuple2<String, Object> categoricalKey = entry.getKey();
 
                 List<Object> existingLabels =
                         labelAndCountList.stream().map(v -> v.f0).collect(Collectors.toList());
 
-                for (Object label : numLabels) {
+                for (Object label : distinctLabels) {
                     if (!existingLabels.contains(label)) {
                         Tuple2<Object, Long> generatedLabelCount = new Tuple2<>(label, 0L);
                         labelAndCountList.add(generatedLabelCount);
@@ -322,6 +307,9 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
                                             labelAndCount.f1)));
                 }
             }
+
+            valuesMapState.clear();
+            distinctLabelsState.clear();
         }
 
         @Override
@@ -334,17 +322,168 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
             Tuple2<Object, Long> labelAndCount =
                     new Tuple2<>(
                             colAndCategoryAndLabelAndCount.f2, colAndCategoryAndLabelAndCount.f3);
-            ArrayList<Tuple2<Object, Long>> labelAndCountList = values.get(key);
+            ArrayList<Tuple2<Object, Long>> labelAndCountList = valuesMap.get(key);
 
             if (labelAndCountList == null) {
                 ArrayList<Tuple2<Object, Long>> value = new ArrayList<>();
                 value.add(labelAndCount);
-                values.put(key, value);
+                valuesMap.put(key, value);
             } else {
                 labelAndCountList.add(labelAndCount);
             }
 
-            numLabels.add(colAndCategoryAndLabelAndCount.f2);
+            distinctLabels.add(colAndCategoryAndLabelAndCount.f2);
+        }
+
+        @Override
+        public void initializeState(StateInitializationContext context) throws Exception {
+            super.initializeState(context);
+            valuesMapState =
+                    context.getOperatorStateStore()
+                            .getListState(
+                                    new ListStateDescriptor<>(
+                                            "valuesMapState",
+                                            TypeInformation.of(
+                                                    new TypeHint<
+                                                            HashMap<
+                                                                    Tuple2<String, Object>,
+                                                                    ArrayList<
+                                                                            Tuple2<
+                                                                                    Object,
+                                                                                    Long>>>>() {})));
+            distinctLabelsState =
+                    context.getOperatorStateStore()
+                            .getListState(
+                                    new ListStateDescriptor<>(
+                                            "distinctLabelsState",
+                                            TypeInformation.of(
+                                                    new TypeHint<HashSet<Object>>() {})));
+
+            OperatorStateUtils.getUniqueElement(valuesMapState, "valuesMapState")
+                    .ifPresent(x -> valuesMap = x);
+
+            OperatorStateUtils.getUniqueElement(distinctLabelsState, "distinctLabelsState")
+                    .ifPresent(x -> distinctLabels = x);
+        }
+
+        @Override
+        public void snapshotState(StateSnapshotContext context) throws Exception {
+            super.snapshotState(context);
+            valuesMapState.update(Collections.singletonList(valuesMap));
+            distinctLabelsState.update(Collections.singletonList(distinctLabels));
+        }
+    }
+
+    /** return a DataStream of the marginal sums of the factors. */
+    private static class AggregateCategoricalMargins
+            extends AbstractStreamOperator<Tuple3<String, Object, Long>>
+            implements OneInputStreamOperator<
+                            Tuple4<String, Object, Object, Long>, Tuple3<String, Object, Long>>,
+                    BoundedOneInput {
+
+        private HashMap<Tuple2<String, Object>, Long> categoricalMarginsMap = new HashMap<>();
+
+        private ListState<HashMap<Tuple2<String, Object>, Long>> categoricalMarginsMapState;
+
+        @Override
+        public void endInput() {
+            for (Tuple2<String, Object> key : categoricalMarginsMap.keySet()) {
+                Long categoricalMargin = categoricalMarginsMap.get(key);
+                output.collect(new StreamRecord<>(new Tuple3<>(key.f0, key.f1, categoricalMargin)));
+            }
+            categoricalMarginsMap.clear();
+        }
+
+        @Override
+        public void processElement(StreamRecord<Tuple4<String, Object, Object, Long>> element) {
+
+            Tuple4<String, Object, Object, Long> colAndCategoryAndLabelAndCnt = element.getValue();
+            Tuple2<String, Object> key =
+                    new Tuple2<>(colAndCategoryAndLabelAndCnt.f0, colAndCategoryAndLabelAndCnt.f1);
+            Long observedFreq = colAndCategoryAndLabelAndCnt.f3;
+            categoricalMarginsMap.compute(
+                    key, (k, v) -> (v == null ? observedFreq : v + observedFreq));
+        }
+
+        @Override
+        public void initializeState(StateInitializationContext context) throws Exception {
+            super.initializeState(context);
+            categoricalMarginsMapState =
+                    context.getOperatorStateStore()
+                            .getListState(
+                                    new ListStateDescriptor<>(
+                                            "categoricalMarginsMapState",
+                                            TypeInformation.of(
+                                                    new TypeHint<
+                                                            HashMap<
+                                                                    Tuple2<String, Object>,
+                                                                    Long>>() {})));
+
+            OperatorStateUtils.getUniqueElement(
+                            categoricalMarginsMapState, "categoricalMarginsMapState")
+                    .ifPresent(x -> categoricalMarginsMap = x);
+        }
+
+        @Override
+        public void snapshotState(StateSnapshotContext context) throws Exception {
+            super.snapshotState(context);
+            categoricalMarginsMapState.update(Collections.singletonList(categoricalMarginsMap));
+        }
+    }
+
+    /** return a DataStream of the marginal sums of the labels. */
+    private static class AggregateLabelMargins
+            extends AbstractStreamOperator<Tuple3<String, Object, Long>>
+            implements OneInputStreamOperator<
+                            Tuple4<String, Object, Object, Long>, Tuple3<String, Object, Long>>,
+                    BoundedOneInput {
+
+        private HashMap<Tuple2<String, Object>, Long> labelMarginsMap = new HashMap<>();
+        private ListState<HashMap<Tuple2<String, Object>, Long>> labelMarginsMapState;
+
+        @Override
+        public void endInput() {
+
+            for (Tuple2<String, Object> key : labelMarginsMap.keySet()) {
+                Long labelMargin = labelMarginsMap.get(key);
+                output.collect(new StreamRecord<>(new Tuple3<>(key.f0, key.f1, labelMargin)));
+            }
+            labelMarginsMapState.clear();
+        }
+
+        @Override
+        public void processElement(StreamRecord<Tuple4<String, Object, Object, Long>> element) {
+
+            Tuple4<String, Object, Object, Long> colAndFeatureAndLabelAndCnt = element.getValue();
+            Long observedFreq = colAndFeatureAndLabelAndCnt.f3;
+            Tuple2<String, Object> key =
+                    new Tuple2<>(colAndFeatureAndLabelAndCnt.f0, colAndFeatureAndLabelAndCnt.f2);
+
+            labelMarginsMap.compute(key, (k, v) -> (v == null ? observedFreq : v + observedFreq));
+        }
+
+        @Override
+        public void initializeState(StateInitializationContext context) throws Exception {
+            super.initializeState(context);
+            labelMarginsMapState =
+                    context.getOperatorStateStore()
+                            .getListState(
+                                    new ListStateDescriptor<>(
+                                            "labelMarginsMapState",
+                                            TypeInformation.of(
+                                                    new TypeHint<
+                                                            HashMap<
+                                                                    Tuple2<String, Object>,
+                                                                    Long>>() {})));
+
+            OperatorStateUtils.getUniqueElement(labelMarginsMapState, "labelMarginsMapState")
+                    .ifPresent(x -> labelMarginsMap = x);
+        }
+
+        @Override
+        public void snapshotState(StateSnapshotContext context) throws Exception {
+            super.snapshotState(context);
+            labelMarginsMapState.update(Collections.singletonList(labelMarginsMap));
         }
     }
 
@@ -443,7 +582,8 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
             implements OneInputStreamOperator<Tuple3<String, Double, Integer>, Row>,
                     BoundedOneInput {
 
-        HashMap<String, Tuple2<Double, Integer>> col2Statistic = new HashMap<>();
+        private HashMap<String, Tuple2<Double, Integer>> col2Statistic = new HashMap<>();
+        private ListState<HashMap<String, Tuple2<Double, Integer>>> col2StatisticState;
 
         @Override
         public void endInput() {
@@ -484,6 +624,32 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
                         thisOne.f0 += otherOne.f0;
                         return thisOne;
                     });
+        }
+
+        @Override
+        public void initializeState(StateInitializationContext context) throws Exception {
+            super.initializeState(context);
+            col2StatisticState =
+                    context.getOperatorStateStore()
+                            .getListState(
+                                    new ListStateDescriptor<>(
+                                            "col2StatisticState",
+                                            TypeInformation.of(
+                                                    new TypeHint<
+                                                            HashMap<
+                                                                    String,
+                                                                    Tuple2<
+                                                                            Double,
+                                                                            Integer>>>() {})));
+
+            OperatorStateUtils.getUniqueElement(col2StatisticState, "col2StatisticState")
+                    .ifPresent(x -> col2Statistic = x);
+        }
+
+        @Override
+        public void snapshotState(StateSnapshotContext context) throws Exception {
+            super.snapshotState(context);
+            col2StatisticState.update(Collections.singletonList(col2Statistic));
         }
     }
 }
