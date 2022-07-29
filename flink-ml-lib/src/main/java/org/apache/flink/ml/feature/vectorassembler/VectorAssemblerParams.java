@@ -23,7 +23,7 @@ import org.apache.flink.ml.common.param.HasInputCols;
 import org.apache.flink.ml.common.param.HasOutputCol;
 
 /**
- * Params of VectorAssembler.
+ * Params of {@link VectorAssembler}.
  *
  * @param <T> The class type of this instance.
  */
