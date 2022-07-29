@@ -373,7 +373,7 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
         }
     }
 
-    /** Return a DataStream of the marginal sums of the factors. */
+    /** Returns a DataStream of the marginal sums of the factors. */
     private static class AggregateCategoricalMargins
             extends AbstractStreamOperator<Tuple3<String, Object, Long>>
             implements OneInputStreamOperator<
@@ -430,7 +430,7 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
         }
     }
 
-    /** Return a DataStream of the marginal sums of the labels. */
+    /** Returns a DataStream of the marginal sums of the labels. */
     private static class AggregateLabelMargins
             extends AbstractStreamOperator<Tuple3<String, Object, Long>>
             implements OneInputStreamOperator<
