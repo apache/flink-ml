@@ -68,10 +68,10 @@ import java.util.stream.Collectors;
 /**
  * An AlgoOperator which implements the Chi-square test algorithm.
  *
- * <p>Chi-square test of independence of variables in a contingency table. This function computes
- * the chi-square statistic and p-value and dof(number of degrees of freedom) for every feature in
- * the contingency table. The contingency table is constructed from the observed of categorical
- * values.
+ * <p>Chi-square Test is an AlgoOperator that computes the statistics of independence of variables
+ * in a contingency table. This function computes the chi-square statistic, p-value, and DOF(number
+ * of degrees of freedom) for every feature in the contingency table. The contingency table is
+ * constructed from the observed categorical values.
  *
  * <p>See: http://en.wikipedia.org/wiki/Chi-squared_test.
  */
@@ -100,7 +100,6 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
                 tEnv.toDataStream(inputs[0])
                         .flatMap(new ExtractColAndFeatureAndLabel(inputCols, labelCol));
 
-        // compute the observed frequencies
         DataStream<Tuple4<String, Object, Object, Long>> observedFreq =
                 colAndFeatureAndLabel
                         .keyBy(Tuple3::hashCode)
@@ -210,7 +209,7 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
     }
 
     /**
-     * Compute a frequency table(DataStream) of the factors(categorical values). The returned
+     * Computes a frequency table(DataStream) of the factors(categorical values). The returned
      * DataStream contains the observed frequencies (i.e. number of occurrences) in each category.
      */
     private static class GenerateObservedFrequencies
@@ -263,7 +262,7 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
         }
     }
 
-    /** Fill the factors which frequencies are zero in frequency table. */
+    /** Fills the factors which frequencies are zero in frequency table. */
     private static class FillZeroFunc
             extends AbstractStreamOperator<Tuple4<String, Object, Object, Long>>
             implements OneInputStreamOperator<
@@ -374,7 +373,7 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
         }
     }
 
-    /** return a DataStream of the marginal sums of the factors. */
+    /** Return a DataStream of the marginal sums of the factors. */
     private static class AggregateCategoricalMargins
             extends AbstractStreamOperator<Tuple3<String, Object, Long>>
             implements OneInputStreamOperator<
@@ -431,7 +430,7 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
         }
     }
 
-    /** return a DataStream of the marginal sums of the labels. */
+    /** Return a DataStream of the marginal sums of the labels. */
     private static class AggregateLabelMargins
             extends AbstractStreamOperator<Tuple3<String, Object, Long>>
             implements OneInputStreamOperator<
@@ -575,8 +574,8 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
     }
 
     /**
-     * This function computes the Pearson's chi-squared statistic and p-value and the number of
-     * degrees of freedom for every feature across the input DataStream.
+     * Computes the Pearson's chi-squared statistic, p-value and the number of degrees of freedom
+     * for every feature across the input DataStream.
      */
     private static class AggregateChiSqFunc extends AbstractStreamOperator<Row>
             implements OneInputStreamOperator<Tuple3<String, Double, Integer>, Row>,
