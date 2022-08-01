@@ -16,7 +16,7 @@
 # limitations under the License.
 ################################################################################
 
-# Simple program that creates a VectorAssembler instance and uses it for feature
+# Simple program that creates a FeatureHasher instance and uses it for feature
 # engineering.
 #
 # Before executing this program, please make sure you have followed Flink ML's
@@ -27,8 +27,7 @@
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo, SparseVectorTypeInfo
-from pyflink.ml.lib.feature.vectorassembler import VectorAssembler
+from pyflink.ml.lib.feature.featurehasher import FeatureHasher
 from pyflink.table import StreamTableEnvironment
 
 # create a new StreamExecutionEnvironment
@@ -40,32 +39,28 @@ t_env = StreamTableEnvironment.create(env)
 # generate input data
 input_data_table = t_env.from_data_stream(
     env.from_collection([
-        (Vectors.dense(2.1, 3.1),
-         1.0,
-         Vectors.sparse(5, [3], [1.0])),
-        (Vectors.dense(2.1, 3.1),
-         1.0,
-         Vectors.sparse(5, [1, 2, 3, 4],
-                        [1.0, 2.0, 3.0, 4.0])),
+        (0, 'a', 1.0, True),
+        (1, 'c', 1.0, False),
     ],
         type_info=Types.ROW_NAMED(
-            ['vec', 'num', 'sparse_vec'],
-            [DenseVectorTypeInfo(), Types.DOUBLE(), SparseVectorTypeInfo()])))
+            ['id', 'f0', 'f1', 'f2'],
+            [Types.INT(), Types.STRING(), Types.DOUBLE(), Types.BOOLEAN()])))
 
-# create a vector assembler object and initialize its parameters
-vector_assembler = VectorAssembler() \
-    .set_input_cols('vec', 'num', 'sparse_vec') \
-    .set_output_col('assembled_vec') \
-    .set_handle_invalid('keep')
+# create a feature hasher object and initialize its parameters
+feature_hasher = FeatureHasher() \
+    .set_input_cols('f0', 'f1', 'f2') \
+    .set_categorical_cols('f0', 'f2') \
+    .set_output_col('vec') \
+    .set_num_features(1000)
 
-# use the vector assembler for feature engineering
-output = vector_assembler.transform(input_data_table)[0]
+# use the feature hasher for feature engineering
+output = feature_hasher.transform(input_data_table)[0]
 
 # extract and display the results
 field_names = output.get_schema().get_field_names()
-input_values = [None for _ in vector_assembler.get_input_cols()]
+input_values = [None for _ in feature_hasher.get_input_cols()]
 for result in t_env.to_data_stream(output).execute_and_collect():
-    for i in range(len(vector_assembler.get_input_cols())):
-        input_values[i] = result[field_names.index(vector_assembler.get_input_cols()[i])]
-    output_value = result[field_names.index(vector_assembler.get_output_col())]
+    for i in range(len(feature_hasher.get_input_cols())):
+        input_values[i] = result[field_names.index(feature_hasher.get_input_cols()[i])]
+    output_value = result[field_names.index(feature_hasher.get_output_col())]
     print('Input Values: ' + str(input_values) + '\tOutput Value: ' + str(output_value))
