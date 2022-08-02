@@ -68,10 +68,9 @@ import java.util.stream.Collectors;
 /**
  * An AlgoOperator which implements the Chi-square test algorithm.
  *
- * <p>Chi-square Test is an AlgoOperator that computes the statistics of independence of variables
- * in a contingency table. This function computes the chi-square statistic, p-value, and DOF(number
- * of degrees of freedom) for every feature in the contingency table. The contingency table is
- * constructed from the observed categorical values.
+ * <p>Chi-square Test computes the statistics of independence of variables in a contingency table,
+ * e.g., p-value, and DOF(number of degrees of freedom) for each input feature. The contingency
+ * table is constructed from the observed categorical values.
  *
  * <p>See: http://en.wikipedia.org/wiki/Chi-squared_test.
  */
@@ -118,7 +117,7 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
                                         Types.GENERIC(Object.class),
                                         Types.GENERIC(Object.class),
                                         Types.LONG),
-                                new FillZeroFunc())
+                                new FillFrequencyTable())
                         .setParallelism(1);
 
         DataStream<Tuple3<String, Object, Long>> categoricalMargins =
@@ -209,8 +208,9 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
     }
 
     /**
-     * Computes a frequency table(DataStream) of the factors(categorical values). The returned
-     * DataStream contains the observed frequencies (i.e. number of occurrences) in each category.
+     * Computes the frequency of each feature value at different columns by labels. An output record
+     * (columnA, featureValueB, labelC, countD) represents that A feature value {featureValueB} with
+     * label {labelC} at column {columnA} has appeared {countD} times in the input table.
      */
     private static class GenerateObservedFrequencies
             extends AbstractStreamOperator<Tuple4<String, Object, Object, Long>>
@@ -262,8 +262,11 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
         }
     }
 
-    /** Fills the factors which frequencies are zero in frequency table. */
-    private static class FillZeroFunc
+    /**
+     * Fills the frequency table by setting the frequency of missed elements (i.e., missed
+     * combinations of column, featureValue and labelValue) as zero.
+     */
+    private static class FillFrequencyTable
             extends AbstractStreamOperator<Tuple4<String, Object, Object, Long>>
             implements OneInputStreamOperator<
                             Tuple4<String, Object, Object, Long>,
@@ -373,7 +376,7 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
         }
     }
 
-    /** Returns a DataStream of the marginal sums of the factors. */
+    /** Computes the marginal sums of different categories. */
     private static class AggregateCategoricalMargins
             extends AbstractStreamOperator<Tuple3<String, Object, Long>>
             implements OneInputStreamOperator<
@@ -430,7 +433,7 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
         }
     }
 
-    /** Returns a DataStream of the marginal sums of the labels. */
+    /** Computes the marginal sums of different labels. */
     private static class AggregateLabelMargins
             extends AbstractStreamOperator<Tuple3<String, Object, Long>>
             implements OneInputStreamOperator<
