@@ -18,6 +18,8 @@
 
 package org.apache.flink.ml.api;
 
+import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.param.BooleanParam;
 import org.apache.flink.ml.param.DoubleArrayArrayParam;
 import org.apache.flink.ml.param.DoubleArrayParam;
@@ -34,6 +36,7 @@ import org.apache.flink.ml.param.ParamValidators;
 import org.apache.flink.ml.param.StringArrayArrayParam;
 import org.apache.flink.ml.param.StringArrayParam;
 import org.apache.flink.ml.param.StringParam;
+import org.apache.flink.ml.param.VectorParam;
 import org.apache.flink.ml.param.WithParams;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -113,6 +116,9 @@ public class StageTest {
                         "doubleArrayArrayParam",
                         "Description",
                         new Double[][] {new Double[] {14.0, 15.0}, new Double[] {16.0, 17.0}});
+
+        Param<Vector> VECTOR_PARAM =
+                new VectorParam("vectorParam", "Description", Vectors.dense(1.0, 2.0, 3.0));
     }
 
     /**
@@ -332,6 +338,9 @@ public class StageTest {
         stage.set(MyParams.STRING_ARRAY_PARAM, new String[] {"50", "51"});
         Assert.assertArrayEquals(new String[] {"50", "51"}, stage.get(MyParams.STRING_ARRAY_PARAM));
 
+        stage.set(MyParams.VECTOR_PARAM, Vectors.dense(1, 5, 3));
+        Assert.assertEquals(Vectors.dense(1, 5, 3), stage.get(MyParams.VECTOR_PARAM));
+
         stage.set(
                 MyParams.DOUBLE_ARRAY_ARRAY_PARAM,
                 new Double[][] {new Double[] {50.0, 51.0}, new Double[] {52.0, 53.0}});
@@ -373,6 +382,7 @@ public class StageTest {
         stage.set(MyParams.FLOAT_ARRAY_PARAM, new Float[] {50.0f, 51.0f});
         stage.set(MyParams.DOUBLE_ARRAY_PARAM, new Double[] {50.0, 51.0});
         stage.set(MyParams.STRING_ARRAY_PARAM, new String[] {"50", "51"});
+        stage.set(MyParams.VECTOR_PARAM, Vectors.dense(2, 3, 4));
         stage.set(
                 MyParams.DOUBLE_ARRAY_ARRAY_PARAM,
                 new Double[][] {new Double[] {50.0, 51.0}, new Double[] {52.0, 53.0}});
@@ -411,6 +421,7 @@ public class StageTest {
                 new String[] {"50", "51"}, stage.get(MyParams.STRING_ARRAY_ARRAY_PARAM)[0]);
         Assert.assertArrayEquals(
                 new String[] {"52", "53"}, stage.get(MyParams.STRING_ARRAY_ARRAY_PARAM)[1]);
+        Assert.assertEquals(Vectors.dense(2, 3, 4), loadedStage.get(MyParams.VECTOR_PARAM));
     }
 
     @Test
