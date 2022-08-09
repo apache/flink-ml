@@ -24,7 +24,6 @@ import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Stage;
 import org.apache.flink.ml.common.datastream.TableUtils;
-import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.linalg.typeinfo.SparseVectorTypeInfo;
@@ -34,7 +33,6 @@ import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.types.Row;
-import org.apache.flink.util.Preconditions;
 
 import org.apache.commons.lang3.ArrayUtils;
 
@@ -118,12 +116,15 @@ public class TestUtils {
     }
 
     /** Note: this comparator imposes orderings that are inconsistent with equals. */
-    public static int compare(DenseVector first, DenseVector second) {
-        Preconditions.checkArgument(first.size() == second.size(), "Vector size mismatched.");
-        for (int i = 0; i < first.size(); i++) {
-            int cmp = Double.compare(first.get(i), second.get(i));
-            if (cmp != 0) {
-                return cmp;
+    public static int compare(Vector first, Vector second) {
+        if (first.size() != second.size()) {
+            return Integer.compare(first.size(), second.size());
+        } else {
+            for (int i = 0; i < first.size(); i++) {
+                int cmp = Double.compare(first.get(i), second.get(i));
+                if (cmp != 0) {
+                    return cmp;
+                }
             }
         }
         return 0;
