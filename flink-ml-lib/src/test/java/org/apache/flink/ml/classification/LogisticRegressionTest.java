@@ -37,6 +37,7 @@ import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
+import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.types.Row;
 
 import org.apache.commons.collections.IteratorUtils;
@@ -58,7 +59,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /** Tests {@link LogisticRegression} and {@link LogisticRegressionModel}. */
-public class LogisticRegressionTest {
+public class LogisticRegressionTest extends AbstractTestBase {
 
     @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
 
@@ -304,7 +305,21 @@ public class LogisticRegressionTest {
 
     @Test
     public void testMoreSubtaskThanData() throws Exception {
-        env.setParallelism(12);
+        List<Row> binomialTrainData =
+                Arrays.asList(
+                        Row.of(Vectors.dense(1, 2, 3, 4), 0., 1.),
+                        Row.of(Vectors.dense(11, 2, 3, 4), 1., 1.));
+
+        Table binomialDataTable =
+                tEnv.fromDataStream(
+                        env.fromCollection(
+                                binomialTrainData,
+                                new RowTypeInfo(
+                                        new TypeInformation[] {
+                                            DenseVectorTypeInfo.INSTANCE, Types.DOUBLE, Types.DOUBLE
+                                        },
+                                        new String[] {"features", "label", "weight"})));
+
         LogisticRegression logisticRegression =
                 new LogisticRegression().setWeightCol("weight").setGlobalBatchSize(128);
         Table output = logisticRegression.fit(binomialDataTable).transform(binomialDataTable)[0];

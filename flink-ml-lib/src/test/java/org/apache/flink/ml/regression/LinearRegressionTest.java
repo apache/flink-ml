@@ -35,6 +35,7 @@ import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
+import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.types.Row;
 
 import org.apache.commons.collections.IteratorUtils;
@@ -55,7 +56,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /** Tests {@link LinearRegression} and {@link LinearRegressionModel}. */
-public class LinearRegressionTest {
+public class LinearRegressionTest extends AbstractTestBase {
 
     @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
 
@@ -234,7 +235,21 @@ public class LinearRegressionTest {
 
     @Test
     public void testMoreSubtaskThanData() throws Exception {
-        env.setParallelism(12);
+        List<Row> trainData =
+                Arrays.asList(
+                        Row.of(Vectors.dense(2, 1), 4.0, 1.0),
+                        Row.of(Vectors.dense(3, 2), 7.0, 1.0));
+
+        Table trainDataTable =
+                tEnv.fromDataStream(
+                        env.fromCollection(
+                                trainData,
+                                new RowTypeInfo(
+                                        new TypeInformation[] {
+                                            DenseVectorTypeInfo.INSTANCE, Types.DOUBLE, Types.DOUBLE
+                                        },
+                                        new String[] {"features", "label", "weight"})));
+
         LinearRegression linearRegression =
                 new LinearRegression().setWeightCol("weight").setGlobalBatchSize(128);
         Table output = linearRegression.fit(trainDataTable).transform(trainDataTable)[0];

@@ -38,6 +38,7 @@ import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.util.InMemorySinkFunction;
 import org.apache.flink.ml.util.InMemorySourceFunction;
 import org.apache.flink.ml.util.TestUtils;
+import org.apache.flink.runtime.client.JobStatusMessage;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.minicluster.MiniClusterConfiguration;
@@ -51,8 +52,10 @@ import org.apache.flink.util.TestLogger;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -136,26 +139,17 @@ public class OnlineKMeansTest extends TestLogger {
     private InMemorySinkFunction<Row> outputSink;
     private InMemorySinkFunction<KMeansModelData> modelDataSink;
 
-    // TODO: creates static mini cluster once for whole test class after dependency upgrades to
-    // Flink 1.15.
-    private InMemoryReporter reporter;
-    private MiniCluster miniCluster;
-    private StreamExecutionEnvironment env;
-    private StreamTableEnvironment tEnv;
+    private static InMemoryReporter reporter;
+    private static MiniCluster miniCluster;
+    private static StreamExecutionEnvironment env;
+    private static StreamTableEnvironment tEnv;
 
     private Table offlineTrainTable;
     private Table onlineTrainTable;
     private Table onlinePredictTable;
 
-    @Before
-    public void before() throws Exception {
-        currentModelDataVersion = 0;
-
-        trainSource = new InMemorySourceFunction<>();
-        predictSource = new InMemorySourceFunction<>();
-        outputSink = new InMemorySinkFunction<>();
-        modelDataSink = new InMemorySinkFunction<>();
-
+    @BeforeClass
+    public static void beforeClass() throws Exception {
         Configuration config = new Configuration();
         config.set(RestOptions.BIND_PORT, "18081-19091");
         config.set(ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
@@ -169,6 +163,7 @@ public class OnlineKMeansTest extends TestLogger {
                                 .setNumTaskManagers(numTaskManagers)
                                 .setNumSlotsPerTaskManager(numSlotsPerTaskManager)
                                 .build());
+
         miniCluster.start();
 
         env = StreamExecutionEnvironment.getExecutionEnvironment(config);
@@ -176,6 +171,16 @@ public class OnlineKMeansTest extends TestLogger {
         env.enableCheckpointing(100);
         env.setRestartStrategy(RestartStrategies.noRestart());
         tEnv = StreamTableEnvironment.create(env);
+    }
+
+    @Before
+    public void before() throws Exception {
+        currentModelDataVersion = 0;
+
+        trainSource = new InMemorySourceFunction<>();
+        predictSource = new InMemorySourceFunction<>();
+        outputSink = new InMemorySinkFunction<>();
+        modelDataSink = new InMemorySinkFunction<>();
 
         offlineTrainTable = tEnv.fromDataStream(env.fromElements(trainData1)).as("features");
         onlineTrainTable =
@@ -188,6 +193,13 @@ public class OnlineKMeansTest extends TestLogger {
 
     @After
     public void after() throws Exception {
+        for (JobStatusMessage message : miniCluster.listJobs().get()) {
+            miniCluster.cancelJob(message.getJobId());
+        }
+    }
+
+    @AfterClass
+    public static void afterClass() throws Exception {
         miniCluster.close();
     }
 

@@ -159,11 +159,6 @@ public class KMeansTest extends AbstractTestBase {
         assertEquals(
                 Arrays.asList("test_feature", "test_prediction"),
                 output.getResolvedSchema().getColumnNames());
-        List<Row> results = IteratorUtils.toList(output.execute().collect());
-        List<Set<DenseVector>> actualGroups =
-                groupFeaturesByPrediction(
-                        results, kmeans.getFeaturesCol(), kmeans.getPredictionCol());
-        assertTrue(CollectionUtils.isEqualCollection(expectedGroups, actualGroups));
     }
 
     @Test
