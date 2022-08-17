@@ -119,7 +119,7 @@ public class MinMaxScaler
      * A stream operator to compute the min and max values in each partition of the input bounded
      * data stream.
      */
-    private static class MinMaxReduceFunctionOperator extends AbstractStreamOperator<DenseVector>
+    public static class MinMaxReduceFunctionOperator extends AbstractStreamOperator<DenseVector>
             implements OneInputStreamOperator<DenseVector, DenseVector>, BoundedOneInput {
         private ListState<DenseVector> minState;
         private ListState<DenseVector> maxState;
