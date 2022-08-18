@@ -11,12 +11,11 @@ on:
 jobs:
   tests:
     name: python tests on ${{ matrix.os }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: ['macOS-latest', 'ubuntu-latest']
         python-version: ['3.6', '3.7', '3.8']
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v2

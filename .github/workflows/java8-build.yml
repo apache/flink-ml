@@ -3,9 +3,11 @@ name: Java 8 Build
 on: [push, pull_request]
 
 jobs:
-  build:
+  java-tests:
     runs-on: ubuntu-latest
-
+    strategy:
+      matrix:
+        stage: ['core', 'lib', 'tests', 'misc']
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -13,6 +15,5 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 1.8
-      - name: Build
-        run: mvn clean install --no-transfer-progress
-
+      - name: Build and test
+        run: ./tools/ci/java_test_controller.sh "${{ matrix.stage }}"

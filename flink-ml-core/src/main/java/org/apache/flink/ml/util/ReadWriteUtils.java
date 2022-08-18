@@ -417,7 +417,8 @@ public class ReadWriteUtils {
             method.setAccessible(true);
             return (Stage<?>) method.invoke(null, tEnv, path);
         } catch (NoSuchMethodException e) {
-            String methodName = String.format("%s::load(String)", className);
+            String methodName =
+                    String.format("%s::load(StreamTableEnvironment, String)", className);
             throw new RuntimeException(
                     "Failed to load stage because the static method "
                             + methodName

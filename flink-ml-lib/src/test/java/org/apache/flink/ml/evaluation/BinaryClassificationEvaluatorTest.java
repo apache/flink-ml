@@ -29,6 +29,7 @@ import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
+import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.types.Row;
 
 import org.apache.commons.collections.IteratorUtils;
@@ -45,7 +46,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
 /** Tests {@link BinaryClassificationEvaluator}. */
-public class BinaryClassificationEvaluatorTest {
+public class BinaryClassificationEvaluatorTest extends AbstractTestBase {
     @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
     private StreamTableEnvironment tEnv;
     private StreamExecutionEnvironment env;
@@ -247,14 +248,20 @@ public class BinaryClassificationEvaluatorTest {
 
     @Test
     public void testMoreSubtaskThanData() {
-        env.setParallelism(15);
+        List<Row> inputData =
+                Arrays.asList(
+                        Row.of(1.0, Vectors.dense(0.1, 0.9)), Row.of(0.0, Vectors.dense(0.9, 0.1)));
+        double[] expectedData = new double[] {1.0, 1.0, 1.0};
+        inputDataTable =
+                tEnv.fromDataStream(env.fromCollection(inputData)).as("label", "rawPrediction");
+
         BinaryClassificationEvaluator eval =
                 new BinaryClassificationEvaluator()
                         .setMetricsNames(
                                 BinaryClassificationEvaluatorParams.AREA_UNDER_PR,
                                 BinaryClassificationEvaluatorParams.KS,
                                 BinaryClassificationEvaluatorParams.AREA_UNDER_ROC);
-        Table evalResult = eval.transform(inputDataTableScore)[0];
+        Table evalResult = eval.transform(inputDataTable)[0];
         List<Row> results = IteratorUtils.toList(evalResult.execute().collect());
         assertArrayEquals(
                 new String[] {
@@ -264,8 +271,8 @@ public class BinaryClassificationEvaluatorTest {
                 },
                 evalResult.getResolvedSchema().getColumnNames().toArray());
         Row result = results.get(0);
-        for (int i = 0; i < EXPECTED_DATA.length; ++i) {
-            assertEquals(EXPECTED_DATA[i], result.getFieldAs(i), EPS);
+        for (int i = 0; i < expectedData.length; ++i) {
+            assertEquals(expectedData[i], result.getFieldAs(i), EPS);
         }
     }
 
