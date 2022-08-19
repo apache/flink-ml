@@ -79,6 +79,9 @@ import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.OutputTag;
+import org.apache.flink.util.function.ThrowingRunnable;
+
+import javax.annotation.concurrent.GuardedBy;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -86,6 +89,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static org.apache.flink.util.Preconditions.checkState;
 
@@ -125,7 +131,7 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
 
     private final OperatorEventGateway operatorEventGateway;
 
-    private final MailboxExecutor mailboxExecutor;
+    private final MailboxExecutorWithYieldTimeout mailboxExecutor;
 
     private transient BroadcastOutput<?> eventBroadcastOutput;
 
@@ -159,7 +165,8 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
         this.iterationId = Objects.requireNonNull(iterationId);
         this.feedbackIndex = feedbackIndex;
         this.isCriteriaStream = isCriteriaStream;
-        this.mailboxExecutor = Objects.requireNonNull(mailboxExecutor);
+        this.mailboxExecutor =
+                new MailboxExecutorWithYieldTimeout(Objects.requireNonNull(mailboxExecutor));
         this.operatorEventGateway = Objects.requireNonNull(operatorEventGateway);
 
         // Even though this operator does not use the processing
@@ -379,8 +386,7 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
         boolean endOfPartitionReceived = false;
         long lastTriggerCheckpointId = 0;
         while (!endOfPartitionReceived && status != HeadOperatorStatus.TERMINATED) {
-            mailboxExecutor.tryYield();
-            Thread.sleep(200);
+            mailboxExecutor.yield(200, TimeUnit.MILLISECONDS);
 
             List<AbstractEvent> events = parseInputChannelEvents(inputChannel);
 
@@ -546,6 +552,71 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
         @Override
         public void notifyTerminatingOnInitialize() {
             operatorEventGateway.sendEventToCoordinator(TerminatingOnInitializeEvent.INSTANCE);
+        }
+    }
+
+    /**
+     * A {@link MailboxExecutor} that provides support for method {@link #yield(long, TimeUnit)}.
+     */
+    private static class MailboxExecutorWithYieldTimeout implements MailboxExecutor {
+        private final MailboxExecutor mailboxExecutor;
+
+        private final ReentrantLock lock;
+
+        @GuardedBy("lock")
+        private final Condition notEmpty;
+
+        private MailboxExecutorWithYieldTimeout(MailboxExecutor mailboxExecutor) {
+            this.mailboxExecutor = mailboxExecutor;
+            this.lock = new ReentrantLock();
+            this.notEmpty = lock.newCondition();
+        }
+
+        @Override
+        public void execute(
+                ThrowingRunnable<? extends Exception> command,
+                String descriptionFormat,
+                Object... descriptionArgs) {
+            final ReentrantLock lock = this.lock;
+            lock.lock();
+            try {
+                mailboxExecutor.execute(command, descriptionFormat, descriptionArgs);
+                notEmpty.signal();
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        @Override
+        public void yield() throws InterruptedException, FlinkRuntimeException {
+            mailboxExecutor.yield();
+        }
+
+        @Override
+        public boolean tryYield() throws FlinkRuntimeException {
+            return mailboxExecutor.tryYield();
+        }
+
+        /**
+         * This method starts running the command at the head of the mailbox and is intended to be
+         * used by the mailbox thread to yield from a currently ongoing action to another command.
+         * The method blocks until another command to run is available in the mailbox within the
+         * provided timeout or if the timeout is reached.
+         *
+         * @param time the maximum time to wait
+         * @param unit the time unit of the {@code time} argument
+         */
+        private void yield(long time, TimeUnit unit) throws InterruptedException {
+            final ReentrantLock lock = this.lock;
+            lock.lock();
+            try {
+                if (!mailboxExecutor.tryYield()) {
+                    notEmpty.await(time, unit);
+                    mailboxExecutor.tryYield();
+                }
+            } finally {
+                lock.unlock();
+            }
         }
     }
 }
