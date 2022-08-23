@@ -76,22 +76,22 @@ import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.ProcessingTimeService;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
+import org.apache.flink.streaming.runtime.tasks.mailbox.TaskMailbox;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.OutputTag;
 import org.apache.flink.util.function.ThrowingRunnable;
-
-import javax.annotation.concurrent.GuardedBy;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
 
 import static org.apache.flink.util.Preconditions.checkState;
 
@@ -561,15 +561,11 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
     private static class MailboxExecutorWithYieldTimeout implements MailboxExecutor {
         private final MailboxExecutor mailboxExecutor;
 
-        private final ReentrantLock lock;
-
-        @GuardedBy("lock")
-        private final Condition notEmpty;
+        private final Timer timer;
 
         private MailboxExecutorWithYieldTimeout(MailboxExecutor mailboxExecutor) {
             this.mailboxExecutor = mailboxExecutor;
-            this.lock = new ReentrantLock();
-            this.notEmpty = lock.newCondition();
+            this.timer = new Timer();
         }
 
         @Override
@@ -577,14 +573,7 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
                 ThrowingRunnable<? extends Exception> command,
                 String descriptionFormat,
                 Object... descriptionArgs) {
-            final ReentrantLock lock = this.lock;
-            lock.lock();
-            try {
-                mailboxExecutor.execute(command, descriptionFormat, descriptionArgs);
-                notEmpty.signal();
-            } finally {
-                lock.unlock();
-            }
+            mailboxExecutor.execute(command, descriptionFormat, descriptionArgs);
         }
 
         @Override
@@ -607,16 +596,27 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
          * @param unit the time unit of the {@code time} argument
          */
         private void yield(long time, TimeUnit unit) throws InterruptedException {
-            final ReentrantLock lock = this.lock;
-            lock.lock();
-            try {
-                if (!mailboxExecutor.tryYield()) {
-                    notEmpty.await(time, unit);
-                    mailboxExecutor.tryYield();
-                }
-            } finally {
-                lock.unlock();
+            if (mailboxExecutor.tryYield()) {
+                return;
             }
+
+            timer.schedule(
+                    new TimerTask() {
+                        @Override
+                        public void run() {
+                            try {
+                                mailboxExecutor.execute(
+                                        () -> {}, "NoOp runnable to trigger yield timeout");
+                            } catch (RejectedExecutionException e) {
+                                if (!(e.getCause() instanceof TaskMailbox.MailboxClosedException)) {
+                                    throw e;
+                                }
+                            }
+                        }
+                    },
+                    unit.toMillis(time));
+
+            mailboxExecutor.yield();
         }
     }
 }
