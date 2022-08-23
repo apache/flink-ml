@@ -16,16 +16,17 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.feature.minmaxscaler;
+package org.apache.flink.ml.feature.maxabsscaler;
 
 import org.apache.flink.api.common.functions.RichMapFunction;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
+import org.apache.flink.ml.linalg.BLAS;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -43,18 +44,18 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-/** A Model which transforms data using the model data computed by {@link MinMaxScaler}. */
-public class MinMaxScalerModel
-        implements Model<MinMaxScalerModel>, MinMaxScalerParams<MinMaxScalerModel> {
+/** A Model which transforms data using the model data computed by {@link MaxAbsScaler}. */
+public class MaxAbsScalerModel
+        implements Model<MaxAbsScalerModel>, MaxAbsScalerParams<MaxAbsScalerModel> {
     private final Map<Param<?>, Object> paramMap = new HashMap<>();
     private Table modelDataTable;
 
-    public MinMaxScalerModel() {
+    public MaxAbsScalerModel() {
         ParamUtils.initializeMapWithDefaultValues(paramMap, this);
     }
 
     @Override
-    public MinMaxScalerModel setModelData(Table... inputs) {
+    public MaxAbsScalerModel setModelData(Table... inputs) {
         modelDataTable = inputs[0];
         return this;
     }
@@ -70,28 +71,29 @@ public class MinMaxScalerModel
         Preconditions.checkArgument(inputs.length == 1);
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
+
         DataStream<Row> data = tEnv.toDataStream(inputs[0]);
-        DataStream<MinMaxScalerModelData> minMaxScalerModel =
-                MinMaxScalerModelData.getModelDataStream(modelDataTable);
+        DataStream<MaxAbsScalerModelData> maxAbsScalerModel =
+                MaxAbsScalerModelData.getModelDataStream(modelDataTable);
+
         final String broadcastModelKey = "broadcastModelKey";
         RowTypeInfo inputTypeInfo = TableUtils.getRowTypeInfo(inputs[0].getResolvedSchema());
         RowTypeInfo outputTypeInfo =
                 new RowTypeInfo(
-                        ArrayUtils.addAll(
-                                inputTypeInfo.getFieldTypes(),
-                                TypeInformation.of(DenseVector.class)),
+                        ArrayUtils.addAll(inputTypeInfo.getFieldTypes(), VectorTypeInfo.INSTANCE),
                         ArrayUtils.addAll(inputTypeInfo.getFieldNames(), getOutputCol()));
+
         DataStream<Row> output =
                 BroadcastUtils.withBroadcastStream(
                         Collections.singletonList(data),
-                        Collections.singletonMap(broadcastModelKey, minMaxScalerModel),
+                        Collections.singletonMap(broadcastModelKey, maxAbsScalerModel),
                         inputList -> {
                             DataStream input = inputList.get(0);
                             return input.map(
-                                    new PredictOutputFunction(
-                                            broadcastModelKey, getMax(), getMin(), getInputCol()),
+                                    new PredictOutputFunction(broadcastModelKey, getInputCol()),
                                     outputTypeInfo);
                         });
+
         return new Table[] {tEnv.fromDataStream(output)};
     }
 
@@ -104,9 +106,9 @@ public class MinMaxScalerModel
     public void save(String path) throws IOException {
         ReadWriteUtils.saveMetadata(this, path);
         ReadWriteUtils.saveModelData(
-                MinMaxScalerModelData.getModelDataStream(modelDataTable),
+                MaxAbsScalerModelData.getModelDataStream(modelDataTable),
                 path,
-                new MinMaxScalerModelData.ModelDataEncoder());
+                new MaxAbsScalerModelData.ModelDataEncoder());
     }
 
     /**
@@ -114,30 +116,25 @@ public class MinMaxScalerModel
      *
      * @param tEnv Stream table environment.
      * @param path Model path.
-     * @return MinMaxScalerModel model.
+     * @return MaxAbsScalerModel model.
      */
-    public static MinMaxScalerModel load(StreamTableEnvironment tEnv, String path)
+    public static MaxAbsScalerModel load(StreamTableEnvironment tEnv, String path)
             throws IOException {
-        MinMaxScalerModel model = ReadWriteUtils.loadStageParam(path);
+        MaxAbsScalerModel model = ReadWriteUtils.loadStageParam(path);
+
         Table modelDataTable =
                 ReadWriteUtils.loadModelData(
-                        tEnv, path, new MinMaxScalerModelData.ModelDataDecoder());
+                        tEnv, path, new MaxAbsScalerModelData.ModelDataDecoder());
         return model.setModelData(modelDataTable);
     }
 
-    /** This operator loads model data and predicts result. */
+    /** This function loads model data and predicts result. */
     private static class PredictOutputFunction extends RichMapFunction<Row, Row> {
         private final String inputCol;
         private final String broadcastKey;
-        private final double upperBound;
-        private final double lowerBound;
         private DenseVector scaleVector;
-        private DenseVector offsetVector;
 
-        public PredictOutputFunction(
-                String broadcastKey, double upperBound, double lowerBound, String inputCol) {
-            this.upperBound = upperBound;
-            this.lowerBound = lowerBound;
+        public PredictOutputFunction(String broadcastKey, String inputCol) {
             this.broadcastKey = broadcastKey;
             this.inputCol = inputCol;
         }
@@ -145,32 +142,23 @@ public class MinMaxScalerModel
         @Override
         public Row map(Row row) {
             if (scaleVector == null) {
-                MinMaxScalerModelData minMaxScalerModelData =
-                        (MinMaxScalerModelData)
+                MaxAbsScalerModelData maxAbsScalerModelData =
+                        (MaxAbsScalerModelData)
                                 getRuntimeContext().getBroadcastVariable(broadcastKey).get(0);
-                DenseVector minVector = minMaxScalerModelData.minVector;
-                DenseVector maxVector = minMaxScalerModelData.maxVector;
-                scaleVector = new DenseVector(minVector.size());
-                offsetVector = new DenseVector(minVector.size());
-                for (int i = 0; i < maxVector.size(); ++i) {
-                    if (Math.abs(minVector.values[i] - maxVector.values[i]) < 1.0e-5) {
-                        scaleVector.values[i] = 0.0;
-                        offsetVector.values[i] = (upperBound + lowerBound) / 2;
+                scaleVector = maxAbsScalerModelData.maxVector;
+
+                for (int i = 0; i < scaleVector.size(); ++i) {
+                    if (scaleVector.values[i] != 0) {
+                        scaleVector.values[i] = 1.0 / scaleVector.values[i];
                     } else {
-                        scaleVector.values[i] =
-                                (upperBound - lowerBound)
-                                        / (maxVector.values[i] - minVector.values[i]);
-                        offsetVector.values[i] =
-                                lowerBound - minVector.values[i] * scaleVector.values[i];
+                        scaleVector.values[i] = 1.0;
                     }
                 }
             }
-            DenseVector inputVec = ((Vector) row.getField(inputCol)).toDense();
-            DenseVector outputVec = new DenseVector(scaleVector.size());
-            for (int i = 0; i < scaleVector.size(); ++i) {
-                outputVec.values[i] =
-                        inputVec.values[i] * scaleVector.values[i] + offsetVector.values[i];
-            }
+
+            Vector inputVec = row.getFieldAs(inputCol);
+            Vector outputVec = inputVec.clone();
+            BLAS.hDot(scaleVector, outputVec);
             return Row.join(row, Row.of(outputVec));
         }
     }

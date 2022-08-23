@@ -70,8 +70,7 @@ class _MinMaxScalerParams(
 
 class MinMaxScalerModel(JavaFeatureModel, _MinMaxScalerParams):
     """
-    * A Model which do a minMax scaler operation using the model data computed
-    by :class:`MinMaxScaler`.
+    A Model which transforms data using the model data computed by :class:`MinMaxScaler`.
     """
 
     def __init__(self, java_model=None):
