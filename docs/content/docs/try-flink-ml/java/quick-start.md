@@ -3,7 +3,7 @@ title: "Quick Start"
 weight: 1
 type: docs
 aliases:
-- /try-flink-ml/quick-start.html
+- /try-flink-ml/java/quick-start.html
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

@@ -9,7 +9,7 @@ Flink](https://flink.apache.org/).
 ## <a name="start"></a>Getting Started
 
 You can follow this [quick
-start](https://nightlies.apache.org/flink/flink-ml-docs-master/docs/try-flink-ml/quick-start/)
+start](https://nightlies.apache.org/flink/flink-ml-docs-master/docs/try-flink-ml/java/quick-start/)
 guideline to get hands-on experience with Flink ML.
 
 ## <a name="build"></a>Building the Project

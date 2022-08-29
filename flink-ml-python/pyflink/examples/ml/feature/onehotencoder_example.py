@@ -18,12 +18,6 @@
 
 # Simple program that trains a OneHotEncoder model and uses it for feature
 # engineering.
-#
-# Before executing this program, please make sure you have followed Flink ML's
-# quick start guideline to set up Flink ML and Flink environment. The guideline
-# can be found at
-#
-# https://nightlies.apache.org/flink/flink-ml-docs-master/docs/try-flink-ml/quick-start/
 
 from pyflink.common import Row
 from pyflink.datastream import StreamExecutionEnvironment
