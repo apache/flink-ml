@@ -3,7 +3,7 @@ title: "Building your own Flink ML project"
 weight: 2
 type: docs
 aliases:
-- /try-flink-ml/building-your-own-project.html
+- /try-flink-ml/java/building-your-own-project.html
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

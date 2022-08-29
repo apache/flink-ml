@@ -134,12 +134,6 @@ public class BinaryClassificationEvaluatorExample {
 ```python
 # Simple program that creates a BinaryClassificationEvaluator instance and uses
 # it for evaluation.
-#
-# Before executing this program, please make sure you have followed Flink ML's
-# quick start guideline to set up Flink ML and Flink environment. The guideline
-# can be found at
-#
-# https://nightlies.apache.org/flink/flink-ml-docs-master/docs/try-flink-ml/quick-start/
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
