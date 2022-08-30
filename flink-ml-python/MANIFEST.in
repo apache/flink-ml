@@ -17,5 +17,6 @@
 ################################################################################
 
 global-exclude *.py[cod] __pycache__ .DS_Store
+include deps/lib/*.jar
 recursive-include deps/examples *.py
 include README.md
