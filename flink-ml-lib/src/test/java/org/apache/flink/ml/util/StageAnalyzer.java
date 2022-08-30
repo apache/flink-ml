@@ -113,8 +113,8 @@ public class StageAnalyzer {
         } catch (Throwable t) {
             System.err.println(
                     String.format(
-                            "Failed to load class {} while analyzing flink-ml-lib JAR because of %s.",
-                            clazz.getCanonicalName()));
+                            "Failed to load class %s while analyzing flink-ml-lib JAR because of %s.",
+                            clazz.getCanonicalName(), t));
             return false;
         }
     }
