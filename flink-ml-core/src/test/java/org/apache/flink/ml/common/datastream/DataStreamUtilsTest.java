@@ -18,6 +18,7 @@
 
 package org.apache.flink.ml.common.datastream;
 
+import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.api.common.functions.MapPartitionFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.functions.RichMapPartitionFunction;
@@ -76,6 +77,16 @@ public class DataStreamUtilsTest {
     }
 
     @Test
+    public void testAggregate() throws Exception {
+        DataStream<Long> dataStream =
+                env.fromParallelCollection(new NumberSequenceIterator(0L, 19L), Types.LONG);
+        DataStream<String> result = DataStreamUtils.aggregate(dataStream, new TestAggregateFunc());
+        List<String> stringSum = IteratorUtils.toList(result.executeAndCollect());
+        assertEquals(1, stringSum.size());
+        assertEquals("190", stringSum.get(0));
+    }
+
+    @Test
     public void testGenerateBatchData() throws Exception {
         DataStream<Long> dataStream =
                 env.fromParallelCollection(new NumberSequenceIterator(0L, 19L), Types.LONG);
@@ -97,6 +108,29 @@ public class DataStreamUtilsTest {
                 cnt++;
             }
             out.collect(cnt);
+        }
+    }
+
+    /** A simple implementation for {@link AggregateFunction}. */
+    private static class TestAggregateFunc implements AggregateFunction<Long, Long, String> {
+        @Override
+        public Long createAccumulator() {
+            return 0L;
+        }
+
+        @Override
+        public Long add(Long element, Long acc) {
+            return element + acc;
+        }
+
+        @Override
+        public String getResult(Long acc) {
+            return String.valueOf(acc);
+        }
+
+        @Override
+        public Long merge(Long acc1, Long acc2) {
+            return acc1 + acc2;
         }
     }
 }
