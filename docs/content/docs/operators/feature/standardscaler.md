@@ -31,20 +31,20 @@ Standard Scaler is an algorithm that standardizes the input features by removing
 the mean and scaling each dimension to unit variance.
 ### Input Columns
 
-| Param name | Type   | Default   | Description           |
-| :--------- | :----- | :-------- | :-------------------- |
-| inputCol   | Vector | `"input"` | features to be scaled |
+| Param name | Type   | Default   | Description            |
+|:-----------|:-------|:----------|:-----------------------|
+| inputCol   | Vector | `"input"` | Features to be scaled. |
 
 ### Output Columns
 
-| Param name | Type   | Default    | Description     |
-| :--------- | :----- | :--------- | :-------------- |
-| outputCol  | Vector | `"output"` | scaled features |
+| Param name | Type   | Default    | Description      |
+|:-----------|:-------|:-----------|:-----------------|
+| outputCol  | Vector | `"output"` | Scaled features. |
 
 ### Parameters
 
 | Key       | Default    | Type    | Required | Description                                        |
-| --------- | ---------- | ------- | -------- | -------------------------------------------------- |
+|-----------|------------|---------|----------|----------------------------------------------------|
 | inputCol  | `"input"`  | String  | no       | Input column name.                                 |
 | outputCol | `"output"` | String  | no       | Output column name.                                |
 | withMean  | `false`    | Boolean | no       | Whether centers the data with mean before scaling. |

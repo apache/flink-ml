@@ -30,18 +30,18 @@ widely used to predict a binary response.
 
 ### Input Columns
 
-| Param name  | Type    | Default      | Description      |
-| :---------- | :------ | :----------- | :--------------- |
-| featuresCol | Vector  | `"features"` | Feature vector   |
-| labelCol    | Integer | `"label"`    | Label to predict |
-| weightCol   | Double  | `"weight"`   | Weight of sample |
+| Param name  | Type    | Default      | Description       |
+| :---------- | :------ | :----------- |:------------------|
+| featuresCol | Vector  | `"features"` | Feature vector.   |
+| labelCol    | Integer | `"label"`    | Label to predict. |
+| weightCol   | Double  | `"weight"`   | Weight of sample. |
 
 ### Output Columns
 
-| Param name       | Type    | Default           | Description                             |
-| :--------------- | :------ | :---------------- | :-------------------------------------- |
-| predictionCol    | Integer | `"prediction"`    | Label of the max probability            |
-| rawPredictionCol | Vector  | `"rawPrediction"` | Vector of the probability of each label |
+| Param name       | Type    | Default           | Description                              |
+| :--------------- | :------ | :---------------- |:-----------------------------------------|
+| predictionCol    | Integer | `"prediction"`    | Label of the max probability.            |
+| rawPredictionCol | Vector  | `"rawPrediction"` | Vector of the probability of each label. |
 
 ### Parameters
 
@@ -55,17 +55,17 @@ Below are the parameters required by `LogisticRegressionModel`.
 
 `LogisticRegression` needs parameters above and also below.
 
-| Key             | Default   | Type    | Required | Description                                                  |
-| --------------- | --------- | ------- | -------- | ------------------------------------------------------------ |
-| labelCol        | `"label"` | String  | no       | Label column name.                                           |
-| weightCol       | `null`    | String  | no       | Weight column name.                                          |
-| maxIter         | `20`      | Integer | no       | Maximum number of iterations.                                |
-| reg             | `0.`      | Double  | no       | Regularization parameter.                                    |
-| elasticNet      | `0.`      | Double  | no       | ElasticNet parameter.                                        |
-| learningRate    | `0.1`     | Double  | no       | Learning rate of optimization method.                        |
-| globalBatchSize | `32`      | Integer | no       | Global batch size of training algorithms.                    |
-| tol             | `1e-6`    | Double  | no       | Convergence tolerance for iterative algorithms.              |
-| multiClass      | `"auto"`  | String  | no       | Classification type. Supported values: "auto", "binomial", "multinomial" |
+| Key             | Default   | Type    | Required | Description                                                               |
+|-----------------|-----------|---------|----------|---------------------------------------------------------------------------|
+| labelCol        | `"label"` | String  | no       | Label column name.                                                        |
+| weightCol       | `null`    | String  | no       | Weight column name.                                                       |
+| maxIter         | `20`      | Integer | no       | Maximum number of iterations.                                             |
+| reg             | `0.`      | Double  | no       | Regularization parameter.                                                 |
+| elasticNet      | `0.`      | Double  | no       | ElasticNet parameter.                                                     |
+| learningRate    | `0.1`     | Double  | no       | Learning rate of optimization method.                                     |
+| globalBatchSize | `32`      | Integer | no       | Global batch size of training algorithms.                                 |
+| tol             | `1e-6`    | Double  | no       | Convergence tolerance for iterative algorithms.                           |
+| multiClass      | `"auto"`  | String  | no       | Classification type. Supported values: "auto", "binomial", "multinomial". |
 
 ### Examples
 {{< tabs examples >}}

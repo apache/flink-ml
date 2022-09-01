@@ -30,26 +30,26 @@ there is strong (naive) independence between every pair of features.
 
 ### Input Columns
 
-| Param name  | Type    | Default      | Description      |
-| :---------- | :------ | :----------- | :--------------- |
-| featuresCol | Vector  | `"features"` | Feature vector   |
-| labelCol    | Integer | `"label"`    | Label to predict |
+| Param name  | Type    | Default      | Description       |
+| :---------- | :------ | :----------- |:------------------|
+| featuresCol | Vector  | `"features"` | Feature vector.   |
+| labelCol    | Integer | `"label"`    | Label to predict. |
 
 ### Output Columns
 
-| Param name    | Type    | Default        | Description     |
-| :------------ | :------ | :------------- | :-------------- |
-| predictionCol | Integer | `"prediction"` | Predicted label |
+| Param name    | Type    | Default        | Description      |
+| :------------ | :------ | :------------- |:-----------------|
+| predictionCol | Integer | `"prediction"` | Predicted label. |
 
 ### Parameters
 
 Below are parameters required by `NaiveBayesModel`.
 
-| Key           | Default         | Type   | Required | Description                                     |
-| ------------- | --------------- | ------ | -------- | ----------------------------------------------- |
-| modelType     | `"multinomial"` | String | no       | The model type. Supported values: "multinomial" |
-| featuresCol   | `"features"`    | String | no       | Features column name.                           |
-| predictionCol | `"prediction"`  | String | no       | Prediction column name.                         |
+| Key           | Default         | Type   | Required | Description                                      |
+| ------------- | --------------- | ------ | -------- |--------------------------------------------------|
+| modelType     | `"multinomial"` | String | no       | The model type. Supported values: "multinomial". |
+| featuresCol   | `"features"`    | String | no       | Features column name.                            |
+| predictionCol | `"prediction"`  | String | no       | Prediction column name.                          |
 
 `NaiveBayes` needs parameters above and also below.
 

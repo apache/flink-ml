@@ -32,16 +32,16 @@ to that label.
 
 ### Input Columns
 
-| Param name  | Type    | Default      | Description      |
-| :---------- | :------ | :----------- | :--------------- |
-| featuresCol | Vector  | `"features"` | Feature vector   |
-| labelCol    | Integer | `"label"`    | Label to predict |
+| Param name  | Type    | Default      | Description       |
+| :---------- | :------ | :----------- |:------------------|
+| featuresCol | Vector  | `"features"` | Feature vector.   |
+| labelCol    | Integer | `"label"`    | Label to predict. |
 
 ### Output Columns
 
-| Param name    | Type    | Default        | Description     |
-| :------------ | :------ | :------------- | :-------------- |
-| predictionCol | Integer | `"prediction"` | Predicted label |
+| Param name    | Type    | Default        | Description      |
+| :------------ | :------ | :------------- |:-----------------|
+| predictionCol | Integer | `"prediction"` | Predicted label. |
 
 ### Parameters
 
