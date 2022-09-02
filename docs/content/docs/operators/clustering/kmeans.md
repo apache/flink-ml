@@ -31,30 +31,30 @@ into a predefined number of clusters.
 ### Input Columns
 
 | Param name  | Type   | Default      | Description    |
-| :---------- | :----- | :----------- | :------------- |
+|:------------|:-------|:-------------|:---------------|
 | featuresCol | Vector | `"features"` | Feature vector |
 
 ### Output Columns
 
 | Param name    | Type    | Default        | Description              |
-| :------------ | :------ | :------------- | :----------------------- |
+|:--------------|:--------|:---------------|:-------------------------|
 | predictionCol | Integer | `"prediction"` | Predicted cluster center |
 
 ### Parameters
 
 Below are the parameters required by `KMeansModel`.
 
-| Key             | Default                         | Type    | Required | Description                                                  |
-| --------------- | ------------------------------- | ------- | -------- | ------------------------------------------------------------ |
-| distanceMeasure | `EuclideanDistanceMeasure.NAME` | String  | no       | Distance measure. Supported values: `EuclideanDistanceMeasure.NAME` |
-| featuresCol     | `"features"`                    | String  | no       | Features column name.                                        |
-| predictionCol   | `"prediction"`                  | String  | no       | Prediction column name.                                      |
-| k               | `2`                             | Integer | no       | The max number of clusters to create.                        |
+| Key             | Default        | Type    | Required | Description                                                               |
+|-----------------|----------------|---------|----------|---------------------------------------------------------------------------|
+| distanceMeasure | `euclidean`    | String  | no       | Distance measure. Supported values: `'euclidean', 'manhattan', 'cosine'`. |
+| featuresCol     | `"features"`   | String  | no       | Features column name.                                                     |
+| predictionCol   | `"prediction"` | String  | no       | Prediction column name.                                                   |
+| k               | `2`            | Integer | no       | The max number of clusters to create.                                     |
 
 `KMeans` needs parameters above and also below.
 
 | Key      | Default    | Type    | Required | Description                                                |
-| -------- | ---------- | ------- | -------- | ---------------------------------------------------------- |
+|----------|------------|---------|----------|------------------------------------------------------------|
 | initMode | `"random"` | String  | no       | The initialization algorithm. Supported options: 'random'. |
 | seed     | `null`     | Long    | no       | The random seed.                                           |
 | maxIter  | `20`       | Integer | no       | Maximum number of iterations.                              |
@@ -187,30 +187,30 @@ correspond to more forgetting.
 ### Input Columns
 
 | Param name  | Type   | Default      | Description    |
-| :---------- | :----- | :----------- | :------------- |
+|:------------|:-------|:-------------|:---------------|
 | featuresCol | Vector | `"features"` | Feature vector |
 
 ### Output Columns
 
 | Param name    | Type    | Default        | Description              |
-| :------------ | :------ | :------------- | :----------------------- |
+|:--------------|:--------|:---------------|:-------------------------|
 | predictionCol | Integer | `"prediction"` | Predicted cluster center |
 
 ### Parameters
 
 Below are the parameters required by `OnlineKMeansModel`.
 
-| Key             | Default                         | Type    | Required | Description                                                  |
-| --------------- | ------------------------------- | ------- | -------- | ------------------------------------------------------------ |
-| distanceMeasure | `EuclideanDistanceMeasure.NAME` | String  | no       | Distance measure. Supported values: `EuclideanDistanceMeasure.NAME` |
-| featuresCol     | `"features"`                    | String  | no       | Features column name.                                        |
-| predictionCol   | `"prediction"`                  | String  | no       | Prediction column name.                                      |
-| k               | `2`                             | Integer | no       | The max number of clusters to create.                        |
+| Key             | Default        | Type    | Required | Description                                                               |
+|-----------------|----------------|---------|----------|---------------------------------------------------------------------------|
+| distanceMeasure | `euclidean`    | String  | no       | Distance measure. Supported values: `'euclidean', 'manhattan', 'cosine'`. |
+| featuresCol     | `"features"`   | String  | no       | Features column name.                                                     |
+| predictionCol   | `"prediction"` | String  | no       | Prediction column name.                                                   |
+| k               | `2`            | Integer | no       | The max number of clusters to create.                                     |
 
 `OnlineKMeans` needs parameters above and also below.
 
 | Key             | Default          | Type    | Required | Description                                           |
-| --------------- | ---------------- | ------- | -------- | ----------------------------------------------------- |
+|-----------------|------------------|---------|----------|-------------------------------------------------------|
 | batchStrategy   | `COUNT_STRATEGY` | String  | no       | Strategy to create mini batch from online train data. |
 | globalBatchSize | `32`             | Integer | no       | Global batch size of training algorithms.             |
 | decayFactor     | `0.`             | Double  | no       | The forgetfulness of the previous centroids.          |

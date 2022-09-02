@@ -17,7 +17,7 @@
 ################################################################################
 from abc import ABC, abstractmethod
 
-from pyflink.ml.core.wrapper import JavaModel, JavaEstimator
+from pyflink.ml.core.wrapper import JavaModel, JavaEstimator, JavaAlgoOperator
 
 JAVA_CLUSTERING_PACKAGE_NAME = "org.apache.flink.ml.clustering"
 
@@ -71,4 +71,30 @@ class JavaClusteringEstimator(JavaEstimator, ABC):
     @classmethod
     @abstractmethod
     def _java_estimator_class_name(cls) -> str:
+        pass
+
+
+class JavaClusteringAlgoOperator(JavaAlgoOperator, ABC):
+    """
+    Wrapper class for a Java clustering AlgoOperator.
+    """
+
+    def __init__(self, java_algo_operator):
+        super(JavaClusteringAlgoOperator, self).__init__(java_algo_operator)
+
+    @classmethod
+    def _java_stage_path(cls) -> str:
+        return ".".join(
+            [JAVA_CLUSTERING_PACKAGE_NAME,
+             cls._java_algo_operator_package_name(),
+             cls._java_algo_operator_class_name()])
+
+    @classmethod
+    @abstractmethod
+    def _java_algo_operator_package_name(cls) -> str:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def _java_algo_operator_class_name(cls) -> str:
         pass

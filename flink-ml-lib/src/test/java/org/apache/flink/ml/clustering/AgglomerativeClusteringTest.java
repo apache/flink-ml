@@ -1,0 +1,302 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.flink.ml.clustering;
+
+import org.apache.flink.api.common.restartstrategy.RestartStrategies;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.ml.clustering.agglomerativeclustering.AgglomerativeClustering;
+import org.apache.flink.ml.clustering.agglomerativeclustering.AgglomerativeClusteringParams;
+import org.apache.flink.ml.common.distance.CosineDistanceMeasure;
+import org.apache.flink.ml.common.distance.EuclideanDistanceMeasure;
+import org.apache.flink.ml.common.distance.ManhattanDistanceMeasure;
+import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.Vectors;
+import org.apache.flink.ml.util.TestUtils;
+import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.table.api.Table;
+import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
+import org.apache.flink.test.util.AbstractTestBase;
+import org.apache.flink.types.Row;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.IteratorUtils;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
+
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+
+/** Tests {@link AgglomerativeClustering}. */
+public class AgglomerativeClusteringTest extends AbstractTestBase {
+
+    @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
+    private StreamTableEnvironment tEnv;
+    private StreamExecutionEnvironment env;
+    private Table inputDataTable;
+
+    private static final double[] EUCLIDEAN_AVERAGE_MERGE_DISTANCES =
+            new double[] {1, 1.5, 3, 3.1394402, 3.9559706};
+
+    private static final double[] COSINE_AVERAGE_MERGE_DISTANCES =
+            new double[] {0, 1.1102230E-16, 0.0636708, 0.1425070, 0.3664484};
+
+    private static final double[] MANHATTAN_AVERAGE_MERGE_DISTANCES =
+            new double[] {1, 1.5, 3, 3.75, 4.875};
+    private static final double[] EUCLIDEAN_SINGLE_MERGE_DISTANCES =
+            new double[] {1, 1.5, 2.5, 3, 3};
+
+    private static final double[] EUCLIDEAN_WARD_MERGE_DISTANCES =
+            new double[] {1, 1.5, 3, 4.2573465, 5.5113519};
+
+    private static final double[] EUCLIDEAN_COMPLETE_MERGE_DISTANCES =
+            new double[] {1, 1.5, 3, 3.3541019, 5};
+
+    private static final List<Set<DenseVector>> EUCLIDEAN_WARD_NUM_CLUSTERS_AS_TWO_RESULT =
+            Arrays.asList(
+                    new HashSet<>(
+                            Arrays.asList(
+                                    Vectors.dense(1, 1),
+                                    Vectors.dense(1, 0),
+                                    Vectors.dense(4, 1.5),
+                                    Vectors.dense(4, 0))),
+                    new HashSet<>(Arrays.asList(Vectors.dense(1, 4), Vectors.dense(4, 4))));
+
+    private static final List<Set<DenseVector>> EUCLIDEAN_WARD_THRESHOLD_AS_TWO_RESULT =
+            Arrays.asList(
+                    new HashSet<>(Arrays.asList(Vectors.dense(1, 1), Vectors.dense(1, 0))),
+                    new HashSet<>(Arrays.asList(Vectors.dense(1, 4), Vectors.dense(4, 4))),
+                    new HashSet<>(Arrays.asList(Vectors.dense(4, 1.5), Vectors.dense(4, 0))));
+
+    private static final double TOLERANCE = 1e-7;
+
+    @Before
+    public void before() {
+        Configuration config = new Configuration();
+        config.set(ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
+        env = StreamExecutionEnvironment.getExecutionEnvironment(config);
+        env.setParallelism(3);
+        env.enableCheckpointing(100);
+        env.setRestartStrategy(RestartStrategies.noRestart());
+        tEnv = StreamTableEnvironment.create(env);
+        List<DenseVector> inputData =
+                Arrays.asList(
+                        Vectors.dense(1, 1),
+                        Vectors.dense(1, 4),
+                        Vectors.dense(1, 0),
+                        Vectors.dense(4, 1.5),
+                        Vectors.dense(4, 4),
+                        Vectors.dense(4, 0));
+        inputDataTable =
+                tEnv.fromDataStream(env.fromCollection(inputData).map(x -> x)).as("features");
+    }
+
+    @Test
+    public void testParam() {
+        AgglomerativeClustering agglomerativeClustering = new AgglomerativeClustering();
+        assertEquals("features", agglomerativeClustering.getFeaturesCol());
+        assertEquals(2, agglomerativeClustering.getNumClusters().intValue());
+        assertNull(agglomerativeClustering.getDistanceThreshold());
+        assertEquals(AgglomerativeClustering.LINKAGE_WARD, agglomerativeClustering.getLinkage());
+        assertEquals(EuclideanDistanceMeasure.NAME, agglomerativeClustering.getDistanceMeasure());
+        assertFalse(agglomerativeClustering.getComputeFullTree());
+        assertEquals("prediction", agglomerativeClustering.getPredictionCol());
+
+        agglomerativeClustering
+                .setFeaturesCol("test_features")
+                .setNumClusters(null)
+                .setDistanceThreshold(0.01)
+                .setLinkage(AgglomerativeClusteringParams.LINKAGE_AVERAGE)
+                .setDistanceMeasure(CosineDistanceMeasure.NAME)
+                .setComputeFullTree(true)
+                .setPredictionCol("cluster_id");
+
+        assertEquals("test_features", agglomerativeClustering.getFeaturesCol());
+        assertNull(agglomerativeClustering.getNumClusters());
+        assertEquals(0.01, agglomerativeClustering.getDistanceThreshold(), TOLERANCE);
+        assertEquals(AgglomerativeClustering.LINKAGE_AVERAGE, agglomerativeClustering.getLinkage());
+        assertEquals(CosineDistanceMeasure.NAME, agglomerativeClustering.getDistanceMeasure());
+        assertTrue(agglomerativeClustering.getComputeFullTree());
+        assertEquals("cluster_id", agglomerativeClustering.getPredictionCol());
+    }
+
+    @Test
+    public void testOutputSchema() {
+        Table tempTable =
+                tEnv.fromDataStream(env.fromElements(Row.of("", "")))
+                        .as("test_features", "dummy_input");
+        AgglomerativeClustering agglomerativeClustering =
+                new AgglomerativeClustering()
+                        .setFeaturesCol("test_features")
+                        .setPredictionCol("test_prediction");
+        Table[] outputs = agglomerativeClustering.transform(tempTable);
+        assertEquals(2, outputs.length);
+        assertEquals(
+                Arrays.asList("test_features", "dummy_input", "test_prediction"),
+                outputs[0].getResolvedSchema().getColumnNames());
+        assertEquals(
+                Arrays.asList("clusterId1", "clusterId2", "distance", "sizeOfMergedCluster"),
+                outputs[1].getResolvedSchema().getColumnNames());
+    }
+
+    @Test
+    public void testTransform() throws Exception {
+        Table[] outputs;
+        AgglomerativeClustering agglomerativeClustering =
+                new AgglomerativeClustering()
+                        .setLinkage(AgglomerativeClusteringParams.LINKAGE_AVERAGE)
+                        .setDistanceMeasure(EuclideanDistanceMeasure.NAME)
+                        .setPredictionCol("pred");
+
+        // Tests euclidean distance with linkage as average, numClusters = 2.
+        outputs = agglomerativeClustering.transform(inputDataTable);
+        verifyClusteringResult(
+                EUCLIDEAN_WARD_NUM_CLUSTERS_AS_TWO_RESULT,
+                outputs[0],
+                agglomerativeClustering.getFeaturesCol(),
+                agglomerativeClustering.getPredictionCol());
+
+        // Tests euclidean distance with linkage as average, numClusters = 2, compute_full_tree =
+        // true.
+        outputs = agglomerativeClustering.setComputeFullTree(true).transform(inputDataTable);
+        verifyClusteringResult(
+                EUCLIDEAN_WARD_NUM_CLUSTERS_AS_TWO_RESULT,
+                outputs[0],
+                agglomerativeClustering.getFeaturesCol(),
+                agglomerativeClustering.getPredictionCol());
+
+        // Tests euclidean distance with linkage as average, distance_threshold = 2.
+        outputs =
+                agglomerativeClustering
+                        .setNumClusters(null)
+                        .setDistanceThreshold(2.0)
+                        .transform(inputDataTable);
+        verifyClusteringResult(
+                EUCLIDEAN_WARD_THRESHOLD_AS_TWO_RESULT,
+                outputs[0],
+                agglomerativeClustering.getFeaturesCol(),
+                agglomerativeClustering.getPredictionCol());
+    }
+
+    @Test
+    public void testMergeInfo() throws Exception {
+        Table[] outputs;
+        AgglomerativeClustering agglomerativeClustering =
+                new AgglomerativeClustering()
+                        .setLinkage(AgglomerativeClusteringParams.LINKAGE_AVERAGE)
+                        .setDistanceMeasure(EuclideanDistanceMeasure.NAME)
+                        .setPredictionCol("pred")
+                        .setComputeFullTree(true);
+
+        // Tests euclidean distance with linkage as average.
+        outputs = agglomerativeClustering.transform(inputDataTable);
+        verifyMergeInfo(EUCLIDEAN_AVERAGE_MERGE_DISTANCES, outputs[1]);
+
+        // Tests cosine distance with linkage as average.
+        agglomerativeClustering.setDistanceMeasure(CosineDistanceMeasure.NAME);
+        outputs = agglomerativeClustering.transform(inputDataTable);
+        verifyMergeInfo(COSINE_AVERAGE_MERGE_DISTANCES, outputs[1]);
+
+        // Tests manhattan distance with linkage as average.
+        agglomerativeClustering.setDistanceMeasure(ManhattanDistanceMeasure.NAME);
+        outputs = agglomerativeClustering.transform(inputDataTable);
+        verifyMergeInfo(MANHATTAN_AVERAGE_MERGE_DISTANCES, outputs[1]);
+
+        // Tests euclidean distance with linkage as complete.
+        agglomerativeClustering
+                .setDistanceMeasure(EuclideanDistanceMeasure.NAME)
+                .setLinkage(AgglomerativeClusteringParams.LINKAGE_COMPLETE);
+        outputs = agglomerativeClustering.transform(inputDataTable);
+        verifyMergeInfo(EUCLIDEAN_COMPLETE_MERGE_DISTANCES, outputs[1]);
+
+        // Tests euclidean distance with linkage as single.
+        agglomerativeClustering.setLinkage(AgglomerativeClusteringParams.LINKAGE_SINGLE);
+        outputs = agglomerativeClustering.transform(inputDataTable);
+        verifyMergeInfo(EUCLIDEAN_SINGLE_MERGE_DISTANCES, outputs[1]);
+
+        // Tests euclidean distance with linkage as ward.
+        agglomerativeClustering.setLinkage(AgglomerativeClusteringParams.LINKAGE_WARD);
+        outputs = agglomerativeClustering.transform(inputDataTable);
+        verifyMergeInfo(EUCLIDEAN_WARD_MERGE_DISTANCES, outputs[1]);
+
+        // Tests merge info not fully computed.
+        agglomerativeClustering.setComputeFullTree(false);
+        outputs = agglomerativeClustering.transform(inputDataTable);
+        verifyMergeInfo(
+                Arrays.copyOfRange(
+                        EUCLIDEAN_WARD_MERGE_DISTANCES,
+                        0,
+                        EUCLIDEAN_WARD_MERGE_DISTANCES.length - 1),
+                outputs[1]);
+    }
+
+    @Test
+    public void testSaveLoadTransform() throws Exception {
+        AgglomerativeClustering agglomerativeClustering =
+                new AgglomerativeClustering()
+                        .setLinkage(AgglomerativeClusteringParams.LINKAGE_AVERAGE)
+                        .setDistanceMeasure(EuclideanDistanceMeasure.NAME)
+                        .setPredictionCol("pred");
+
+        agglomerativeClustering =
+                TestUtils.saveAndReload(
+                        tEnv, agglomerativeClustering, tempFolder.newFolder().getAbsolutePath());
+
+        Table[] outputs = agglomerativeClustering.transform(inputDataTable);
+        verifyClusteringResult(
+                EUCLIDEAN_WARD_NUM_CLUSTERS_AS_TWO_RESULT,
+                outputs[0],
+                agglomerativeClustering.getFeaturesCol(),
+                agglomerativeClustering.getPredictionCol());
+    }
+
+    @SuppressWarnings("unchecked")
+    private void verifyMergeInfo(double[] expectedDistances, Table mergeInfoTable)
+            throws Exception {
+        List<Row> mergeInfo =
+                IteratorUtils.toList(tEnv.toDataStream(mergeInfoTable).executeAndCollect());
+        assertEquals(expectedDistances.length, mergeInfo.size());
+        for (int i = 0; i < mergeInfo.size(); i++) {
+            double actualDistance = ((Number) mergeInfo.get(i).getFieldAs(2)).doubleValue();
+            assertEquals(expectedDistances[i], actualDistance, TOLERANCE);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public void verifyClusteringResult(
+            List<Set<DenseVector>> expected,
+            Table outputTable,
+            String featureCol,
+            String predictionCol)
+            throws Exception {
+        List<Row> output = IteratorUtils.toList(tEnv.toDataStream(outputTable).executeAndCollect());
+        List<Set<DenseVector>> actualGroups =
+                KMeansTest.groupFeaturesByPrediction(output, featureCol, predictionCol);
+        assertTrue(CollectionUtils.isEqualCollection(expected, actualGroups));
+    }
+}

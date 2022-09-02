@@ -26,13 +26,19 @@ import java.io.Serializable;
 public interface DistanceMeasure extends Serializable {
 
     static DistanceMeasure getInstance(String distanceMeasure) {
-        if (distanceMeasure.equals(EuclideanDistanceMeasure.NAME)) {
-            return EuclideanDistanceMeasure.getInstance();
+        switch (distanceMeasure) {
+            case EuclideanDistanceMeasure.NAME:
+                return EuclideanDistanceMeasure.getInstance();
+            case ManhattanDistanceMeasure.NAME:
+                return ManhattanDistanceMeasure.getInstance();
+            case CosineDistanceMeasure.NAME:
+                return CosineDistanceMeasure.getInstance();
+            default:
+                throw new IllegalArgumentException(
+                        "distanceMeasure "
+                                + distanceMeasure
+                                + " is not recognized. Supported options: 'euclidean, manhattan, cosine'.");
         }
-        throw new IllegalArgumentException(
-                "distanceMeasure "
-                        + distanceMeasure
-                        + " is not recognized. Supported options: 'euclidean'.");
     }
 
     /**
@@ -43,5 +49,16 @@ public interface DistanceMeasure extends Serializable {
     double distance(VectorWithNorm v1, VectorWithNorm v2);
 
     /** Finds the index of the closest center to the given point. */
-    int findClosest(VectorWithNorm[] centroids, VectorWithNorm point);
+    default int findClosest(VectorWithNorm[] centroids, VectorWithNorm point) {
+        int targetCentroidId = -1;
+        double minDistance = Double.MAX_VALUE;
+        for (int i = 0; i < centroids.length; i++) {
+            double distance = distance(centroids[i], point);
+            if (distance < minDistance) {
+                minDistance = distance;
+                targetCentroidId = i;
+            }
+        }
+        return targetCentroidId;
+    }
 }
