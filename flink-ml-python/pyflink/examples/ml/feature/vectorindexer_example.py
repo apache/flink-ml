@@ -16,7 +16,7 @@
 # limitations under the License.
 ################################################################################
 
-# Simple program that trains a StringIndexer model and uses it for feature
+# Simple program that trains a VectorIndexer model and uses it for feature
 # engineering.
 
 from pyflink.common import Types

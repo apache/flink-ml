@@ -16,7 +16,7 @@
 # limitations under the License.
 ################################################################################
 
-# Simple program that creates a VectorAssembler instance and uses it for feature
+# Simple program that creates a HashingTF instance and uses it for feature
 # engineering.
 
 from pyflink.common import Types
