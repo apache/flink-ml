@@ -41,7 +41,8 @@ class ParamTests(unittest.TestCase):
         distance_measure = param.DISTANCE_MEASURE
         self.assertEqual(distance_measure.name, "distance_measure")
         self.assertEqual(distance_measure.description,
-                         "Distance measure. Supported options: 'euclidean' and 'cosine'.")
+                         "Distance measure. Supported options: "
+                         "'euclidean', 'manhattan' and 'cosine'.")
         self.assertEqual(distance_measure.default_value, "euclidean")
 
         param.set_distance_measure("cosine")

@@ -68,9 +68,10 @@ class MLLibTest(PyFlinkMLTestCase):
                 if hasattr(obj, '_java_stage_path') and name not in (
                     'JavaClassificationEstimator', 'JavaClassificationModel',
                     'JavaClusteringEstimator', 'JavaClusteringModel',
-                    'JavaEvaluationAlgoOperator', 'JavaFeatureTransformer',
-                    'JavaFeatureEstimator', 'JavaFeatureModel',
-                    'JavaRegressionEstimator', 'JavaRegressionModel')]
+                    'JavaClusteringAlgoOperator', 'JavaEvaluationAlgoOperator',
+                    'JavaFeatureTransformer', 'JavaFeatureEstimator',
+                    'JavaFeatureModel', 'JavaRegressionEstimator',
+                    'JavaRegressionModel')]
 
     @abstractmethod
     def module_name(self):

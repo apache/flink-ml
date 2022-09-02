@@ -21,7 +21,7 @@ package org.apache.flink.ml.common.distance;
 import org.apache.flink.ml.linalg.BLAS;
 import org.apache.flink.ml.linalg.VectorWithNorm;
 
-/** Interface for measuring the Euclidean distance between two vectors. */
+/** Euclidean distance (also known as L2 distance) between two vectors. */
 public class EuclideanDistanceMeasure implements DistanceMeasure {
 
     private static final EuclideanDistanceMeasure instance = new EuclideanDistanceMeasure();

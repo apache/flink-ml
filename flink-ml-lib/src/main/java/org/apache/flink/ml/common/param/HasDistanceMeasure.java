@@ -18,7 +18,9 @@
 
 package org.apache.flink.ml.common.param;
 
+import org.apache.flink.ml.common.distance.CosineDistanceMeasure;
 import org.apache.flink.ml.common.distance.EuclideanDistanceMeasure;
+import org.apache.flink.ml.common.distance.ManhattanDistanceMeasure;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.param.ParamValidators;
 import org.apache.flink.ml.param.StringParam;
@@ -31,7 +33,10 @@ public interface HasDistanceMeasure<T> extends WithParams<T> {
                     "distanceMeasure",
                     "Distance measure.",
                     EuclideanDistanceMeasure.NAME,
-                    ParamValidators.inArray(EuclideanDistanceMeasure.NAME));
+                    ParamValidators.inArray(
+                            EuclideanDistanceMeasure.NAME,
+                            ManhattanDistanceMeasure.NAME,
+                            CosineDistanceMeasure.NAME));
 
     default String getDistanceMeasure() {
         return get(DISTANCE_MEASURE);

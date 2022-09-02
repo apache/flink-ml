@@ -28,9 +28,9 @@ class HasDistanceMeasure(WithParams, ABC):
     """
     DISTANCE_MEASURE: Param[str] = StringParam(
         "distance_measure",
-        "Distance measure. Supported options: 'euclidean' and 'cosine'.",
+        "Distance measure. Supported options: 'euclidean', 'manhattan' and 'cosine'.",
         "euclidean",
-        ParamValidators.in_array(['euclidean', 'cosine']))
+        ParamValidators.in_array(['euclidean', 'manhattan', 'cosine']))
 
     def set_distance_measure(self, distance_measure: str):
         return self.set(self.DISTANCE_MEASURE, distance_measure)
