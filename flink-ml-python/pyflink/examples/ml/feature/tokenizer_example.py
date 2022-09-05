@@ -16,7 +16,7 @@
 # limitations under the License.
 ################################################################################
 
-# Simple program that creates a VectorAssembler instance and uses it for feature
+# Simple program that creates a Tokenizer instance and uses it for feature
 # engineering.
 
 from pyflink.common import Types
@@ -51,4 +51,4 @@ field_names = output.get_schema().get_field_names()
 for result in t_env.to_data_stream(output).execute_and_collect():
     input_value = result[field_names.index(tokenizer.get_input_col())]
     output_value = result[field_names.index(tokenizer.get_output_col())]
-    print('Input Values: ' + str(input_value) + '\tOutput Value: ' + str(output_value))
+    print('Input Value: ' + str(input_value) + '\tOutput Values: ' + str(output_value))

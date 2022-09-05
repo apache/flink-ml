@@ -16,7 +16,7 @@
 # limitations under the License.
 ################################################################################
 
-# Simple program that creates an IndexToStringModelExample instance and uses it
+# Simple program that creates an IndexToStringModel instance and uses it
 # for feature engineering.
 
 from pyflink.common import Types

@@ -49,15 +49,15 @@ format of the merging information is
 
 ### Parameters
 
-| Key               | Default        | Type    | Required | Description                                                |
-|:------------------|:---------------|:--------|:---------|:-----------------------------------------------------------|
-| numClusters       | `2`            | Integer | no       | The max number of clusters to create.                      |
-| distanceThreshold | `null`         | Double  | no       | Threshold to decide whether two clusters should be merged. |
-| linkage           | `"ward"`       | String  | no       | Criterion for computing distance between two clusters.     |
-| computeFullTree   | `false`        | Boolean | no       | Whether computes the full tree after convergence.          |
-| distanceMeasure   | `"euclidean"`  | String  | no       | Distance measure.                                          |
-| featuresCol       | `"features"`   | String  | no       | Features column name.                                      |
-| predictionCol     | `"prediction"` | String  | no       | Prediction column name.                                    |
+| Key               | Default        | Type    | Required | Description                                                                                                         |
+|:------------------|:---------------|:--------|:---------|:--------------------------------------------------------------------------------------------------------------------|
+| numClusters       | `2`            | Integer | no       | The max number of clusters to create.                                                                               |
+| distanceThreshold | `null`         | Double  | no       | Threshold to decide whether two clusters should be merged.                                                          |
+| linkage           | `"ward"`       | String  | no       | Criterion for computing distance between two clusters. Supported values: `'ward', 'complete', 'single', 'average'`. |
+| computeFullTree   | `false`        | Boolean | no       | Whether computes the full tree after convergence.                                                                   |
+| distanceMeasure   | `"euclidean"`  | String  | no       | Distance measure. Supported values: `'euclidean', 'manhattan', 'cosine'`.                                           |
+| featuresCol       | `"features"`   | String  | no       | Features column name.                                                                                               |
+| predictionCol     | `"prediction"` | String  | no       | Prediction column name.                                                                                             |
 
 ### Examples
 
@@ -152,9 +152,9 @@ input_data = t_env.from_data_stream(
             [DenseVectorTypeInfo()])))
 
 # Creates an AgglomerativeClustering object and initializes its parameters.
-agglomerative_clustering = AgglomerativeClustering()
-    .set_linkage('ward')
-    .set_distance_measure('euclidean')
+agglomerative_clustering = AgglomerativeClustering() \
+    .set_linkage('ward') \
+    .set_distance_measure('euclidean') \
     .set_prediction_col('prediction')
 
 # Uses the AgglomerativeClustering for clustering.
