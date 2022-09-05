@@ -31,28 +31,28 @@ a hyperplane to maximize the distance between classified samples.
 
 ### Input Columns
 
-| Param name  | Type    | Default      | Description      |
-| :---------- | :------ | :----------- | :--------------- |
-| featuresCol | Vector  | `"features"` | Feature vector   |
-| labelCol    | Integer | `"label"`    | Label to predict |
-| weightCol   | Double  | `"weight"`   | Weight of sample |
+| Param name  | Type    | Default      | Description       |
+| :---------- | :------ | :----------- |:------------------|
+| featuresCol | Vector  | `"features"` | Feature vector.   |
+| labelCol    | Integer | `"label"`    | Label to predict. |
+| weightCol   | Double  | `"weight"`   | Weight of sample. |
 
 ### Output Columns
 
-| Param name       | Type    | Default           | Description                             |
-| :--------------- | :------ | :---------------- | :-------------------------------------- |
-| predictionCol    | Integer | `"prediction"`    | Label of the max probability            |
-| rawPredictionCol | Vector  | `"rawPrediction"` | Vector of the probability of each label |
+| Param name       | Type    | Default           | Description                              |
+| :--------------- | :------ | :---------------- |:-----------------------------------------|
+| predictionCol    | Integer | `"prediction"`    | Label of the max probability.            |
+| rawPredictionCol | Vector  | `"rawPrediction"` | Vector of the probability of each label. |
 
 ### Parameters
 
 Below are the parameters required by `LinearSVCModel`.
 
-| Key              | Default           | Type   | Required | Description                                                  |
-| ---------------- | ----------------- | ------ | -------- | ------------------------------------------------------------ |
-| featuresCol      | `"features"`      | String | no       | Features column name.                                        |
-| predictionCol    | `"prediction"`    | String | no       | Prediction column name.                                      |
-| rawPredictionCol | `"rawPrediction"` | String | no       | Raw prediction column name.                                  |
+| Key              | Default           | Type   | Required | Description                                                             |
+|------------------|-------------------|--------|----------|-------------------------------------------------------------------------|
+| featuresCol      | `"features"`      | String | no       | Features column name.                                                   |
+| predictionCol    | `"prediction"`    | String | no       | Prediction column name.                                                 |
+| rawPredictionCol | `"rawPrediction"` | String | no       | Raw prediction column name.                                             |
 | threshold        | `0.0`             | Double | no       | Threshold in binary classification prediction applied to rawPrediction. |
 
 `LinearSVC` needs parameters above and also below.

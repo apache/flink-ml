@@ -35,29 +35,29 @@ predictions, scores, or label probabilities). The output may contain different
 metrics defined by the parameter `MetricsNames`.
 ### Input Columns
 
-| Param name       | Type          | Default         | Description               |
-| :--------------- | :------------ | :-------------- | :------------------------ |
-| labelCol         | Number        | `"label"`       | The label of this entry   |
-| rawPredictionCol | Vector/Number | `rawPrediction` | The raw prediction result |
-| weightCol        | Number        | `null`          | The weight of this entry  |
+| Param name       | Type          | Default         | Description                |
+| :--------------- | :------------ | :-------------- |:---------------------------|
+| labelCol         | Number        | `"label"`       | The label of this entry.   |
+| rawPredictionCol | Vector/Number | `rawPrediction` | The raw prediction result. |
+| weightCol        | Number        | `null`          | The weight of this entry.  |
 
 ### Output Columns
 
-| Column name       | Type   | Description                                                  |
-| ----------------- | ------ | ------------------------------------------------------------ |
-| "areaUnderROC"    | Double | the area under the receiver operating characteristic (ROC) curve |
-| "areaUnderPR"     | Double | the area under the precision-recall curve                    |
-| "areaUnderLorenz" | Double | Kolmogorov-Smirnov, measures the ability of the model to separate positive and negative samples |
-| "ks"              | Double | the area under the lorenz curve                              |
+| Column name       | Type   | Description                                                                                      |
+| ----------------- | ------ |--------------------------------------------------------------------------------------------------|
+| "areaUnderROC"    | Double | The area under the receiver operating characteristic (ROC) curve.                                |
+| "areaUnderPR"     | Double | The area under the precision-recall curve.                                                       |
+| "areaUnderLorenz" | Double | Kolmogorov-Smirnov, measures the ability of the model to separate positive and negative samples. |
+| "ks"              | Double | The area under the lorenz curve.                                                                 |
 
 ### Parameters
 
-| Key              | Default                                                      | Type         | Required | Description                  |
-| ---------------- | ------------------------------------------------------------ | ------------ | -------- | ---------------------------- |
-| labelCol         | `"label"`                                                    | String       | no       | Label column name.           |
-| weightCol        | `null`                                                       | String       | no       | Weight column name.          |
-| rawPredictionCol | `"rawPrediction"`                                            | String       | no       | Raw prediction column name.  |
-| metricsNames     | `[BinaryClassificationEvaluatorParams.AREA_UNDER_ROC, BinaryClassificationEvaluatorParams.AREA_UNDER_PR]` | String Array | no       | Names of the output metrics. |
+| Key              | Default                           | Type     | Required | Description                                                                                            |
+|------------------|-----------------------------------|----------|----------|--------------------------------------------------------------------------------------------------------|
+| labelCol         | `"label"`                         | String   | no       | Label column name.                                                                                     |
+| weightCol        | `null`                            | String   | no       | Weight column name.                                                                                    |
+| rawPredictionCol | `"rawPrediction"`                 | String   | no       | Raw prediction column name.                                                                            |
+| metricsNames     | `["areaUnderROC", "areaUnderPR"]` | String[] | no       | Names of the output metrics. Supported values: 'areaUnderROC', 'areaUnderPR', 'areaUnderLorenz', 'ks'. |
 
 ### Examples
 

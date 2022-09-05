@@ -31,17 +31,17 @@ between a scalar response and one or more explanatory variables.
 
 ### Input Columns
 
-| Param name  | Type    | Default      | Description      |
-| :---------- | :------ | :----------- | :--------------- |
-| featuresCol | Vector  | `"features"` | Feature vector   |
-| labelCol    | Integer | `"label"`    | Label to predict |
-| weightCol   | Double  | `"weight"`   | Weight of sample |
+| Param name  | Type    | Default      | Description       |
+| :---------- | :------ | :----------- |:------------------|
+| featuresCol | Vector  | `"features"` | Feature vector.   |
+| labelCol    | Integer | `"label"`    | Label to predict. |
+| weightCol   | Double  | `"weight"`   | Weight of sample. |
 
 ### Output Columns
 
-| Param name    | Type    | Default        | Description                  |
-| :------------ | :------ | :------------- | :--------------------------- |
-| predictionCol | Integer | `"prediction"` | Label of the max probability |
+| Param name    | Type    | Default        | Description                   |
+| :------------ | :------ | :------------- |:------------------------------|
+| predictionCol | Integer | `"prediction"` | Label of the max probability. |
 
 ### Parameters
 

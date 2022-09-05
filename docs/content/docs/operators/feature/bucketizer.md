@@ -32,24 +32,24 @@ multiple columns of discrete features, i.e., buckets indices. The indices are in
 [0, numSplitsInThisColumn - 1].
 ### Input Columns
 
-| Param name | Type   | Default | Description                          |
-| :--------- | :----- | :------ | :----------------------------------- |
-| inputCols  | Number | `null`  | Continuous features to be bucketized |
+| Param name | Type   | Default | Description                           |
+|:-----------|:-------|:--------|:--------------------------------------|
+| inputCols  | Number | `null`  | Continuous features to be bucketized. |
 
 ### Output Columns
 
-| Param name | Type   | Default | Description                  |
-| :--------- | :----- | :------ | :--------------------------- |
-| outputCols | Double | `null`  | Discrete bucketized features |
+| Param name | Type   | Default | Description           |
+|:-----------|:-------|:--------|:----------------------|
+| outputCols | Double | `null`  | Discretized features. |
 
 ### Parameters
 
-| Key           | Default                          | Type        | Required | Description                                                  |
-| ------------- | -------------------------------- | ----------- | -------- | ------------------------------------------------------------ |
-| inputCols     | `null`                           | String      | yes      | Input column names.                                          |
-| outputCols    | `null`                           | String      | yes      | Output column names.                                         |
-| handleInvalid | `HasHandleInvalid.ERROR_INVALID` | String      | No       | Strategy to handle invalid entries.                          |
-| splitsArray   | `null`                           | Double\[][] | yes      | Array of split points for mapping continuous features into buckets. |
+| Key           | Default   | Type        | Required | Description                                                                    |
+|---------------|-----------|-------------|----------|--------------------------------------------------------------------------------|
+| inputCols     | `null`    | String[]    | yes      | Input column names.                                                            |
+| outputCols    | `null`    | String[]    | yes      | Output column names.                                                           |
+| handleInvalid | `"error"` | String      | no       | Strategy to handle invalid entries. Supported values: 'error', 'skip', 'keep'. |
+| splitsArray   | `null`    | Double\[][] | yes      | Array of split points for mapping continuous features into buckets.            |
 
 ### Examples
 

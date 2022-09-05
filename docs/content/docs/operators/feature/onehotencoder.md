@@ -37,24 +37,24 @@ vector column for each input column.
 
 ### Input Columns
 
-| Param name | Type    | Default | Description |
-| :--------- | :------ | :------ | :---------- |
-| inputCols  | Integer | `null`  | Label index |
+| Param name | Type    | Default | Description  |
+| :--------- | :------ | :------ |:-------------|
+| inputCols  | Integer | `null`  | Label index. |
 
 ### Output Columns
 
-| Param name | Type   | Default | Description           |
-| :--------- | :----- | :------ | :-------------------- |
-| outputCols | Vector | `null`  | Encoded binary vector |
+| Param name | Type   | Default | Description            |
+| :--------- | :----- | :------ |:-----------------------|
+| outputCols | Vector | `null`  | Encoded binary vector. |
 
 ### Parameters
 
-| Key           | Default                          | Type    | Required | Description                                                  |
-| ------------- | -------------------------------- | ------- | -------- | ------------------------------------------------------------ |
-| inputCols     | `null`                           | String  | yes      | Input column names.                                          |
-| outputCols    | `null`                           | String  | yes      | Output column names.                                         |
-| handleInvalid | `HasHandleInvalid.ERROR_INVALID` | String  | No       | Strategy to handle invalid entries. Supported values: `HasHandleInvalid.ERROR_INVALID`, `HasHandleInvalid.SKIP_INVALID` |
-| dropLast      | `true`                           | Boolean | no       | Whether to drop the last category.                           |
+| Key           | Default   | Type     | Required | Description                                                                    |
+|---------------|-----------|----------|----------|--------------------------------------------------------------------------------|
+| inputCols     | `null`    | String[] | yes      | Input column names.                                                            |
+| outputCols    | `null`    | String[] | yes      | Output column names.                                                           |
+| handleInvalid | `"error"` | String   | no       | Strategy to handle invalid entries. Supported values: 'error', 'skip', 'keep'. |
+| dropLast      | `true`    | Boolean  | no       | Whether to drop the last category.                                             |
 
 ### Examples
 

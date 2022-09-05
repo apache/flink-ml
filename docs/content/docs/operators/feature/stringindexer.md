@@ -38,30 +38,30 @@ StringIndexerModel.
 ### Input Columns
 
 | Param name | Type          | Default | Description                            |
-| :--------- | :------------ | :------ | :------------------------------------- |
-| inputCols  | Number/String | `null`  | string/numerical values to be indexed. |
+| :--------- | :------------ | :------ |:---------------------------------------|
+| inputCols  | Number/String | `null`  | String/Numerical values to be indexed. |
 
 ### Output Columns
 
 | Param name | Type   | Default | Description                         |
-| :--------- | :----- | :------ | :---------------------------------- |
+|:-----------|:-------|:--------|:------------------------------------|
 | outputCols | Double | `null`  | Indices of string/numerical values. |
 
 ### Parameters
 
 Below are the parameters required by `StringIndexerModel`.
 
-| Key           | Default                          | Type   | Required | Description                         |
-| ------------- | -------------------------------- | ------ | -------- | ----------------------------------- |
-| inputCols     | `null`                           | String | yes      | Input column names.                 |
-| outputCols    | `null`                           | String | yes      | Output column names.                |
-| handleInvalid | `HasHandleInvalid.ERROR_INVALID` | String | No       | Strategy to handle invalid entries. |
+| Key           | Default   | Type     | Required | Description                                                                    |
+|---------------|-----------|----------|----------|--------------------------------------------------------------------------------|
+| inputCols     | `null`    | String[] | yes      | Input column names.                                                            |
+| outputCols    | `null`    | String[] | yes      | Output column names.                                                           |
+| handleInvalid | `"error"` | String   | no       | Strategy to handle invalid entries. Supported values: 'error', 'skip', 'keep'. |
 
 `StringIndexer` needs parameters above and also below.
 
-| Key             | Default                               | Type   | Required | Description                          |
-| --------------- | ------------------------------------- | ------ | -------- | ------------------------------------ |
-| stringOrderType | `StringIndexerParams.ARBITRARY_ORDER` | String | no       | How to order strings of each column. |
+| Key             | Default       | Type   | Required | Description                                                                                                                         |
+|-----------------|---------------|--------|----------|-------------------------------------------------------------------------------------------------------------------------------------|
+| stringOrderType | `"arbitrary"` | String | no       | How to order strings of each column. Supported values: 'arbitrary', 'frequencyDesc', 'frequencyAsc', 'alphabetDesc', 'alphabetAsc'. |
 
 ### Examples
 

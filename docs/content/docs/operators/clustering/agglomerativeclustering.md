@@ -120,8 +120,7 @@ public class AgglomerativeClusteringExample {
 
 {{< tab "Python">}}
 ```python
-# Simple program that creates a Bucketizer instance and uses it for feature
-# engineering.
+# Simple program that creates an agglomerativeclustering instance and uses it for clustering.
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment

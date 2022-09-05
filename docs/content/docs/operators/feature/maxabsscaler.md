@@ -1,9 +1,9 @@
 ---
-title: "Min Max Scaler"
+title: "Max Abs Scaler"
 weight: 1
 type: docs
 aliases:
-- /operators/feature/minmaxscaler.html
+- /operators/feature/maxabsscaler.html
 ---
 
 <!--
@@ -25,10 +25,12 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-## Min Max Scaler
+## Max Abs Scaler
 
-Min Max Scaler is an algorithm that rescales feature values to a common range
-[min, max] which defined by user.
+Max Abs Scaler is an algorithm rescales feature values to the range [-1, 1] 
+by dividing through the largest maximum absolute value in each feature. 
+It does not shift/center the data and thus does not destroy any sparsity.
+
 ### Input Columns
 
 | Param name | Type   | Default   | Description            |
@@ -43,12 +45,10 @@ Min Max Scaler is an algorithm that rescales feature values to a common range
 
 ### Parameters
 
-| Key       | Default    | Type   | Required | Description                              |
-|-----------|------------|--------|----------|------------------------------------------|
-| inputCol  | `"input"`  | String | no       | Input column name.                       |
-| outputCol | `"output"` | String | no       | Output column name.                      |
-| min       | `0.0`      | Double | no       | Lower bound of the output feature range. |
-| max       | `1.0`      | Double | no       | Upper bound of the output feature range. |
+| Key       | Default    | Type   | Required | Description         |
+|-----------|------------|--------|----------|---------------------|
+| inputCol  | `"input"`  | String | no       | Input column name.  |
+| outputCol | `"output"` | String | no       | Output column name. |
 
 ### Examples
 
@@ -57,8 +57,8 @@ Min Max Scaler is an algorithm that rescales feature values to a common range
 {{< tab "Java">}}
 
 ```java
-import org.apache.flink.ml.feature.minmaxscaler.MinMaxScaler;
-import org.apache.flink.ml.feature.minmaxscaler.MinMaxScalerModel;
+import org.apache.flink.ml.feature.maxabsscaler.MaxAbsScaler;
+import org.apache.flink.ml.feature.maxabsscaler.MaxAbsScalerModel;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -68,8 +68,8 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
-/** Simple program that trains a MinMaxScaler model and uses it for feature engineering. */
-public class MinMaxScalerExample {
+/** Simple program that trains a MaxAbsScaler model and uses it for feature engineering. */
+public class MaxAbsScalerExample {
     public static void main(String[] args) {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
@@ -91,20 +91,20 @@ public class MinMaxScalerExample {
                         Row.of(Vectors.dense(100.0, 50.0)));
         Table predictTable = tEnv.fromDataStream(predictStream).as("input");
 
-        // Creates a MinMaxScaler object and initializes its parameters.
-        MinMaxScaler minMaxScaler = new MinMaxScaler();
+        // Creates a MaxAbsScaler object and initializes its parameters.
+        MaxAbsScaler maxAbsScaler = new MaxAbsScaler();
 
-        // Trains the MinMaxScaler Model.
-        MinMaxScalerModel minMaxScalerModel = minMaxScaler.fit(trainTable);
+        // Trains the MaxAbsScaler Model.
+        MaxAbsScalerModel maxAbsScalerModel = maxAbsScaler.fit(trainTable);
 
-        // Uses the MinMaxScaler Model for predictions.
-        Table outputTable = minMaxScalerModel.transform(predictTable)[0];
+        // Uses the MaxAbsScaler Model for predictions.
+        Table outputTable = maxAbsScalerModel.transform(predictTable)[0];
 
         // Extracts and displays the results.
         for (CloseableIterator<Row> it = outputTable.execute().collect(); it.hasNext(); ) {
             Row row = it.next();
-            DenseVector inputValue = (DenseVector) row.getField(minMaxScaler.getInputCol());
-            DenseVector outputValue = (DenseVector) row.getField(minMaxScaler.getOutputCol());
+            DenseVector inputValue = (DenseVector) row.getField(maxAbsScaler.getInputCol());
+            DenseVector outputValue = (DenseVector) row.getField(maxAbsScaler.getOutputCol());
             System.out.printf("Input Value: %-15s\tOutput Value: %s\n", inputValue, outputValue);
         }
     }
@@ -117,13 +117,13 @@ public class MinMaxScalerExample {
 {{< tab "Python">}}
 
 ```python
-# Simple program that trains a MinMaxScaler model and uses it for feature
+# Simple program that trains a MaxAbsScaler model and uses it for feature
 # engineering.
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
-from pyflink.ml.lib.feature.minmaxscaler import MinMaxScaler
+from pyflink.ml.lib.feature.maxabsscaler import MaxAbsScaler
 from pyflink.table import StreamTableEnvironment
 
 # create a new StreamExecutionEnvironment
@@ -157,20 +157,20 @@ predict_data = t_env.from_data_stream(
             [DenseVectorTypeInfo()])
     ))
 
-# create a min-max-scaler object and initialize its parameters
-min_max_scaler = MinMaxScaler()
+# create a maxabs scaler object and initialize its parameters
+max_abs_scaler = MaxAbsScaler()
 
-# train the min-max-scaler model
-model = min_max_scaler.fit(train_data)
+# train the maxabs scaler model
+model = max_abs_scaler.fit(train_data)
 
-# use the min-max-scaler model for predictions
+# use the maxabs scaler model for predictions
 output = model.transform(predict_data)[0]
 
 # extract and display the results
 field_names = output.get_schema().get_field_names()
 for result in t_env.to_data_stream(output).execute_and_collect():
-    input_value = result[field_names.index(min_max_scaler.get_input_col())]
-    output_value = result[field_names.index(min_max_scaler.get_output_col())]
+    input_value = result[field_names.index(max_abs_scaler.get_input_col())]
+    output_value = result[field_names.index(max_abs_scaler.get_output_col())]
     print('Input Value: ' + str(input_value) + ' \tOutput Value: ' + str(output_value))
 
 ```

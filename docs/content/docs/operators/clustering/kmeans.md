@@ -30,15 +30,15 @@ into a predefined number of clusters.
 
 ### Input Columns
 
-| Param name  | Type   | Default      | Description    |
-|:------------|:-------|:-------------|:---------------|
-| featuresCol | Vector | `"features"` | Feature vector |
+| Param name  | Type   | Default      | Description     |
+|:------------|:-------|:-------------|:----------------|
+| featuresCol | Vector | `"features"` | Feature vector. |
 
 ### Output Columns
 
-| Param name    | Type    | Default        | Description              |
-|:--------------|:--------|:---------------|:-------------------------|
-| predictionCol | Integer | `"prediction"` | Predicted cluster center |
+| Param name    | Type    | Default        | Description               |
+|:--------------|:--------|:---------------|:--------------------------|
+| predictionCol | Integer | `"prediction"` | Predicted cluster center. |
 
 ### Parameters
 

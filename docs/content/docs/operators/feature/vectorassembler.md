@@ -33,22 +33,22 @@ Types of input columns must be either vector or numerical value.
 ### Input Columns
 
 | Param name | Type          | Default | Description                     |
-| :--------- | :------------ | :------ | :------------------------------ |
+|:-----------|:--------------|:--------|:--------------------------------|
 | inputCols  | Number/Vector | `null`  | Number/Vectors to be assembled. |
 
 ### Output Columns
 
 | Param name | Type   | Default    | Description       |
-| :--------- | :----- | :--------- | :---------------- |
+|:-----------|:-------|:-----------|:------------------|
 | outputCol  | Vector | `"output"` | Assembled vector. |
 
 ### Parameters
 
-| Key           | Default                          | Type   | Required | Description                         |
-| ------------- | -------------------------------- | ------ | -------- | ----------------------------------- |
-| inputCols     | `null`                           | String | yes      | Input column names.                 |
-| outputCol     | `"output"`                       | String | No       | Output column name.                 |
-| handleInvalid | `HasHandleInvalid.ERROR_INVALID` | String | No       | Strategy to handle invalid entries. |
+| Key           | Default    | Type     | Required | Description                                                                    |
+|---------------|------------|----------|----------|--------------------------------------------------------------------------------|
+| inputCols     | `null`     | String[] | yes      | Input column names.                                                            |
+| outputCol     | `"output"` | String   | no       | Output column name.                                                            |
+| handleInvalid | `"error"`  | String   | no       | Strategy to handle invalid entries. Supported values: 'error', 'skip', 'keep'. |
 
 ### Examples
 
