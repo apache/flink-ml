@@ -129,9 +129,41 @@ public class BLAS {
         return JAVA_BLAS.dnrm2(x.values.length, x.values, 1);
     }
 
+    /** Calculates the p-norm of the vector x. */
+    public static double norm(Vector x, double p) {
+        Preconditions.checkArgument(p >= 1.0, "p value must >= 1.0, but the current p is : " + p);
+        double norm = 0.0;
+        double[] data =
+                (x instanceof DenseVector) ? ((DenseVector) x).values : ((SparseVector) x).values;
+
+        if (p == 1.0) {
+            for (double datum : data) {
+                norm += Math.abs(datum);
+            }
+        } else if (p == 2.0) {
+            norm = norm2(x);
+        } else if (p == Double.POSITIVE_INFINITY) {
+            for (double datum : data) {
+                norm = Math.max(Math.abs(datum), norm);
+            }
+        } else {
+            for (double datum : data) {
+                norm += Math.pow(Math.abs(datum), p);
+            }
+            norm = Math.pow(norm, 1.0 / p);
+        }
+
+        return norm;
+    }
+
     /** x = x * a . */
-    public static void scal(double a, DenseVector x) {
-        JAVA_BLAS.dscal(x.size(), a, x.values, 1);
+    public static void scal(double a, Vector x) {
+        if (x instanceof DenseVector) {
+            JAVA_BLAS.dscal(x.size(), a, ((DenseVector) x).values, 1);
+        } else {
+            double[] values = ((SparseVector) x).values;
+            JAVA_BLAS.dscal(values.length, a, values, 1);
+        }
     }
 
     /**
