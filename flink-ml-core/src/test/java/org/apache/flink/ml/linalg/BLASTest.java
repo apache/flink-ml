@@ -93,10 +93,31 @@ public class BLASTest {
     }
 
     @Test
+    public void testNorm() {
+        assertEquals(Math.sqrt(55), BLAS.norm(inputDenseVec, 2.0), TOLERANCE);
+
+        SparseVector sparseVector = Vectors.sparse(5, new int[] {0, 2, 4}, new double[] {1, 3, 5});
+        assertEquals(5.0, BLAS.norm(sparseVector, Double.POSITIVE_INFINITY), TOLERANCE);
+
+        assertEquals(5.348481241239363, BLAS.norm(sparseVector, 3.0), TOLERANCE);
+    }
+
+    @Test
     public void testScal() {
         BLAS.scal(2, inputDenseVec);
-        double[] expectedResult = new double[] {2, -4, 6, 8, -10};
-        assertArrayEquals(expectedResult, inputDenseVec.values, TOLERANCE);
+
+        double[] expectedDenseResult = new double[] {2, -4, 6, 8, -10};
+        assertArrayEquals(expectedDenseResult, inputDenseVec.values, TOLERANCE);
+
+        SparseVector inputSparseVector =
+                Vectors.sparse(5, new int[] {0, 2, 4}, new double[] {1, 3, 5});
+        BLAS.scal(1.5, inputSparseVector);
+
+        double[] expectedSparseResult = new double[] {1.5, 4.5, 7.5};
+        int[] expectedSparseIndices = new int[] {0, 2, 4};
+
+        assertArrayEquals(expectedSparseResult, inputSparseVector.values, TOLERANCE);
+        assertArrayEquals(expectedSparseIndices, inputSparseVector.indices);
     }
 
     @Test
