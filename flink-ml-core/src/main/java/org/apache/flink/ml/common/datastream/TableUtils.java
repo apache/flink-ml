@@ -43,6 +43,17 @@ public class TableUtils {
         return new RowTypeInfo(types, names);
     }
 
+    // Retrieves the TypeInformation of a column by name. Returns null if the name does not exist in
+    // the input schema.
+    public static TypeInformation<?> getTypeInfoByName(ResolvedSchema schema, String name) {
+        for (Column column : schema.getColumns()) {
+            if (column.getName().equals(name)) {
+                return TypeInformation.of(column.getDataType().getConversionClass());
+            }
+        }
+        return null;
+    }
+
     public static StreamExecutionEnvironment getExecutionEnvironment(StreamTableEnvironment tEnv) {
         Table table = tEnv.fromValues();
         DataStream<Row> dataStream = tEnv.toDataStream(table);

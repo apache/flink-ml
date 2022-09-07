@@ -19,6 +19,7 @@
 package org.apache.flink.ml.common.datastream;
 
 import org.apache.flink.annotation.Internal;
+import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.MapPartitionFunction;
@@ -114,6 +115,36 @@ public class DataStreamUtils {
                     .transform("reduce", input.getType(), new ReduceOperator<>(func))
                     .setParallelism(1);
         }
+    }
+
+    /**
+     * Applies an {@link AggregateFunction} on a bounded stream. The output stream contains the
+     * aggregated result and its parallelism is one.
+     *
+     * @param input The input data stream.
+     * @param func The user defined aggregate function.
+     * @return The result data stream.
+     * @param <IN> The class type of the input.
+     * @param <ACC> The class type of the accumulated values.
+     * @param <OUT> The class type of the output values.
+     */
+    public static <IN, ACC, OUT> DataStream<OUT> aggregate(
+            DataStream<IN> input, AggregateFunction<IN, ACC, OUT> func) {
+        TypeInformation<ACC> accType =
+                TypeExtractor.getAggregateFunctionAccumulatorType(
+                        func, input.getType(), null, true);
+        TypeInformation<OUT> outType =
+                TypeExtractor.getAggregateFunctionReturnType(func, input.getType(), null, true);
+
+        DataStream<ACC> partialAggregatedStream =
+                input.transform(
+                        "partialAggregate", accType, new PartialAggregateOperator<>(func, accType));
+        DataStream<OUT> aggregatedStream =
+                partialAggregatedStream.transform(
+                        "aggregate", outType, new AggregateOperator<>(func, accType));
+        aggregatedStream.getTransformation().setParallelism(1);
+
+        return aggregatedStream;
     }
 
     /**
@@ -260,6 +291,106 @@ public class DataStreamUtils {
             if (result != null) {
                 state.add(result);
             }
+        }
+    }
+
+    /**
+     * A stream operator to apply {@link AggregateFunction#add(IN, ACC)} on each partition of the
+     * input bounded data stream.
+     */
+    private static class PartialAggregateOperator<IN, ACC, OUT>
+            extends AbstractUdfStreamOperator<ACC, AggregateFunction<IN, ACC, OUT>>
+            implements OneInputStreamOperator<IN, ACC>, BoundedOneInput {
+        /** Type information of the accumulated result. */
+        private final TypeInformation<ACC> accType;
+        /** The accumulated result of the aggregate function in one partition. */
+        private ACC acc;
+        /** State of acc. */
+        private ListState<ACC> accState;
+
+        public PartialAggregateOperator(
+                AggregateFunction<IN, ACC, OUT> userFunction, TypeInformation<ACC> accType) {
+            super(userFunction);
+            this.accType = accType;
+        }
+
+        @Override
+        public void endInput() {
+            output.collect(new StreamRecord<>(acc));
+        }
+
+        @Override
+        public void processElement(StreamRecord<IN> streamRecord) throws Exception {
+            acc = userFunction.add(streamRecord.getValue(), acc);
+        }
+
+        @Override
+        public void initializeState(StateInitializationContext context) throws Exception {
+            super.initializeState(context);
+            accState =
+                    context.getOperatorStateStore()
+                            .getListState(new ListStateDescriptor<>("accState", accType));
+            acc =
+                    OperatorStateUtils.getUniqueElement(accState, "accState")
+                            .orElse(userFunction.createAccumulator());
+        }
+
+        @Override
+        public void snapshotState(StateSnapshotContext context) throws Exception {
+            super.snapshotState(context);
+            accState.clear();
+            accState.add(acc);
+        }
+    }
+
+    /**
+     * A stream operator to apply {@link AggregateFunction#merge(ACC, ACC)} and {@link
+     * AggregateFunction#getResult(ACC)} on the input bounded data stream.
+     */
+    private static class AggregateOperator<IN, ACC, OUT>
+            extends AbstractUdfStreamOperator<OUT, AggregateFunction<IN, ACC, OUT>>
+            implements OneInputStreamOperator<ACC, OUT>, BoundedOneInput {
+        /** Type information of the accumulated result. */
+        private final TypeInformation<ACC> accType;
+        /** The accumulated result of the aggregate function in the final partition. */
+        private ACC acc;
+        /** State of acc. */
+        private ListState<ACC> accState;
+
+        public AggregateOperator(
+                AggregateFunction<IN, ACC, OUT> userFunction, TypeInformation<ACC> accType) {
+            super(userFunction);
+            this.accType = accType;
+        }
+
+        @Override
+        public void endInput() {
+            output.collect(new StreamRecord<>(userFunction.getResult(acc)));
+        }
+
+        @Override
+        public void processElement(StreamRecord<ACC> streamRecord) throws Exception {
+            if (acc == null) {
+                acc = streamRecord.getValue();
+            } else {
+                acc = userFunction.merge(streamRecord.getValue(), acc);
+            }
+        }
+
+        @Override
+        public void initializeState(StateInitializationContext context) throws Exception {
+            super.initializeState(context);
+            accState =
+                    context.getOperatorStateStore()
+                            .getListState(new ListStateDescriptor<>("accState", accType));
+            acc = OperatorStateUtils.getUniqueElement(accState, "accState").orElse(null);
+        }
+
+        @Override
+        public void snapshotState(StateSnapshotContext context) throws Exception {
+            super.snapshotState(context);
+            accState.clear();
+            accState.add(acc);
         }
     }
 
