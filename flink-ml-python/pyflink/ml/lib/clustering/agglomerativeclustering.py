@@ -21,14 +21,15 @@ from pyflink.ml.core.param import Param, StringParam, IntParam, FloatParam, \
     BooleanParam, ParamValidators
 from pyflink.ml.core.wrapper import JavaWithParams
 from pyflink.ml.lib.clustering.common import JavaClusteringAlgoOperator
-from pyflink.ml.lib.param import HasDistanceMeasure, HasFeaturesCol, HasPredictionCol
+from pyflink.ml.lib.param import HasDistanceMeasure, HasFeaturesCol, HasPredictionCol, HasWindows
 
 
 class _AgglomerativeClusteringParams(
     JavaWithParams,
     HasDistanceMeasure,
     HasFeaturesCol,
-    HasPredictionCol
+    HasPredictionCol,
+    HasWindows
 ):
     """
     Params for :class:`AgglomerativeClustering`.
@@ -112,16 +113,21 @@ class _AgglomerativeClusteringParams(
 class AgglomerativeClustering(JavaClusteringAlgoOperator, _AgglomerativeClusteringParams):
     """
     An AlgoOperator that performs a hierarchical clustering using a bottom-up approach. Each
-    observation starts in its own cluster and the clusters are merged together one by one.
-    Users can choose different strategies to merge two clusters by setting
-    {@link AgglomerativeClusteringParams#LINKAGE} and different distance measures by setting
-    {@link AgglomerativeClusteringParams#DISTANCE_MEASURE}.
+    observation starts in its own cluster and the clusters are merged together one by one. Users can
+    choose different strategies to merge two clusters by setting
+    AgglomerativeClusteringParams#LINKAGE and different distance measures by setting
+    AgglomerativeClusteringParams#DISTANCE_MEASURE.
 
-    <p>The output contains two tables. The first one assigns one cluster Id for each data point.
+    The output contains two tables. The first one assigns one cluster Id for each data point.
     The second one contains the information of merging two clusters at each step. The data format
     of the merging information is (clusterId1, clusterId2, distance, sizeOfMergedCluster).
 
-    <p>See https://en.wikipedia.org/wiki/Hierarchical_clustering.
+    This AlgoOperator splits input stream into mini-batches of elements according to the windowing
+    strategy specified by the HasWindows parameter, and performs the hierarchical clustering on each
+    mini-batch independently. The clustering result of each element depends only on the elements in
+    the same mini-batch.
+
+    See https://en.wikipedia.org/wiki/Hierarchical_clustering.
     """
 
     def __init__(self, java_algo_operator=None):

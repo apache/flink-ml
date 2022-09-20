@@ -18,6 +18,14 @@
 
 package org.apache.flink.ml.api;
 
+import org.apache.flink.api.common.time.Time;
+import org.apache.flink.ml.common.window.CountTumblingWindows;
+import org.apache.flink.ml.common.window.EventTimeSessionWindows;
+import org.apache.flink.ml.common.window.EventTimeTumblingWindows;
+import org.apache.flink.ml.common.window.GlobalWindows;
+import org.apache.flink.ml.common.window.ProcessingTimeSessionWindows;
+import org.apache.flink.ml.common.window.ProcessingTimeTumblingWindows;
+import org.apache.flink.ml.common.window.Windows;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.param.BooleanParam;
@@ -37,6 +45,7 @@ import org.apache.flink.ml.param.StringArrayArrayParam;
 import org.apache.flink.ml.param.StringArrayParam;
 import org.apache.flink.ml.param.StringParam;
 import org.apache.flink.ml.param.VectorParam;
+import org.apache.flink.ml.param.WindowsParam;
 import org.apache.flink.ml.param.WithParams;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -51,6 +60,8 @@ import java.nio.file.Files;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+
+import static org.junit.Assert.assertEquals;
 
 /** Tests the behavior of Stage and WithParams. */
 public class StageTest {
@@ -119,6 +130,13 @@ public class StageTest {
 
         Param<Vector> VECTOR_PARAM =
                 new VectorParam("vectorParam", "Description", Vectors.dense(1.0, 2.0, 3.0));
+
+        Param<Windows> WINDOWS_PARAM =
+                new WindowsParam(
+                        "windowsParam",
+                        "Description",
+                        CountTumblingWindows.of(100),
+                        ParamValidators.notNull());
     }
 
     /**
@@ -341,6 +359,9 @@ public class StageTest {
         stage.set(MyParams.VECTOR_PARAM, Vectors.dense(1, 5, 3));
         Assert.assertEquals(Vectors.dense(1, 5, 3), stage.get(MyParams.VECTOR_PARAM));
 
+        stage.set(MyParams.WINDOWS_PARAM, CountTumblingWindows.of(50));
+        Assert.assertEquals(CountTumblingWindows.of(50), stage.get(MyParams.WINDOWS_PARAM));
+
         stage.set(
                 MyParams.DOUBLE_ARRAY_ARRAY_PARAM,
                 new Double[][] {new Double[] {50.0, 51.0}, new Double[] {52.0, 53.0}});
@@ -383,6 +404,7 @@ public class StageTest {
         stage.set(MyParams.DOUBLE_ARRAY_PARAM, new Double[] {50.0, 51.0});
         stage.set(MyParams.STRING_ARRAY_PARAM, new String[] {"50", "51"});
         stage.set(MyParams.VECTOR_PARAM, Vectors.dense(2, 3, 4));
+        stage.set(MyParams.WINDOWS_PARAM, EventTimeSessionWindows.withGap(Time.milliseconds(100)));
         stage.set(
                 MyParams.DOUBLE_ARRAY_ARRAY_PARAM,
                 new Double[][] {new Double[] {50.0, 51.0}, new Double[] {52.0, 53.0}});
@@ -422,6 +444,9 @@ public class StageTest {
         Assert.assertArrayEquals(
                 new String[] {"52", "53"}, stage.get(MyParams.STRING_ARRAY_ARRAY_PARAM)[1]);
         Assert.assertEquals(Vectors.dense(2, 3, 4), loadedStage.get(MyParams.VECTOR_PARAM));
+        Assert.assertEquals(
+                EventTimeSessionWindows.withGap(Time.milliseconds(100)),
+                loadedStage.get(MyParams.WINDOWS_PARAM));
     }
 
     @Test
@@ -510,5 +535,30 @@ public class StageTest {
         Assert.assertFalse(isSubArray.validate(new String[] {"c", "v"}));
         Assert.assertTrue(isSubArray.validate(new String[] {"a", "b"}));
         Assert.assertFalse(isSubArray.validate(new String[] {"e", "v"}));
+    }
+
+    @Test
+    public void testSaveLoadWindowsParams() throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+        MyStage stage = new MyStage();
+
+        Windows[] testWindows =
+                new Windows[] {
+                    GlobalWindows.getInstance(),
+                    CountTumblingWindows.of(100),
+                    EventTimeTumblingWindows.of(Time.milliseconds(100)),
+                    ProcessingTimeTumblingWindows.of(Time.seconds(100)),
+                    EventTimeSessionWindows.withGap(Time.minutes(100)),
+                    ProcessingTimeSessionWindows.withGap(Time.hours(100))
+                };
+
+        for (Windows windows : testWindows) {
+            stage.set(MyParams.WINDOWS_PARAM, windows);
+            Stage<?> loadedStage =
+                    validateStageSaveLoad(
+                            tEnv, stage, Collections.singletonMap("paramWithNullDefault", 10));
+            assertEquals(windows, loadedStage.get(MyParams.WINDOWS_PARAM));
+        }
     }
 }

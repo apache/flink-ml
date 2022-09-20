@@ -18,12 +18,13 @@
 
 package org.apache.flink.ml.clustering.agglomerativeclustering;
 
-import org.apache.flink.api.common.state.ListState;
-import org.apache.flink.api.common.state.ListStateDescriptor;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple4;
+import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.AlgoOperator;
+import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.common.distance.DistanceMeasure;
 import org.apache.flink.ml.common.distance.EuclideanDistanceMeasure;
@@ -35,18 +36,17 @@ import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
-import org.apache.flink.runtime.state.StateInitializationContext;
-import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
-import org.apache.flink.streaming.api.operators.BoundedOneInput;
-import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
-import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.streaming.api.functions.windowing.ProcessAllWindowFunction;
+import org.apache.flink.streaming.api.windowing.windows.Window;
+import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
 import org.apache.flink.types.Row;
+import org.apache.flink.util.Collector;
 import org.apache.flink.util.OutputTag;
 import org.apache.flink.util.Preconditions;
 
@@ -69,6 +69,11 @@ import java.util.Map;
  * <p>The output contains two tables. The first one assigns one cluster Id for each data point. The
  * second one contains the information of merging two clusters at each step. The data format of the
  * merging information is (clusterId1, clusterId2, distance, sizeOfMergedCluster).
+ *
+ * <p>This AlgoOperator splits input stream into mini-batches of elements according to the windowing
+ * strategy specified by the {@link org.apache.flink.ml.common.param.HasWindows} parameter, and
+ * performs the hierarchical clustering on each mini-batch independently. The clustering result of
+ * each element depends only on the elements in the same mini-batch.
  *
  * <p>See https://en.wikipedia.org/wiki/Hierarchical_clustering.
  */
@@ -113,20 +118,26 @@ public class AgglomerativeClustering
                 new OutputTag<Tuple4<Integer, Integer, Double, Integer>>("MERGE_INFO") {};
 
         SingleOutputStreamOperator<Row> output =
-                dataStream.transform(
-                        "doLocalAgglomerativeClustering",
-                        outputTypeInfo,
-                        new LocalAgglomerativeClusteringOperator(
+                DataStreamUtils.windowAllAndProcess(
+                        dataStream,
+                        getWindows(),
+                        new LocalAgglomerativeClusteringFunction<>(
                                 getFeaturesCol(),
                                 getLinkage(),
                                 getDistanceMeasure(),
                                 getNumClusters(),
                                 getDistanceThreshold(),
                                 getComputeFullTree(),
-                                mergeInfoOutputTag));
-        output.getTransformation().setParallelism(1);
+                                mergeInfoOutputTag,
+                                outputTypeInfo));
 
-        Table outputTable = tEnv.fromDataStream(output);
+        Schema schema =
+                Schema.newBuilder()
+                        .fromResolvedSchema(inputs[0].getResolvedSchema())
+                        .column(getPredictionCol(), DataTypes.INT())
+                        .build();
+
+        Table outputTable = tEnv.fromDataStream(output, schema);
 
         DataStream<Tuple4<Integer, Integer, Double, Integer>> mergeInfo =
                 output.getSideOutput(mergeInfoOutputTag);
@@ -153,8 +164,8 @@ public class AgglomerativeClustering
         return paramMap;
     }
 
-    private static class LocalAgglomerativeClusteringOperator extends AbstractStreamOperator<Row>
-            implements OneInputStreamOperator<Row, Row>, BoundedOneInput {
+    private static class LocalAgglomerativeClusteringFunction<W extends Window>
+            extends ProcessAllWindowFunction<Row, Row, W> implements ResultTypeQueryable<Row> {
         private final String featuresCol;
         private final String linkage;
         private final DistanceMeasure distanceMeasure;
@@ -162,9 +173,8 @@ public class AgglomerativeClustering
         private final Double distanceThreshold;
         private final boolean computeFullTree;
         private final OutputTag<Tuple4<Integer, Integer, Double, Integer>> mergeInfoOutputTag;
+        private final RowTypeInfo outputTypeInfo;
 
-        /** State for the input data. */
-        private ListState<Row> inputListState;
         /** Cluster id of each data point in inputList. */
         private int[] clusterIds;
         /** Precomputes the norm of each vector for performance. */
@@ -172,14 +182,15 @@ public class AgglomerativeClustering
         /** Next cluster Id to be assigned. */
         private int nextClusterId = 0;
 
-        public LocalAgglomerativeClusteringOperator(
+        public LocalAgglomerativeClusteringFunction(
                 String featuresCol,
                 String linkage,
                 String distanceMeasureName,
                 Integer numCluster,
                 Double distanceThreshold,
                 boolean computeFullTree,
-                OutputTag<Tuple4<Integer, Integer, Double, Integer>> mergeInfoOutputTag) {
+                OutputTag<Tuple4<Integer, Integer, Double, Integer>> mergeInfoOutputTag,
+                RowTypeInfo outputTypeInfo) {
             this.featuresCol = featuresCol;
             this.linkage = linkage;
             this.numCluster = numCluster;
@@ -188,30 +199,15 @@ public class AgglomerativeClustering
             this.mergeInfoOutputTag = mergeInfoOutputTag;
 
             distanceMeasure = DistanceMeasure.getInstance(distanceMeasureName);
+            this.outputTypeInfo = outputTypeInfo;
         }
 
         @Override
-        public void initializeState(StateInitializationContext context) throws Exception {
-            super.initializeState(context);
-            inputListState =
-                    context.getOperatorStateStore()
-                            .getListState(new ListStateDescriptor<>("inputListState", Row.class));
-        }
-
-        @Override
-        public void snapshotState(StateSnapshotContext context) throws Exception {
-            super.snapshotState(context);
-        }
-
-        @Override
-        public void processElement(StreamRecord<Row> input) throws Exception {
-            inputListState.add(input.getValue());
-        }
-
-        @Override
-        @SuppressWarnings("unchecked")
-        public void endInput() throws Exception {
-            List<Row> inputList = IteratorUtils.toList(inputListState.get().iterator());
+        public void process(
+                ProcessAllWindowFunction<Row, Row, W>.Context context,
+                Iterable<Row> values,
+                Collector<Row> output) {
+            List<Row> inputList = IteratorUtils.toList(values.iterator());
             int numDataPoints = inputList.size();
 
             // Assigns initial cluster Ids.
@@ -235,7 +231,7 @@ public class AgglomerativeClustering
             }
 
             // Clustering process.
-            doClustering(activeClusters);
+            doClustering(activeClusters, context);
 
             // Remaps the cluster Ids and output results.
             HashMap<Integer, Integer> remappedClusterIds = new HashMap<>();
@@ -251,8 +247,7 @@ public class AgglomerativeClustering
             }
 
             for (int i = 0; i < numDataPoints; i++) {
-                output.collect(
-                        new StreamRecord<>(Row.join(inputList.get(i), Row.of(clusterIds[i]))));
+                output.collect(Row.join(inputList.get(i), Row.of(clusterIds[i])));
             }
         }
 
@@ -260,7 +255,9 @@ public class AgglomerativeClustering
             return nextClusterId++;
         }
 
-        private void doClustering(List<Cluster> activeClusters) {
+        private void doClustering(
+                List<Cluster> activeClusters,
+                ProcessAllWindowFunction<Row, Row, ?>.Context context) {
             int clusterOffset1 = -1, clusterOffset2 = -1;
             boolean clusteringRunning =
                     (numCluster != null && activeClusters.size() > numCluster)
@@ -287,15 +284,13 @@ public class AgglomerativeClustering
                 Cluster cluster2 = activeClusters.get(clusterOffset2);
                 int clusterId1 = cluster1.clusterId;
                 int clusterId2 = cluster2.clusterId;
-                output.collect(
+                context.output(
                         mergeInfoOutputTag,
-                        new StreamRecord<>(
-                                Tuple4.of(
-                                        Math.min(clusterId1, clusterId2),
-                                        Math.max(clusterId1, clusterId2),
-                                        minDistance,
-                                        cluster1.dataPointIds.size()
-                                                + cluster2.dataPointIds.size())));
+                        Tuple4.of(
+                                Math.min(clusterId1, clusterId2),
+                                Math.max(clusterId1, clusterId2),
+                                minDistance,
+                                cluster1.dataPointIds.size() + cluster2.dataPointIds.size()));
 
                 // Merges these two clusters.
                 Cluster mergedCluster =
@@ -398,6 +393,11 @@ public class AgglomerativeClustering
                             "Unsupported " + LINKAGE + " type: " + linkage + ".");
             }
             return distance;
+        }
+
+        @Override
+        public TypeInformation<Row> getProducedType() {
+            return outputTypeInfo;
         }
 
         /** A cluster with cluster Id specified and data points that belong to this cluster. */

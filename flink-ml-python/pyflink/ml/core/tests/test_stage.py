@@ -18,13 +18,19 @@
 import os
 from typing import Dict, Any
 
+from pyflink.common import Time
 from pyflink.table import StreamTableEnvironment
 
 from pyflink.ml.core.api import Stage
 from pyflink.ml.core.linalg import Vectors
 from pyflink.ml.core.param import ParamValidators, Param, BooleanParam, IntParam, \
-    FloatParam, StringParam, VectorParam, IntArrayParam, FloatArrayParam, StringArrayParam
+    FloatParam, StringParam, VectorParam, IntArrayParam, FloatArrayParam, StringArrayParam, \
+    WindowsParam
 from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
+
+from pyflink.ml.core.windows import ProcessingTimeSessionWindows, GlobalWindows, \
+    CountTumblingWindows, EventTimeTumblingWindows, ProcessingTimeTumblingWindows, \
+    EventTimeSessionWindows
 
 BOOLEAN_PARAM = BooleanParam("boolean_param", "Description", False)
 INT_PARAM = IntParam("int_param", "Description", 1, ParamValidators.lt(100))
@@ -34,6 +40,8 @@ INT_ARRAY_PARAM = IntArrayParam("int_array_param", "Description", (6, 7))
 FLOAT_ARRAY_PARAM = FloatArrayParam("float_array_param", "Description", (10.0, 11.0))
 STRING_ARRAY_PARAM = StringArrayParam("string_array_param", "Description", ("14", "15"))
 VECTOR_PARAM = VectorParam('vector_param', "Description", Vectors.dense(1, 2, 3))
+WINDOWS_PARAM = WindowsParam('windows_param', "Description",
+                             ProcessingTimeSessionWindows.with_gap(Time.milliseconds(100)))
 EXTRA_INT_PARAM = IntParam("extra_int_param",
                            "Description",
                            20,
@@ -105,6 +113,11 @@ class StageTest(PyFlinkMLTestCase):
                                  ".Vector'> is incompatible with the type of <class 'int'>"):
             stage.set(VECTOR_PARAM, 100)
 
+        with pytest.raises(TypeError,
+                           match="Parameter windows_param's type <class 'pyflink.ml.core.windows"
+                                 ".Windows'> is incompatible with the type of <class 'int'>"):
+            stage.set(WINDOWS_PARAM, 100)
+
     def test_param_set_valid_value(self):
         stage = MyStage()
 
@@ -131,6 +144,19 @@ class StageTest(PyFlinkMLTestCase):
         self.assertEqual(sparse_vec.get(1), stage.get(VECTOR_PARAM).get(1))
         self.assertEqual(sparse_vec.get(2), stage.get(VECTOR_PARAM).get(2))
 
+        windows_list = [
+            GlobalWindows(),
+            CountTumblingWindows.of(100),
+            EventTimeTumblingWindows.of(Time.milliseconds(100)),
+            ProcessingTimeTumblingWindows.of(Time.seconds(100)),
+            EventTimeSessionWindows.with_gap(Time.minutes(100)),
+            ProcessingTimeSessionWindows.with_gap(Time.hours(100))
+        ]
+
+        for windows in windows_list:
+            stage.set(WINDOWS_PARAM, windows)
+            self.assertEqual(windows, stage.get(WINDOWS_PARAM))
+
         stage.set(INT_ARRAY_PARAM, (50, 51))
         self.assertEqual((50, 51), stage.get(INT_ARRAY_PARAM))
 
@@ -139,6 +165,26 @@ class StageTest(PyFlinkMLTestCase):
 
         stage.set(STRING_ARRAY_PARAM, ("50", "51"))
         self.assertEqual(("50", "51"), stage.get(STRING_ARRAY_PARAM))
+
+    def test_save_load_windows_params(self):
+        stage = MyStage()
+        stage.set(PARAM_WITH_NONE_DEFAULT, 1)
+
+        windows_list = [
+            GlobalWindows(),
+            CountTumblingWindows.of(100),
+            EventTimeTumblingWindows.of(Time.milliseconds(100)),
+            ProcessingTimeTumblingWindows.of(Time.seconds(100)),
+            EventTimeSessionWindows.with_gap(Time.minutes(100)),
+            ProcessingTimeSessionWindows.with_gap(Time.hours(100))
+        ]
+
+        for windows in windows_list:
+            stage.set(WINDOWS_PARAM, windows)
+            path = os.path.join(self.temp_dir, "test_save_load_windows_params" + str(windows))
+            stage.save(path)
+            loaded_stage = MyStage.load(self.env, path)
+            self.assertEqual(windows, loaded_stage.get(WINDOWS_PARAM))
 
     def test_stage_save_load(self):
         stage = MyStage()
@@ -223,6 +269,7 @@ class MyStage(Stage):
         self._param_map[FLOAT_PARAM] = FLOAT_PARAM.default_value
         self._param_map[STRING_PARAM] = STRING_PARAM.default_value
         self._param_map[VECTOR_PARAM] = VECTOR_PARAM.default_value
+        self._param_map[WINDOWS_PARAM] = WINDOWS_PARAM.default_value
         self._param_map[INT_ARRAY_PARAM] = INT_ARRAY_PARAM.default_value
         self._param_map[FLOAT_ARRAY_PARAM] = FLOAT_ARRAY_PARAM.default_value
         self._param_map[STRING_ARRAY_PARAM] = STRING_ARRAY_PARAM.default_value

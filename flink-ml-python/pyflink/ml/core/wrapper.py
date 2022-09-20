@@ -19,7 +19,7 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Any
 
 from py4j.java_gateway import JavaObject, get_java_class
-from pyflink.common import typeinfo
+from pyflink.common import typeinfo, Time
 from pyflink.common.typeinfo import _from_java_type, TypeInformation, _is_instance_of
 from pyflink.java_gateway import get_gateway
 from pyflink.table import Table, StreamTableEnvironment
@@ -29,7 +29,9 @@ from pyflink.ml.core.api import Model, Transformer, AlgoOperator, Stage, Estimat
 from pyflink.ml.core.linalg import DenseVectorTypeInfo, SparseVectorTypeInfo, DenseMatrixTypeInfo, \
     VectorTypeInfo, DenseVector
 from pyflink.ml.core.param import Param, WithParams, StringArrayParam, IntArrayParam, VectorParam, \
-    FloatArrayParam, FloatArrayArrayParam
+    FloatArrayParam, FloatArrayArrayParam, WindowsParam
+from pyflink.ml.core.windows import GlobalWindows, CountTumblingWindows, EventTimeTumblingWindows, \
+    ProcessingTimeTumblingWindows, EventTimeSessionWindows, ProcessingTimeSessionWindows
 
 _from_java_type_alias = _from_java_type
 
@@ -231,6 +233,64 @@ class VectorJavaParamConverter(JavaParamConverter):
         return DenseVector(tuple(value.get(i) for i in range(value.size())))
 
 
+class WindowsJavaParamConverter(JavaParamConverter):
+    @staticmethod
+    def _to_java_time(time: Time):
+        return get_gateway().jvm.org.apache.flink.api.common.time.Time.milliseconds(
+            time.to_milliseconds())
+
+    @staticmethod
+    def _to_python_time(time) -> Time:
+        return Time.milliseconds(time.toMilliseconds())
+
+    def to_java(self, value):
+        java_window_package = get_gateway().jvm.org.apache.flink.ml.common.window
+        if isinstance(value, GlobalWindows):
+            return java_window_package.GlobalWindows.getInstance()
+        elif isinstance(value, CountTumblingWindows):
+            return java_window_package.CountTumblingWindows.of(value.size)
+        elif isinstance(value, EventTimeTumblingWindows):
+            return java_window_package.EventTimeTumblingWindows.of(
+                WindowsJavaParamConverter._to_java_time(value.size))
+        elif isinstance(value, ProcessingTimeTumblingWindows):
+            return java_window_package.ProcessingTimeTumblingWindows.of(
+                WindowsJavaParamConverter._to_java_time(value.size))
+        elif isinstance(value, EventTimeSessionWindows):
+            return java_window_package.EventTimeSessionWindows.withGap(
+                WindowsJavaParamConverter._to_java_time(value.gap))
+        elif isinstance(value, ProcessingTimeSessionWindows):
+            return java_window_package.ProcessingTimeSessionWindows.withGap(
+                WindowsJavaParamConverter._to_java_time(value.gap))
+        else:
+            raise TypeError(f'Python object {str(value)}\' cannot be converted to Java object')
+
+    def to_python(self, value):
+        if value.getClass().getName() == \
+                "org.apache.flink.ml.common.window.GlobalWindows":
+            return GlobalWindows()
+        elif value.getClass().getName() == \
+                "org.apache.flink.ml.common.window.CountTumblingWindows":
+            return CountTumblingWindows.of(value.getSize())
+        elif value.getClass().getName() == \
+                "org.apache.flink.ml.common.window.EventTimeTumblingWindows":
+            return EventTimeTumblingWindows.of(
+                WindowsJavaParamConverter._to_python_time(value.getSize()))
+        elif value.getClass().getName() == \
+                "org.apache.flink.ml.common.window.ProcessingTimeTumblingWindows":
+            return ProcessingTimeTumblingWindows.of(
+                WindowsJavaParamConverter._to_python_time(value.getSize()))
+        elif value.getClass().getName() == \
+                "org.apache.flink.ml.common.window.EventTimeSessionWindows":
+            return EventTimeSessionWindows.with_gap(
+                WindowsJavaParamConverter._to_python_time(value.getGap()))
+        elif value.getClass().getName() == \
+                "org.apache.flink.ml.common.window.ProcessingTimeSessionWindows":
+            return ProcessingTimeSessionWindows.with_gap(
+                WindowsJavaParamConverter._to_python_time(value.getGap()))
+        else:
+            raise TypeError(f'Java object {str(value)}\' cannot be converted to Python object')
+
+
 class StringArrayJavaParamConverter(JavaParamConverter):
     def to_java(self, value):
         return to_jarray(get_gateway().jvm.java.lang.String, value)
@@ -269,6 +329,7 @@ _map_java_param_converter = {
     FloatArrayArrayParam: FloatArrayArrayJavaPramConverter(),
     StringArrayParam: StringArrayJavaParamConverter(),
     VectorParam: VectorJavaParamConverter(),
+    WindowsParam: WindowsJavaParamConverter(),
     Param: default_converter
 }
 

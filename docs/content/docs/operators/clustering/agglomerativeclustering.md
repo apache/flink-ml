@@ -49,15 +49,16 @@ format of the merging information is
 
 ### Parameters
 
-| Key               | Default        | Type    | Required | Description                                                                                                         |
-|:------------------|:---------------|:--------|:---------|:--------------------------------------------------------------------------------------------------------------------|
-| numClusters       | `2`            | Integer | no       | The max number of clusters to create.                                                                               |
-| distanceThreshold | `null`         | Double  | no       | Threshold to decide whether two clusters should be merged.                                                          |
-| linkage           | `"ward"`       | String  | no       | Criterion for computing distance between two clusters. Supported values: `'ward', 'complete', 'single', 'average'`. |
-| computeFullTree   | `false`        | Boolean | no       | Whether computes the full tree after convergence.                                                                   |
-| distanceMeasure   | `"euclidean"`  | String  | no       | Distance measure. Supported values: `'euclidean', 'manhattan', 'cosine'`.                                           |
-| featuresCol       | `"features"`   | String  | no       | Features column name.                                                                                               |
-| predictionCol     | `"prediction"` | String  | no       | Prediction column name.                                                                                             |
+| Key               | Default                       | Type    | Required | Description                                                                    |
+|:------------------|:------------------------------|:--------|:---------|:-------------------------------------------------------------------------------|
+| numClusters       | `2`                           | Integer | no       | The max number of clusters to create.                                          |
+| distanceThreshold | `null`                        | Double  | no       | Threshold to decide whether two clusters should be merged.                     |
+| linkage           | `"ward"`                      | String  | no       | Criterion for computing distance between two clusters.                         |
+| computeFullTree   | `false`                       | Boolean | no       | Whether computes the full tree after convergence.                              |
+| distanceMeasure   | `"euclidean"`                 | String  | no       | Distance measure.                                                              |
+| featuresCol       | `"features"`                  | String  | no       | Features column name.                                                          |
+| predictionCol     | `"prediction"`                | String  | no       | Prediction column name.                                                        |
+| windows           | `GlobalWindows.getInstance()` | Windows | no       | Windowing strategy that determines how to create mini-batches from input data. |
 
 ### Examples
 

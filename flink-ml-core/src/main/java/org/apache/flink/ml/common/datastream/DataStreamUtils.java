@@ -26,6 +26,7 @@ import org.apache.flink.api.common.functions.MapPartitionFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
+import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.base.IntSerializer;
 import org.apache.flink.api.dag.Transformation;
@@ -34,16 +35,31 @@ import org.apache.flink.api.java.typeutils.TypeExtractor;
 import org.apache.flink.core.memory.ManagedMemoryUseCase;
 import org.apache.flink.iteration.datacache.nonkeyed.ListStateWithCache;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
+import org.apache.flink.ml.common.window.CountTumblingWindows;
+import org.apache.flink.ml.common.window.EventTimeSessionWindows;
+import org.apache.flink.ml.common.window.EventTimeTumblingWindows;
+import org.apache.flink.ml.common.window.GlobalWindows;
+import org.apache.flink.ml.common.window.ProcessingTimeSessionWindows;
+import org.apache.flink.ml.common.window.ProcessingTimeTumblingWindows;
+import org.apache.flink.ml.common.window.Windows;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
+import org.apache.flink.streaming.api.datastream.AllWindowedStream;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.functions.windowing.AllWindowFunction;
+import org.apache.flink.streaming.api.functions.windowing.ProcessAllWindowFunction;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator;
 import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.TimestampedCollector;
+import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
+import org.apache.flink.streaming.api.windowing.assigners.TumblingProcessingTimeWindows;
+import org.apache.flink.streaming.api.windowing.assigners.WindowAssigner;
 import org.apache.flink.streaming.api.windowing.windows.GlobalWindow;
+import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
+import org.apache.flink.streaming.api.windowing.windows.Window;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.util.Collector;
@@ -195,6 +211,60 @@ public class DataStreamUtils {
                         "Managed memory weight has been set, this should not happen.");
             }
         }
+    }
+
+    /**
+     * Creates windows from data in the non key grouped input stream and applies the given window
+     * function to each window.
+     *
+     * @param input The input data stream to be windowed and processed.
+     * @param windows The windowing strategy that defines how input data would be sliced into
+     *     batches.
+     * @param function The user defined process function.
+     * @return The data stream that is the result of applying the window function to each window.
+     */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public static <IN, OUT, W extends Window> SingleOutputStreamOperator<OUT> windowAllAndProcess(
+            DataStream<IN> input, Windows windows, ProcessAllWindowFunction<IN, OUT, W> function) {
+        AllWindowedStream<IN, W> allWindowedStream;
+        if (windows instanceof CountTumblingWindows) {
+            long countWindowSize = ((CountTumblingWindows) windows).getSize();
+            allWindowedStream = (AllWindowedStream<IN, W>) input.countWindowAll(countWindowSize);
+        } else {
+            allWindowedStream =
+                    input.windowAll((WindowAssigner) getDataStreamTimeWindowAssigner(windows));
+        }
+        return allWindowedStream.process(function);
+    }
+
+    private static WindowAssigner<Object, TimeWindow> getDataStreamTimeWindowAssigner(
+            Windows windows) {
+        if (windows instanceof GlobalWindows) {
+            return EndOfStreamWindows.get();
+        } else if (windows instanceof EventTimeTumblingWindows) {
+            return TumblingEventTimeWindows.of(
+                    getStreamWindowTime(((EventTimeTumblingWindows) windows).getSize()));
+        } else if (windows instanceof ProcessingTimeTumblingWindows) {
+            return TumblingProcessingTimeWindows.of(
+                    getStreamWindowTime(((ProcessingTimeTumblingWindows) windows).getSize()));
+        } else if (windows instanceof EventTimeSessionWindows) {
+            return org.apache.flink.streaming.api.windowing.assigners.EventTimeSessionWindows
+                    .withGap(getStreamWindowTime(((EventTimeSessionWindows) windows).getGap()));
+        } else if (windows instanceof ProcessingTimeSessionWindows) {
+            return org.apache.flink.streaming.api.windowing.assigners.ProcessingTimeSessionWindows
+                    .withGap(
+                            getStreamWindowTime(((ProcessingTimeSessionWindows) windows).getGap()));
+        } else {
+            throw new UnsupportedOperationException(
+                    String.format(
+                            "Unsupported Windows subclass: %s", windows.getClass().getName()));
+        }
+    }
+
+    private static org.apache.flink.streaming.api.windowing.time.Time getStreamWindowTime(
+            Time time) {
+        return org.apache.flink.streaming.api.windowing.time.Time.of(
+                time.getSize(), time.getUnit());
     }
 
     /**
