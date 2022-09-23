@@ -71,7 +71,7 @@ class MLLibTest(PyFlinkMLTestCase):
                     'JavaClusteringAlgoOperator', 'JavaEvaluationAlgoOperator',
                     'JavaFeatureTransformer', 'JavaFeatureEstimator',
                     'JavaFeatureModel', 'JavaRegressionEstimator',
-                    'JavaRegressionModel')]
+                    'JavaRegressionModel', 'JavaStatsAlgoOperator')]
 
     @abstractmethod
     def module_name(self):
@@ -129,6 +129,16 @@ class RegressionCompletenessTest(CompletenessTest, MLLibTest):
     def module(self):
         from pyflink.ml.lib import regression
         return regression
+
+
+class StatsCompletenessTest(CompletenessTest, MLLibTest):
+
+    def module_name(self):
+        return "stats"
+
+    def module(self):
+        from pyflink.ml.lib import stats
+        return stats
 
 
 if __name__ == "__main__":

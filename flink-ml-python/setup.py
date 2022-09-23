@@ -93,6 +93,8 @@ try:
                 'pyflink.ml.lib.clustering',
                 'pyflink.ml.lib.evaluation',
                 'pyflink.ml.lib.feature',
+                'pyflink.ml.lib.regression',
+                'pyflink.ml.lib.stats',
                 'pyflink.ml.lib',
                 'pyflink.ml.util',
                 'pyflink.lib',

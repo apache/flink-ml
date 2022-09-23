@@ -18,12 +18,28 @@
 
 package org.apache.flink.ml.stats.chisqtest;
 
-import org.apache.flink.ml.common.param.HasInputCols;
+import org.apache.flink.ml.common.param.HasFeaturesCol;
 import org.apache.flink.ml.common.param.HasLabelCol;
+import org.apache.flink.ml.param.BooleanParam;
+import org.apache.flink.ml.param.Param;
 
 /**
  * Params for {@link ChiSqTest}.
  *
  * @param <T> The class type of this instance.
  */
-public interface ChiSqTestParams<T> extends HasInputCols<T>, HasLabelCol<T> {}
+public interface ChiSqTestParams<T> extends HasFeaturesCol<T>, HasLabelCol<T> {
+    Param<Boolean> FLATTEN =
+            new BooleanParam(
+                    "flatten",
+                    "If false, the returned table contains only a single row, otherwise, one row per feature.",
+                    false);
+
+    default boolean getFlatten() {
+        return get(FLATTEN);
+    }
+
+    default T setFlatten(boolean value) {
+        return set(FLATTEN, value);
+    }
+}

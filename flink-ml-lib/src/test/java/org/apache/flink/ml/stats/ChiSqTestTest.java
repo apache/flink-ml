@@ -20,6 +20,7 @@ package org.apache.flink.ml.stats;
 
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.stats.chisqtest.ChiSqTest;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -38,10 +39,12 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 /** Tests the {@link ChiSqTest}. */
 public class ChiSqTestTest extends AbstractTestBase {
@@ -49,70 +52,57 @@ public class ChiSqTestTest extends AbstractTestBase {
     private StreamTableEnvironment tEnv;
     private Table inputTableWithDoubleLabel;
     private Table inputTableWithIntegerLabel;
-    private Table inputTableWithStringLabel;
 
     private final List<Row> samplesWithDoubleLabel =
             Arrays.asList(
-                    Row.of(0., 5, 1.),
-                    Row.of(2., 6, 2.),
-                    Row.of(1., 7, 2.),
-                    Row.of(1., 5, 4.),
-                    Row.of(0., 5, 1.),
-                    Row.of(2., 6, 2.),
-                    Row.of(1., 7, 2.),
-                    Row.of(1., 5, 4.),
-                    Row.of(2., 5, 1.),
-                    Row.of(0., 5, 2.),
-                    Row.of(0., 5, 2.),
-                    Row.of(1., 9, 4.),
-                    Row.of(1., 9, 3.));
+                    Row.of(0., Vectors.dense(5, 1.)),
+                    Row.of(2., Vectors.dense(6, 2.)),
+                    Row.of(1., Vectors.dense(7, 2.)),
+                    Row.of(1., Vectors.dense(5, 4.)),
+                    Row.of(0., Vectors.dense(5, 1.)),
+                    Row.of(2., Vectors.dense(6, 2.)),
+                    Row.of(1., Vectors.dense(7, 2.)),
+                    Row.of(1., Vectors.dense(5, 4.)),
+                    Row.of(2., Vectors.dense(5, 1.)),
+                    Row.of(0., Vectors.dense(5, 2.)),
+                    Row.of(0., Vectors.dense(5, 2.)),
+                    Row.of(1., Vectors.dense(9, 4.)),
+                    Row.of(1., Vectors.dense(9, 3.)));
 
     private final List<Row> expectedChiSqTestResultWithDoubleLabel =
+            Collections.singletonList(
+                    Row.of(
+                            Vectors.dense(0.03419350755, 0.24220177737),
+                            new int[] {6, 6},
+                            Vectors.dense(13.61904761905, 7.94444444444)));
+
+    private final List<Row> expectedChiSqTestResultWithDoubleLabelWithFlatten =
             Arrays.asList(
-                    Row.of("f1", 0.03419350755, 13.61904761905, 6),
-                    Row.of("f2", 0.24220177737, 7.94444444444, 6));
+                    Row.of(0, 0.03419350755, 6, 13.61904761905),
+                    Row.of(1, 0.24220177737, 6, 7.94444444444));
 
     private final List<Row> samplesWithIntegerLabel =
             Arrays.asList(
-                    Row.of(33, 5, "a"),
-                    Row.of(44, 6, "b"),
-                    Row.of(55, 7, "b"),
-                    Row.of(11, 5, "b"),
-                    Row.of(11, 5, "a"),
-                    Row.of(33, 6, "c"),
-                    Row.of(22, 7, "c"),
-                    Row.of(66, 5, "d"),
-                    Row.of(77, 5, "d"),
-                    Row.of(88, 5, "f"),
-                    Row.of(77, 5, "h"),
-                    Row.of(44, 9, "h"),
-                    Row.of(11, 9, "j"));
+                    Row.of(33, Vectors.dense(5, 0)),
+                    Row.of(44, Vectors.dense(6, 1)),
+                    Row.of(55, Vectors.dense(7, 1)),
+                    Row.of(11, Vectors.dense(5, 1)),
+                    Row.of(11, Vectors.dense(5, 0)),
+                    Row.of(33, Vectors.dense(6, 2)),
+                    Row.of(22, Vectors.dense(7, 2)),
+                    Row.of(66, Vectors.dense(5, 3)),
+                    Row.of(77, Vectors.dense(5, 3)),
+                    Row.of(88, Vectors.dense(5, 4)),
+                    Row.of(77, Vectors.dense(5, 6)),
+                    Row.of(44, Vectors.dense(9, 6)),
+                    Row.of(11, Vectors.dense(9, 8)));
 
     private final List<Row> expectedChiSqTestResultWithIntegerLabel =
-            Arrays.asList(
-                    Row.of("f1", 0.35745138256, 22.75, 21),
-                    Row.of("f2", 0.39934987096, 43.69444444444, 42));
-
-    private final List<Row> samplesWithStringLabel =
-            Arrays.asList(
-                    Row.of("v1", 11, 21.22),
-                    Row.of("v1", 33, 22.33),
-                    Row.of("v2", 22, 32.44),
-                    Row.of("v3", 11, 54.22),
-                    Row.of("v3", 33, 22.22),
-                    Row.of("v2", 22, 22.22),
-                    Row.of("v4", 55, 22.22),
-                    Row.of("v5", 11, 41.11),
-                    Row.of("v6", 55, 14.41),
-                    Row.of("v7", 13, 25.55),
-                    Row.of("v8", 14, 25.55),
-                    Row.of("v9", 14, 44.44),
-                    Row.of("v9", 14, 31.11));
-
-    private final List<Row> expectedChiSqTestResultWithStringLabel =
-            Arrays.asList(
-                    Row.of("f1", 0.06672255089, 54.16666666667, 40),
-                    Row.of("f2", 0.42335512313, 73.66666666667, 72));
+            Collections.singletonList(
+                    Row.of(
+                            Vectors.dense(0.35745138256, 0.39934987096),
+                            new int[] {21, 42},
+                            Vectors.dense(22.75, 43.69444444444)));
 
     @Before
     public void before() {
@@ -125,13 +115,10 @@ public class ChiSqTestTest extends AbstractTestBase {
         tEnv = StreamTableEnvironment.create(env);
         inputTableWithDoubleLabel =
                 tEnv.fromDataStream(env.fromCollection(samplesWithDoubleLabel))
-                        .as("label", "f1", "f2");
+                        .as("label", "features");
         inputTableWithIntegerLabel =
                 tEnv.fromDataStream(env.fromCollection(samplesWithIntegerLabel))
-                        .as("label", "f1", "f2");
-        inputTableWithStringLabel =
-                tEnv.fromDataStream(env.fromCollection(samplesWithStringLabel))
-                        .as("label", "f1", "f2");
+                        .as("label", "features");
     }
 
     private static void verifyPredictionResult(Table output, List<Row> expected) throws Exception {
@@ -157,39 +144,56 @@ public class ChiSqTestTest extends AbstractTestBase {
     public void testParam() {
         ChiSqTest chiSqTest = new ChiSqTest();
         assertEquals("label", chiSqTest.getLabelCol());
+        assertEquals("features", chiSqTest.getFeaturesCol());
+        assertFalse(chiSqTest.getFlatten());
 
-        chiSqTest.setInputCols("f1", "f2").setLabelCol("click");
-        assertArrayEquals(new String[] {"f1", "f2"}, chiSqTest.getInputCols());
-        assertEquals("click", chiSqTest.getLabelCol());
+        chiSqTest.setLabelCol("test_label").setFeaturesCol("test_features").setFlatten(true);
+
+        assertEquals("test_features", chiSqTest.getFeaturesCol());
+        assertEquals("test_label", chiSqTest.getLabelCol());
+        assertTrue(chiSqTest.getFlatten());
     }
 
     @Test
     public void testOutputSchema() {
-        ChiSqTest chiSqTest = new ChiSqTest().setInputCols("f1", "f2").setLabelCol("label");
+        ChiSqTest chiSqTest = new ChiSqTest().setFeaturesCol("features").setLabelCol("label");
 
         Table output = chiSqTest.transform(inputTableWithDoubleLabel)[0];
         assertEquals(
-                Arrays.asList("column", "pValue", "statistic", "degreesOfFreedom"),
+                Arrays.asList("pValues", "degreesOfFreedom", "statistics"),
+                output.getResolvedSchema().getColumnNames());
+
+        chiSqTest.setFlatten(true);
+
+        output = chiSqTest.transform(inputTableWithDoubleLabel)[0];
+        assertEquals(
+                Arrays.asList("featureIndex", "pValue", "degreeOfFreedom", "statistic"),
                 output.getResolvedSchema().getColumnNames());
     }
 
     @Test
     public void testTransform() throws Exception {
-        ChiSqTest chiSqTest = new ChiSqTest().setInputCols("f1", "f2").setLabelCol("label");
+        ChiSqTest chiSqTest = new ChiSqTest().setFeaturesCol("features").setLabelCol("label");
 
         Table output1 = chiSqTest.transform(inputTableWithDoubleLabel)[0];
         verifyPredictionResult(output1, expectedChiSqTestResultWithDoubleLabel);
 
         Table output2 = chiSqTest.transform(inputTableWithIntegerLabel)[0];
         verifyPredictionResult(output2, expectedChiSqTestResultWithIntegerLabel);
+    }
 
-        Table output3 = chiSqTest.transform(inputTableWithStringLabel)[0];
-        verifyPredictionResult(output3, expectedChiSqTestResultWithStringLabel);
+    @Test
+    public void testTransformWithFlatten() throws Exception {
+        ChiSqTest chiSqTest =
+                new ChiSqTest().setFlatten(true).setFeaturesCol("features").setLabelCol("label");
+
+        Table output1 = chiSqTest.transform(inputTableWithDoubleLabel)[0];
+        verifyPredictionResult(output1, expectedChiSqTestResultWithDoubleLabelWithFlatten);
     }
 
     @Test
     public void testSaveLoadAndTransform() throws Exception {
-        ChiSqTest chiSqTest = new ChiSqTest().setInputCols("f1", "f2").setLabelCol("label");
+        ChiSqTest chiSqTest = new ChiSqTest().setFeaturesCol("features").setLabelCol("label");
 
         ChiSqTest loadedChiSqTest =
                 TestUtils.saveAndReload(tEnv, chiSqTest, tempFolder.newFolder().getAbsolutePath());

@@ -15,24 +15,16 @@
 #  See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
+import os
+import sys
+from pathlib import Path
 
-import importlib
-import pkgutil
+# Because the project and the dependent `pyflink` project have the same directory structure,
+# we need to manually add `flink-ml-python` path to `sys.path` in the test of this project to change
+# the order of package search.
+flink_ml_python_dir = Path(__file__).parents[5]
+sys.path.append(str(flink_ml_python_dir))
 
-from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
+import pyflink
 
-
-class ExamplesTest(PyFlinkMLTestCase):
-    def test_examples(self):
-        self.execute_all_in_module('pyflink.examples.ml.classification')
-        self.execute_all_in_module('pyflink.examples.ml.clustering')
-        self.execute_all_in_module('pyflink.examples.ml.evaluation')
-        self.execute_all_in_module('pyflink.examples.ml.feature')
-        self.execute_all_in_module('pyflink.examples.ml.regression')
-        self.execute_all_in_module('pyflink.examples.ml.stats')
-
-    def execute_all_in_module(self, module):
-        module = importlib.import_module(module)
-        for importer, sub_modname, ispkg in pkgutil.iter_modules(module.__path__):
-            # importing an example module means executing the example.
-            importlib.import_module(module.__name__ + "." + sub_modname)
+pyflink.__path__.insert(0, os.path.join(flink_ml_python_dir, 'pyflink'))
