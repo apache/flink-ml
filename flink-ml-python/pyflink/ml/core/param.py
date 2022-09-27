@@ -19,6 +19,7 @@
 from abc import ABC, abstractmethod
 from typing import TypeVar, Generic, List, Dict, Any, Optional, Tuple, Union
 from pyflink.ml.core.linalg import Vector
+from pyflink.ml.core.windows import Windows
 
 import jsonpickle
 
@@ -87,9 +88,7 @@ class WithParams(Generic[T], ABC):
     @staticmethod
     def _is_compatible_type(param: 'Param[V]', value: V) -> bool:
         if value is not None and param.type != type(value):
-            if type(value).__name__ == 'DenseVector' or type(value).__name__ == 'SparseVector':
-                return issubclass(type(value), param.type)
-            return False
+            return issubclass(type(value), param.type)
         if isinstance(value, list):
             for item in value:
                 if param.type_name != f'list[{type(item).__name__}]':
@@ -392,3 +391,14 @@ class VectorParam(Param[Vector]):
                  validator: ParamValidator[Vector] = ParamValidators.always_true()):
         super(VectorParam, self).__init__(name, Vector, "str", description, default_value,
                                           validator)
+
+
+class WindowsParam(Param[Windows]):
+    """
+    Class for the Windows parameter.
+    """
+
+    def __init__(self, name: str, description: str, default_value: Optional[Windows],
+                 validator: ParamValidator[Windows] = ParamValidators.always_true()):
+        super(WindowsParam, self).__init__(name, Windows, "str", description, default_value,
+                                           validator)

@@ -21,13 +21,16 @@ from typing import Dict, Any
 from pyflink.ml.core.param import Param
 from pyflink.ml.lib.param import HasDistanceMeasure, HasFeaturesCol, HasGlobalBatchSize, \
     HasHandleInvalid, HasInputCols, HasLabelCol, HasLearningRate, HasMaxIter, HasMultiClass, \
-    HasOutputCols, HasPredictionCol, HasRawPredictionCol, HasReg, HasSeed, HasTol, HasWeightCol
+    HasOutputCols, HasPredictionCol, HasRawPredictionCol, HasReg, HasSeed, HasTol, HasWeightCol, \
+    HasWindows
+
+from pyflink.ml.core.windows import GlobalWindows, CountTumblingWindows
 
 
 class TestParams(HasDistanceMeasure, HasFeaturesCol, HasGlobalBatchSize, HasHandleInvalid,
                  HasInputCols, HasLabelCol, HasLearningRate, HasMaxIter, HasMultiClass,
                  HasOutputCols, HasPredictionCol, HasRawPredictionCol, HasReg, HasSeed, HasTol,
-                 HasWeightCol):
+                 HasWeightCol, HasWindows):
     def __init__(self):
         self._param_map = {}
 
@@ -200,3 +203,15 @@ class ParamTests(unittest.TestCase):
 
         param.set_weight_col('test_weight_col')
         self.assertEqual(param.get_weight_col(), 'test_weight_col')
+
+    def test_windows(self):
+        param = TestParams()
+        windows = param.WINDOWS
+        self.assertEqual(windows.name, "windows")
+        self.assertEqual(windows.description,
+                         "Windowing strategy that determines how to create "
+                         "mini-batches from input data.")
+        self.assertEqual(windows.default_value, GlobalWindows())
+
+        param.set_windows(CountTumblingWindows.of(100))
+        self.assertEqual(param.get_windows(), CountTumblingWindows.of(100))

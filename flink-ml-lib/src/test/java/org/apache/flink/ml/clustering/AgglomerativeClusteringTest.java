@@ -19,17 +19,29 @@
 package org.apache.flink.ml.clustering;
 
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
+import org.apache.flink.api.common.time.Time;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeinfo.Types;
+import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.ml.clustering.agglomerativeclustering.AgglomerativeClustering;
 import org.apache.flink.ml.clustering.agglomerativeclustering.AgglomerativeClusteringParams;
 import org.apache.flink.ml.common.distance.CosineDistanceMeasure;
 import org.apache.flink.ml.common.distance.EuclideanDistanceMeasure;
 import org.apache.flink.ml.common.distance.ManhattanDistanceMeasure;
+import org.apache.flink.ml.common.window.CountTumblingWindows;
+import org.apache.flink.ml.common.window.EventTimeTumblingWindows;
+import org.apache.flink.ml.common.window.GlobalWindows;
+import org.apache.flink.ml.common.window.ProcessingTimeTumblingWindows;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vectors;
+import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.util.TestUtils;
+import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.test.util.AbstractTestBase;
@@ -42,7 +54,9 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -59,6 +73,15 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
     private StreamTableEnvironment tEnv;
     private StreamExecutionEnvironment env;
     private Table inputDataTable;
+
+    private static final List<DenseVector> INPUT_DATA =
+            Arrays.asList(
+                    Vectors.dense(1, 1),
+                    Vectors.dense(1, 4),
+                    Vectors.dense(1, 0),
+                    Vectors.dense(4, 4),
+                    Vectors.dense(4, 1.5),
+                    Vectors.dense(4, 0));
 
     private static final double[] EUCLIDEAN_AVERAGE_MERGE_DISTANCES =
             new double[] {1, 1.5, 3, 3.1394402, 3.9559706};
@@ -93,6 +116,22 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
                     new HashSet<>(Arrays.asList(Vectors.dense(1, 4), Vectors.dense(4, 4))),
                     new HashSet<>(Arrays.asList(Vectors.dense(4, 1.5), Vectors.dense(4, 0))));
 
+    private static final List<Set<DenseVector>> EUCLIDEAN_WARD_COUNT_FIVE_WINDOW_AS_TWO_RESULT =
+            Arrays.asList(
+                    new HashSet<>(Arrays.asList(Vectors.dense(1, 1), Vectors.dense(1, 0))),
+                    new HashSet<>(
+                            Arrays.asList(
+                                    Vectors.dense(1, 4),
+                                    Vectors.dense(4, 4),
+                                    Vectors.dense(4, 1.5))));
+
+    private static final List<Set<DenseVector>> EUCLIDEAN_WARD_EVENT_TIME_WINDOW_AS_TWO_RESULT =
+            Arrays.asList(
+                    new HashSet<>(Arrays.asList(Vectors.dense(1, 1), Vectors.dense(1, 0))),
+                    new HashSet<>(Collections.singletonList(Vectors.dense(1, 4))),
+                    new HashSet<>(Arrays.asList(Vectors.dense(4, 0), Vectors.dense(4, 1.5))),
+                    new HashSet<>(Collections.singletonList(Vectors.dense(4, 4))));
+
     private static final double TOLERANCE = 1e-7;
 
     @Before
@@ -104,16 +143,8 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
         env.enableCheckpointing(100);
         env.setRestartStrategy(RestartStrategies.noRestart());
         tEnv = StreamTableEnvironment.create(env);
-        List<DenseVector> inputData =
-                Arrays.asList(
-                        Vectors.dense(1, 1),
-                        Vectors.dense(1, 4),
-                        Vectors.dense(1, 0),
-                        Vectors.dense(4, 1.5),
-                        Vectors.dense(4, 4),
-                        Vectors.dense(4, 0));
         inputDataTable =
-                tEnv.fromDataStream(env.fromCollection(inputData).map(x -> x)).as("features");
+                tEnv.fromDataStream(env.fromCollection(INPUT_DATA).map(x -> x)).as("features");
     }
 
     @Test
@@ -126,6 +157,7 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
         assertEquals(EuclideanDistanceMeasure.NAME, agglomerativeClustering.getDistanceMeasure());
         assertFalse(agglomerativeClustering.getComputeFullTree());
         assertEquals("prediction", agglomerativeClustering.getPredictionCol());
+        assertEquals(GlobalWindows.getInstance(), agglomerativeClustering.getWindows());
 
         agglomerativeClustering
                 .setFeaturesCol("test_features")
@@ -134,7 +166,8 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
                 .setLinkage(AgglomerativeClusteringParams.LINKAGE_AVERAGE)
                 .setDistanceMeasure(CosineDistanceMeasure.NAME)
                 .setComputeFullTree(true)
-                .setPredictionCol("cluster_id");
+                .setPredictionCol("cluster_id")
+                .setWindows(ProcessingTimeTumblingWindows.of(Time.milliseconds(100)));
 
         assertEquals("test_features", agglomerativeClustering.getFeaturesCol());
         assertNull(agglomerativeClustering.getNumClusters());
@@ -143,6 +176,9 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
         assertEquals(CosineDistanceMeasure.NAME, agglomerativeClustering.getDistanceMeasure());
         assertTrue(agglomerativeClustering.getComputeFullTree());
         assertEquals("cluster_id", agglomerativeClustering.getPredictionCol());
+        assertEquals(
+                ProcessingTimeTumblingWindows.of(Time.milliseconds(100)),
+                agglomerativeClustering.getWindows());
     }
 
     @Test
@@ -201,6 +237,81 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
                 outputs[0],
                 agglomerativeClustering.getFeaturesCol(),
                 agglomerativeClustering.getPredictionCol());
+    }
+
+    @Test
+    public void testTransformWithCountTumblingWindows() throws Exception {
+        env.setParallelism(1);
+
+        inputDataTable =
+                tEnv.fromDataStream(env.fromCollection(INPUT_DATA).map(x -> x)).as("features");
+
+        AgglomerativeClustering agglomerativeClustering =
+                new AgglomerativeClustering()
+                        .setLinkage(AgglomerativeClusteringParams.LINKAGE_AVERAGE)
+                        .setDistanceMeasure(EuclideanDistanceMeasure.NAME)
+                        .setPredictionCol("pred")
+                        .setWindows(CountTumblingWindows.of(5));
+
+        Table[] outputs = agglomerativeClustering.transform(inputDataTable);
+        verifyClusteringResult(
+                EUCLIDEAN_WARD_COUNT_FIVE_WINDOW_AS_TWO_RESULT,
+                outputs[0],
+                agglomerativeClustering.getFeaturesCol(),
+                agglomerativeClustering.getPredictionCol());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void testTransformWithEventTimeTumblingWindows() throws Exception {
+        RowTypeInfo outputTypeInfo =
+                new RowTypeInfo(
+                        new TypeInformation<?>[] {DenseVectorTypeInfo.INSTANCE, Types.INSTANT},
+                        new String[] {"features", "ts"});
+
+        Instant baseTime = Instant.now();
+        DataStream<Row> inputDataStream =
+                env.fromCollection(INPUT_DATA)
+                        .setParallelism(1)
+                        .map(x -> Row.of(x, baseTime.plusSeconds((long) x.get(0))), outputTypeInfo);
+
+        Schema schema =
+                Schema.newBuilder()
+                        .column("features", DataTypes.of(DenseVectorTypeInfo.INSTANCE))
+                        .column("ts", DataTypes.TIMESTAMP_LTZ(3))
+                        .watermark("ts", "ts - INTERVAL '5' SECOND")
+                        .build();
+
+        Table inputDataTable = tEnv.fromDataStream(inputDataStream, schema);
+
+        AgglomerativeClustering agglomerativeClustering =
+                new AgglomerativeClustering()
+                        .setLinkage(AgglomerativeClusteringParams.LINKAGE_AVERAGE)
+                        .setDistanceMeasure(EuclideanDistanceMeasure.NAME)
+                        .setPredictionCol("pred")
+                        .setWindows(EventTimeTumblingWindows.of(Time.seconds(1)));
+
+        Table[] outputs = agglomerativeClustering.transform(inputDataTable);
+
+        List<Row> output = IteratorUtils.toList(tEnv.toDataStream(outputs[0]).executeAndCollect());
+        List<Set<DenseVector>> actualGroups =
+                KMeansTest.groupFeaturesByPrediction(
+                        output,
+                        agglomerativeClustering.getFeaturesCol(),
+                        agglomerativeClustering.getPredictionCol());
+
+        boolean isAllSubSet = true;
+        for (Set<DenseVector> expectedSet : EUCLIDEAN_WARD_EVENT_TIME_WINDOW_AS_TWO_RESULT) {
+            boolean isSubset = false;
+            for (Set<DenseVector> actualSet : actualGroups) {
+                if (actualSet.containsAll(expectedSet)) {
+                    isSubset = true;
+                    break;
+                }
+            }
+            isAllSubSet &= isSubset;
+        }
+        assertTrue(isAllSubSet);
     }
 
     @Test

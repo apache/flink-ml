@@ -21,6 +21,7 @@ package org.apache.flink.ml.clustering.agglomerativeclustering;
 import org.apache.flink.ml.common.param.HasDistanceMeasure;
 import org.apache.flink.ml.common.param.HasFeaturesCol;
 import org.apache.flink.ml.common.param.HasPredictionCol;
+import org.apache.flink.ml.common.param.HasWindows;
 import org.apache.flink.ml.param.BooleanParam;
 import org.apache.flink.ml.param.DoubleParam;
 import org.apache.flink.ml.param.IntParam;
@@ -34,7 +35,7 @@ import org.apache.flink.ml.param.StringParam;
  * @param <T> The class type of this instance.
  */
 public interface AgglomerativeClusteringParams<T>
-        extends HasDistanceMeasure<T>, HasFeaturesCol<T>, HasPredictionCol<T> {
+        extends HasDistanceMeasure<T>, HasFeaturesCol<T>, HasPredictionCol<T>, HasWindows<T> {
     Param<Integer> NUM_CLUSTERS =
             new IntParam("numClusters", "The max number of clusters to create.", 2);
 

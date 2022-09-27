@@ -19,7 +19,8 @@ from abc import ABC
 from typing import Tuple
 
 from pyflink.ml.core.param import WithParams, Param, ParamValidators, StringParam, IntParam, \
-    StringArrayParam, FloatParam
+    StringArrayParam, FloatParam, WindowsParam
+from pyflink.ml.core.windows import Windows, GlobalWindows
 
 
 class HasDistanceMeasure(WithParams, ABC):
@@ -513,3 +514,25 @@ class HasElasticNet(WithParams, ABC):
     @property
     def elastic_net(self):
         return self.get(self.ELASTIC_NET)
+
+
+class HasWindows(WithParams, ABC):
+    """
+    Base class for the shared windows param.
+    """
+    WINDOWS: Param[Windows] = WindowsParam(
+        "windows",
+        "Windowing strategy that determines how to create mini-batches from input data.",
+        GlobalWindows(),
+        ParamValidators.not_null())
+
+    def set_windows(self, value: Windows):
+        self.set(self.WINDOWS, value)
+        return self
+
+    def get_windows(self) -> Windows:
+        return self.get(self.WINDOWS)
+
+    @property
+    def windows(self):
+        return self.get(self.WINDOWS)
