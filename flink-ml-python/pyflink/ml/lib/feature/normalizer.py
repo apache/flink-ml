@@ -44,7 +44,7 @@ class _NormalizerParams(
     def set_p(self, value: float):
         return typing.cast(_NormalizerParams, self.set(self.P, value))
 
-    def get_p(self) -> bool:
+    def get_p(self) -> float:
         return self.get(self.P)
 
     @property
