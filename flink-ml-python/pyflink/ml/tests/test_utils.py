@@ -20,6 +20,7 @@ import os
 import shutil
 import tempfile
 import unittest
+import uuid
 
 from pyflink.common import RestartStrategies, Configuration
 from pyflink.datastream import StreamExecutionEnvironment
@@ -70,3 +71,16 @@ class PyFlinkMLTestCase(unittest.TestCase):
             FLINK_ML_LIB_SOURCE_PATH, "target", "flink-ml-lib-*-tests.jar"))[0]
 
         self.env.add_classpaths("file://{0}".format(ml_test_jar))
+
+    def save_and_reload(self, stage):
+        path = os.path.join(self.temp_dir, 'test_save_and_reload', str(uuid.uuid1()))
+        stage.save(path)
+        try:
+            self.env.execute('save_stage')
+        except Exception as e:
+            if "No operators defined in streaming topology." in str(e):
+                pass
+            else:
+                raise e
+        load_func = getattr(stage, 'load')
+        return load_func(self.t_env, path)
