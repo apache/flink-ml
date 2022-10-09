@@ -56,7 +56,8 @@ public class VectorAssemblerExample {
         VectorAssembler vectorAssembler =
                 new VectorAssembler()
                         .setInputCols("vec", "num", "sparseVec")
-                        .setOutputCol("assembledVec");
+                        .setOutputCol("assembledVec")
+                        .setInputSizes(2, 1, 5);
 
         // Uses the VectorAssembler object for feature transformations.
         Table outputTable = vectorAssembler.transform(inputTable)[0];
