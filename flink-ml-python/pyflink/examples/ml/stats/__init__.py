@@ -15,24 +15,3 @@
 #  See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
-
-import importlib
-import pkgutil
-
-from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
-
-
-class ExamplesTest(PyFlinkMLTestCase):
-    def test_examples(self):
-        self.execute_all_in_module('pyflink.examples.ml.classification')
-        self.execute_all_in_module('pyflink.examples.ml.clustering')
-        self.execute_all_in_module('pyflink.examples.ml.evaluation')
-        self.execute_all_in_module('pyflink.examples.ml.feature')
-        self.execute_all_in_module('pyflink.examples.ml.regression')
-        self.execute_all_in_module('pyflink.examples.ml.stats')
-
-    def execute_all_in_module(self, module):
-        module = importlib.import_module(module)
-        for importer, sub_modname, ispkg in pkgutil.iter_modules(module.__path__):
-            # importing an example module means executing the example.
-            importlib.import_module(module.__name__ + "." + sub_modname)

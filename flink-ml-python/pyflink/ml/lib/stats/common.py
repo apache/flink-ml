@@ -15,24 +15,34 @@
 #  See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
+from abc import ABC, abstractmethod
 
-import importlib
-import pkgutil
+from pyflink.ml.core.wrapper import JavaAlgoOperator
 
-from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
+JAVA_STATS_PACKAGE_NAME = "org.apache.flink.ml.stats"
 
 
-class ExamplesTest(PyFlinkMLTestCase):
-    def test_examples(self):
-        self.execute_all_in_module('pyflink.examples.ml.classification')
-        self.execute_all_in_module('pyflink.examples.ml.clustering')
-        self.execute_all_in_module('pyflink.examples.ml.evaluation')
-        self.execute_all_in_module('pyflink.examples.ml.feature')
-        self.execute_all_in_module('pyflink.examples.ml.regression')
-        self.execute_all_in_module('pyflink.examples.ml.stats')
+class JavaStatsAlgoOperator(JavaAlgoOperator, ABC):
+    """
+    Wrapper class for a Java Stats AlgoOperator.
+    """
 
-    def execute_all_in_module(self, module):
-        module = importlib.import_module(module)
-        for importer, sub_modname, ispkg in pkgutil.iter_modules(module.__path__):
-            # importing an example module means executing the example.
-            importlib.import_module(module.__name__ + "." + sub_modname)
+    def __init__(self, java_algo_operator):
+        super(JavaStatsAlgoOperator, self).__init__(java_algo_operator)
+
+    @classmethod
+    def _java_stage_path(cls) -> str:
+        return ".".join(
+            [JAVA_STATS_PACKAGE_NAME,
+             cls._java_algo_operator_package_name(),
+             cls._java_algo_operator_class_name()])
+
+    @classmethod
+    @abstractmethod
+    def _java_algo_operator_package_name(cls) -> str:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def _java_algo_operator_class_name(cls) -> str:
+        pass
