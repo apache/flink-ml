@@ -22,7 +22,7 @@ from py4j.java_gateway import JavaObject, get_java_class
 from pyflink.common import typeinfo, Time
 from pyflink.common.typeinfo import _from_java_type, TypeInformation, _is_instance_of
 from pyflink.java_gateway import get_gateway
-from pyflink.table import Table, StreamTableEnvironment
+from pyflink.table import Table, StreamTableEnvironment, Expression
 from pyflink.util.java_utils import to_jarray
 
 from pyflink.ml.core.api import Model, Transformer, AlgoOperator, Stage, Estimator
@@ -360,3 +360,12 @@ def _to_java_tables(*inputs: Table):
     """
     gateway = get_gateway()
     return to_jarray(gateway.jvm.org.apache.flink.table.api.Table, [t._j_table for t in inputs])
+
+
+def call_java_table_function(java_table_function_name: str, *args):
+    _function = get_gateway().jvm
+    for member_name in java_table_function_name.split('.'):
+        _function = _function.__getattr__(member_name)
+    return Expression(_function(to_jarray(
+        get_gateway().jvm.java.lang.Object,
+        [expression._j_expr for expression in args])))
