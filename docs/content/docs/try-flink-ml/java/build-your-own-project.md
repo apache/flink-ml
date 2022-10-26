@@ -28,43 +28,152 @@ under the License.
 
 This document provides a quick introduction to using Flink ML. Readers of this
 document will be guided to create a simple Flink job that trains a Machine
-Learning Model and use it to provide prediction service.
+Learning Model and uses it to provide prediction service.
 
-## Maven Setup
+## What Will You Be Building?
 
-In order to use Flink ML in a Maven project, add the following dependencies to
-`pom.xml`.
+Kmeans is a widely-used clustering algorithm and has been supported by Flink ML.
+This walkthrough guides you to create a Flink job with Flink ML that initializes
+and trains a Kmeans model, and finally uses it to predict the cluster id of
+certain data points.
 
-{{< artifact flink-ml-uber >}}
+## Prerequisites
 
-The example code provided in this document requires additional dependencies on
-the Flink Table API. In order to execute the example code successfully, please
-make sure the following dependencies also exist in `pom.xml`.
+This walkthrough assumes that you have some familiarity with Java, but you
+should be able to follow along even if you are coming from a different
+programming language.
+
+## Help, I’m Stuck!
+
+If you get stuck, check out the [community support
+resources](https://flink.apache.org/gettinghelp.html). In particular, Apache
+Flink's [user mailing
+list](https://flink.apache.org/community.html#mailing-lists) is consistently
+ranked as one of the most active of any Apache project and a great way to get
+help quickly.
+
+## How To Follow Along
+
+If you want to follow along, you will require a computer with:
+
+- Java 8
+- Maven 3
+
+{{< unstable >}}
+
+Before walking through the following sections of this document, make sure you
+have downloaded Flink ML's latest code and installed Flink ML's Java SDK in your
+local machine. You can refer to this [guideline]({{< ref
+"docs/development/build-and-install#build-and-install-java-sdk" >}}) for how to
+build and install Flink ML.
+
+{{< /unstable >}}
+
+While commands to be executed in a CLI are provided to walk through this example
+in the following steps, it is recommended to use an IDE, like IntelliJ IDEA, to
+manage, build and execute the example codes below.
+
+Please use the following command to create a Flink Maven Archetype that provides
+the basic skeleton of a project, with some necessary Flink dependencies.
+
+```shell
+$ mvn archetype:generate \
+    -DarchetypeGroupId=org.apache.flink \
+    -DarchetypeArtifactId=flink-quickstart-java \
+    -DarchetypeVersion=1.15.1 \
+    -DgroupId=kmeans-example \
+    -DartifactId=kmeans-example \
+    -Dversion=0.1 \
+    -Dpackage=myflinkml \
+    -DinteractiveMode=false
+```
+
+The command above would create a maven project named `kmeans-example` in your
+current directory with the following structure:
+
+```
+$ tree kmeans-example
+kmeans-example
+├── pom.xml
+└── src
+    └── main
+        ├── java
+        │   └── myflinkml
+        │       └── DataStreamJob.java
+        └── resources
+            └── log4j2.properties
+```
+
+Change the dependencies provided in `pom.xml` as follows:
 
 ```xml
+<dependency>
+  <groupId>org.apache.flink</groupId>
+  <artifactId>flink-ml-uber</artifactId>
+  <version>2.2-SNAPSHOT</version>
+  <scope>provided</scope>
+</dependency>
+
+<dependency>
+  <groupId>org.apache.flink</groupId>
+  <artifactId>flink-connector-files</artifactId>
+  <version>${flink.version}</version>
+  <scope>provided</scope>
+</dependency>
+
 <dependency>
   <groupId>org.apache.flink</groupId>
   <artifactId>flink-clients</artifactId>
-  <version>1.15.1</version>
+  <version>${flink.version}</version>
+  <scope>provided</scope>
 </dependency>
-```
 
-```xml
+<dependency>
+  <groupId>org.apache.flink</groupId>
+  <artifactId>flink-table-api-java-bridge</artifactId>
+  <version>${flink.version}</version>
+  <scope>provided</scope>
+</dependency>
+
+<dependency>
+  <groupId>org.apache.flink</groupId>
+  <artifactId>flink-table-runtime</artifactId>
+  <version>${flink.version}</version>
+  <scope>provided</scope>
+</dependency>		
+
 <dependency>
   <groupId>org.apache.flink</groupId>
   <artifactId>flink-table-planner-loader</artifactId>
-  <version>1.15.1</version>
+  <version>${flink.version}</version>
+  <scope>provided</scope>
+</dependency>
+
+<dependency>
+  <groupId>org.apache.flink</groupId>
+  <artifactId>statefun-flink-core</artifactId>
+  <version>3.2.0</version>
+  <exclusions>
+    <exclusion>
+      <groupId>org.apache.flink</groupId>
+      <artifactId>flink-streaming-java_2.12</artifactId>
+    </exclusion>
+    <exclusion>
+      <groupId>org.apache.flink</groupId>
+      <artifactId>flink-metrics-dropwizard</artifactId>
+    </exclusion>
+  </exclusions>
 </dependency>
 ```
 
-## Flink ML Example
-
-Kmeans is a widely-used clustering algorithm and has been supported by Flink ML.
-The example code below creates a Flink job with Flink ML that initializes and
-trains a Kmeans model, and finally uses it to predict the cluster id of certain
-data points.
+Create file `src/main/java/myflinkml/KMeansExample.java`, and save the following
+content into the file. You may feel free to ignore and delete
+`src/main/java/myflinkml/DataStreamJob.java` as it is not used in this
+walkthrough.
 
 ```java
+package myflinkml;
+
 import org.apache.flink.ml.clustering.kmeans.KMeans;
 import org.apache.flink.ml.clustering.kmeans.KMeansModel;
 import org.apache.flink.ml.linalg.DenseVector;
@@ -76,7 +185,7 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
-public class QuickStart {
+public class KMeansExample {
     public static void main(String[] args) {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
@@ -121,8 +230,25 @@ public class QuickStart {
 }
 ```
 
-After placing the code above into your Maven project and executing it,
-information like below will be printed out to your terminal window.
+After placing the code above into your Maven project, you may use the following
+command or your IDE to build and execute the example job.
+
+```shell
+cd kmeans-example/
+mvn clean package
+mvn exec:java -Dexec.mainClass="myflinkml.KMeansExample" -Dexec.classpathScope="compile"
+```
+
+If you are running the project in an IDE, you may get a
+`java.lang.NoClassDefFoundError` exception. This is probably because you do not
+have all required Flink dependencies implicitly loaded into the classpath.
+
+- IntelliJ IDEA: Go to Run > Edit Configurations > Modify options > Select
+  `include dependencies with "Provided" scope`. This run configuration will now
+  include all required classes to run the application from within the IDE.
+
+After executing the job, information like below will be printed out to your
+terminal window.
 
 ```
 Vector: [0.3, 0.0]	Cluster ID: 1
@@ -132,6 +258,12 @@ Vector: [0.0, 0.0]	Cluster ID: 1
 Vector: [0.0, 0.3]	Cluster ID: 1
 Vector: [9.0, 0.0]	Cluster ID: 0
 ```
+
+<!-- TODO: figure out why the process above does not terminate. -->
+The program might get stuck after printing out the information above, and you
+may need to enter ^C to terminate the process. This only happens when the
+program is executed locally and would not happen when the job is submitted to a
+Flink cluster.
 
 ## Breaking Down The Code
 
@@ -153,8 +285,8 @@ StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 ### Creating Training & Inference Data Table
 
 Then the program creates the Table containing data for the training and
-prediction process of the following Kmeans algorithm. Flink ML operators
-search the names of the columns of the input table for input data, and produce
+prediction process of the following Kmeans algorithm. Flink ML operators search
+the names of the columns of the input table for input data, and produce
 prediction results to designated column of the output Table.
 
 ```java

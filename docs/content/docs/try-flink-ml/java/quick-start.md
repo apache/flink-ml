@@ -28,20 +28,38 @@ under the License.
 
 This document provides a quick introduction to using Flink ML. Readers of this
 document will be guided to submit a simple Flink job that trains a Machine
-Learning Model and use it to provide prediction service.
+Learning Model and uses it to provide prediction service.
+
+## Help, I’m Stuck!
+
+If you get stuck, check out the [community support
+resources](https://flink.apache.org/gettinghelp.html). In particular, Apache
+Flink's [user mailing
+list](https://flink.apache.org/community.html#mailing-lists) is consistently
+ranked as one of the most active of any Apache project and a great way to get
+help quickly.
 
 ## Prerequisites
 
-### Install Flink
+Make sure Java 8 or a higher version has been installed in your local machine.
+To check the Java version installed, type in your terminal:
 
-Please make sure Flink 1.15 or higher version has been installed in your local
-environment. You can refer to the [local
-installation](https://nightlies.apache.org/flink/flink-docs-master/docs/try-flink/local_installation/)
-instruction on Flink's document website for how to achieve this.
+```shell
+$ java -version
+```
 
-### Set Up Flink Environment Variables
+## Download Flink
 
-After having installed Flink, please register `$FLINK_HOME` as an environment
+[Download 1.15 or a higher version of
+Flink](https://flink.apache.org/downloads.html), then extract the archive:
+
+```shell
+$ tar -xzf flink-*.tgz
+```
+
+## Set Up Flink Environment Variables
+
+After having downloaded Flink, please register `$FLINK_HOME` as an environment
 variable into your local environment.
 
 ```bash
@@ -49,30 +67,42 @@ cd ${path_to_flink}
 export FLINK_HOME=`pwd`
 ```
 
+## Add Flink ML library to Flink's library folder
 
-[//]: # (TODO: Add instructions to download binary distribution when release is
-    available)
-### Build Flink ML library
+You need to copy Flink ML's library files to Flink's folder for proper
+initialization. 
 
-In order to use Flink ML's CLI you need to have the latest binary distribution
-of Flink ML. You can acquire the distribution by building Flink ML's source code
-locally with the following command.
+{{< stable >}}
 
-```bash
-cd ${path_to_flink_ml}
-mvn clean package -DskipTests
-cd ./flink-ml-dist/target/flink-ml-*-bin/flink-ml*/
+Please [download the correponding binary
+release](https://flink.apache.org/downloads.html) of Flink ML, then extract the
+archive:
+
+```shell
+tar -xzf flink-ml-*.tgz
 ```
 
-### Add Flink ML binaries to Flink
+Then you may copy the extracted library files to Flink's folder with the
+following commands.
 
-You need to copy Flink ML's binary distribution files to Flink's folder for
-proper initialization. Please run the following command from Flink ML's binary
-distribution's folder.
-
-```bash
+```shell
+cd ${path_to_flink_ml}
 cp ./lib/*.jar $FLINK_HOME/lib/
 ```
+
+{{< /stable >}} {{< unstable >}}
+
+Please walk through this [guideline]({{< ref
+"docs/development/build-and-install#build-and-install-java-sdk" >}}) to build
+Flink ML's Java SDK. After that, you may copy the generated library files to
+Flink's folder with the following commands.
+
+```shell
+cd ${path_to_flink_ml}
+cp ./flink-ml-dist/target/flink-ml-*-bin/flink-ml*/lib/*.jar $FLINK_HOME/lib/
+```
+
+{{< /unstable >}}
 
 ## Run Flink ML example job
 
