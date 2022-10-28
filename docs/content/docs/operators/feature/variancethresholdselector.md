@@ -34,9 +34,9 @@ variance 0 (i.e. features that have the same value in all samples) will be remov
 
 ### Input Columns
 
-| Param name  | Type   | Default      | Description     |
-|:------------|:-------|:-------------|:----------------|
-| featuresCol | Vector | `"features"` | Feature vector. |
+| Param name  | Type   | Default   | Description     |
+|:------------|:-------|:----------|:----------------|
+| inputCol    | Vector | `"input"` | Input features. |
 
 ### Output Columns
 
@@ -46,11 +46,19 @@ variance 0 (i.e. features that have the same value in all samples) will be remov
 
 ### Parameters
 
+Below are the parameters required by `VarianceThresholdSelectorModel`.
+
+| Key        | Default    | Type   | Required | Description           |
+|------------|------------|--------|----------|-----------------------|
+| inputCol   | `"input"`  | String | no       | Input column name.    |
+| outputCol  | `"output"` | String | no       | Output column name.   |
+
+`VarianceThresholdSelector` needs parameters above and also below.
+
 | Key               | Default      | Type   | Required | Description                                                               |
 |-------------------|--------------|--------|----------|---------------------------------------------------------------------------|
-| featuresCol       | `"features"` | String | no       | Features column name.                                                     |
-| outputCol         | `"output"`   | String | no       | Output column name.                                                       |
 | varianceThreshold | `0.0`        | Double | no       | Features with a variance not greater than this threshold will be removed. |
+
 
 ### Examples
 
@@ -89,14 +97,14 @@ public class VarianceThresholdSelectorExample {
                         Row.of(4, Vectors.dense(1.0, 9.0, 8.0, 5.0, 7.0, 4.0)),
                         Row.of(5, Vectors.dense(9.0, 8.0, 6.0, 5.0, 4.0, 4.0)),
                         Row.of(6, Vectors.dense(6.0, 9.0, 7.0, 0.0, 2.0, 0.0)));
-        Table trainTable = tEnv.fromDataStream(trainStream).as("id", "features");
+        Table trainTable = tEnv.fromDataStream(trainStream).as("id", "input");
 
         // Create a VarianceThresholdSelector object and initialize its parameters
         double threshold = 8.0;
         VarianceThresholdSelector varianceThresholdSelector =
                 new VarianceThresholdSelector()
                         .setVarianceThreshold(threshold)
-                        .setFeaturesCol("features");
+                        .setInputCol("input");
 
         // Train the VarianceThresholdSelector model.
         VarianceThresholdSelectorModel model = varianceThresholdSelector.fit(trainTable);
@@ -109,11 +117,10 @@ public class VarianceThresholdSelectorExample {
         for (CloseableIterator<Row> it = outputTable.execute().collect(); it.hasNext(); ) {
             Row row = it.next();
             DenseVector inputValue =
-                    (DenseVector) row.getField(varianceThresholdSelector.getFeaturesCol());
+                    (DenseVector) row.getField(varianceThresholdSelector.getInputCol());
             DenseVector outputValue =
                     (DenseVector) row.getField(varianceThresholdSelector.getOutputCol());
-            System.out.printf(
-                    "Original Features: %-15s\tSelected Features: %s\n", inputValue, outputValue);
+            System.out.printf("Input Values: %-15s\tOutput Values: %s\n", inputValue, outputValue);
         }
     }
 }
@@ -151,14 +158,14 @@ train_data = t_env.from_data_stream(
         (6, Vectors.dense(6.0, 9.0, 7.0, 0.0, 2.0, 0.0),),
     ],
         type_info=Types.ROW_NAMED(
-            ['id', 'features'],
+            ['id', 'input'],
             [Types.INT(), DenseVectorTypeInfo()])
     ))
 
 # create a VarianceThresholdSelector object and initialize its parameters
 threshold = 8.0
 variance_thread_selector = VarianceThresholdSelector()\
-    .set_features_col("features")\
+    .set_input_col("input")\
     .set_variance_threshold(threshold)
 
 # train the VarianceThresholdSelector model
@@ -171,9 +178,9 @@ output = model.transform(train_data)[0]
 print("Variance Threshold: " + str(threshold))
 field_names = output.get_schema().get_field_names()
 for result in t_env.to_data_stream(output).execute_and_collect():
-    input_value = result[field_names.index(variance_thread_selector.get_features_col())]
+    input_value = result[field_names.index(variance_thread_selector.get_input_col())]
     output_value = result[field_names.index(variance_thread_selector.get_output_col())]
-    print('Original Features: ' + str(input_value) + ' \tSelected Features: ' + str(output_value))
+    print('Input Values: ' + str(input_value) + ' \tOutput Values: ' + str(output_value))
 
 ```
 

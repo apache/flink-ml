@@ -18,12 +18,18 @@
 
 package org.apache.flink.ml.common.param;
 
+import org.apache.flink.ml.api.Stage;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.param.ParamValidators;
 import org.apache.flink.ml.param.StringParam;
 import org.apache.flink.ml.param.WithParams;
 
-/** Interface for the shared featuresCol param. */
+/**
+ * Interface for the shared featuresCol param.
+ *
+ * <p>{@link HasFeaturesCol} is typically used for {@link Stage}s that implement {@link
+ * HasLabelCol}. It is preferred to use {@link HasInputCol} for other cases.
+ */
 public interface HasFeaturesCol<T> extends WithParams<T> {
     Param<String> FEATURES_COL =
             new StringParam(

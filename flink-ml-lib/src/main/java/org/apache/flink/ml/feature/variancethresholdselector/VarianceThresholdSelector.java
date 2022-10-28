@@ -60,14 +60,14 @@ public class VarianceThresholdSelector
     @Override
     public VarianceThresholdSelectorModel fit(Table... inputs) {
         Preconditions.checkArgument(inputs.length == 1);
-        final String featuresCol = getFeaturesCol();
+        final String inputCol = getInputCol();
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
         DataStream<DenseVector> inputData =
                 tEnv.toDataStream(inputs[0])
                         .map(
                                 (MapFunction<Row, DenseVector>)
-                                        value -> ((Vector) value.getField(featuresCol)).toDense());
+                                        value -> ((Vector) value.getField(inputCol)).toDense());
 
         DataStream<VarianceThresholdSelectorModelData> modelData =
                 DataStreamUtils.aggregate(

@@ -38,7 +38,7 @@ class VarianceThresholdSelectorTest(PyFlinkMLTestCase):
                 (6, Vectors.dense(6.0, 9.0, 7.0, 0.0, 2.0, 0.0),),
             ],
                 type_info=Types.ROW_NAMED(
-                    ['id', 'features'],
+                    ['id', 'input'],
                     [Types.INT(), DenseVectorTypeInfo()])
             ))
 
@@ -48,7 +48,7 @@ class VarianceThresholdSelectorTest(PyFlinkMLTestCase):
                 (Vectors.dense(0.1, 0.2, 0.3, 0.4, 0.5, 0.6),),
             ],
                 type_info=Types.ROW_NAMED(
-                    ['features'],
+                    ['input'],
                     [DenseVectorTypeInfo()])
             ))
         self.expected_output = [
@@ -57,13 +57,15 @@ class VarianceThresholdSelectorTest(PyFlinkMLTestCase):
 
     def test_param(self):
         variance_threshold_selector = VarianceThresholdSelector()
-        self.assertEqual("features", variance_threshold_selector.features_col)
+        self.assertEqual("input", variance_threshold_selector.input_col)
         self.assertEqual("output", variance_threshold_selector.output_col)
         self.assertEqual(0.0, variance_threshold_selector.variance_threshold)
 
-        variance_threshold_selector.set_output_col("test_output")\
-            .set_variance_threshold(8.0)
-        self.assertEqual("features", variance_threshold_selector.features_col)
+        variance_threshold_selector.\
+            set_input_col("test_input").\
+            set_output_col("test_output").\
+            set_variance_threshold(8.0)
+        self.assertEqual("test_input", variance_threshold_selector.input_col)
         self.assertEqual("test_output", variance_threshold_selector.output_col)
         self.assertEqual(8.0, variance_threshold_selector.variance_threshold)
 
@@ -99,7 +101,7 @@ class VarianceThresholdSelectorTest(PyFlinkMLTestCase):
                 (Vectors.dense(0.1, 0.2, 0.3, 0.4, 0.5),),
             ],
                 type_info=Types.ROW_NAMED(
-                    ['features'],
+                    ['input'],
                     [DenseVectorTypeInfo()])
             ))
         with self.assertRaisesRegex(Exception, 'but VarianceThresholdSelector is expecting'):

@@ -48,14 +48,14 @@ public class VarianceThresholdSelectorExample {
                         Row.of(4, Vectors.dense(1.0, 9.0, 8.0, 5.0, 7.0, 4.0)),
                         Row.of(5, Vectors.dense(9.0, 8.0, 6.0, 5.0, 4.0, 4.0)),
                         Row.of(6, Vectors.dense(6.0, 9.0, 7.0, 0.0, 2.0, 0.0)));
-        Table trainTable = tEnv.fromDataStream(trainStream).as("id", "features");
+        Table trainTable = tEnv.fromDataStream(trainStream).as("id", "input");
 
         // Create a VarianceThresholdSelector object and initialize its parameters
         double threshold = 8.0;
         VarianceThresholdSelector varianceThresholdSelector =
                 new VarianceThresholdSelector()
                         .setVarianceThreshold(threshold)
-                        .setFeaturesCol("features");
+                        .setInputCol("input");
 
         // Train the VarianceThresholdSelector model.
         VarianceThresholdSelectorModel model = varianceThresholdSelector.fit(trainTable);
@@ -68,11 +68,10 @@ public class VarianceThresholdSelectorExample {
         for (CloseableIterator<Row> it = outputTable.execute().collect(); it.hasNext(); ) {
             Row row = it.next();
             DenseVector inputValue =
-                    (DenseVector) row.getField(varianceThresholdSelector.getFeaturesCol());
+                    (DenseVector) row.getField(varianceThresholdSelector.getInputCol());
             DenseVector outputValue =
                     (DenseVector) row.getField(varianceThresholdSelector.getOutputCol());
-            System.out.printf(
-                    "Original Features: %-15s\tSelected Features: %s\n", inputValue, outputValue);
+            System.out.printf("Input Values: %-15s\tOutput Values: %s\n", inputValue, outputValue);
         }
     }
 }

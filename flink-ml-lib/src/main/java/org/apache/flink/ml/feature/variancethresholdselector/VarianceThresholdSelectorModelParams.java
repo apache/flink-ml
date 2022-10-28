@@ -18,7 +18,7 @@
 
 package org.apache.flink.ml.feature.variancethresholdselector;
 
-import org.apache.flink.ml.common.param.HasFeaturesCol;
+import org.apache.flink.ml.common.param.HasInputCol;
 import org.apache.flink.ml.common.param.HasOutputCol;
 
 /**
@@ -26,5 +26,4 @@ import org.apache.flink.ml.common.param.HasOutputCol;
  *
  * @param <T> The class type of this instance.
  */
-public interface VarianceThresholdSelectorModelParams<T>
-        extends HasFeaturesCol<T>, HasOutputCol<T> {}
+public interface VarianceThresholdSelectorModelParams<T> extends HasInputCol<T>, HasOutputCol<T> {}

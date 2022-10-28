@@ -93,8 +93,8 @@ public class VarianceThresholdSelectorTest extends AbstractTestBase {
         env.setRestartStrategy(RestartStrategies.noRestart());
         tEnv = StreamTableEnvironment.create(env);
 
-        trainDataTable = tEnv.fromDataStream(env.fromCollection(TRAIN_DATA)).as("id", "features");
-        predictDataTable = tEnv.fromDataStream(env.fromCollection(PREDICT_DATA)).as("features");
+        trainDataTable = tEnv.fromDataStream(env.fromCollection(TRAIN_DATA)).as("id", "input");
+        predictDataTable = tEnv.fromDataStream(env.fromCollection(PREDICT_DATA)).as("input");
     }
 
     private static void verifyPredictionResult(
@@ -113,15 +113,15 @@ public class VarianceThresholdSelectorTest extends AbstractTestBase {
     @Test
     public void testParam() {
         VarianceThresholdSelector varianceThresholdSelector = new VarianceThresholdSelector();
-        assertEquals("features", varianceThresholdSelector.getFeaturesCol());
+        assertEquals("input", varianceThresholdSelector.getInputCol());
         assertEquals("output", varianceThresholdSelector.getOutputCol());
         assertEquals(0.0, varianceThresholdSelector.getVarianceThreshold(), EPS);
 
         varianceThresholdSelector
-                .setFeaturesCol("test_feature")
+                .setInputCol("test_input")
                 .setOutputCol("test_output")
                 .setVarianceThreshold(0.5);
-        assertEquals("test_feature", varianceThresholdSelector.getFeaturesCol());
+        assertEquals("test_input", varianceThresholdSelector.getInputCol());
         assertEquals(0.5, varianceThresholdSelector.getVarianceThreshold(), EPS);
         assertEquals("test_output", varianceThresholdSelector.getOutputCol());
     }
@@ -129,11 +129,11 @@ public class VarianceThresholdSelectorTest extends AbstractTestBase {
     @Test
     public void testOutputSchema() {
         VarianceThresholdSelector varianceThresholdSelector =
-                new VarianceThresholdSelector().setOutputCol("output").setVarianceThreshold(0.5);
+                new VarianceThresholdSelector().setVarianceThreshold(0.5);
         VarianceThresholdSelectorModel model = varianceThresholdSelector.fit(trainDataTable);
         Table output = model.transform(trainDataTable)[0];
         assertEquals(
-                Arrays.asList("id", "features", "output"),
+                Arrays.asList("id", "input", "output"),
                 output.getResolvedSchema().getColumnNames());
     }
 
@@ -163,7 +163,7 @@ public class VarianceThresholdSelectorTest extends AbstractTestBase {
     public void testInputTypeConversion() throws Exception {
         trainDataTable =
                 TestUtils.convertDataTypesToSparseInt(
-                        tEnv, trainDataTable.select(Expressions.$("features")));
+                        tEnv, trainDataTable.select(Expressions.$("input")));
         predictDataTable = TestUtils.convertDataTypesToSparseInt(tEnv, predictDataTable);
         assertArrayEquals(
                 new Class<?>[] {SparseVector.class}, TestUtils.getColumnDataTypes(trainDataTable));
@@ -172,9 +172,7 @@ public class VarianceThresholdSelectorTest extends AbstractTestBase {
                 TestUtils.getColumnDataTypes(predictDataTable));
 
         VarianceThresholdSelector varianceThresholdSelector =
-                new VarianceThresholdSelector()
-                        .setFeaturesCol("features")
-                        .setVarianceThreshold(8.0);
+                new VarianceThresholdSelector().setVarianceThreshold(8.0);
         VarianceThresholdSelectorModel model = varianceThresholdSelector.fit(trainDataTable);
         Table output = model.transform(predictDataTable)[0];
         verifyPredictionResult(output, varianceThresholdSelector.getOutputCol(), EXPECTED_OUTPUT);
@@ -183,9 +181,7 @@ public class VarianceThresholdSelectorTest extends AbstractTestBase {
     @Test
     public void testSaveLoadAndPredict() throws Exception {
         VarianceThresholdSelector varianceThresholdSelector =
-                new VarianceThresholdSelector()
-                        .setFeaturesCol("features")
-                        .setVarianceThreshold(8.0);
+                new VarianceThresholdSelector().setVarianceThreshold(8.0);
         VarianceThresholdSelector loadedVarianceThresholdSelector =
                 TestUtils.saveAndReload(
                         tEnv, varianceThresholdSelector, tempFolder.newFolder().getAbsolutePath());
@@ -203,7 +199,7 @@ public class VarianceThresholdSelectorTest extends AbstractTestBase {
     public void testFitOnEmptyData() {
         Table emptyTable =
                 tEnv.fromDataStream(env.fromCollection(TRAIN_DATA).filter(x -> x.getArity() == 0))
-                        .as("id", "features");
+                        .as("id", "input");
         VarianceThresholdSelector varianceThresholdSelector = new VarianceThresholdSelector();
         VarianceThresholdSelectorModel model = varianceThresholdSelector.fit(emptyTable);
         Table modelDataTable = model.getModelData()[0];
@@ -227,7 +223,7 @@ public class VarianceThresholdSelectorTest extends AbstractTestBase {
                         Arrays.asList(
                                 Row.of(Vectors.dense(1.0, 2.0, 3.0, 4.0)),
                                 Row.of(Vectors.dense(0.1, 0.2, 0.3, 0.4))));
-        Table predictTable = tEnv.fromDataStream(env.fromCollection(predictData)).as("features");
+        Table predictTable = tEnv.fromDataStream(env.fromCollection(predictData)).as("input");
         Table output = model.transform(predictTable)[0];
         try {
             output.execute().print();
@@ -243,9 +239,7 @@ public class VarianceThresholdSelectorTest extends AbstractTestBase {
     @Test
     public void testGetModelData() throws Exception {
         VarianceThresholdSelector varianceThresholdSelector =
-                new VarianceThresholdSelector()
-                        .setFeaturesCol("features")
-                        .setVarianceThreshold(8.0);
+                new VarianceThresholdSelector().setVarianceThreshold(8.0);
         VarianceThresholdSelectorModel model = varianceThresholdSelector.fit(trainDataTable);
         Table modelData = model.getModelData()[0];
         assertEquals(
@@ -265,9 +259,7 @@ public class VarianceThresholdSelectorTest extends AbstractTestBase {
     @Test
     public void testSetModelData() throws Exception {
         VarianceThresholdSelector varianceThresholdSelector =
-                new VarianceThresholdSelector()
-                        .setFeaturesCol("features")
-                        .setVarianceThreshold(8.0);
+                new VarianceThresholdSelector().setVarianceThreshold(8.0);
         VarianceThresholdSelectorModel modelA = varianceThresholdSelector.fit(trainDataTable);
 
         Table modelData = modelA.getModelData()[0];
