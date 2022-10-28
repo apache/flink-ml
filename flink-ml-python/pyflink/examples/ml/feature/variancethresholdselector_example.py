@@ -42,14 +42,14 @@ train_data = t_env.from_data_stream(
         (6, Vectors.dense(6.0, 9.0, 7.0, 0.0, 2.0, 0.0),),
     ],
         type_info=Types.ROW_NAMED(
-            ['id', 'features'],
+            ['id', 'input'],
             [Types.INT(), DenseVectorTypeInfo()])
     ))
 
 # create a VarianceThresholdSelector object and initialize its parameters
 threshold = 8.0
 variance_thread_selector = VarianceThresholdSelector()\
-    .set_features_col("features")\
+    .set_input_col("input")\
     .set_variance_threshold(threshold)
 
 # train the VarianceThresholdSelector model
@@ -62,6 +62,6 @@ output = model.transform(train_data)[0]
 print("Variance Threshold: " + str(threshold))
 field_names = output.get_schema().get_field_names()
 for result in t_env.to_data_stream(output).execute_and_collect():
-    input_value = result[field_names.index(variance_thread_selector.get_features_col())]
+    input_value = result[field_names.index(variance_thread_selector.get_input_col())]
     output_value = result[field_names.index(variance_thread_selector.get_output_col())]
-    print('Original Features: ' + str(input_value) + ' \tSelected Features: ' + str(output_value))
+    print('Input Values: ' + str(input_value) + ' \tOutput Values: ' + str(output_value))

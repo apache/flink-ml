@@ -20,14 +20,23 @@ import typing
 from pyflink.ml.core.param import Param, FloatParam, ParamValidators
 from pyflink.ml.core.wrapper import JavaWithParams
 from pyflink.ml.lib.feature.common import JavaFeatureModel, JavaFeatureEstimator
-from pyflink.ml.lib.param import HasFeaturesCol, HasOutputCol
+from pyflink.ml.lib.param import HasInputCol, HasOutputCol
 
 
-class _VarianceThresholdSelectorParams(
+class _VarianceThresholdSelectorModelParams(
     JavaWithParams,
-    HasFeaturesCol,
+    HasInputCol,
     HasOutputCol
 ):
+    """
+    Params for :class:`VarianceThresholdSelectorModel`.
+    """
+
+    def __init__(self, java_params):
+        super(_VarianceThresholdSelectorModelParams, self).__init__(java_params)
+
+
+class _VarianceThresholdSelectorParams(_VarianceThresholdSelectorModelParams):
     """
     Params for :class:`VarianceThresholdSelector`.
     """
@@ -53,7 +62,7 @@ class _VarianceThresholdSelectorParams(
         return self.get_variance_threshold()
 
 
-class VarianceThresholdSelectorModel(JavaFeatureModel, _VarianceThresholdSelectorParams):
+class VarianceThresholdSelectorModel(JavaFeatureModel, _VarianceThresholdSelectorModelParams):
     """
     A Model which transforms data using the model data
     computed by :class:`VarianceThresholdSelector`.

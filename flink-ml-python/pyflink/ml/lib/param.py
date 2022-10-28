@@ -47,6 +47,9 @@ class HasDistanceMeasure(WithParams, ABC):
 class HasFeaturesCol(WithParams, ABC):
     """
     Base class for the shared feature_col param.
+
+    `HasFeaturesCol` is typically used for `Stage`s that implement `HasLabelCol`. It is preferred
+    to use `HasInputCol` for other cases.
     """
     FEATURES_COL: Param[str] = StringParam(
         "features_col",

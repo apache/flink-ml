@@ -119,7 +119,7 @@ public class VarianceThresholdSelectorModel
                         inputList -> {
                             DataStream input = inputList.get(0);
                             return input.map(
-                                    new PredictOutputFunction(getFeaturesCol(), broadcastModelKey),
+                                    new PredictOutputFunction(getInputCol(), broadcastModelKey),
                                     outputTypeInfo);
                         });
 
@@ -129,13 +129,13 @@ public class VarianceThresholdSelectorModel
     /** This operator loads model data and predicts result. */
     private static class PredictOutputFunction extends RichMapFunction<Row, Row> {
 
-        private final String featureCol;
+        private final String inputCol;
         private final String broadcastKey;
         private int expectedNumOfFeatures;
         private int[] indices = null;
 
-        public PredictOutputFunction(String featureCol, String broadcastKey) {
-            this.featureCol = featureCol;
+        public PredictOutputFunction(String inputCol, String broadcastKey) {
+            this.inputCol = inputCol;
             this.broadcastKey = broadcastKey;
         }
 
@@ -149,11 +149,11 @@ public class VarianceThresholdSelectorModel
                 indices = varianceThresholdSelectorModelData.indices;
             }
 
-            DenseVector inputVec = ((Vector) row.getField(featureCol)).toDense();
+            DenseVector inputVec = ((Vector) row.getField(inputCol)).toDense();
             Preconditions.checkArgument(
                     inputVec.size() == expectedNumOfFeatures,
                     "%s has %s features, but VarianceThresholdSelector is expecting %s features as input.",
-                    featureCol,
+                    inputCol,
                     inputVec.size(),
                     expectedNumOfFeatures);
             if (indices.length == 0) {
