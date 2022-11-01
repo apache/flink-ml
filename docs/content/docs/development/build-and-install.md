@@ -1,9 +1,9 @@
 ---
-title: "Building Flink ML from Source"
+title: "Building And Installing Flink ML From Source"
 weight: 999
 type: docs
 aliases:
-- /development/building.html
+- /development/build-and-install.html
 
 ---
 
@@ -26,11 +26,11 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Building Flink ML from Source
+# Building And Installing Flink ML From Source
 
-This page covers how to build Flink ML from sources.
+This page covers how to build and install Flink ML from sources.
 
-## Build Flink ML Java SDK
+## Build and Install Java SDK
 
 In order to build Flink ML you need the source code. Either [download the source
 of a release](https://flink.apache.org/downloads.html) or [clone the git
@@ -52,7 +52,7 @@ mvn clean install -DskipTests
 ```
 
 This instructs [Maven](http://maven.apache.org/) (`mvn`) to first remove all
-existing builds (`clean`) and then create a new Flink binary (`install`).
+existing builds (`clean`) and then create a new Flink ML binary (`install`).
 
 After the build finishes, you can acquire the build result in the following path
 from the root directory of Flink ML:
@@ -61,7 +61,11 @@ from the root directory of Flink ML:
 ./flink-ml-dist/target/flink-ml-*-bin/flink-ml*/
 ```
 
-## Build Flink ML Python SDK
+The `mvn clean install` command would have installed the binary into your local
+Maven repository so other projects can refer to it and grab it from the
+repository. There is no additional step required for installation.
+
+## Build and Install Python SDK
 
 ### Prerequisites
 
