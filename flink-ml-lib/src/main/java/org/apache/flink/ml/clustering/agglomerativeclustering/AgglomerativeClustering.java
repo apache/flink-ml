@@ -258,12 +258,12 @@ public class AgglomerativeClustering
         private void doClustering(
                 List<Cluster> activeClusters,
                 ProcessAllWindowFunction<Row, Row, ?>.Context context) {
-            int clusterOffset1 = -1, clusterOffset2 = -1;
             boolean clusteringRunning =
                     (numCluster != null && activeClusters.size() > numCluster)
                             || (distanceThreshold != null);
 
             while (clusteringRunning || (computeFullTree && activeClusters.size() > 1)) {
+                int clusterOffset1 = -1, clusterOffset2 = -1;
                 // Computes the distance between two clusters.
                 double minDistance = Double.MAX_VALUE;
                 for (int i = 0; i < activeClusters.size(); i++) {
@@ -309,7 +309,9 @@ public class AgglomerativeClustering
 
                 clusteringRunning =
                         (numCluster != null && activeClusters.size() > numCluster)
-                                || (distanceThreshold != null && distanceThreshold > minDistance);
+                                || (distanceThreshold != null
+                                        && distanceThreshold > minDistance
+                                        && activeClusters.size() > 1);
             }
         }
 
