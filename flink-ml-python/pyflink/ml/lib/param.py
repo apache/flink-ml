@@ -539,3 +539,24 @@ class HasWindows(WithParams, ABC):
     @property
     def windows(self):
         return self.get(self.WINDOWS)
+
+
+class HasRelativeError(WithParams, ABC):
+    """
+    Interface for shared param relativeError.
+    """
+    RELATIVE_ERROR: Param[float] = FloatParam(
+        "relative_error",
+        "The relative target precision for the approximate quantile algorithm.",
+        0.001,
+        ParamValidators.in_range(0.0, 1.0))
+
+    def set_relative_error(self, value: float):
+        return self.set(self.RELATIVE_ERROR, value)
+
+    def get_relative_error(self) -> float:
+        return self.get(self.RELATIVE_ERROR)
+
+    @property
+    def relative_error(self):
+        return self.get(self.RELATIVE_ERROR)

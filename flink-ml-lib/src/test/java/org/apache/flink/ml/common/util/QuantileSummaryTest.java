@@ -76,7 +76,10 @@ public class QuantileSummaryTest {
                                         + Arrays.stream(data).filter(x -> x < approx).count())
                                 / 2.0);
         double lower = Math.floor((percentile - summary.getRelativeError()) * data.length);
-        double upper = Math.ceil((percentile + summary.getRelativeError()) * data.length);
+        double upper =
+                summary.getRelativeError() == 0
+                        ? Math.ceil((percentile + summary.getRelativeError()) * data.length) + 1
+                        : Math.ceil((percentile + summary.getRelativeError()) * data.length);
         String errMessage =
                 String.format(
                         "Rank not in [%s, %s], percentile: %s, approx returned: %s",
@@ -109,6 +112,15 @@ public class QuantileSummaryTest {
     public void testQuantiles() {
         for (double[] data : datasets) {
             QuantileSummary summary = buildSummary(data, 0.001);
+            double[] percentiles = {0, 0.01, 0.1, 0.25, 0.75, 0.5, 0.9, 0.99, 1};
+            checkQuantiles(data, percentiles, summary);
+        }
+    }
+
+    @Test
+    public void testNoRelativeError() {
+        for (double[] data : datasets) {
+            QuantileSummary summary = buildSummary(data, 0.0);
             double[] percentiles = {0, 0.01, 0.1, 0.25, 0.75, 0.5, 0.9, 0.99, 1};
             checkQuantiles(data, percentiles, summary);
         }

@@ -102,8 +102,8 @@ public class QuantileSummary implements Serializable {
             long count,
             boolean compressed) {
         Preconditions.checkArgument(
-                relativeError > 0 && relativeError < 1,
-                "An appropriate relative error must lay between 0 and 1.");
+                relativeError >= 0 && relativeError <= 1,
+                "An appropriate relative error must be in the range [0, 1].");
         Preconditions.checkArgument(
                 compressThreshold > 0, "An compress threshold must greater than 0.");
         this.relativeError = relativeError;
