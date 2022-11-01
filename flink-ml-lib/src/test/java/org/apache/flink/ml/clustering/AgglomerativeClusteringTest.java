@@ -240,6 +240,23 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
     }
 
     @Test
+    public void testLargeDistanceThreshold() throws Exception {
+        AgglomerativeClustering agglomerativeClustering =
+                new AgglomerativeClustering()
+                        .setNumClusters(null)
+                        .setDistanceThreshold(Double.MAX_VALUE);
+        Table output = agglomerativeClustering.transform(inputDataTable)[0];
+        HashSet<Integer> clusterIds = new HashSet<>();
+        tEnv.toDataStream(output)
+                .executeAndCollect()
+                .forEachRemaining(
+                        x ->
+                                clusterIds.add(
+                                        x.getFieldAs(agglomerativeClustering.getPredictionCol())));
+        assertEquals(1, clusterIds.size());
+    }
+
+    @Test
     public void testTransformWithCountTumblingWindows() throws Exception {
         env.setParallelism(1);
 
