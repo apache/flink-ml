@@ -55,6 +55,13 @@ public class DistanceMeasureTest {
     }
 
     @Test
+    public void testEuclideanOfIdenticalVectors() {
+        VectorWithNorm vector = new VectorWithNorm(Vectors.dense(3.0, 3.0));
+        DistanceMeasure distanceMeasure = EuclideanDistanceMeasure.getInstance();
+        assertEquals(0, distanceMeasure.distance(vector, vector));
+    }
+
+    @Test
     public void testManhattan() {
         DistanceMeasure distanceMeasure = ManhattanDistanceMeasure.getInstance();
         assertEquals(
