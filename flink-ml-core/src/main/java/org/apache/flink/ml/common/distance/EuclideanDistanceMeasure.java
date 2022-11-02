@@ -39,7 +39,14 @@ public class EuclideanDistanceMeasure implements DistanceMeasure {
     }
 
     private double distanceSquare(VectorWithNorm v1, VectorWithNorm v2) {
-        return v1.l2Norm * v1.l2Norm + v2.l2Norm * v2.l2Norm - 2.0 * BLAS.dot(v1.vector, v2.vector);
+        // Computing the distance square between two vectors that are close enough might result in
+        // a negative value, due to the loss of data accuracy. A Math.max helps to guarantee that
+        // a non-negative value is returned.
+        return Math.max(
+                0.0,
+                v1.l2Norm * v1.l2Norm
+                        + v2.l2Norm * v2.l2Norm
+                        - 2.0 * BLAS.dot(v1.vector, v2.vector));
     }
 
     @Override
