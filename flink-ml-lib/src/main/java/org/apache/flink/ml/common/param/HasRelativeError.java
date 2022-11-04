@@ -16,29 +16,27 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.param;
+package org.apache.flink.ml.common.param;
 
-import java.io.IOException;
+import org.apache.flink.ml.param.DoubleParam;
+import org.apache.flink.ml.param.Param;
+import org.apache.flink.ml.param.ParamValidators;
+import org.apache.flink.ml.param.WithParams;
 
-/** Class for the float parameter. */
-public class FloatParam extends Param<Float> {
+/** Interface for shared param relativeError. */
+public interface HasRelativeError<T> extends WithParams<T> {
+    Param<Double> RELATIVE_ERROR =
+            new DoubleParam(
+                    "relativeError",
+                    "The relative target precision for the approximate quantile algorithm.",
+                    0.001,
+                    ParamValidators.inRange(0, 1));
 
-    public FloatParam(
-            String name, String description, Float defaultValue, ParamValidator<Float> validator) {
-        super(name, Float.class, description, defaultValue, validator);
+    default double getRelativeError() {
+        return get(RELATIVE_ERROR);
     }
 
-    public FloatParam(String name, String description, Float defaultValue) {
-        this(name, description, defaultValue, ParamValidators.alwaysTrue());
-    }
-
-    @Override
-    public Float jsonDecode(Object json) throws IOException {
-        if (json instanceof Double) {
-            return ((Double) json).floatValue();
-        } else if (json instanceof String) {
-            return Float.valueOf((String) json);
-        }
-        return (Float) json;
+    default T setFeaturesCol(double value) {
+        return set(RELATIVE_ERROR, value);
     }
 }

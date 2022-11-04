@@ -22,7 +22,7 @@ from pyflink.ml.core.param import Param
 from pyflink.ml.lib.param import HasDistanceMeasure, HasFeaturesCol, HasGlobalBatchSize, \
     HasHandleInvalid, HasInputCols, HasLabelCol, HasLearningRate, HasMaxIter, HasMultiClass, \
     HasOutputCols, HasPredictionCol, HasRawPredictionCol, HasReg, HasSeed, HasTol, HasWeightCol, \
-    HasWindows
+    HasWindows, HasRelativeError
 
 from pyflink.ml.core.windows import GlobalWindows, CountTumblingWindows
 
@@ -30,7 +30,7 @@ from pyflink.ml.core.windows import GlobalWindows, CountTumblingWindows
 class TestParams(HasDistanceMeasure, HasFeaturesCol, HasGlobalBatchSize, HasHandleInvalid,
                  HasInputCols, HasLabelCol, HasLearningRate, HasMaxIter, HasMultiClass,
                  HasOutputCols, HasPredictionCol, HasRawPredictionCol, HasReg, HasSeed, HasTol,
-                 HasWeightCol, HasWindows):
+                 HasWeightCol, HasWindows, HasRelativeError):
     def __init__(self):
         self._param_map = {}
 
@@ -215,3 +215,15 @@ class ParamTests(unittest.TestCase):
 
         param.set_windows(CountTumblingWindows.of(100))
         self.assertEqual(param.get_windows(), CountTumblingWindows.of(100))
+
+    def test_relative_error(self):
+        param = TestParams()
+        relative_error = param.RELATIVE_ERROR
+        self.assertEqual(relative_error.name, "relative_error")
+        self.assertEqual(relative_error.description,
+                         "The relative target precision for the approximate"
+                         " quantile algorithm.")
+        self.assertEqual(relative_error.default_value, 0.001)
+
+        param.set_relative_error(0.1)
+        self.assertEqual(param.get_relative_error(), 0.1)
