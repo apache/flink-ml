@@ -36,6 +36,8 @@ public class FloatParam extends Param<Float> {
     public Float jsonDecode(Object json) throws IOException {
         if (json instanceof Double) {
             return ((Double) json).floatValue();
+        } else if (json instanceof String) {
+            return Float.valueOf((String) json);
         }
         return (Float) json;
     }

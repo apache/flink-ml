@@ -88,8 +88,14 @@ public class StageTest {
         Param<Float> FLOAT_PARAM =
                 new FloatParam("floatParam", "Description", 3.0f, ParamValidators.lt(100));
 
+        Param<Float> SPECIAL_FLOAT_PARAM =
+                new FloatParam("specialFloatParam", "Description", Float.NaN);
+
         Param<Double> DOUBLE_PARAM =
                 new DoubleParam("doubleParam", "Description", 4.0, ParamValidators.lt(100));
+
+        Param<Double> SPECIAL_DOUBLE_PARAM =
+                new DoubleParam("specialDoubleParam", "Description", Double.NaN);
 
         Param<String> STRING_PARAM = new StringParam("stringParam", "Description", "5");
 
@@ -447,6 +453,36 @@ public class StageTest {
         Assert.assertEquals(
                 EventTimeSessionWindows.withGap(Time.milliseconds(100)),
                 loadedStage.get(MyParams.WINDOWS_PARAM));
+    }
+
+    @Test
+    public void testSaveLoadWithSpecialParams() throws IOException {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+        MyStage stage = new MyStage();
+        stage.set(stage.paramWithNullDefault, 1);
+
+        stage.set(MyParams.SPECIAL_FLOAT_PARAM, Float.NaN);
+        stage.set(MyParams.SPECIAL_DOUBLE_PARAM, Double.NaN);
+        Stage<?> loadedStage = validateStageSaveLoad(tEnv, stage, Collections.emptyMap());
+        Assert.assertEquals(Float.NaN, loadedStage.get(MyParams.SPECIAL_FLOAT_PARAM), 0.0001);
+        Assert.assertEquals(Double.NaN, loadedStage.get(MyParams.SPECIAL_DOUBLE_PARAM), 0.0001);
+
+        stage.set(MyParams.SPECIAL_FLOAT_PARAM, Float.POSITIVE_INFINITY);
+        stage.set(MyParams.SPECIAL_DOUBLE_PARAM, Double.POSITIVE_INFINITY);
+        loadedStage = validateStageSaveLoad(tEnv, stage, Collections.emptyMap());
+        Assert.assertEquals(
+                Float.POSITIVE_INFINITY, loadedStage.get(MyParams.SPECIAL_FLOAT_PARAM), 0.0001);
+        Assert.assertEquals(
+                Double.POSITIVE_INFINITY, loadedStage.get(MyParams.SPECIAL_DOUBLE_PARAM), 0.0001);
+
+        stage.set(MyParams.SPECIAL_FLOAT_PARAM, Float.NEGATIVE_INFINITY);
+        stage.set(MyParams.SPECIAL_DOUBLE_PARAM, Double.NEGATIVE_INFINITY);
+        loadedStage = validateStageSaveLoad(tEnv, stage, Collections.emptyMap());
+        Assert.assertEquals(
+                Float.NEGATIVE_INFINITY, loadedStage.get(MyParams.SPECIAL_FLOAT_PARAM), 0.0001);
+        Assert.assertEquals(
+                Double.NEGATIVE_INFINITY, loadedStage.get(MyParams.SPECIAL_DOUBLE_PARAM), 0.0001);
     }
 
     @Test
