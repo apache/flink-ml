@@ -113,7 +113,8 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
     private static final List<Set<DenseVector>> EUCLIDEAN_WARD_THRESHOLD_AS_TWO_RESULT =
             Arrays.asList(
                     new HashSet<>(Arrays.asList(Vectors.dense(1, 1), Vectors.dense(1, 0))),
-                    new HashSet<>(Arrays.asList(Vectors.dense(1, 4), Vectors.dense(4, 4))),
+                    new HashSet<>(Collections.singletonList(Vectors.dense(1, 4))),
+                    new HashSet<>(Collections.singletonList(Vectors.dense(4, 4))),
                     new HashSet<>(Arrays.asList(Vectors.dense(4, 1.5), Vectors.dense(4, 0))));
 
     private static final List<Set<DenseVector>> EUCLIDEAN_WARD_COUNT_FIVE_WINDOW_AS_TWO_RESULT =
@@ -131,6 +132,16 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
                     new HashSet<>(Collections.singletonList(Vectors.dense(1, 4))),
                     new HashSet<>(Arrays.asList(Vectors.dense(4, 0), Vectors.dense(4, 1.5))),
                     new HashSet<>(Collections.singletonList(Vectors.dense(4, 4))));
+
+    private static final List<Set<DenseVector>> EUCLIDEAN_AVERAGE_NUM_CLUSTERS_AS_TWO_RESULT =
+            Arrays.asList(
+                    new HashSet<>(
+                            Arrays.asList(
+                                    Vectors.dense(1, 1),
+                                    Vectors.dense(1, 0),
+                                    Vectors.dense(4, 1.5),
+                                    Vectors.dense(4, 0))),
+                    new HashSet<>(Arrays.asList(Vectors.dense(1, 4), Vectors.dense(4, 4))));
 
     private static final double TOLERANCE = 1e-7;
 
@@ -206,11 +217,11 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
         Table[] outputs;
         AgglomerativeClustering agglomerativeClustering =
                 new AgglomerativeClustering()
-                        .setLinkage(AgglomerativeClusteringParams.LINKAGE_AVERAGE)
+                        .setLinkage(AgglomerativeClusteringParams.LINKAGE_WARD)
                         .setDistanceMeasure(EuclideanDistanceMeasure.NAME)
                         .setPredictionCol("pred");
 
-        // Tests euclidean distance with linkage as average, numClusters = 2.
+        // Tests euclidean distance with linkage as ward, numClusters = 2.
         outputs = agglomerativeClustering.transform(inputDataTable);
         verifyClusteringResult(
                 EUCLIDEAN_WARD_NUM_CLUSTERS_AS_TWO_RESULT,
@@ -218,7 +229,7 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
                 agglomerativeClustering.getFeaturesCol(),
                 agglomerativeClustering.getPredictionCol());
 
-        // Tests euclidean distance with linkage as average, numClusters = 2, compute_full_tree =
+        // Tests euclidean distance with linkage as ward, numClusters = 2, compute_full_tree =
         // true.
         outputs = agglomerativeClustering.setComputeFullTree(true).transform(inputDataTable);
         verifyClusteringResult(
@@ -227,7 +238,7 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
                 agglomerativeClustering.getFeaturesCol(),
                 agglomerativeClustering.getPredictionCol());
 
-        // Tests euclidean distance with linkage as average, distance_threshold = 2.
+        // Tests euclidean distance with linkage as ward, distance_threshold = 2.
         outputs =
                 agglomerativeClustering
                         .setNumClusters(null)
@@ -236,6 +247,23 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
         verifyClusteringResult(
                 EUCLIDEAN_WARD_THRESHOLD_AS_TWO_RESULT,
                 outputs[0],
+                agglomerativeClustering.getFeaturesCol(),
+                agglomerativeClustering.getPredictionCol());
+    }
+
+    @Test
+    public void testTransformWithAverageLinkage() throws Exception {
+        AgglomerativeClustering agglomerativeClustering =
+                new AgglomerativeClustering()
+                        .setLinkage(AgglomerativeClusteringParams.LINKAGE_AVERAGE)
+                        .setDistanceMeasure(EuclideanDistanceMeasure.NAME)
+                        .setNumClusters(2)
+                        .setPredictionCol("pred");
+
+        Table output = agglomerativeClustering.transform(inputDataTable)[0];
+        verifyClusteringResult(
+                EUCLIDEAN_AVERAGE_NUM_CLUSTERS_AS_TWO_RESULT,
+                output,
                 agglomerativeClustering.getFeaturesCol(),
                 agglomerativeClustering.getPredictionCol());
     }
@@ -266,7 +294,7 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
 
         AgglomerativeClustering agglomerativeClustering =
                 new AgglomerativeClustering()
-                        .setLinkage(AgglomerativeClusteringParams.LINKAGE_AVERAGE)
+                        .setLinkage(AgglomerativeClusteringParams.LINKAGE_WARD)
                         .setDistanceMeasure(EuclideanDistanceMeasure.NAME)
                         .setPredictionCol("pred")
                         .setWindows(CountTumblingWindows.of(5));
@@ -304,7 +332,7 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
 
         AgglomerativeClustering agglomerativeClustering =
                 new AgglomerativeClustering()
-                        .setLinkage(AgglomerativeClusteringParams.LINKAGE_AVERAGE)
+                        .setLinkage(AgglomerativeClusteringParams.LINKAGE_WARD)
                         .setDistanceMeasure(EuclideanDistanceMeasure.NAME)
                         .setPredictionCol("pred")
                         .setWindows(EventTimeTumblingWindows.of(Time.seconds(1)));
@@ -388,7 +416,7 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
     public void testSaveLoadTransform() throws Exception {
         AgglomerativeClustering agglomerativeClustering =
                 new AgglomerativeClustering()
-                        .setLinkage(AgglomerativeClusteringParams.LINKAGE_AVERAGE)
+                        .setLinkage(AgglomerativeClusteringParams.LINKAGE_WARD)
                         .setDistanceMeasure(EuclideanDistanceMeasure.NAME)
                         .setPredictionCol("pred");
 
