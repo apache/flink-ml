@@ -64,6 +64,7 @@ class NormalizerTest(PyFlinkMLTestCase):
 
         self.assertEqual("intput_vec", normalizer.get_input_col())
         self.assertEqual(1.5, normalizer.get_p())
+        self.assertEqual(float, type(normalizer.get_p()))
         self.assertEqual('output_vec', normalizer.get_output_col())
 
     def test_save_load_transform(self):
