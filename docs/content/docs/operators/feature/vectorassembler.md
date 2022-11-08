@@ -26,10 +26,20 @@ under the License.
 -->
 
 ## Vector Assembler
-
-Vector Assembler combines a given list of input columns into a vector column.
-Types of input columns must be either vector or numerical value.
-
+A Transformer which combines a given list of input columns into a vector column. Input columns
+would be numerical or vectors whose sizes are specified by the {@link #INPUT_SIZES} parameter.
+Invalid input data with null values or values with wrong sizes would be dealt with according to
+the strategy specified by the {@link HasHandleInvalid} parameter as follows:
+<ul>
+   <li>keep: If the input column data is null, a vector would be created with the specified size
+       and NaN values. The vector would be used in the assembling process to represent the input
+       column data. If the input column data is a vector, the data would be used in the assembling
+       process even if it has a wrong size.
+   <li>skip: If the input column data is null or a vector with wrong size, the input row would be
+       filtered out and not be sent to downstream operators.
+   <li>error: If the input column data is null or a vector with wrong size, an exception would be
+       thrown.
+</ul>
 ### Input Columns
 
 | Param name | Type          | Default | Description                     |
@@ -44,11 +54,12 @@ Types of input columns must be either vector or numerical value.
 
 ### Parameters
 
-| Key           | Default    | Type     | Required | Description                                                                    |
-|---------------|------------|----------|----------|--------------------------------------------------------------------------------|
-| inputCols     | `null`     | String[] | yes      | Input column names.                                                            |
-| outputCol     | `"output"` | String   | no       | Output column name.                                                            |
-| handleInvalid | `"error"`  | String   | no       | Strategy to handle invalid entries. Supported values: 'error', 'skip', 'keep'. |
+| Key             | Default    | Type      | Required | Description                                                                    |
+|-----------------|------------|-----------|----------|--------------------------------------------------------------------------------|
+| inputCols       | `null`     | String[]  | yes      | Input column names.                                                            |
+| outputCol       | `"output"` | String    | no       | Output column name.                                                            |
+| inputSizes      | `null`     | Integer[] | yes      | Sizes of the input elements to be assembled.                                   |
+| handleInvalid   | `"error"`  | String    | no       | Strategy to handle invalid entries. Supported values: 'error', 'skip', 'keep'. |
 
 ### Examples
 
@@ -95,7 +106,8 @@ public class VectorAssemblerExample {
         VectorAssembler vectorAssembler =
                 new VectorAssembler()
                         .setInputCols("vec", "num", "sparseVec")
-                        .setOutputCol("assembledVec");
+                        .setOutputCol("assembledVec")
+                        .setInputSizes(2, 1, 5);
 
         // Uses the VectorAssembler object for feature transformations.
         Table outputTable = vectorAssembler.transform(inputTable)[0];
@@ -159,9 +171,10 @@ input_data_table = t_env.from_data_stream(
 vector_assembler = VectorAssembler() \
     .set_input_cols('vec', 'num', 'sparse_vec') \
     .set_output_col('assembled_vec') \
+    .set_input_sizes(2, 1, 5) \
     .set_handle_invalid('keep')
 
-# use the vector assembler model for feature engineering
+# use the vector assembler for feature engineering
 output = vector_assembler.transform(input_data_table)[0]
 
 # extract and display the results

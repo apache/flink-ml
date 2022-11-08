@@ -55,16 +55,19 @@ class VectorAssemblerTest(PyFlinkMLTestCase):
 
         vector_assembler.set_input_cols('vec', 'num', 'sparse_vec') \
             .set_output_col('assembled_vec') \
+            .set_input_sizes(2, 1, 5) \
             .set_handle_invalid('skip')
 
         self.assertEqual(('vec', 'num', 'sparse_vec'), vector_assembler.input_cols)
-        self.assertEqual('skip', vector_assembler.handle_invalid)
         self.assertEqual('assembled_vec', vector_assembler.output_col)
+        self.assertEqual((2, 1, 5), vector_assembler.input_sizes)
+        self.assertEqual('skip', vector_assembler.handle_invalid)
 
     def test_save_load_transform(self):
         vector_assembler = VectorAssembler() \
             .set_input_cols('vec', 'num', 'sparse_vec') \
             .set_output_col('assembled_vec') \
+            .set_input_sizes(2, 1, 5) \
             .set_handle_invalid('keep')
 
         path = os.path.join(self.temp_dir, 'test_save_load_transform_vector_assembler')

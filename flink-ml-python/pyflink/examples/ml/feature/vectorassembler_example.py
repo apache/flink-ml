@@ -50,6 +50,7 @@ input_data_table = t_env.from_data_stream(
 vector_assembler = VectorAssembler() \
     .set_input_cols('vec', 'num', 'sparse_vec') \
     .set_output_col('assembled_vec') \
+    .set_input_sizes(2, 1, 5) \
     .set_handle_invalid('keep')
 
 # use the vector assembler for feature engineering
