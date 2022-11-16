@@ -65,7 +65,7 @@ under the License.
   <properties>
     <flink.shaded.version>15.0</flink.shaded.version>
     <jackson.version>2.12.4</jackson.version>
-    <jackson-databind.version>2.12.6.1</jackson-databind.version>
+    <jackson-databind.version>2.12.7.1</jackson-databind.version>
     <target.java.version>1.8</target.java.version>
     <spotless.version>2.4.2</spotless.version>
     <slf4j.version>1.7.36</slf4j.version>
