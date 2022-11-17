@@ -175,9 +175,16 @@ public class ImputerTest extends AbstractTestBase {
         assertEquals(Double.NaN, imputer.getMissingValue(), EPS);
         assertEquals(0.001, imputer.getRelativeError(), EPS);
 
-        imputer.setMissingValue(0.0).setStrategy(MEDIAN);
+        imputer.setMissingValue(0.0)
+                .setStrategy(MEDIAN)
+                .setRelativeError(0.1)
+                .setInputCols("f1", "f2")
+                .setOutputCols("o1", "o2");
         assertEquals(MEDIAN, imputer.getStrategy());
         assertEquals(0.0, imputer.getMissingValue(), EPS);
+        assertEquals(0.1, imputer.getRelativeError(), EPS);
+        assertArrayEquals(new String[] {"f1", "f2"}, imputer.getInputCols());
+        assertArrayEquals(new String[] {"o1", "o2"}, imputer.getOutputCols());
     }
 
     @Test
