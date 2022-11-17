@@ -22,9 +22,11 @@ import tempfile
 import unittest
 import uuid
 
+from py4j.java_gateway import JavaObject
 from pyflink.common import RestartStrategies, Configuration
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.java_gateway import get_gateway
+from pyflink.ml import add_jars_to_context_class_loader
 from pyflink.table import StreamTableEnvironment
 from pyflink.util.java_utils import get_j_env_configuration
 
@@ -37,10 +39,30 @@ def update_existing_params(target: JavaWithParams, source: JavaWithParams):
 
 
 class PyFlinkMLTestCase(unittest.TestCase):
+    resource: JavaObject
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._load_dependency_jars()
+
+        gateway = get_gateway()
+        mini_cluster_resource_configuration = (
+            gateway.jvm.org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration
+            .Builder()
+            .setNumberTaskManagers(4)
+            .setNumberSlotsPerTaskManager(1)
+            .setRpcServiceSharing(
+                get_gateway().jvm.org.apache.flink.runtime.minicluster.RpcServiceSharing.DEDICATED)
+            .withHaLeadershipControl()
+            .build())
+        cls.resource = (
+            get_gateway().jvm.org.apache.flink.test.util.
+            MiniClusterWithClientResource(mini_cluster_resource_configuration))
+        cls.resource.before()
+
     def setUp(self):
         self.env = StreamExecutionEnvironment.get_execution_environment()
         self.env.get_config().enable_object_reuse()
-        self._load_dependency_jars()
         config = Configuration(
             j_configuration=get_j_env_configuration(self.env._j_stream_execution_environment))
         config.set_boolean("execution.checkpointing.checkpoints-after-tasks-finish.enabled", True)
@@ -54,7 +76,12 @@ class PyFlinkMLTestCase(unittest.TestCase):
     def tearDown(self) -> None:
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    def _load_dependency_jars(self):
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.resource.after()
+
+    @classmethod
+    def _load_dependency_jars(cls):
         from pyflink.ml.version import __version__
 
         flink_version = __version__.replace(".dev0", "-SNAPSHOT")
@@ -70,7 +97,7 @@ class PyFlinkMLTestCase(unittest.TestCase):
 
         for file in os.listdir(FLINK_ML_LIB_PATH):
             if file.endswith('.jar'):
-                self.env.add_classpaths("file://{0}/{1}".format(FLINK_ML_LIB_PATH, file))
+                add_jars_to_context_class_loader(["file://{0}/{1}".format(FLINK_ML_LIB_PATH, file)])
 
         # load flink-ml-lib/flink-ml-lib-*-tests.jar
         FLINK_ML_LIB_SOURCE_PATH = os.path.abspath(os.path.join(
@@ -79,7 +106,13 @@ class PyFlinkMLTestCase(unittest.TestCase):
         ml_test_jar = glob.glob(os.path.join(
             FLINK_ML_LIB_SOURCE_PATH, "target", "flink-ml-lib-*-tests.jar"))[0]
 
-        self.env.add_classpaths("file://{0}".format(ml_test_jar))
+        add_jars_to_context_class_loader(["file://{0}".format(ml_test_jar)])
+
+        # load test utility jars.
+        test_util_jars = glob.glob(os.path.join(
+            this_directory, "../../../target/test-dependencies", "*.jar"))
+
+        add_jars_to_context_class_loader(["file://{0}".format(x) for x in test_util_jars])
 
     def save_and_reload(self, stage):
         path = os.path.join(self.temp_dir, 'test_save_and_reload', str(uuid.uuid1()))
