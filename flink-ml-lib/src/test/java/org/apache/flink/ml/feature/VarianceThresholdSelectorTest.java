@@ -128,12 +128,15 @@ public class VarianceThresholdSelectorTest extends AbstractTestBase {
 
     @Test
     public void testOutputSchema() {
+        Table tempTable = trainDataTable.as("id", "test_input");
         VarianceThresholdSelector varianceThresholdSelector =
-                new VarianceThresholdSelector().setVarianceThreshold(0.5);
-        VarianceThresholdSelectorModel model = varianceThresholdSelector.fit(trainDataTable);
-        Table output = model.transform(trainDataTable)[0];
+                new VarianceThresholdSelector()
+                        .setInputCol("test_input")
+                        .setOutputCol("test_output");
+        VarianceThresholdSelectorModel model = varianceThresholdSelector.fit(tempTable);
+        Table output = model.transform(tempTable)[0];
         assertEquals(
-                Arrays.asList("id", "input", "output"),
+                Arrays.asList("id", "test_input", "test_output"),
                 output.getResolvedSchema().getColumnNames());
     }
 

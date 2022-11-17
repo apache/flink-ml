@@ -36,7 +36,7 @@ public interface HasRelativeError<T> extends WithParams<T> {
         return get(RELATIVE_ERROR);
     }
 
-    default T setFeaturesCol(double value) {
+    default T setRelativeError(double value) {
         return set(RELATIVE_ERROR, value);
     }
 }
