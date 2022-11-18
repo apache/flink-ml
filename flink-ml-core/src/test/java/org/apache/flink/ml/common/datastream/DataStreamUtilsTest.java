@@ -87,6 +87,27 @@ public class DataStreamUtilsTest {
     }
 
     @Test
+    public void testAggregateWithNonNeutralInitialAccumulator() throws Exception {
+        DataStream<Long> dataStream =
+                env.fromParallelCollection(new NumberSequenceIterator(0L, 19L), Types.LONG);
+        DataStream<String> result =
+                DataStreamUtils.aggregate(
+                        dataStream, new TestAggregateFuncWithNonNeutralInitialAccumulator());
+        List<String> stringSum = IteratorUtils.toList(result.executeAndCollect());
+        assertEquals(1, stringSum.size());
+        assertEquals(Integer.toString(190 + env.getParallelism()), stringSum.get(0));
+
+        env.setParallelism(env.getParallelism() + 1);
+        dataStream = env.fromParallelCollection(new NumberSequenceIterator(0L, 19L), Types.LONG);
+        result =
+                DataStreamUtils.aggregate(
+                        dataStream, new TestAggregateFuncWithNonNeutralInitialAccumulator());
+        stringSum = IteratorUtils.toList(result.executeAndCollect());
+        assertEquals(1, stringSum.size());
+        assertEquals(Integer.toString(190 + env.getParallelism()), stringSum.get(0));
+    }
+
+    @Test
     public void testGenerateBatchData() throws Exception {
         DataStream<Long> dataStream =
                 env.fromParallelCollection(new NumberSequenceIterator(0L, 19L), Types.LONG);
@@ -131,6 +152,17 @@ public class DataStreamUtilsTest {
         @Override
         public Long merge(Long acc1, Long acc2) {
             return acc1 + acc2;
+        }
+    }
+
+    /**
+     * An extension for {@link TestAggregateFunc} that provides a non-neutral initial accumulator.
+     */
+    private static class TestAggregateFuncWithNonNeutralInitialAccumulator
+            extends TestAggregateFunc {
+        @Override
+        public Long createAccumulator() {
+            return 1L;
         }
     }
 }

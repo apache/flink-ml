@@ -134,15 +134,22 @@ public class DataStreamUtils {
     }
 
     /**
-     * Applies an {@link AggregateFunction} on a bounded stream. The output stream contains the
-     * aggregated result and its parallelism is one.
+     * Aggregates the elements in each partition of the input bounded stream, and then merges the
+     * partial results of all partitions. The output stream contains the aggregated result and its
+     * parallelism is one.
+     *
+     * <p>Note: If the parallelism of the input stream is N, this method would invoke {@link
+     * AggregateFunction#createAccumulator()} N times and {@link AggregateFunction#merge(Object,
+     * Object)} N - 1 times. Thus the initial accumulator should be neutral (e.g. empty list for
+     * list concatenation or `0` for summation), otherwise the aggregation result would be affected
+     * by the parallelism of the input stream.
      *
      * @param input The input data stream.
      * @param func The user defined aggregate function.
-     * @return The result data stream.
      * @param <IN> The class type of the input.
      * @param <ACC> The class type of the accumulated values.
      * @param <OUT> The class type of the output values.
+     * @return The result data stream.
      */
     public static <IN, ACC, OUT> DataStream<OUT> aggregate(
             DataStream<IN> input, AggregateFunction<IN, ACC, OUT> func) {
@@ -460,7 +467,9 @@ public class DataStreamUtils {
         public void snapshotState(StateSnapshotContext context) throws Exception {
             super.snapshotState(context);
             accState.clear();
-            accState.add(acc);
+            if (acc != null) {
+                accState.add(acc);
+            }
         }
     }
 
