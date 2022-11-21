@@ -20,8 +20,8 @@ from typing import List
 import numpy as np
 from pyflink.table import Table
 from pyflink.common import Types, Row
-from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
-from pyflink.ml.lib.feature.imputer import Imputer
+from pyflink.ml.tests.test_utils import PyFlinkMLTestCase, update_existing_params
+from pyflink.ml.lib.feature.imputer import Imputer, ImputerModel
 
 
 class ImputerTest(PyFlinkMLTestCase):
@@ -106,6 +106,32 @@ class ImputerTest(PyFlinkMLTestCase):
             field_names = output.get_schema().get_field_names()
             self.verify_output_result(
                 output, imputer.get_output_cols(), field_names, expected_output)
+
+    def test_get_model_data(self):
+        imputer = Imputer().\
+            set_input_cols('f1', 'f2', 'f3').\
+            set_output_cols('o1', 'o2', 'o3')
+        model = imputer.fit(self.train_table)
+        model_data = model.get_model_data()[0]
+        expected_field_names = ['surrogates']
+        self.assertEqual(expected_field_names, model_data.get_schema().get_field_names())
+
+        # TODO: Add test to collect and verify the model data results after FLINK-30124 is resolved.
+
+    def test_set_model_data(self):
+        imputer = Imputer().\
+            set_input_cols('f1', 'f2', 'f3').\
+            set_output_cols('o1', 'o2', 'o3')
+        model_a = imputer.fit(self.train_table)
+        model_data = model_a.get_model_data()[0]
+
+        model_b = ImputerModel().set_model_data(model_data)
+        update_existing_params(model_b, model_a)
+
+        output = model_b.transform(self.train_table)[0]
+        field_names = output.get_schema().get_field_names()
+        self.verify_output_result(
+            output, imputer.get_output_cols(), field_names, self.expected_mean_strategy_output)
 
     def test_save_load_predict(self):
         imputer = Imputer(). \

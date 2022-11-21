@@ -21,8 +21,8 @@ from pyflink.common import Types
 from pyflink.table import Table
 
 from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo, DenseVector
-from pyflink.ml.lib.feature.maxabsscaler import MaxAbsScaler
-from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
+from pyflink.ml.lib.feature.maxabsscaler import MaxAbsScaler, MaxAbsScalerModel
+from pyflink.ml.tests.test_utils import PyFlinkMLTestCase, update_existing_params
 
 
 class MaxAbsScalerTest(PyFlinkMLTestCase):
@@ -55,32 +55,72 @@ class MaxAbsScalerTest(PyFlinkMLTestCase):
             Vectors.dense(0.75, 0.225)]
 
     def test_param(self):
-        max_abs_scalar = MaxAbsScaler()
-        self.assertEqual("input", max_abs_scalar.input_col)
-        self.assertEqual("output", max_abs_scalar.output_col)
-        max_abs_scalar.set_input_col('test_input') \
+        max_abs_scaler = MaxAbsScaler()
+        self.assertEqual("input", max_abs_scaler.input_col)
+        self.assertEqual("output", max_abs_scaler.output_col)
+        max_abs_scaler.set_input_col('test_input') \
             .set_output_col('test_output')
-        self.assertEqual('test_input', max_abs_scalar.input_col)
-        self.assertEqual('test_output', max_abs_scalar.output_col)
+        self.assertEqual('test_input', max_abs_scaler.input_col)
+        self.assertEqual('test_output', max_abs_scaler.output_col)
 
     def test_output_schema(self):
-        max_abs_scalar = MaxAbsScaler() \
+        max_abs_scaler = MaxAbsScaler() \
             .set_input_col('test_input') \
             .set_output_col('test_output')
 
-        model = max_abs_scalar.fit(self.train_data.alias('test_input'))
+        model = max_abs_scaler.fit(self.train_data.alias('test_input'))
         output = model.transform(self.predict_data.alias('test_input'))[0]
         self.assertEqual(
             ['test_input', 'test_output'],
             output.get_schema().get_field_names())
 
     def test_fit_and_predict(self):
-        max_abs_scalar = MaxAbsScaler()
-        model = max_abs_scalar.fit(self.train_data)
+        max_abs_scaler = MaxAbsScaler()
+        model = max_abs_scaler.fit(self.train_data)
         output = model.transform(self.predict_data)[0]
         self.verify_output_result(
             output,
-            max_abs_scalar.get_output_col(),
+            max_abs_scaler.get_output_col(),
+            output.get_schema().get_field_names(),
+            self.expected_data)
+
+    def test_get_model_data(self):
+        max_abs_scaler = MaxAbsScaler()
+        model = max_abs_scaler.fit(self.train_data)
+        model_data = model.get_model_data()[0]
+        expected_field_names = ['maxVector']
+        self.assertEqual(expected_field_names, model_data.get_schema().get_field_names())
+
+        model_rows = [result for result in
+                      self.t_env.to_data_stream(model_data).execute_and_collect()]
+        self.assertEqual(1, len(model_rows))
+        self.assertListAlmostEqual([200.0, 400.0],
+                                   model_rows[0][expected_field_names.index('maxVector')])
+
+    def test_set_model_data(self):
+        max_abs_scaler = MaxAbsScaler()
+        model_a = max_abs_scaler.fit(self.train_data)
+        model_data = model_a.get_model_data()[0]
+
+        model_b = MaxAbsScalerModel().set_model_data(model_data)
+        update_existing_params(model_b, model_a)
+
+        output = model_b.transform(self.predict_data)[0]
+        self.verify_output_result(
+            output,
+            max_abs_scaler.get_output_col(),
+            output.get_schema().get_field_names(),
+            self.expected_data)
+
+    def test_save_load_and_predict(self):
+        max_abs_scaler = MaxAbsScaler()
+        reloaded_max_abs_scaler = self.save_and_reload(max_abs_scaler)
+        model = reloaded_max_abs_scaler.fit(self.train_data)
+        reloaded_model = self.save_and_reload(model)
+        output = reloaded_model.transform(self.predict_data)[0]
+        self.verify_output_result(
+            output,
+            max_abs_scaler.get_output_col(),
             output.get_schema().get_field_names(),
             self.expected_data)
 

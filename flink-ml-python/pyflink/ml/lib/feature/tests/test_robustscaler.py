@@ -18,11 +18,11 @@
 from typing import List
 
 from pyflink.common import Types
-from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
+from pyflink.ml.tests.test_utils import PyFlinkMLTestCase, update_existing_params
 
 from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo, DenseVector
 
-from pyflink.ml.lib.feature.robustscaler import RobustScaler
+from pyflink.ml.lib.feature.robustscaler import RobustScaler, RobustScalerModel
 from pyflink.table import Table
 
 
@@ -102,6 +102,36 @@ class RobustScalerTest(PyFlinkMLTestCase):
         robust_scaler = RobustScaler()
         model = robust_scaler.fit(self.train_table)
         output = model.transform(self.predict_table)[0]
+        self.verify_output_result(
+            output,
+            robust_scaler.get_output_col(),
+            output.get_schema().get_field_names(),
+            self.expected_output)
+
+    def test_get_model_data(self):
+        robust_scaler = RobustScaler()
+        model = robust_scaler.fit(self.train_table)
+        model_data = model.get_model_data()[0]
+        expected_field_names = ['medians', 'ranges']
+        self.assertEqual(expected_field_names, model_data.get_schema().get_field_names())
+
+        model_rows = [result for result in
+                      self.t_env.to_data_stream(model_data).execute_and_collect()]
+        self.assertEqual(1, len(model_rows))
+        self.assertListAlmostEqual(
+            [4.0, -4.0], model_rows[0][expected_field_names.index('medians')])
+        self.assertListAlmostEqual(
+            [4.0, 4.0], model_rows[0][expected_field_names.index('ranges')])
+
+    def test_set_model_data(self):
+        robust_scaler = RobustScaler()
+        model_a = robust_scaler.fit(self.train_table)
+        model_data = model_a.get_model_data()[0]
+
+        model_b = RobustScalerModel().set_model_data(model_data)
+        update_existing_params(model_b, model_a)
+
+        output = model_b.transform(self.predict_table)[0]
         self.verify_output_result(
             output,
             robust_scaler.get_output_col(),

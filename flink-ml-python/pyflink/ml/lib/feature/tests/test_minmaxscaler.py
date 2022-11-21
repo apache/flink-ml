@@ -21,8 +21,8 @@ from pyflink.common import Types
 from pyflink.table import Table
 
 from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo, DenseVector
-from pyflink.ml.lib.feature.minmaxscaler import MinMaxScaler
-from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
+from pyflink.ml.lib.feature.minmaxscaler import MinMaxScaler, MinMaxScalerModel
+from pyflink.ml.tests.test_utils import PyFlinkMLTestCase, update_existing_params
 
 
 class MinMaxScalerTest(PyFlinkMLTestCase):
@@ -55,28 +55,28 @@ class MinMaxScalerTest(PyFlinkMLTestCase):
             Vectors.dense(0.75, 0.225)]
 
     def test_param(self):
-        min_max_scalar = MinMaxScaler()
-        self.assertEqual("input", min_max_scalar.input_col)
-        self.assertEqual("output", min_max_scalar.output_col)
-        self.assertEqual(0.0, min_max_scalar.min)
-        self.assertEqual(1.0, min_max_scalar.max)
-        min_max_scalar.set_input_col('test_input') \
+        min_max_scaler = MinMaxScaler()
+        self.assertEqual("input", min_max_scaler.input_col)
+        self.assertEqual("output", min_max_scaler.output_col)
+        self.assertEqual(0.0, min_max_scaler.min)
+        self.assertEqual(1.0, min_max_scaler.max)
+        min_max_scaler.set_input_col('test_input') \
             .set_output_col('test_output') \
             .set_min(1.0) \
             .set_max(4.0)
-        self.assertEqual('test_input', min_max_scalar.input_col)
-        self.assertEqual(1.0, min_max_scalar.min)
-        self.assertEqual(4.0, min_max_scalar.max)
-        self.assertEqual('test_output', min_max_scalar.output_col)
+        self.assertEqual('test_input', min_max_scaler.input_col)
+        self.assertEqual(1.0, min_max_scaler.min)
+        self.assertEqual(4.0, min_max_scaler.max)
+        self.assertEqual('test_output', min_max_scaler.output_col)
 
     def test_output_schema(self):
-        min_max_scalar = MinMaxScaler() \
+        min_max_scaler = MinMaxScaler() \
             .set_input_col('test_input') \
             .set_output_col('test_output') \
             .set_min(1.0) \
             .set_max(4.0)
 
-        model = min_max_scalar.fit(self.train_data.alias('test_input'))
+        model = min_max_scaler.fit(self.train_data.alias('test_input'))
         output = model.transform(self.predict_data.alias('test_input'))[0]
         self.assertEqual(
             ['test_input', 'test_output'],
@@ -99,25 +99,67 @@ class MinMaxScalerTest(PyFlinkMLTestCase):
                     ['input'],
                     [DenseVectorTypeInfo()])))
 
-        min_max_scalar = MinMaxScaler() \
+        min_max_scaler = MinMaxScaler() \
             .set_min(0.0) \
             .set_max(10.0)
 
-        model = min_max_scalar.fit(train_data)
+        model = min_max_scaler.fit(train_data)
         result = model.transform(predict_data)[0]
         self.verify_output_result(
             result,
-            min_max_scalar.get_output_col(),
+            min_max_scaler.get_output_col(),
             result.get_schema().get_field_names(),
             [Vectors.dense(5.0, 5.0)])
 
     def test_fit_and_predict(self):
-        min_max_scalar = MinMaxScaler()
-        model = min_max_scalar.fit(self.train_data)
+        min_max_scaler = MinMaxScaler()
+        model = min_max_scaler.fit(self.train_data)
         output = model.transform(self.predict_data)[0]
         self.verify_output_result(
             output,
-            min_max_scalar.get_output_col(),
+            min_max_scaler.get_output_col(),
+            output.get_schema().get_field_names(),
+            self.expected_data)
+
+    def test_get_model_data(self):
+        min_max_scaler = MinMaxScaler()
+        model = min_max_scaler.fit(self.train_data)
+        model_data = model.get_model_data()[0]
+        expected_field_names = ['minVector', 'maxVector']
+        self.assertEqual(expected_field_names, model_data.get_schema().get_field_names())
+
+        model_rows = [result for result in
+                      self.t_env.to_data_stream(model_data).execute_and_collect()]
+        self.assertEqual(1, len(model_rows))
+        self.assertListAlmostEqual(
+            [0.0, 0.0], model_rows[0][expected_field_names.index('minVector')])
+        self.assertListAlmostEqual(
+            [200.0, 400.0], model_rows[0][expected_field_names.index('maxVector')])
+
+    def test_set_model_data(self):
+        min_max_scaler = MinMaxScaler()
+        model_a = min_max_scaler.fit(self.train_data)
+        model_data = model_a.get_model_data()[0]
+
+        model_b = MinMaxScalerModel().set_model_data(model_data)
+        update_existing_params(model_b, model_a)
+
+        output = model_b.transform(self.predict_data)[0]
+        self.verify_output_result(
+            output,
+            min_max_scaler.get_output_col(),
+            output.get_schema().get_field_names(),
+            self.expected_data)
+
+    def test_save_load_and_predict(self):
+        min_max_scaler = MinMaxScaler()
+        reloaded_min_max_scaler = self.save_and_reload(min_max_scaler)
+        model = reloaded_min_max_scaler.fit(self.train_data)
+        reloaded_model = self.save_and_reload(model)
+        output = reloaded_model.transform(self.predict_data)[0]
+        self.verify_output_result(
+            output,
+            min_max_scaler.get_output_col(),
             output.get_schema().get_field_names(),
             self.expected_data)
 

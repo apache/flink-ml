@@ -75,3 +75,31 @@ class IndexToStringModelTest(PyFlinkMLTestCase):
         predicted_results.sort(key=lambda x: x[0])
 
         self.assertEqual(predicted_results, self.expected_prediction)
+
+    def test_get_model_data(self):
+        model = IndexToStringModel() \
+            .set_input_cols('input_col1', 'input_col2') \
+            .set_output_cols('output_col1', 'output_col2') \
+            .set_model_data(self.model_data_table)
+        model_data = model.get_model_data()[0]
+        expected_field_names = ['stringArrays']
+        self.assertEqual(expected_field_names, model_data.get_schema().get_field_names())
+
+        # TODO: Add test to collect and verify the model data results after FLINK-30122 is resolved.
+
+    def test_save_load_and_predict(self):
+        model = IndexToStringModel() \
+            .set_input_cols('input_col1', 'input_col2') \
+            .set_output_cols('output_col1', 'output_col2') \
+            .set_model_data(self.model_data_table)
+
+        reloaded_model = self.save_and_reload(model)
+
+        output = reloaded_model.transform(self.predict_table)[0]
+
+        predicted_results = [result for result in
+                             self.t_env.to_data_stream(output).execute_and_collect()]
+
+        predicted_results.sort(key=lambda x: x[0])
+
+        self.assertEqual(predicted_results, self.expected_prediction)

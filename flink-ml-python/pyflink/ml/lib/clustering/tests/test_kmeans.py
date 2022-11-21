@@ -22,7 +22,7 @@ from typing import List, Dict, Set
 
 from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo, DenseVector
 from pyflink.ml.lib.clustering.kmeans import KMeans, KMeansModel, OnlineKMeans
-from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
+from pyflink.ml.tests.test_utils import PyFlinkMLTestCase, update_existing_params
 
 
 def group_features_by_prediction(
@@ -133,6 +133,37 @@ class KMeansTest(PyFlinkMLTestCase):
         model = kmeans.fit(self.data_table)
         output = model.transform(self.data_table)[0]
 
+        self.assertEqual(['features', 'prediction'], output.get_schema().get_field_names())
+        results = [result for result in self.t_env.to_data_stream(output).execute_and_collect()]
+        field_names = output.get_schema().get_field_names()
+        actual_groups = group_features_by_prediction(
+            results,
+            field_names.index(kmeans.features_col),
+            field_names.index(kmeans.prediction_col))
+
+        self.assertTrue(actual_groups[0] == self.expected_groups[0]
+                        and actual_groups[1] == self.expected_groups[1] or
+                        actual_groups[0] == self.expected_groups[1]
+                        and actual_groups[1] == self.expected_groups[0])
+
+    def test_get_model_data(self):
+        kmeans = KMeans().set_max_iter(2).set_k(2)
+        model = kmeans.fit(self.data_table)
+        model_data = model.get_model_data()[0]
+        expected_field_names = ['centroids', 'weights']
+        self.assertEqual(expected_field_names, model_data.get_schema().get_field_names())
+
+        # TODO: Add test to collect and verify the model data results after FLINK-30122 is resolved.
+
+    def test_set_model_data(self):
+        kmeans = KMeans().set_max_iter(2).set_k(2)
+        model_a = kmeans.fit(self.data_table)
+        model_data = model_a.get_model_data()[0]
+
+        model_b = KMeansModel().set_model_data(model_data)
+        update_existing_params(model_b, model_a)
+
+        output = model_b.transform(self.data_table)[0]
         self.assertEqual(['features', 'prediction'], output.get_schema().get_field_names())
         results = [result for result in self.t_env.to_data_stream(output).execute_and_collect()]
         field_names = output.get_schema().get_field_names()

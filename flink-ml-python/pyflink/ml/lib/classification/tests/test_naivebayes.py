@@ -22,7 +22,7 @@ from pyflink.table import Table
 
 from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
 from pyflink.ml.lib.classification.naivebayes import NaiveBayes, NaiveBayesModel
-from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
+from pyflink.ml.tests.test_utils import PyFlinkMLTestCase, update_existing_params
 
 
 class NaiveBayesTest(PyFlinkMLTestCase):
@@ -109,6 +109,25 @@ class NaiveBayesTest(PyFlinkMLTestCase):
         estimator = NaiveBayes.load(self.t_env, path)  # type: NaiveBayes
         model = estimator.fit(self.train_data)
         output_table = model.transform(self.predict_data)[0]
+        actual_output = self.execute_and_collect(output_table)
+        self.assertEqual(self.expected_output, actual_output)
+
+    def test_get_model_data(self):
+        model = self.estimator.fit(self.train_data)
+        model_data = model.get_model_data()[0]
+        expected_field_names = ['theta', 'piArray', 'labels']
+        self.assertEqual(expected_field_names, model_data.get_schema().get_field_names())
+
+        # TODO: Add test to collect and verify the model data results after FLINK-30124 is resolved.
+
+    def test_set_model_data(self):
+        model_a = self.estimator.fit(self.train_data)
+        model_data = model_a.get_model_data()[0]
+
+        model_b = NaiveBayesModel().set_model_data(model_data)
+        update_existing_params(model_b, model_a)
+
+        output_table = model_b.transform(self.predict_data)[0]
         actual_output = self.execute_and_collect(output_table)
         self.assertEqual(self.expected_output, actual_output)
 
