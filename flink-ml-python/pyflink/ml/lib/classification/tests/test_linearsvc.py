@@ -20,8 +20,8 @@ from pyflink.common import Types
 from pyflink.table import Table
 
 from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
-from pyflink.ml.lib.classification.linearsvc import LinearSVC
-from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
+from pyflink.ml.lib.classification.linearsvc import LinearSVC, LinearSVCModel
+from pyflink.ml.tests.test_utils import PyFlinkMLTestCase, update_existing_params
 
 
 class LinearSVCTest(PyFlinkMLTestCase):
@@ -43,6 +43,8 @@ class LinearSVCTest(PyFlinkMLTestCase):
                 type_info=Types.ROW_NAMED(
                     ['features', 'label', 'weight'],
                     [DenseVectorTypeInfo(), Types.DOUBLE(), Types.DOUBLE()])))
+
+        self.eps = 0.1
 
     def test_param(self):
         linear_svc = LinearSVC()
@@ -106,6 +108,49 @@ class LinearSVCTest(PyFlinkMLTestCase):
     def test_fit_and_predict(self):
         linear_svc = LinearSVC().set_weight_col('weight')
         output = linear_svc.fit(self.train_data).transform(self.train_data)[0]
+        self.verify_prediction_result(
+            output,
+            output.get_schema().get_field_names(),
+            linear_svc.features_col,
+            linear_svc.prediction_col,
+            linear_svc.raw_prediction_col)
+
+    def test_get_model_data(self):
+        linear_svc = LinearSVC().set_weight_col('weight')
+        model_data = linear_svc.fit(self.train_data).get_model_data()[0]
+        expected_field_names = ['coefficient']
+        self.assertEqual(expected_field_names, model_data.get_schema().get_field_names())
+
+        model_rows = [result for result in
+                      self.t_env.to_data_stream(model_data).execute_and_collect()]
+        self.assertEqual(1, len(model_rows))
+        self.assertListAlmostEqual(
+            [0.470, -0.273, -0.410, -0.546],
+            model_rows[expected_field_names.index('coefficient')][0].to_array(),
+            delta=self.eps)
+
+    def test_set_model_data(self):
+        linear_svc = LinearSVC().set_weight_col('weight')
+        model_a = linear_svc.fit(self.train_data)
+        model_data = model_a.get_model_data()[0]
+
+        model_b = LinearSVCModel().set_model_data(model_data)
+        update_existing_params(model_b, model_a)
+
+        output = model_b.transform(self.train_data)[0]
+        self.verify_prediction_result(
+            output,
+            output.get_schema().get_field_names(),
+            linear_svc.features_col,
+            linear_svc.prediction_col,
+            linear_svc.raw_prediction_col)
+
+    def test_save_load_and_predict(self):
+        linear_svc = LinearSVC().set_weight_col('weight')
+        reloaded_linear_svc = self.save_and_reload(linear_svc)
+        model = reloaded_linear_svc.fit(self.train_data)
+        reloaded_model = self.save_and_reload(model)
+        output = reloaded_model.transform(self.train_data)[0]
         self.verify_prediction_result(
             output,
             output.get_schema().get_field_names(),

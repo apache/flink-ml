@@ -24,8 +24,16 @@ import uuid
 
 from pyflink.common import RestartStrategies, Configuration
 from pyflink.datastream import StreamExecutionEnvironment
+from pyflink.java_gateway import get_gateway
 from pyflink.table import StreamTableEnvironment
 from pyflink.util.java_utils import get_j_env_configuration
+
+from pyflink.ml.core.wrapper import JavaWithParams
+
+
+def update_existing_params(target: JavaWithParams, source: JavaWithParams):
+    get_gateway().jvm.org.apache.flink.ml.util.ReadWriteUtils \
+        .updateExistingParams(target._java_obj, source._java_obj.getParamMap())
 
 
 class PyFlinkMLTestCase(unittest.TestCase):
@@ -84,3 +92,10 @@ class PyFlinkMLTestCase(unittest.TestCase):
                 raise e
         load_func = getattr(stage, 'load')
         return load_func(self.t_env, path)
+
+    def assertListAlmostEqual(self, expected_list, actual_list, places=None, msg=None,
+                              delta=None):
+        self.assertEqual(len(expected_list), len(actual_list))
+        for i in range(len(expected_list)):
+            self.assertAlmostEqual(expected_list[i], actual_list[i],
+                                   places=places, msg=msg, delta=delta)

@@ -22,7 +22,7 @@ from pyflink.common import Types
 
 from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
 from pyflink.ml.lib.feature.idf import IDF, IDFModel
-from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
+from pyflink.ml.tests.test_utils import PyFlinkMLTestCase, update_existing_params
 
 
 class IDFTest(PyFlinkMLTestCase):
@@ -111,6 +111,27 @@ class IDFTest(PyFlinkMLTestCase):
         idf.set_min_doc_freq(2)
         output = idf.fit(self.input_data).transform(self.input_data)[0]
         self.verify_prediction_result(self.expected_output_min_doc_freq_as_two, output)
+
+    def test_get_model_data(self):
+        idf = IDF()
+        model = idf.fit(self.input_data)
+        model_data = model.get_model_data()[0]
+        expected_field_names = ['idf', 'docFreq', 'numDocs']
+        self.assertEqual(expected_field_names, model_data.get_schema().get_field_names())
+
+        # TODO: Add test to collect and verify the model data results after Flink dependency
+        #  is upgraded to 1.15.3, 1.16.0 or a higher version. Related ticket: FLINK-29477
+
+    def test_set_model_data(self):
+        idf = IDF()
+        model_a = idf.fit(self.input_data)
+        model_data = model_a.get_model_data()[0]
+
+        model_b = IDFModel().set_model_data(model_data)
+        update_existing_params(model_b, model_a)
+
+        output = model_b.transform(self.input_data)[0]
+        self.verify_prediction_result(self.expected_output, output)
 
     def test_save_load_predict(self):
         idf = IDF()

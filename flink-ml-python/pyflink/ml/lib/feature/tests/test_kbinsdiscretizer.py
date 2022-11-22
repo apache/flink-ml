@@ -22,7 +22,7 @@ from pyflink.common import Types
 
 from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
 from pyflink.ml.lib.feature.kbinsdiscretizer import KBinsDiscretizer, KBinsDiscretizerModel
-from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
+from pyflink.ml.tests.test_utils import PyFlinkMLTestCase, update_existing_params
 
 
 class KBinsDiscretizerTest(PyFlinkMLTestCase):
@@ -155,6 +155,26 @@ class KBinsDiscretizerTest(PyFlinkMLTestCase):
         k_bins_discretizer.set_strategy('kmeans')
         output = k_bins_discretizer.fit(self.train_table).transform(self.predict_table)[0]
         self.verify_prediction_result(self.kmeans_output, output)
+
+    def test_get_model_data(self):
+        k_bins_discretizer = KBinsDiscretizer().set_num_bins(3).set_strategy('uniform')
+        model = k_bins_discretizer.fit(self.train_table)
+        model_data = model.get_model_data()[0]
+        expected_field_names = ['binEdges']
+        self.assertEqual(expected_field_names, model_data.get_schema().get_field_names())
+
+        # TODO: Add test to collect and verify the model data results after FLINK-30122 is resolved.
+
+    def test_set_model_data(self):
+        k_bins_discretizer = KBinsDiscretizer().set_num_bins(3).set_strategy('uniform')
+        model_a = k_bins_discretizer.fit(self.train_table)
+        model_data = model_a.get_model_data()[0]
+
+        model_b = KBinsDiscretizerModel().set_model_data(model_data)
+        update_existing_params(model_b, model_a)
+
+        output = model_b.transform(self.predict_table)[0]
+        self.verify_prediction_result(self.uniform_output, output)
 
     def test_save_load_predict(self):
         k_bins_discretizer = KBinsDiscretizer().set_num_bins(3)

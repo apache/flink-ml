@@ -23,7 +23,7 @@ from pyflink.table import Table
 
 from pyflink.ml.core.linalg import Vectors, SparseVector
 from pyflink.ml.lib.feature.onehotencoder import OneHotEncoder, OneHotEncoderModel
-from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
+from pyflink.ml.tests.test_utils import PyFlinkMLTestCase, update_existing_params
 
 
 class OneHotEncoderTest(PyFlinkMLTestCase):
@@ -105,6 +105,45 @@ class OneHotEncoderTest(PyFlinkMLTestCase):
             model.output_cols,
             output_table.get_schema().get_field_names(),
             expected_data)
+
+    def test_get_model_data(self):
+        model = self.estimator.fit(self.train_data)
+        model_data = model.get_model_data()[0]
+        expected_field_names = ['f0', 'f1']
+        self.assertEqual(expected_field_names, model_data.get_schema().get_field_names())
+
+        model_rows = [result for result in
+                      self.t_env.to_data_stream(model_data).execute_and_collect()]
+        self.assertEqual(1, len(model_rows))
+        self.assertEqual(0, model_rows[0][expected_field_names.index('f0')])
+        self.assertEqual(2, model_rows[0][expected_field_names.index('f1')])
+
+    def test_set_model_data(self):
+        model_a = self.estimator.fit(self.train_data)
+        model_data = model_a.get_model_data()[0]
+
+        model_b = OneHotEncoderModel().set_model_data(model_data)
+        update_existing_params(model_b, model_a)
+
+        output = model_b.transform(self.predict_data)[0]
+        self.verify_output_result(
+            output,
+            model_b.input_cols,
+            model_b.output_cols,
+            output.get_schema().get_field_names(),
+            self.expected_data)
+
+    def test_save_load_and_predict(self):
+        reloaded_estimator = self.save_and_reload(self.estimator)
+        model = reloaded_estimator.fit(self.train_data)  # type: OneHotEncoderModel
+        reloaded_model = self.save_and_reload(model)
+        output_table = reloaded_model.transform(self.predict_data)[0]
+        self.verify_output_result(
+            output_table,
+            model.input_cols,
+            model.output_cols,
+            output_table.get_schema().get_field_names(),
+            self.expected_data)
 
     def verify_output_result(
             self,

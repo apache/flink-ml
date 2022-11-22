@@ -22,7 +22,7 @@ from pyflink.common import Types
 
 from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
 from pyflink.ml.lib.feature.vectorindexer import VectorIndexer, VectorIndexerModel
-from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
+from pyflink.ml.tests.test_utils import PyFlinkMLTestCase, update_existing_params
 
 
 class VectorIndexerTest(PyFlinkMLTestCase):
@@ -97,6 +97,31 @@ class VectorIndexerTest(PyFlinkMLTestCase):
         output_table = model.transform(self.predict_table)[0]
         predicted_results = [result[1] for result in
                              self.t_env.to_data_stream(output_table).execute_and_collect()]
+
+        predicted_results.sort(key=lambda x: x[1])
+        self.expected_output.sort(key=lambda x: x[1])
+        self.assertEqual(self.expected_output, predicted_results)
+
+    def test_get_model_data(self):
+        vector_indexer = VectorIndexer().set_handle_invalid('keep')
+        model = vector_indexer.fit(self.train_table)
+        model_data = model.get_model_data()[0]
+        expected_field_names = ['categoryMaps']
+        self.assertEqual(expected_field_names, model_data.get_schema().get_field_names())
+
+        # TODO: Add test to collect and verify the model data results after FLINK-30124 is resolved.
+
+    def test_set_model_data(self):
+        vector_indexer = VectorIndexer().set_handle_invalid('keep')
+        model_a = vector_indexer.fit(self.train_table)
+        model_data = model_a.get_model_data()[0]
+
+        model_b = VectorIndexerModel().set_model_data(model_data)
+        update_existing_params(model_b, model_a)
+
+        output = model_b.transform(self.predict_table)[0]
+        predicted_results = [result[1] for result in
+                             self.t_env.to_data_stream(output).execute_and_collect()]
 
         predicted_results.sort(key=lambda x: x[1])
         self.expected_output.sort(key=lambda x: x[1])

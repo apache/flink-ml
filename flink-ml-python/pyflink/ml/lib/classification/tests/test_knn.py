@@ -21,7 +21,7 @@ from pyflink.common import Types
 from pyflink.table import Table
 
 from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo, DenseMatrix, DenseVector
-from pyflink.ml.lib.classification.knn import KNN
+from pyflink.ml.lib.classification.knn import KNN, KNNModel
 from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
 
 
@@ -156,6 +156,19 @@ class KNNTest(PyFlinkMLTestCase):
         self.assertEqual(2, packed_features.num_rows())
         self.assertEqual(packed_features.num_cols(), labels.size())
         self.assertEqual(feature_norm_squares.size(), labels.size())
+
+    def test_set_model_data(self):
+        knn = KNN()
+        model_a = knn.fit(self.train_data)
+        model_data = model_a.get_model_data()[0]
+
+        model_b = KNNModel().set_model_data(model_data)
+        output = model_b.transform(self.predict_data)[0]
+        field_names = output.get_schema().get_field_names()
+        self.verify_predict_result(
+            output,
+            field_names.index(knn.label_col),
+            field_names.index(knn.prediction_col))
 
     def verify_predict_result(
             self, output: Table, label_index, prediction_index):

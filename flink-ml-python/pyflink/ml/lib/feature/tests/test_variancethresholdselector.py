@@ -21,8 +21,9 @@ from pyflink.common import Types
 from pyflink.table import Table
 
 from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo, DenseVector
-from pyflink.ml.lib.feature.variancethresholdselector import VarianceThresholdSelector
-from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
+from pyflink.ml.lib.feature.variancethresholdselector import \
+    VarianceThresholdSelector, VarianceThresholdSelectorModel
+from pyflink.ml.tests.test_utils import PyFlinkMLTestCase, update_existing_params
 
 
 class VarianceThresholdSelectorTest(PyFlinkMLTestCase):
@@ -111,6 +112,33 @@ class VarianceThresholdSelectorTest(PyFlinkMLTestCase):
                 variance_threshold_selector.get_output_col(),
                 output.get_schema().get_field_names(),
                 self.expected_output)
+
+    def test_get_model_data(self):
+        variance_threshold_selector = VarianceThresholdSelector() \
+            .set_variance_threshold(8.0)
+        model = variance_threshold_selector.fit(self.train_table)
+        model_data = model.get_model_data()[0]
+        expected_field_names = ['numOfFeatures', 'indices']
+        self.assertEqual(expected_field_names, model_data.get_schema().get_field_names())
+
+        # TODO: Add test to collect and verify the model data results after Flink dependency
+        #  is upgraded to 1.15.3, 1.16.0 or a higher version. Related ticket: FLINK-29477
+
+    def test_set_model_data(self):
+        variance_threshold_selector = VarianceThresholdSelector() \
+            .set_variance_threshold(8.0)
+        model_a = variance_threshold_selector.fit(self.train_table)
+        model_data = model_a.get_model_data()[0]
+
+        model_b = VarianceThresholdSelectorModel().set_model_data(model_data)
+        update_existing_params(model_b, model_a)
+
+        output = model_b.transform(self.predict_table)[0]
+        self.verify_output_result(
+            output,
+            variance_threshold_selector.get_output_col(),
+            output.get_schema().get_field_names(),
+            self.expected_output)
 
     def test_save_load_predict(self):
         variance_threshold_selector = VarianceThresholdSelector() \

@@ -21,8 +21,8 @@ from pyflink.table import Table
 from typing import List
 
 from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo, DenseVector
-from pyflink.ml.lib.feature.standardscaler import StandardScaler
-from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
+from pyflink.ml.lib.feature.standardscaler import StandardScaler, StandardScalerModel
+from pyflink.ml.tests.test_utils import PyFlinkMLTestCase, update_existing_params
 
 
 class StandardScalerTest(PyFlinkMLTestCase):
@@ -112,6 +112,48 @@ class StandardScalerTest(PyFlinkMLTestCase):
             output.get_schema().get_field_names(),
             standard_scaler.get_output_col(),
             self.expected_res_with_mean_and_std)
+
+    def test_get_model_data(self):
+        standard_scaler = StandardScaler()
+        model = standard_scaler.fit(self.dense_input)
+        model_data = model.get_model_data()[0]
+        expected_field_names = ['mean', 'std']
+        self.assertEqual(expected_field_names, model_data.get_schema().get_field_names())
+
+        model_rows = [result for result in
+                      self.t_env.to_data_stream(model_data).execute_and_collect()]
+        self.assertEqual(1, len(model_rows))
+        self.assertListAlmostEqual(
+            self.expected_mean, model_rows[0][expected_field_names.index('mean')])
+        self.assertListAlmostEqual(
+            self.expected_std, model_rows[0][expected_field_names.index('std')])
+
+    def test_set_model_data(self):
+        standard_scaler = StandardScaler()
+        model_a = standard_scaler.fit(self.dense_input)
+        model_data = model_a.get_model_data()[0]
+
+        model_b = StandardScalerModel().set_model_data(model_data)
+        update_existing_params(model_b, model_a)
+
+        output = model_b.transform(self.dense_input)[0]
+        self.verify_output_result(
+            output,
+            output.get_schema().get_field_names(),
+            standard_scaler.get_output_col(),
+            self.expected_res_with_std)
+
+    def test_save_load_and_predict(self):
+        standard_scaler = StandardScaler()
+        reloaded_standard_scaler = self.save_and_reload(standard_scaler)
+        model = reloaded_standard_scaler.fit(self.dense_input)
+        reloaded_model = self.save_and_reload(model)
+        output = reloaded_model.transform(self.dense_input)[0]
+        self.verify_output_result(
+            output,
+            output.get_schema().get_field_names(),
+            standard_scaler.get_output_col(),
+            self.expected_res_with_std)
 
     def verify_output_result(
             self,
