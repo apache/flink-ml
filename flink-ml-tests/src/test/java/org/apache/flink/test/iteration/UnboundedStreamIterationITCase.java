@@ -174,6 +174,7 @@ public class UnboundedStreamIterationITCase extends TestLogger {
             boolean doBroadcast,
             SharedReference<BlockingQueue<OutputRecord<Integer>>> result) {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.getConfig().enableObjectReuse();
         env.setParallelism(1);
         DataStream<EpochRecord> source =
                 env.addSource(new SequenceSource(numRecordsPerSource, holdSource, period))
@@ -223,6 +224,7 @@ public class UnboundedStreamIterationITCase extends TestLogger {
             int maxRound,
             SharedReference<BlockingQueue<OutputRecord<Integer>>> result) {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.getConfig().enableObjectReuse();
         env.setParallelism(1);
         DataStream<EpochRecord> variableSource =
                 env.addSource(new DraftExecutionEnvironment.EmptySource<EpochRecord>() {})

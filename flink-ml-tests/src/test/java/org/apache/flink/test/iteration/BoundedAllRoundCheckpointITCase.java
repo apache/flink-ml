@@ -141,6 +141,7 @@ public class BoundedAllRoundCheckpointITCase extends TestLogger {
                                         true);
                             }
                         });
+        env.getConfig().enableObjectReuse();
         env.enableCheckpointing(500, CheckpointingMode.EXACTLY_ONCE);
         env.setParallelism(1);
         DataStream<EpochRecord> variableSource =

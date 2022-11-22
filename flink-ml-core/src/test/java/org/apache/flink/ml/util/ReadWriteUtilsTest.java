@@ -54,6 +54,7 @@ public class ReadWriteUtilsTest extends AbstractTestBase {
                 new org.apache.flink.configuration.Configuration();
         config.set(ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
         env = StreamExecutionEnvironment.getExecutionEnvironment(config);
+        env.getConfig().enableObjectReuse();
         env.setParallelism(4);
         env.enableCheckpointing(100);
         env.setRestartStrategy(RestartStrategies.noRestart());

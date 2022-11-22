@@ -165,6 +165,7 @@ public class BoundedAllRoundStreamIterationITCase extends TestLogger {
             boolean terminationCriteriaFollowsConstantsStreams,
             SharedReference<BlockingQueue<OutputRecord<Integer>>> result) {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.getConfig().enableObjectReuse();
         env.setParallelism(1);
         DataStream<EpochRecord> variableSource =
                 env.addSource(new DraftExecutionEnvironment.EmptySource<EpochRecord>() {})
@@ -228,6 +229,7 @@ public class BoundedAllRoundStreamIterationITCase extends TestLogger {
             int maxRound,
             SharedReference<BlockingQueue<OutputRecord<Integer>>> result) {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.getConfig().enableObjectReuse();
         env.setParallelism(1);
         DataStream<EpochRecord> variableSource =
                 env.addSource(new DraftExecutionEnvironment.EmptySource<EpochRecord>() {})

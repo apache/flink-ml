@@ -131,6 +131,7 @@ public class VectorAssemblerTest extends AbstractTestBase {
         config.set(ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment(config);
+        env.getConfig().enableObjectReuse();
         env.setParallelism(2);
         env.enableCheckpointing(100);
         env.setRestartStrategy(RestartStrategies.noRestart());
