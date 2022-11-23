@@ -111,6 +111,7 @@ public class BoundedMixedLifeCycleStreamIterationITCase extends TestLogger {
             SharedReference<BlockingQueue<OutputRecord<Integer>>> allRoundResult,
             SharedReference<BlockingQueue<OutputRecord<Integer>>> perRoundResult) {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.getConfig().enableObjectReuse();
         env.setParallelism(1);
 
         DataStream<EpochRecord> allRoundVariableSource =

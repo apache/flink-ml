@@ -58,6 +58,7 @@ public class OperatorEpochWatermarkTrackerFactoryTest extends TestLogger {
     @Test
     public void testChainedOperator() throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.getConfig().enableObjectReuse();
         env.setParallelism(1);
         env.addSource(new EmptySource())
                 .transform(
@@ -72,6 +73,7 @@ public class OperatorEpochWatermarkTrackerFactoryTest extends TestLogger {
     @Test
     public void testOneInputOperator() throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.getConfig().enableObjectReuse();
         env.addSource(new EmptySource())
                 .setParallelism(4)
                 .transform(
@@ -87,6 +89,7 @@ public class OperatorEpochWatermarkTrackerFactoryTest extends TestLogger {
     @Test
     public void testUnionedOneInput() throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.getConfig().enableObjectReuse();
         env.addSource(new EmptySource())
                 .setParallelism(4)
                 .union(env.addSource(new EmptySource()).setParallelism(3))
@@ -104,6 +107,7 @@ public class OperatorEpochWatermarkTrackerFactoryTest extends TestLogger {
     @Test
     public void testTwoInputOperator() throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.getConfig().enableObjectReuse();
         env.addSource(new EmptySource())
                 .setParallelism(4)
                 .connect(env.addSource(new EmptySource()).setParallelism(3))
@@ -120,6 +124,7 @@ public class OperatorEpochWatermarkTrackerFactoryTest extends TestLogger {
     @Test
     public void testUnionedTwoInputOperator() throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.getConfig().enableObjectReuse();
         env.addSource(new EmptySource())
                 .setParallelism(4)
                 .union(env.addSource(new EmptySource()).setParallelism(2))
@@ -137,6 +142,7 @@ public class OperatorEpochWatermarkTrackerFactoryTest extends TestLogger {
     @Test
     public void testMultipleInputOperator() throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.getConfig().enableObjectReuse();
         DataStream<Integer> first =
                 env.addSource(new EmptySource())
                         .setParallelism(4)

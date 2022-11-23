@@ -39,6 +39,7 @@ def update_existing_params(target: JavaWithParams, source: JavaWithParams):
 class PyFlinkMLTestCase(unittest.TestCase):
     def setUp(self):
         self.env = StreamExecutionEnvironment.get_execution_environment()
+        self.env.get_config().enable_object_reuse()
         self._load_dependency_jars()
         config = Configuration(
             j_configuration=get_j_env_configuration(self.env._j_stream_execution_environment))

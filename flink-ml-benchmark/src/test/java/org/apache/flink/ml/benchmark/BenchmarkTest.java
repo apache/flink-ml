@@ -57,6 +57,7 @@ public class BenchmarkTest extends AbstractTestBase {
     @Test
     public void testRunBenchmark() throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.getConfig().enableObjectReuse();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         Map<String, Map<String, ?>> params = new HashMap<>();

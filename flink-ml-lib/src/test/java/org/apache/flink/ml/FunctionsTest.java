@@ -77,6 +77,7 @@ public class FunctionsTest extends AbstractTestBase {
     @Before
     public void before() {
         env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.getConfig().enableObjectReuse();
         tEnv = StreamTableEnvironment.create(env);
     }
 

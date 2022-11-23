@@ -80,6 +80,7 @@ public class AllReduceImplTest {
         @Test
         public void testAllReduce() throws Exception {
             StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+            env.getConfig().enableObjectReuse();
             env.setParallelism(parallelism);
             DataStream<double[]> elements =
                     env.fromParallelCollection(
@@ -118,6 +119,7 @@ public class AllReduceImplTest {
             try {
                 StreamExecutionEnvironment env =
                         StreamExecutionEnvironment.getExecutionEnvironment();
+                env.getConfig().enableObjectReuse();
                 env.setParallelism(parallelism);
                 DataStream<double[]> elements =
                         env.fromParallelCollection(
@@ -148,6 +150,7 @@ public class AllReduceImplTest {
             try {
                 StreamExecutionEnvironment env =
                         StreamExecutionEnvironment.getExecutionEnvironment();
+                env.getConfig().enableObjectReuse();
                 env.setParallelism(parallelism);
                 DataStream<double[]> elements =
                         env.fromParallelCollection(
@@ -168,6 +171,7 @@ public class AllReduceImplTest {
         @Test
         public void testAllReduceWithEmptyInput() throws Exception {
             StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+            env.getConfig().enableObjectReuse();
             env.setParallelism(parallelism);
             DataStream<double[]> elements =
                     env.fromParallelCollection(

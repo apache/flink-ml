@@ -95,6 +95,7 @@ public class BoundedPerRoundStreamIterationITCase extends TestLogger {
             int maxRound,
             SharedReference<BlockingQueue<OutputRecord<Integer>>> result) {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.getConfig().enableObjectReuse();
         env.setParallelism(1);
 
         DataStream<Integer> variableSource = env.fromElements(0);

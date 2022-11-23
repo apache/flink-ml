@@ -46,6 +46,7 @@ public class IterationConstructionTest extends TestLogger {
     @Test
     public void testEmptyIterationBody() {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.getConfig().enableObjectReuse();
         env.setParallelism(4);
         DataStream<Integer> variableSource =
                 env.addSource(new DraftExecutionEnvironment.EmptySource<Integer>() {})
@@ -81,6 +82,7 @@ public class IterationConstructionTest extends TestLogger {
     @Test
     public void testNotChainingHeadOperator() {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.getConfig().enableObjectReuse();
         env.setParallelism(4);
         DataStream<Integer> variableSource =
                 env.addSource(new DraftExecutionEnvironment.EmptySource<Integer>() {})
@@ -119,6 +121,7 @@ public class IterationConstructionTest extends TestLogger {
     @Test
     public void testUnboundedIteration() {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.getConfig().enableObjectReuse();
         DataStream<Integer> variableSource1 =
                 env.addSource(new DraftExecutionEnvironment.EmptySource<Integer>() {})
                         .setParallelism(2)
@@ -218,6 +221,7 @@ public class IterationConstructionTest extends TestLogger {
     @Test
     public void testBoundedIterationWithTerminationCriteria() {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.getConfig().enableObjectReuse();
         DataStream<Integer> variableSource1 =
                 env.addSource(new DraftExecutionEnvironment.EmptySource<Integer>() {})
                         .setParallelism(2)
@@ -322,6 +326,7 @@ public class IterationConstructionTest extends TestLogger {
     @Test
     public void testReplayedIteration() {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.getConfig().enableObjectReuse();
         DataStream<Integer> variableSource =
                 env.addSource(new DraftExecutionEnvironment.EmptySource<Integer>() {})
                         .setParallelism(2)

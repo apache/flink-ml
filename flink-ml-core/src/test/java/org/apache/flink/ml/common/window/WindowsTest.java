@@ -55,6 +55,7 @@ public class WindowsTest extends AbstractTestBase {
     @BeforeClass
     public static void beforeClass() {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.getConfig().enableObjectReuse();
         inputData = new ArrayList<>();
         for (long i = 0; i < RECORD_NUM; i++) {
             inputData.add(i);

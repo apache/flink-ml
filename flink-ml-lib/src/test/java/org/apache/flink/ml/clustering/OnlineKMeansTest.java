@@ -167,6 +167,7 @@ public class OnlineKMeansTest extends TestLogger {
         miniCluster.start();
 
         env = StreamExecutionEnvironment.getExecutionEnvironment(config);
+        env.getConfig().enableObjectReuse();
         env.setParallelism(defaultParallelism);
         env.enableCheckpointing(100);
         env.setRestartStrategy(RestartStrategies.noRestart());
