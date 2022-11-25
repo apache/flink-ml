@@ -129,7 +129,12 @@ class StringIndexerTest(PyFlinkMLTestCase):
         expected_field_names = ['stringArrays']
         self.assertEqual(expected_field_names, model_data.get_schema().get_field_names())
 
-        # TODO: Add test to collect and verify the model data results after FLINK-30122 is resolved.
+        model_rows = [result for result in
+                      self.t_env.to_data_stream(model_data).execute_and_collect()]
+        self.assertEqual(1, len(model_rows))
+        string_arrays = model_rows[0][expected_field_names.index('stringArrays')]
+        self.assertListEqual(["a", "b", "c", "d"], string_arrays[0])
+        self.assertListEqual(["-1.0", "0.0", "1.0", "2.0"], string_arrays[1])
 
     def test_set_model_data(self):
         string_indexer = StringIndexer() \

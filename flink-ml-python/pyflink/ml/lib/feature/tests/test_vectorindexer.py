@@ -103,13 +103,17 @@ class VectorIndexerTest(PyFlinkMLTestCase):
         self.assertEqual(self.expected_output, predicted_results)
 
     def test_get_model_data(self):
-        vector_indexer = VectorIndexer().set_handle_invalid('keep')
+        vector_indexer = VectorIndexer().set_max_categories(3)
         model = vector_indexer.fit(self.train_table)
         model_data = model.get_model_data()[0]
         expected_field_names = ['categoryMaps']
         self.assertEqual(expected_field_names, model_data.get_schema().get_field_names())
 
-        # TODO: Add test to collect and verify the model data results after FLINK-30124 is resolved.
+        model_rows = [result for result in
+                      self.t_env.to_data_stream(model_data).execute_and_collect()]
+        self.assertEqual(1, len(model_rows))
+        self.assertEqual(
+            {1: {-1.: 1, 0.: 0, 1.: 2}}, model_rows[0][expected_field_names.index('categoryMaps')])
 
     def test_set_model_data(self):
         vector_indexer = VectorIndexer().set_handle_invalid('keep')

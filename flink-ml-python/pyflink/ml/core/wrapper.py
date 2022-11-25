@@ -15,12 +15,16 @@
 #  See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
+import pickle
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
 
 from py4j.java_gateway import JavaObject, get_java_class
-from pyflink.common import typeinfo, Time
-from pyflink.common.typeinfo import _from_java_type, TypeInformation, _is_instance_of
+from pyflink.common import typeinfo, Time, Row, RowKind
+from pyflink.common.typeinfo import _from_java_type, TypeInformation, _is_instance_of, Types, \
+    ExternalTypeInfo, RowTypeInfo, TupleTypeInfo
+from pyflink.datastream import utils
+from pyflink.datastream.utils import pickled_bytes_to_python_converter
 from pyflink.java_gateway import get_gateway
 from pyflink.table import Table, StreamTableEnvironment, Expression
 from pyflink.util.java_utils import to_jarray
@@ -53,6 +57,36 @@ def _from_java_type_wrapper(j_type_info: JavaObject) -> TypeInformation:
 
 
 typeinfo._from_java_type = _from_java_type_wrapper
+
+
+# TODO: Remove this class after Flink ML depends on a Flink version
+#  with FLINK-30168 and FLINK-29477 fixed.
+def convert_to_python_obj_wrapper(data, type_info):
+    if type_info == Types.PICKLED_BYTE_ARRAY():
+        return pickle.loads(data)
+    elif isinstance(type_info, ExternalTypeInfo):
+        return convert_to_python_obj_wrapper(data, type_info._type_info)
+    else:
+        gateway = get_gateway()
+        pickle_bytes = gateway.jvm.org.apache.flink.ml.python.PythonBridgeUtils. \
+            getPickledBytesFromJavaObject(data, type_info.get_java_type_info())
+        if isinstance(type_info, RowTypeInfo) or isinstance(type_info, TupleTypeInfo):
+            field_data = zip(list(pickle_bytes[1:]), type_info.get_field_types())
+            fields = []
+            for data, field_type in field_data:
+                if len(data) == 0:
+                    fields.append(None)
+                else:
+                    fields.append(pickled_bytes_to_python_converter(data, field_type))
+            if isinstance(type_info, RowTypeInfo):
+                return Row.of_kind(RowKind(int.from_bytes(pickle_bytes[0], 'little')), *fields)
+            else:
+                return tuple(fields)
+        else:
+            return pickled_bytes_to_python_converter(pickle_bytes, type_info)
+
+
+utils.convert_to_python_obj = convert_to_python_obj_wrapper
 
 
 class JavaWrapper(ABC):

@@ -69,6 +69,7 @@ class ImputerTest(PyFlinkMLTestCase):
             'median': self.expected_median_strategy_output,
             'most_frequent': self.expected_most_frequent_strategy_output
         }
+        self.eps = 1e-5
 
     def test_param(self):
         imputer = Imputer().\
@@ -116,7 +117,13 @@ class ImputerTest(PyFlinkMLTestCase):
         expected_field_names = ['surrogates']
         self.assertEqual(expected_field_names, model_data.get_schema().get_field_names())
 
-        # TODO: Add test to collect and verify the model data results after FLINK-30124 is resolved.
+        model_rows = [result for result in
+                      self.t_env.to_data_stream(model_data).execute_and_collect()]
+        self.assertEqual(1, len(model_rows))
+        surrogates = model_rows[0][expected_field_names.index('surrogates')]
+        self.assertAlmostEqual(2.0, surrogates['f1'], delta=self.eps)
+        self.assertAlmostEqual(6.8, surrogates['f2'], delta=self.eps)
+        self.assertAlmostEqual(2.0, surrogates['f3'], delta=self.eps)
 
     def test_set_model_data(self):
         imputer = Imputer().\

@@ -47,7 +47,7 @@ class KMeansTest(PyFlinkMLTestCase):
             self.env.from_collection([
                 (Vectors.dense([0.0, 0.0]),),
                 (Vectors.dense([0.0, 0.3]),),
-                (Vectors.dense([0.3, 3.0]),),
+                (Vectors.dense([0.3, 0.0]),),
                 (Vectors.dense([9.0, 0.0]),),
                 (Vectors.dense([9.0, 0.6]),),
                 (Vectors.dense([9.6, 0.0]),),
@@ -56,7 +56,7 @@ class KMeansTest(PyFlinkMLTestCase):
                     ['features'],
                     [DenseVectorTypeInfo()])))
         self.expected_groups = [
-            {DenseVector([0.0, 0.3]), DenseVector([0.3, 3.0]), DenseVector([0.0, 0.0])},
+            {DenseVector([0.0, 0.3]), DenseVector([0.3, 0.0]), DenseVector([0.0, 0.0])},
             {DenseVector([9.6, 0.0]), DenseVector([9.0, 0.0]), DenseVector([9.0, 0.6])}]
 
     def test_param(self):
@@ -153,7 +153,14 @@ class KMeansTest(PyFlinkMLTestCase):
         expected_field_names = ['centroids', 'weights']
         self.assertEqual(expected_field_names, model_data.get_schema().get_field_names())
 
-        # TODO: Add test to collect and verify the model data results after FLINK-30122 is resolved.
+        model_rows = [result for result in
+                      self.t_env.to_data_stream(model_data).execute_and_collect()]
+        self.assertEqual(1, len(model_rows))
+        centroids = model_rows[0][expected_field_names.index('centroids')]
+        self.assertEqual(2, len(centroids))
+        centroids.sort(key=lambda x: x.get(0))
+        self.assertListAlmostEqual([0.1, 0.1], centroids[0], delta=1e-5)
+        self.assertListAlmostEqual([9.2, 0.2], centroids[1], delta=1e-5)
 
     def test_set_model_data(self):
         kmeans = KMeans().set_max_iter(2).set_k(2)
