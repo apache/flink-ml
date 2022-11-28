@@ -65,7 +65,7 @@ class ChiSqTest(JavaStatsAlgoOperator, _ChiSqTestParams):
     - "statistics": vector
 
     The output of this algorithm can be flattened to multiple rows by setting
-    _ChiSqTestParams#FLATTEN, which would contain the following columns:
+    HasFlatten#FLATTEN to True, which would contain the following columns:
 
     - "featureIndex": int
     - "pValue": double

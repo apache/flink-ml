@@ -22,7 +22,7 @@ from pyflink.ml.core.param import Param
 from pyflink.ml.lib.param import HasDistanceMeasure, HasFeaturesCol, HasGlobalBatchSize, \
     HasHandleInvalid, HasInputCols, HasLabelCol, HasLearningRate, HasMaxIter, HasMultiClass, \
     HasOutputCols, HasPredictionCol, HasRawPredictionCol, HasReg, HasSeed, HasTol, HasWeightCol, \
-    HasWindows, HasRelativeError
+    HasWindows, HasRelativeError, HasFlatten
 
 from pyflink.ml.core.windows import GlobalWindows, CountTumblingWindows
 
@@ -30,7 +30,7 @@ from pyflink.ml.core.windows import GlobalWindows, CountTumblingWindows
 class TestParams(HasDistanceMeasure, HasFeaturesCol, HasGlobalBatchSize, HasHandleInvalid,
                  HasInputCols, HasLabelCol, HasLearningRate, HasMaxIter, HasMultiClass,
                  HasOutputCols, HasPredictionCol, HasRawPredictionCol, HasReg, HasSeed, HasTol,
-                 HasWeightCol, HasWindows, HasRelativeError):
+                 HasWeightCol, HasWindows, HasRelativeError, HasFlatten):
     def __init__(self):
         self._param_map = {}
 
@@ -227,3 +227,15 @@ class ParamTests(unittest.TestCase):
 
         param.set_relative_error(0.1)
         self.assertEqual(param.get_relative_error(), 0.1)
+
+    def test_flatten(self):
+        param = TestParams()
+        flatten = param.FLATTEN
+        self.assertEqual(flatten.name, "flatten")
+        self.assertEqual(flatten.description,
+                         "If false, the returned table contains only a "
+                         "single row, otherwise, one row per feature.")
+        self.assertFalse(flatten.default_value)
+
+        param.set_flatten(True)
+        self.assertTrue(param.get_flatten())

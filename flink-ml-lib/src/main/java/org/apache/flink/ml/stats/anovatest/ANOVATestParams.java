@@ -16,15 +16,15 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.stats.chisqtest;
+package org.apache.flink.ml.stats.anovatest;
 
 import org.apache.flink.ml.common.param.HasFeaturesCol;
 import org.apache.flink.ml.common.param.HasFlatten;
 import org.apache.flink.ml.common.param.HasLabelCol;
 
 /**
- * Params for {@link ChiSqTest}.
+ * Params for {@link ANOVATest}.
  *
  * @param <T> The class type of this instance.
  */
-public interface ChiSqTestParams<T> extends HasFeaturesCol<T>, HasLabelCol<T>, HasFlatten<T> {}
+public interface ANOVATestParams<T> extends HasFeaturesCol<T>, HasLabelCol<T>, HasFlatten<T> {}

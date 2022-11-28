@@ -32,6 +32,7 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.api.AlgoOperator;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
+import org.apache.flink.ml.common.param.HasFlatten;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
@@ -87,7 +88,7 @@ import java.util.stream.Collectors;
  * </ul>
  *
  * <p>The output of this algorithm can be flattened to multiple rows by setting {@link
- * ChiSqTestParams#FLATTEN}, which would contain the following columns:
+ * HasFlatten#FLATTEN} to true, which would contain the following columns:
  *
  * <ul>
  *   <li>"featureIndex": int
