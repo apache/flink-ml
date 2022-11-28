@@ -21,6 +21,7 @@ import os
 import pkgutil
 import unittest
 from abc import abstractmethod
+from typing import List
 
 from pyflink.java_gateway import get_gateway
 from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
@@ -51,8 +52,11 @@ class MLLibTest(PyFlinkMLTestCase):
             FLINK_ML_LIB_SOURCE_PATH, "target", "flink-ml-lib-*SNAPSHOT.jar"))[0]
 
         StageAnalyzer = get_gateway().jvm.org.apache.flink.ml.util.StageAnalyzer
+        module_path = 'org.apache.flink.ml.{0}'.format(self.module_name())
+        excluded_stages = list(map(lambda x: f'{module_path}.{x}', self.exclude_java_stage()))
         return sorted([stage for stage in StageAnalyzer.analyzeLibJars(ml_lib_jar)
-                       if 'org.apache.flink.ml.{0}.'.format(self.module_name()) in stage])
+                       if module_path in stage
+                       and stage not in excluded_stages])
 
     def _load_python_stages(self):
         modules = [importlib.import_module('.'.join([self.module().__name__, file_name]))
@@ -80,6 +84,9 @@ class MLLibTest(PyFlinkMLTestCase):
     @abstractmethod
     def module(self):
         pass
+
+    def exclude_java_stage(self):
+        return []
 
 
 class ClassificationCompletenessTest(CompletenessTest, MLLibTest):
@@ -139,6 +146,11 @@ class StatsCompletenessTest(CompletenessTest, MLLibTest):
     def module(self):
         from pyflink.ml.lib import stats
         return stats
+
+    def exclude_java_stage(self) -> List[str]:
+        return [
+            "anovatest.ANOVATest",
+        ]
 
 
 if __name__ == "__main__":

@@ -19,7 +19,7 @@ from abc import ABC
 from typing import Tuple
 
 from pyflink.ml.core.param import WithParams, Param, ParamValidators, StringParam, IntParam, \
-    StringArrayParam, FloatParam, WindowsParam
+    StringArrayParam, FloatParam, WindowsParam, BooleanParam
 from pyflink.ml.core.windows import Windows, GlobalWindows
 
 
@@ -560,3 +560,24 @@ class HasRelativeError(WithParams, ABC):
     @property
     def relative_error(self):
         return self.get(self.RELATIVE_ERROR)
+
+
+class HasFlatten(WithParams, ABC):
+    """
+    Interface for shared flatten param.
+    """
+    FLATTEN: Param[bool] = BooleanParam(
+        "flatten",
+        "If false, the returned table contains only a single row, otherwise, one row per feature.",
+        False
+    )
+
+    def set_flatten(self, value: bool):
+        return self.set(self.FLATTEN, value)
+
+    def get_flatten(self) -> bool:
+        return self.get(self.FLATTEN)
+
+    @property
+    def flatten(self):
+        return self.get(self.FLATTEN)
