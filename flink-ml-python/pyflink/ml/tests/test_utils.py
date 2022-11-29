@@ -44,6 +44,7 @@ class PyFlinkMLTestCase(unittest.TestCase):
         config = Configuration(
             j_configuration=get_j_env_configuration(self.env._j_stream_execution_environment))
         config.set_boolean("execution.checkpointing.checkpoints-after-tasks-finish.enabled", True)
+        config.set_boolean("execution.attached", True)
 
         self.env.set_parallelism(4)
         self.env.enable_checkpointing(100)
