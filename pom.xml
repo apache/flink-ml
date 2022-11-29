@@ -60,6 +60,7 @@ under the License.
     <module>flink-ml-benchmark</module>
     <module>flink-ml-dist</module>
     <module>flink-ml-examples</module>
+    <module>flink-ml-python</module>
   </modules>
 
   <properties>
