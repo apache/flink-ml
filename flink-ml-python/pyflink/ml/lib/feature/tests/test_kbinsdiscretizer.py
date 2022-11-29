@@ -88,6 +88,8 @@ class KBinsDiscretizerTest(PyFlinkMLTestCase):
             Vectors.dense(2, 0, 2),
         ]
 
+        self.eps = 1e-7
+
     def test_param(self):
         k_bins_discretizer = KBinsDiscretizer()
 
@@ -163,7 +165,14 @@ class KBinsDiscretizerTest(PyFlinkMLTestCase):
         expected_field_names = ['binEdges']
         self.assertEqual(expected_field_names, model_data.get_schema().get_field_names())
 
-        # TODO: Add test to collect and verify the model data results after FLINK-30122 is resolved.
+        model_rows = [result for result in
+                      self.t_env.to_data_stream(model_data).execute_and_collect()]
+        self.assertEqual(1, len(model_rows))
+        bin_edges = model_rows[0][expected_field_names.index('binEdges')]
+        self.assertEqual(3, len(bin_edges))
+        self.assertListEqual([1, 5, 9, 13], bin_edges[0])
+        self.assertListEqual([4.9e-324, 1.7976931348623157e+308], bin_edges[1])
+        self.assertListEqual([0, 1, 2, 3], bin_edges[2])
 
     def test_set_model_data(self):
         k_bins_discretizer = KBinsDiscretizer().set_num_bins(3).set_strategy('uniform')

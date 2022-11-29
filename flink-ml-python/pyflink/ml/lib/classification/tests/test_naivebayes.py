@@ -113,12 +113,31 @@ class NaiveBayesTest(PyFlinkMLTestCase):
         self.assertEqual(self.expected_output, actual_output)
 
     def test_get_model_data(self):
-        model = self.estimator.fit(self.train_data)
+        train_data = self.t_env.from_data_stream(
+            self.env.from_collection([
+                (Vectors.dense([1, 1.]), 11.),
+                (Vectors.dense([2, 1]), 11.),
+            ],
+                type_info=Types.ROW_NAMED(
+                    ['features', 'label'],
+                    [DenseVectorTypeInfo(), Types.DOUBLE()])))
+
+        model = self.estimator.fit(train_data)
         model_data = model.get_model_data()[0]
         expected_field_names = ['theta', 'piArray', 'labels']
         self.assertEqual(expected_field_names, model_data.get_schema().get_field_names())
 
-        # TODO: Add test to collect and verify the model data results after FLINK-30124 is resolved.
+        model_rows = [result for result in
+                      self.t_env.to_data_stream(model_data).execute_and_collect()]
+        self.assertEqual(1, len(model_rows))
+        self.assertListAlmostEqual(
+            [11.], model_rows[0][expected_field_names.index('labels')].to_array(), delta=1e-5)
+        self.assertListAlmostEqual(
+            [0.], model_rows[0][expected_field_names.index('piArray')].to_array(), delta=1e-5)
+        theta = model_rows[0][expected_field_names.index('theta')]
+        self.assertAlmostEqual(-0.6931471805599453, theta[0][0].get(1.0), delta=1e-5)
+        self.assertAlmostEqual(-0.6931471805599453, theta[0][0].get(2.0), delta=1e-5)
+        self.assertAlmostEqual(0.0, theta[0][1].get(1.0), delta=1e-5)
 
     def test_set_model_data(self):
         model_a = self.estimator.fit(self.train_data)

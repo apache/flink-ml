@@ -27,6 +27,8 @@ import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
@@ -90,7 +92,13 @@ public class Imputer implements Estimator<Imputer, ImputerModel>, ImputerParams<
             default:
                 throw new RuntimeException("Unsupported strategy of Imputer: " + getStrategy());
         }
-        ImputerModel model = new ImputerModel().setModelData(tEnv.fromDataStream(modelData));
+
+        Schema schema =
+                Schema.newBuilder()
+                        .column("surrogates", DataTypes.MAP(DataTypes.STRING(), DataTypes.DOUBLE()))
+                        .build();
+        ImputerModel model =
+                new ImputerModel().setModelData(tEnv.fromDataStream(modelData, schema));
         ReadWriteUtils.updateExistingParams(model, getParamMap());
         return model;
     }

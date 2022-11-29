@@ -28,10 +28,13 @@ import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
+import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
@@ -104,7 +107,20 @@ public class NaiveBayes
                         aggregatedArrays, new GenerateModelFunction(smoothing));
         modelData.getTransformation().setParallelism(1);
 
-        NaiveBayesModel model = new NaiveBayesModel().setModelData(tEnv.fromDataStream(modelData));
+        Schema schema =
+                Schema.newBuilder()
+                        .column(
+                                "theta",
+                                DataTypes.ARRAY(
+                                        DataTypes.ARRAY(
+                                                DataTypes.MAP(
+                                                        DataTypes.DOUBLE(), DataTypes.DOUBLE()))))
+                        .column("piArray", DataTypes.of(DenseVectorTypeInfo.INSTANCE))
+                        .column("labels", DataTypes.of(DenseVectorTypeInfo.INSTANCE))
+                        .build();
+
+        NaiveBayesModel model =
+                new NaiveBayesModel().setModelData(tEnv.fromDataStream(modelData, schema));
         ReadWriteUtils.updateExistingParams(model, paramMap);
         return model;
     }

@@ -39,6 +39,8 @@ import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
@@ -117,8 +119,17 @@ public class VectorIndexer
                 distinctDoubles.map(new ModelGenerator(maxCategories));
         modelData.getTransformation().setParallelism(1);
 
+        Schema schema =
+                Schema.newBuilder()
+                        .column(
+                                "categoryMaps",
+                                DataTypes.MAP(
+                                        DataTypes.INT(),
+                                        DataTypes.MAP(DataTypes.DOUBLE(), DataTypes.INT())))
+                        .build();
+
         VectorIndexerModel model =
-                new VectorIndexerModel().setModelData(tEnv.fromDataStream(modelData));
+                new VectorIndexerModel().setModelData(tEnv.fromDataStream(modelData, schema));
         ReadWriteUtils.updateExistingParams(model, paramMap);
         return model;
     }

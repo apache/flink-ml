@@ -121,8 +121,11 @@ class VarianceThresholdSelectorTest(PyFlinkMLTestCase):
         expected_field_names = ['numOfFeatures', 'indices']
         self.assertEqual(expected_field_names, model_data.get_schema().get_field_names())
 
-        # TODO: Add test to collect and verify the model data results after Flink dependency
-        #  is upgraded to 1.15.3, 1.16.0 or a higher version. Related ticket: FLINK-29477
+        model_rows = [result for result in
+                      self.t_env.to_data_stream(model_data).execute_and_collect()]
+        self.assertEqual(1, len(model_rows))
+        self.assertEqual(6, model_rows[0][expected_field_names.index('numOfFeatures')])
+        self.assertListEqual([0, 3, 5], model_rows[0][expected_field_names.index('indices')])
 
     def test_set_model_data(self):
         variance_threshold_selector = VarianceThresholdSelector() \
