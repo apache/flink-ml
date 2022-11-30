@@ -150,6 +150,7 @@ class StatsCompletenessTest(CompletenessTest, MLLibTest):
     def exclude_java_stage(self) -> List[str]:
         return [
             "anovatest.ANOVATest",
+            "fvaluetest.FValueTest",
         ]
 
 
