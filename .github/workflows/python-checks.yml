@@ -39,7 +39,7 @@ jobs:
         with:
           java-version: 1.8
       - name: Build
-        run: mvn clean install -DskipTests
+        run: mvn clean install -DskipTests --no-transfer-progress
       - name: Install python
         uses: actions/setup-python@v2
         with:

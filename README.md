@@ -8,9 +8,11 @@ Flink](https://flink.apache.org/).
 
 ## <a name="start"></a>Getting Started
 
-You can follow this [quick
+You can follow the [Python quick
+start](https://nightlies.apache.org/flink/flink-ml-docs-master/docs/try-flink-ml/python/quick-start/)
+and the [Java quick
 start](https://nightlies.apache.org/flink/flink-ml-docs-master/docs/try-flink-ml/java/quick-start/)
-guideline to get hands-on experience with Flink ML.
+to get hands-on experience with Flink ML Python and Java APIs respectively.
 
 ## <a name="build"></a>Building the Project
 
