@@ -44,3 +44,5 @@ overview of ongoing community work.
 
 The code in this repository is licensed under the [Apache Software License
 2](LICENSE).
+
+[//]: # (TODO: Add a guideline for developers to install Flink ML and run tests.)
