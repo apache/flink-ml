@@ -83,22 +83,7 @@ class PyFlinkMLTestCase(unittest.TestCase):
 
     @classmethod
     def _load_dependency_jars(cls):
-        from pyflink.ml.version import __version__
-
-        flink_version = __version__.replace(".dev0", "-SNAPSHOT")
         this_directory = os.path.abspath(os.path.dirname(__file__))
-        FLINK_ML_HOME = os.path.abspath(os.path.join(
-            this_directory,
-            "../../../../flink-ml-dist/target/flink-ml-%s-bin/flink-ml-%s" %
-            (flink_version, flink_version)))
-        FLINK_ML_LIB_PATH = os.path.join(FLINK_ML_HOME, "lib")
-        if not os.path.isdir(FLINK_ML_LIB_PATH):
-            raise Exception("You need to build Flink ML with maven you can run: "
-                            "mvn -DskipTests clean package")
-
-        for file in os.listdir(FLINK_ML_LIB_PATH):
-            if file.endswith('.jar'):
-                add_jars_to_context_class_loader(["file://{0}/{1}".format(FLINK_ML_LIB_PATH, file)])
 
         # load flink-ml-lib/flink-ml-lib-*-tests.jar
         FLINK_ML_LIB_SOURCE_PATH = os.path.abspath(os.path.join(

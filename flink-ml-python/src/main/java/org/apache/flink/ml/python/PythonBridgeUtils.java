@@ -65,7 +65,7 @@ public class PythonBridgeUtils {
                 null, null);
 
         if (obj == null) {
-            return new byte[0];
+            return pickler.dumps(null);
         } else {
             if (dataType instanceof SqlTimeTypeInfo) {
                 SqlTimeTypeInfo<?> sqlTimeTypeInfo =

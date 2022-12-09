@@ -534,6 +534,8 @@ under the License.
             <exclude>**/LICENSE*</exclude>
             <!-- artifacts created during release process -->
             <exclude>release/**</exclude>
+            <!-- resource files used in production code -->
+            <exclude>**/src/main/resources/**</exclude>
           </excludes>
         </configuration>
       </plugin>
