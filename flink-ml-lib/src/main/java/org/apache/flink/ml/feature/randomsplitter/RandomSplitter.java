@@ -18,6 +18,7 @@
 
 package org.apache.flink.ml.feature.randomsplitter;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.AlgoOperator;
 import org.apache.flink.ml.common.datastream.TableUtils;
@@ -63,13 +64,14 @@ public class RandomSplitter
         for (int i = 0; i < outputTags.length; ++i) {
             outputTags[i] = new OutputTag<Row>("outputTag_" + i, outputTypeInfo) {};
         }
+        final long seed = getSeed();
 
         SingleOutputStreamOperator<Row> results =
                 tEnv.toDataStream(inputs[0])
                         .transform(
                                 "SplitterOperator",
                                 outputTypeInfo,
-                                new SplitterOperator(outputTags, weights));
+                                new SplitterOperator(outputTags, weights, seed));
 
         Table[] outputTables = new Table[weights.length];
         outputTables[0] = tEnv.fromDataStream(results);
@@ -83,11 +85,13 @@ public class RandomSplitter
 
     private static class SplitterOperator extends AbstractStreamOperator<Row>
             implements OneInputStreamOperator<Row, Row> {
-        private final Random random = new Random(0);
+        private Random random;
+        private final long initSeed;
         OutputTag<Row>[] outputTag;
         final double[] fractions;
 
-        public SplitterOperator(OutputTag<Row>[] outputTag, Double[] weights) {
+        public SplitterOperator(OutputTag<Row>[] outputTag, Double[] weights, long initSeed) {
+            this.initSeed = initSeed;
             this.outputTag = outputTag;
             this.fractions = new double[weights.length];
             double weightSum = 0.0;
@@ -99,6 +103,15 @@ public class RandomSplitter
                 currentSum += weights[i];
                 fractions[i] = currentSum / weightSum;
             }
+        }
+
+        @Override
+        public void open() throws Exception {
+            super.open();
+            random =
+                    new Random(
+                            Tuple2.of(initSeed, getRuntimeContext().getIndexOfThisSubtask())
+                                    .hashCode());
         }
 
         @Override

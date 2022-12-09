@@ -20,10 +20,12 @@ from typing import Tuple
 from pyflink.ml.core.param import Param, FloatArrayParam, ParamValidator
 from pyflink.ml.core.wrapper import JavaWithParams
 from pyflink.ml.lib.feature.common import JavaFeatureTransformer
+from pyflink.ml.lib.param import HasSeed
 
 
 class _RandomSplitterParams(
-    JavaWithParams
+    JavaWithParams,
+    HasSeed
 ):
     """
     Checks the weights parameter.

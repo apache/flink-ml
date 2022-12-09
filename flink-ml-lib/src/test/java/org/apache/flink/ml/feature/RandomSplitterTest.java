@@ -72,8 +72,9 @@ public class RandomSplitterTest extends AbstractTestBase {
     @Test
     public void testParam() {
         RandomSplitter splitter = new RandomSplitter();
-        splitter.setWeights(0.3, 0.4);
+        splitter.setWeights(0.3, 0.4).setSeed(5L);
         assertArrayEquals(new Double[] {0.3, 0.4}, splitter.getWeights());
+        assertEquals(5L, splitter.getSeed());
     }
 
     @Test
@@ -105,6 +106,32 @@ public class RandomSplitterTest extends AbstractTestBase {
         assertEquals(result1.size() / 200.0, 1.0, 0.1);
         assertEquals(result2.size() / 400.0, 1.0, 0.1);
         verifyResultTables(data, output);
+    }
+
+    @Test
+    public void testSeed() throws Exception {
+        Table data = getTable(100);
+        RandomSplitter splitter = new RandomSplitter().setWeights(2.0, 1.0, 2.0);
+
+        Table[] output0 = splitter.transform(data);
+        List<Row> result00 =
+                IteratorUtils.toList(tEnv.toDataStream(output0[0]).executeAndCollect());
+        List<Row> result01 =
+                IteratorUtils.toList(tEnv.toDataStream(output0[1]).executeAndCollect());
+        List<Row> result02 =
+                IteratorUtils.toList(tEnv.toDataStream(output0[2]).executeAndCollect());
+
+        Table[] output1 = splitter.transform(data);
+        List<Row> result10 =
+                IteratorUtils.toList(tEnv.toDataStream(output1[0]).executeAndCollect());
+        List<Row> result11 =
+                IteratorUtils.toList(tEnv.toDataStream(output1[1]).executeAndCollect());
+        List<Row> result12 =
+                IteratorUtils.toList(tEnv.toDataStream(output1[2]).executeAndCollect());
+
+        assertEquals(result00.size(), result10.size());
+        assertEquals(result01.size(), result11.size());
+        assertEquals(result02.size(), result12.size());
     }
 
     @Test

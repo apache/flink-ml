@@ -47,7 +47,7 @@ public class RandomSplitterExample {
         Table inputTable = tEnv.fromDataStream(inputStream).as("input");
 
         // Creates a RandomSplitter object and initializes its parameters.
-        RandomSplitter splitter = new RandomSplitter().setWeights(4.0, 6.0);
+        RandomSplitter splitter = new RandomSplitter().setWeights(4.0, 6.0).setSeed(0L);
 
         // Uses the RandomSplitter to split inputData.
         Table[] outputTable = splitter.transform(inputTable);

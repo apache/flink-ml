@@ -31,9 +31,10 @@ An AlgoOperator which splits a table into N tables according to the given weight
 
 ### Parameters
 
-| Key     | Default      | Type     | Required | Description                    |
-|:--------|:-------------|:---------|:---------|:-------------------------------|
-| weights | `[1.0, 1.0]` | Double[] | no       | The weights of data splitting. |
+| Key     | Default      | Type     | Required | Description                                                                                                                                                  |
+|:--------|:-------------|:---------|:---------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| weights | `[1.0, 1.0]` | Double[] | no       | The weights of data splitting.                                                                                                                               |
+| seed    | `null`       | Long     | no       | The random seed. This parameter guarantees reproduciable output only when the paralleism is unchanged and each worker reads the same data in the same order. |
 
 ### Examples
 

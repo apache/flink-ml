@@ -39,9 +39,10 @@ class RandomSplitterTest(PyFlinkMLTestCase):
 
     def test_param(self):
         splitter = RandomSplitter()
-        splitter.set_weights(0.2, 0.8)
+        splitter.set_weights(0.2, 0.8).set_seed(5)
         self.assertEqual(0.2, splitter.weights[0])
         self.assertEqual(0.8, splitter.weights[1])
+        self.assertEqual(5, splitter.seed)
 
     def test_output_schema(self):
         splitter = RandomSplitter()
@@ -52,7 +53,7 @@ class RandomSplitterTest(PyFlinkMLTestCase):
                 type_info=Types.ROW_NAMED(
                     ['test_input', 'dummy_input'],
                     [Types.STRING(), Types.STRING()])))
-        output = splitter.set_weights(0.5, 0.5) \
+        output = splitter.set_weights(0.5, 0.5).set_seed(0) \
             .transform(input_data_table)[0]
 
         self.assertEqual(
@@ -60,14 +61,14 @@ class RandomSplitterTest(PyFlinkMLTestCase):
             output.get_schema().get_field_names())
 
     def test_transform(self):
-        splitter = RandomSplitter().set_weights(0.4, 0.6)
+        splitter = RandomSplitter().set_weights(0.4, 0.6).set_seed(0)
 
         output = splitter.transform(self.input_table)
         results = [result for result in self.t_env.to_data_stream(output[0]).execute_and_collect()]
         self.assertAlmostEqual(len(results) / 4000.0, 1.0, delta=0.1)
 
     def test_save_load_transform(self):
-        splitter = RandomSplitter().set_weights(0.4, 0.6)
+        splitter = RandomSplitter().set_weights(0.4, 0.6).set_seed(0)
         path = os.path.join(self.temp_dir, 'test_save_load_random_splitter')
         splitter.save(path)
         splitter = RandomSplitter.load(self.t_env, path)
