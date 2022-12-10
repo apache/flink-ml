@@ -13,12 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Java 8 Build
+name: Java Tests
 
-on: [push, pull_request]
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  push:
+    branches: [ '**' ]
+  pull_request:
+    branches: [ '**' ]
 
 jobs:
   java-tests:
+    if: (github.repository == 'apache/flink-ml')
     runs-on: ubuntu-latest
     strategy:
       matrix:
