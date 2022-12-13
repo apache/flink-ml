@@ -20,6 +20,7 @@ package org.apache.flink.ml.clustering.agglomerativeclustering;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
@@ -28,11 +29,7 @@ import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.common.distance.DistanceMeasure;
 import org.apache.flink.ml.common.distance.EuclideanDistanceMeasure;
-import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.VectorWithNorm;
-import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -55,7 +52,11 @@ import org.apache.commons.lang3.ArrayUtils;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -164,6 +165,10 @@ public class AgglomerativeClustering
         return paramMap;
     }
 
+    /**
+     * The implementation is based on the nearest-neighbor-chain method proposed in "Modern
+     * hierarchical, agglomerative clustering algorithms", by Daniel Mullner.
+     */
     private static class LocalAgglomerativeClusteringFunction<W extends Window>
             extends ProcessAllWindowFunction<Row, Row, W> implements ResultTypeQueryable<Row> {
         private final String featuresCol;
@@ -174,13 +179,6 @@ public class AgglomerativeClustering
         private final boolean computeFullTree;
         private final OutputTag<Tuple4<Integer, Integer, Double, Integer>> mergeInfoOutputTag;
         private final RowTypeInfo outputTypeInfo;
-
-        /** Cluster id of each data point in inputList. */
-        private int[] clusterIds;
-        /** Precomputes the norm of each vector for performance. */
-        private VectorWithNorm[] vectorWithNorms;
-        /** Next cluster Id to be assigned. */
-        private int nextClusterId = 0;
 
         public LocalAgglomerativeClusteringFunction(
                 String featuresCol,
@@ -210,30 +208,48 @@ public class AgglomerativeClustering
             List<Row> inputList = IteratorUtils.toList(values.iterator());
             int numDataPoints = inputList.size();
 
-            // Assigns initial cluster Ids.
-            clusterIds = new int[numDataPoints];
-            for (int i = 0; i < numDataPoints; i++) {
-                clusterIds[i] = getNextClusterId();
+            if (numDataPoints == 0) {
+                return;
             }
 
-            List<Cluster> activeClusters = new ArrayList<>();
+            DistanceMatrix distanceMatrix = new DistanceMatrix(numDataPoints * 2 - 1);
+            VectorWithNorm v1, v2;
             for (int i = 0; i < numDataPoints; i++) {
-                List<Integer> dataPointIds = new ArrayList<>();
-                dataPointIds.add(i);
-                activeClusters.add(new Cluster(i, dataPointIds));
+                v1 = new VectorWithNorm(inputList.get(i).getFieldAs(featuresCol));
+                for (int j = i + 1; j < numDataPoints; j++) {
+                    v2 = new VectorWithNorm(inputList.get(j).getFieldAs(featuresCol));
+                    distanceMatrix.set(i, j, distanceMeasure.distance(v1, v2));
+                }
             }
 
-            // Precomputes vector norms for faster computation.
-            vectorWithNorms = new VectorWithNorm[inputList.size()];
+            HashSet<Integer> nodeLabels = new HashSet<>(numDataPoints);
             for (int i = 0; i < numDataPoints; i++) {
-                vectorWithNorms[i] =
-                        new VectorWithNorm((Vector) inputList.get(i).getField(featuresCol));
+                nodeLabels.add(i);
             }
 
-            // Clustering process.
-            doClustering(activeClusters, context);
+            Tuple2<List<Tuple4<Integer, Integer, Integer, Double>>, int[]> nnChainAndSize =
+                    nnChainCore(nodeLabels, distanceMatrix, linkage);
 
-            // Remaps the cluster Ids and output results.
+            List<Tuple4<Integer, Integer, Integer, Double>> nnChain = nnChainAndSize.f0;
+            nnChain.sort(Comparator.comparingDouble(o -> o.f3));
+            reOrderNnChain(nnChain);
+
+            int stoppedIdx = 0;
+            if (distanceThreshold != null) {
+                for (Tuple4<Integer, Integer, Integer, Double> mergeItem : nnChain) {
+                    if (mergeItem.f3 <= distanceThreshold) {
+                        stoppedIdx++;
+                    }
+                }
+            } else {
+                stoppedIdx = numDataPoints - numCluster;
+            }
+            List<Tuple4<Integer, Integer, Integer, Double>> earlyStoppedNnChain =
+                    nnChain.subList(0, stoppedIdx);
+
+            int[] clusterIds = label(earlyStoppedNnChain, nnChain.size() + 1);
+
+            // Remaps the cluster Ids and output clustering results.
             HashMap<Integer, Integer> remappedClusterIds = new HashMap<>();
             int cnt = 0;
             for (int i = 0; i < clusterIds.length; i++) {
@@ -249,175 +265,223 @@ public class AgglomerativeClustering
             for (int i = 0; i < numDataPoints; i++) {
                 output.collect(Row.join(inputList.get(i), Row.of(clusterIds[i])));
             }
-        }
 
-        private int getNextClusterId() {
-            return nextClusterId++;
-        }
-
-        private void doClustering(
-                List<Cluster> activeClusters,
-                ProcessAllWindowFunction<Row, Row, ?>.Context context) {
-            boolean clusteringRunning =
-                    (numCluster != null && activeClusters.size() > numCluster)
-                            || (distanceThreshold != null);
-
-            while (clusteringRunning || (computeFullTree && activeClusters.size() > 1)) {
-                int clusterOffset1 = -1, clusterOffset2 = -1;
-                // Computes the distance between two clusters.
-                double minDistance = Double.MAX_VALUE;
-                for (int i = 0; i < activeClusters.size(); i++) {
-                    for (int j = i + 1; j < activeClusters.size(); j++) {
-                        double distance =
-                                computeDistanceBetweenClusters(
-                                        activeClusters.get(i), activeClusters.get(j));
-                        if (distance < minDistance) {
-                            minDistance = distance;
-                            clusterOffset1 = i;
-                            clusterOffset2 = j;
-                        }
-                    }
-                }
-
-                // Outputs the merge info.
-                Cluster cluster1 = activeClusters.get(clusterOffset1);
-                Cluster cluster2 = activeClusters.get(clusterOffset2);
-                int clusterId1 = cluster1.clusterId;
-                int clusterId2 = cluster2.clusterId;
+            // Outputs the merge info.
+            if (computeFullTree) {
+                stoppedIdx = nnChain.size();
+            }
+            for (int i = 0; i < stoppedIdx; i++) {
+                Tuple4<Integer, Integer, Integer, Double> mergeItem = nnChain.get(i);
+                int cid1 = Math.min(mergeItem.f0, mergeItem.f1);
+                int cid2 = Math.max(mergeItem.f0, mergeItem.f1);
                 context.output(
                         mergeInfoOutputTag,
                         Tuple4.of(
-                                Math.min(clusterId1, clusterId2),
-                                Math.max(clusterId1, clusterId2),
-                                minDistance,
-                                cluster1.dataPointIds.size() + cluster2.dataPointIds.size()));
-
-                // Merges these two clusters.
-                Cluster mergedCluster =
-                        new Cluster(
-                                getNextClusterId(), cluster1.dataPointIds, cluster2.dataPointIds);
-                activeClusters.set(clusterOffset1, mergedCluster);
-                activeClusters.remove(clusterOffset2);
-
-                // Updates cluster Ids for each data point if clustering is still running.
-                if (clusteringRunning) {
-                    int mergedClusterId = mergedCluster.clusterId;
-                    for (int dataPointId : mergedCluster.dataPointIds) {
-                        clusterIds[dataPointId] = mergedClusterId;
-                    }
-                }
-
-                clusteringRunning =
-                        (numCluster != null && activeClusters.size() > numCluster)
-                                || (distanceThreshold != null
-                                        && distanceThreshold > minDistance
-                                        && activeClusters.size() > 1);
+                                cid1,
+                                cid2,
+                                mergeItem.f3,
+                                nnChainAndSize.f1[cid1] + nnChainAndSize.f1[cid2]));
             }
         }
 
-        private double computeDistanceBetweenClusters(Cluster cluster1, Cluster cluster2) {
-            double distance;
-            int size1 = cluster1.dataPointIds.size();
-            int size2 = cluster2.dataPointIds.size();
+        /** Reorders the nearest-neighbor-chain. */
+        private void reOrderNnChain(List<Tuple4<Integer, Integer, Integer, Double>> nnChain) {
+            int nextClusterId = nnChain.size() + 1;
+            HashMap<Integer, Integer> nodeMapping = new HashMap<>();
+            for (Tuple4<Integer, Integer, Integer, Double> t : nnChain) {
+                if (nodeMapping.containsKey(t.f0)) {
+                    t.f0 = nodeMapping.get(t.f0);
+                }
+                if (nodeMapping.containsKey(t.f1)) {
+                    t.f1 = nodeMapping.get(t.f1);
+                }
+                nodeMapping.put(t.f2, nextClusterId);
+                nextClusterId++;
+            }
+        }
 
+        /** Converts the cluster Ids for each input data point. */
+        private int[] label(
+                List<Tuple4<Integer, Integer, Integer, Double>> nnChains, int numDataPoints) {
+            UnionFind unionFind = new UnionFind(numDataPoints);
+            for (Tuple4<Integer, Integer, Integer, Double> t : nnChains) {
+                unionFind.union(unionFind.find(t.f0), unionFind.find(t.f1));
+            }
+            int[] clusterIds = new int[numDataPoints];
+            for (int i = 0; i < clusterIds.length; i++) {
+                clusterIds[i] = unionFind.find(i);
+            }
+            return clusterIds;
+        }
+
+        /** The main logic of nearest-neighbor-chain algorithm. */
+        private Tuple2<List<Tuple4<Integer, Integer, Integer, Double>>, int[]> nnChainCore(
+                HashSet<Integer> nodeLabels, DistanceMatrix distanceMatrix, String linkage) {
+            int numDataPoints = nodeLabels.size();
+            int nextClusterId = numDataPoints;
+            List<Tuple4<Integer, Integer, Integer, Double>> nnChain =
+                    new ArrayList<>(numDataPoints);
+            List<Integer> chain = new ArrayList<>();
+            int[] size = new int[numDataPoints * 2 - 1];
+            for (int i = 0; i < numDataPoints; i++) {
+                size[i] = 1;
+            }
+
+            int a, b;
+            while (nodeLabels.size() > 1) {
+                if (chain.size() <= 3) {
+                    Iterator<Integer> iterator = nodeLabels.iterator();
+                    a = iterator.next();
+                    chain.clear();
+                    chain.add(a);
+                    b = iterator.next();
+                } else {
+                    int chainSize = chain.size();
+                    a = chain.get(chainSize - 4);
+                    b = chain.get(chainSize - 3);
+                    chain.remove(chainSize - 1);
+                    chain.remove(chainSize - 2);
+                    chain.remove(chainSize - 3);
+                }
+
+                while (chain.size() < 3 || chain.get(chain.size() - 3) != a) {
+                    double minDistance = Double.MAX_VALUE;
+                    int c = -1;
+                    for (int x : nodeLabels) {
+                        if (x == a) {
+                            continue;
+                        }
+                        double dax = distanceMatrix.get(a, x);
+                        if (dax < minDistance) {
+                            c = x;
+                            minDistance = dax;
+                        }
+                    }
+                    if (minDistance == distanceMatrix.get(a, b) && nodeLabels.contains(b)) {
+                        c = b;
+                    }
+                    b = a;
+                    a = c;
+                    chain.add(a);
+                }
+
+                int mergedNodeLabel = nextClusterId;
+                nnChain.add(Tuple4.of(a, b, mergedNodeLabel, distanceMatrix.get(a, b)));
+                nodeLabels.remove(a);
+                nodeLabels.remove(b);
+                nextClusterId++;
+                size[mergedNodeLabel] = size[a] + size[b];
+
+                for (int x : nodeLabels) {
+                    double d =
+                            computeClusterDistances(
+                                    distanceMatrix.get(a, x),
+                                    distanceMatrix.get(b, x),
+                                    distanceMatrix.get(a, b),
+                                    size[a],
+                                    size[b],
+                                    size[x],
+                                    linkage);
+                    distanceMatrix.set(x, mergedNodeLabel, d);
+                }
+
+                nodeLabels.add(mergedNodeLabel);
+            }
+
+            return Tuple2.of(nnChain, size);
+        }
+
+        /** Utility class for finding labels for input data points. */
+        private static class UnionFind {
+            private final int[] parent;
+            private int nextLabel;
+
+            public UnionFind(int numDataPoints) {
+                parent = new int[2 * numDataPoints - 1];
+                Arrays.fill(parent, -1);
+                nextLabel = numDataPoints;
+            }
+
+            public void union(int m, int n) {
+                parent[m] = nextLabel;
+                parent[n] = nextLabel;
+                nextLabel++;
+            }
+
+            public int find(int n) {
+                int p = n;
+                while (parent[n] != -1) {
+                    n = parent[n];
+                }
+                while (parent[p] != n && parent[p] != -1) {
+                    p = parent[p];
+                    parent[p] = n;
+                }
+                return n;
+            }
+        }
+
+        /** Utility class for storing distances between every two clusters. */
+        private static class DistanceMatrix {
+            /** The storage of distances between each two clusters. */
+            private final double[] distances;
+            /** Number of clusters. */
+            private final int n;
+
+            public DistanceMatrix(int n) {
+                distances = new double[n * (n - 1) / 2];
+                this.n = n;
+            }
+
+            public void set(int i, int j, double value) {
+                int smallIdx = Math.min(i, j);
+                int bigIdx = Math.max(i, j);
+                int offset = (n * 2 - 1 - smallIdx) * smallIdx / 2 + (bigIdx - smallIdx - 1);
+                distances[offset] = value;
+            }
+
+            public double get(int i, int j) {
+                int smallIdx = Math.min(i, j);
+                int bigIdx = Math.max(i, j);
+                int offset = (n * 2 - 1 - smallIdx) * smallIdx / 2 + (bigIdx - smallIdx - 1);
+                return distances[offset];
+            }
+        }
+
+        /**
+         * Computes the distance between cluster k and the new cluster merged by cluster i and j.
+         *
+         * @param dik distance between cluster i and k.
+         * @param djk distance between cluster j and k.
+         * @param dij distance between cluster i and j.
+         * @param si size of cluster i.
+         * @param sj size of cluster j.
+         * @param sk size of cluster k.
+         * @param linkage the linkage method.
+         * @return distance between cluster k and the newly merged cluster.
+         */
+        private double computeClusterDistances(
+                double dik, double djk, double dij, int si, int sj, int sk, String linkage) {
             switch (linkage) {
-                case LINKAGE_AVERAGE:
-                    distance = 0;
-                    for (int i = 0; i < size1; i++) {
-                        for (int j = 0; j < size2; j++) {
-                            VectorWithNorm vectorWithNorm1 =
-                                    vectorWithNorms[cluster1.dataPointIds.get(i)];
-                            VectorWithNorm vectorWithNorm2 =
-                                    vectorWithNorms[cluster2.dataPointIds.get(j)];
-                            distance += distanceMeasure.distance(vectorWithNorm1, vectorWithNorm2);
-                        }
-                    }
-                    distance /= size1 * size2;
-                    break;
-                case LINKAGE_COMPLETE:
-                    distance = Double.MIN_VALUE;
-                    for (int i = 0; i < size1; i++) {
-                        for (int j = 0; j < size2; j++) {
-                            VectorWithNorm vectorWithNorm1 =
-                                    vectorWithNorms[cluster1.dataPointIds.get(i)];
-                            VectorWithNorm vectorWithNorm2 =
-                                    vectorWithNorms[cluster2.dataPointIds.get(j)];
-                            distance =
-                                    Math.max(
-                                            distance,
-                                            distanceMeasure.distance(
-                                                    vectorWithNorm1, vectorWithNorm2));
-                        }
-                    }
-                    break;
                 case LINKAGE_SINGLE:
-                    distance = Double.MAX_VALUE;
-                    for (int i = 0; i < size1; i++) {
-                        for (int j = 0; j < size2; j++) {
-                            VectorWithNorm vectorWithNorm1 =
-                                    vectorWithNorms[cluster1.dataPointIds.get(i)];
-                            VectorWithNorm vectorWithNorm2 =
-                                    vectorWithNorms[cluster2.dataPointIds.get(j)];
-                            distance =
-                                    Math.min(
-                                            distance,
-                                            distanceMeasure.distance(
-                                                    vectorWithNorm1, vectorWithNorm2));
-                        }
-                    }
-                    break;
+                    return Math.min(dik, djk);
+                case LINKAGE_COMPLETE:
+                    return Math.max(dik, djk);
+                case LINKAGE_AVERAGE:
+                    return (si * dik + sj * djk) / (si + sj);
                 case LINKAGE_WARD:
-                    int vecSize = vectorWithNorms[0].vector.size();
-                    DenseVector mean1 = Vectors.dense(new double[vecSize]);
-                    DenseVector mean2 = Vectors.dense(new double[vecSize]);
-
-                    for (int i = 0; i < size1; i++) {
-                        BLAS.axpy(1.0, vectorWithNorms[cluster1.dataPointIds.get(i)].vector, mean1);
-                    }
-                    for (int i = 0; i < size2; i++) {
-                        BLAS.axpy(1.0, vectorWithNorms[cluster2.dataPointIds.get(i)].vector, mean2);
-                    }
-
-                    DenseVector meanMerged = mean1.clone();
-                    BLAS.axpy(1.0, mean2, meanMerged);
-                    BLAS.scal(1.0 / size1, mean1);
-                    BLAS.scal(1.0 / size2, mean2);
-                    BLAS.scal(1.0 / (size1 + size2), meanMerged);
-                    double essInc =
-                            size1 * BLAS.dot(mean1, mean1)
-                                    + size2 * BLAS.dot(mean2, mean2)
-                                    - (size1 + size2) * BLAS.dot(meanMerged, meanMerged);
-
-                    distance = Math.sqrt(2 * essInc);
-                    break;
+                    return Math.sqrt(
+                            ((si + sk) * dik * dik + (sj + sk) * djk * djk - sk * dij * dij)
+                                    / (si + sj + sk));
                 default:
                     throw new UnsupportedOperationException(
                             "Unsupported " + LINKAGE + " type: " + linkage + ".");
             }
-            return distance;
         }
 
         @Override
         public TypeInformation<Row> getProducedType() {
             return outputTypeInfo;
-        }
-
-        /** A cluster with cluster Id specified and data points that belong to this cluster. */
-        private static class Cluster {
-            private final int clusterId;
-            private final List<Integer> dataPointIds;
-
-            public Cluster(int clusterId, List<Integer> dataPointIds) {
-                this.clusterId = clusterId;
-                this.dataPointIds = dataPointIds;
-            }
-
-            public Cluster(
-                    int clusterId, List<Integer> dataPointIds, List<Integer> otherDataPointIds) {
-                this.clusterId = clusterId;
-                this.dataPointIds = dataPointIds;
-                this.dataPointIds.addAll(otherDataPointIds);
-            }
         }
     }
 }

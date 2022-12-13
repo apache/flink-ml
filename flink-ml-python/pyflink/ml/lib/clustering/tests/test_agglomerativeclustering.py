@@ -59,8 +59,9 @@ class AgglomerativeClusteringTest(PyFlinkMLTestCase):
 
         self.euclidean_ward_threshold_as_two_result = [
             {Vectors.dense(1, 1), Vectors.dense(1, 0)},
-            {Vectors.dense(1, 4), Vectors.dense(4, 4)},
-            {Vectors.dense(4, 1.5), Vectors.dense(4, 0)}
+            {Vectors.dense(1, 4)},
+            {Vectors.dense(4, 1.5), Vectors.dense(4, 0)},
+            {Vectors.dense(4, 4)}
         ]
 
         self.euclidean_ward_count_five_window_as_two_result = [
@@ -155,22 +156,22 @@ class AgglomerativeClusteringTest(PyFlinkMLTestCase):
 
     def test_transform(self):
         agglomerative_clustering = AgglomerativeClustering() \
-            .set_linkage('average') \
+            .set_linkage('ward') \
             .set_distance_measure('euclidean') \
             .set_prediction_col('pred')
 
-        # Tests euclidean distance with linkage as average, num_clusters = 2.
+        # Tests euclidean distance with linkage as ward, num_clusters = 2.
         outputs = agglomerative_clustering.transform(self.input_table)
         self.verify_clustering_result(self.euclidean_ward_num_clusters_as_two_result,
                                       outputs[0], "features", "pred")
 
-        # Tests euclidean distance with linkage as average, num_clusters = 2,
+        # Tests euclidean distance with linkage as ward, num_clusters = 2,
         # compute_full_tree = true.
         outputs = agglomerative_clustering.set_compute_full_tree(True).transform(self.input_table)
         self.verify_clustering_result(self.euclidean_ward_num_clusters_as_two_result,
                                       outputs[0], "features", "pred")
 
-        # Tests euclidean distance with linkage as average, distance_threshold = 2.
+        # Tests euclidean distance with linkage as ward, distance_threshold = 2.
         outputs = agglomerative_clustering \
             .set_num_clusters(None) \
             .set_distance_threshold(2.0) \
@@ -195,7 +196,7 @@ class AgglomerativeClusteringTest(PyFlinkMLTestCase):
                     [DenseVectorTypeInfo()])))
 
         agglomerative_clustering = AgglomerativeClustering() \
-            .set_linkage('average') \
+            .set_linkage('ward') \
             .set_distance_measure('euclidean') \
             .set_prediction_col('pred') \
             .set_windows(CountTumblingWindows.of(5))
@@ -234,7 +235,7 @@ class AgglomerativeClusteringTest(PyFlinkMLTestCase):
             schema)
 
         agglomerative_clustering = AgglomerativeClustering() \
-            .set_linkage('average') \
+            .set_linkage('ward') \
             .set_distance_measure('euclidean') \
             .set_prediction_col('pred') \
             .set_windows(EventTimeTumblingWindows.of(Time.seconds(1)))
@@ -307,7 +308,7 @@ class AgglomerativeClusteringTest(PyFlinkMLTestCase):
 
     def test_save_load_transform(self):
         agglomerative_clustering = AgglomerativeClustering() \
-            .set_linkage('average') \
+            .set_linkage('ward') \
             .set_distance_measure('euclidean') \
             .set_prediction_col('pred')
 
