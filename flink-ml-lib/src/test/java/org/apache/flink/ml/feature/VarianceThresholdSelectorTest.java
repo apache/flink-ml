@@ -20,17 +20,17 @@ package org.apache.flink.ml.feature;
 
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.ml.feature.variancethresholdselector.VarianceThresholdSelector;
 import org.apache.flink.ml.feature.variancethresholdselector.VarianceThresholdSelectorModel;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
+import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.table.api.Expressions;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
@@ -48,7 +48,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -64,24 +63,25 @@ public class VarianceThresholdSelectorTest extends AbstractTestBase {
 
     private static final double EPS = 1.0e-5;
     private static final List<Row> TRAIN_DATA =
-            new ArrayList<>(
-                    Arrays.asList(
-                            Row.of(1, Vectors.dense(5.0, 7.0, 0.0, 7.0, 6.0, 0.0)),
-                            Row.of(2, Vectors.dense(0.0, 9.0, 6.0, 0.0, 5.0, 9.0)),
-                            Row.of(3, Vectors.dense(0.0, 9.0, 3.0, 0.0, 5.0, 5.0)),
-                            Row.of(4, Vectors.dense(1.0, 9.0, 8.0, 5.0, 7.0, 4.0)),
-                            Row.of(5, Vectors.dense(9.0, 8.0, 6.0, 5.0, 4.0, 4.0)),
-                            Row.of(6, Vectors.dense(6.0, 9.0, 7.0, 0.0, 2.0, 0.0))));
+            Arrays.asList(
+                    Row.of(1, Vectors.dense(5.0, 7.0, 0.0, 7.0, 6.0, 0.0)),
+                    Row.of(2, Vectors.dense(0.0, 9.0, 6.0, 0.0, 5.0, 9.0).toSparse()),
+                    Row.of(3, Vectors.dense(0.0, 9.0, 3.0, 0.0, 5.0, 5.0)),
+                    Row.of(4, Vectors.dense(1.0, 9.0, 8.0, 5.0, 7.0, 4.0).toSparse()),
+                    Row.of(5, Vectors.dense(9.0, 8.0, 6.0, 5.0, 4.0, 4.0)),
+                    Row.of(6, Vectors.dense(6.0, 9.0, 7.0, 0.0, 2.0, 0.0).toSparse()));
 
     private static final List<Row> PREDICT_DATA =
-            new ArrayList<>(
-                    Arrays.asList(
-                            Row.of(Vectors.dense(1.0, 2.0, 3.0, 4.0, 5.0, 6.0)),
-                            Row.of(Vectors.dense(0.1, 0.2, 0.3, 0.4, 0.5, 0.6))));
+            Arrays.asList(
+                    Row.of(Vectors.dense(1.0, 2.0, 3.0, 4.0, 5.0, 6.0)),
+                    Row.of(Vectors.dense(0.1, 0.2, 0.3, 0.4, 0.5, 0.6)),
+                    Row.of(Vectors.sparse(6, new int[] {0, 3, 4}, new double[] {0.1, 0.3, 0.5})));
 
-    private static final List<DenseVector> EXPECTED_OUTPUT =
-            new ArrayList<>(
-                    Arrays.asList(Vectors.dense(1.0, 4.0, 6.0), Vectors.dense(0.1, 0.4, 0.6)));
+    private static final List<Vector> EXPECTED_OUTPUT =
+            Arrays.asList(
+                    Vectors.dense(1.0, 4.0, 6.0),
+                    Vectors.dense(0.1, 0.4, 0.6),
+                    Vectors.sparse(3, new int[] {0, 1}, new double[] {0.1, 0.3}));
 
     @Before
     public void before() {
@@ -94,20 +94,26 @@ public class VarianceThresholdSelectorTest extends AbstractTestBase {
         env.setRestartStrategy(RestartStrategies.noRestart());
         tEnv = StreamTableEnvironment.create(env);
 
-        trainDataTable = tEnv.fromDataStream(env.fromCollection(TRAIN_DATA)).as("id", "input");
-        predictDataTable = tEnv.fromDataStream(env.fromCollection(PREDICT_DATA)).as("input");
+        trainDataTable =
+                tEnv.fromDataStream(
+                                env.fromCollection(
+                                        TRAIN_DATA, Types.ROW(Types.INT, VectorTypeInfo.INSTANCE)))
+                        .as("id", "input");
+        predictDataTable =
+                tEnv.fromDataStream(
+                                env.fromCollection(
+                                        PREDICT_DATA, Types.ROW(VectorTypeInfo.INSTANCE)))
+                        .as("input");
     }
 
     private static void verifyPredictionResult(
-            Table output, String outputCol, List<DenseVector> expected) throws Exception {
+            Table output, String outputCol, List<Vector> expected) throws Exception {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) output).getTableEnvironment();
-        DataStream<DenseVector> stream =
+        DataStream<Vector> stream =
                 tEnv.toDataStream(output)
-                        .map(
-                                (MapFunction<Row, DenseVector>)
-                                        row -> (DenseVector) row.getField(outputCol));
-        List<DenseVector> result = IteratorUtils.toList(stream.executeAndCollect());
+                        .map((MapFunction<Row, Vector>) row -> (Vector) row.getField(outputCol));
+        List<Vector> result = IteratorUtils.toList(stream.executeAndCollect());
         compareResultCollections(expected, result, TestUtils::compare);
     }
 
@@ -160,26 +166,7 @@ public class VarianceThresholdSelectorTest extends AbstractTestBase {
         verifyPredictionResult(
                 predictTableOutput,
                 varianceThresholdSelector.getOutputCol(),
-                new ArrayList<>(Arrays.asList(Vectors.dense(), Vectors.dense())));
-    }
-
-    @Test
-    public void testInputTypeConversion() throws Exception {
-        trainDataTable =
-                TestUtils.convertDataTypesToSparseInt(
-                        tEnv, trainDataTable.select(Expressions.$("input")));
-        predictDataTable = TestUtils.convertDataTypesToSparseInt(tEnv, predictDataTable);
-        assertArrayEquals(
-                new Class<?>[] {SparseVector.class}, TestUtils.getColumnDataTypes(trainDataTable));
-        assertArrayEquals(
-                new Class<?>[] {SparseVector.class},
-                TestUtils.getColumnDataTypes(predictDataTable));
-
-        VarianceThresholdSelector varianceThresholdSelector =
-                new VarianceThresholdSelector().setVarianceThreshold(8.0);
-        VarianceThresholdSelectorModel model = varianceThresholdSelector.fit(trainDataTable);
-        Table output = model.transform(predictDataTable)[0];
-        verifyPredictionResult(output, varianceThresholdSelector.getOutputCol(), EXPECTED_OUTPUT);
+                Arrays.asList(Vectors.dense(), Vectors.dense(), Vectors.dense()));
     }
 
     @Test
@@ -202,12 +189,16 @@ public class VarianceThresholdSelectorTest extends AbstractTestBase {
     @Test
     public void testFitOnEmptyData() {
         Table emptyTable =
-                tEnv.fromDataStream(env.fromCollection(TRAIN_DATA).filter(x -> x.getArity() == 0))
+                tEnv.fromDataStream(
+                                env.fromCollection(
+                                                TRAIN_DATA,
+                                                Types.ROW(Types.INT, VectorTypeInfo.INSTANCE))
+                                        .filter(x -> x.getArity() == 0))
                         .as("id", "input");
+
         VarianceThresholdSelector varianceThresholdSelector = new VarianceThresholdSelector();
         VarianceThresholdSelectorModel model = varianceThresholdSelector.fit(emptyTable);
         Table modelDataTable = model.getModelData()[0];
-
         try {
             modelDataTable.execute().print();
             fail();
