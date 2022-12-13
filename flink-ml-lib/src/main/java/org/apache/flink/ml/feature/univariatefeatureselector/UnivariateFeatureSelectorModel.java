@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.feature.variancethresholdselector;
+package org.apache.flink.ml.feature.univariatefeatureselector;
 
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
@@ -46,22 +46,21 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * A Model which removes low-variance data using the model data computed by {@link
- * VarianceThresholdSelector}.
+ * A Model which transforms data using the model data computed by {@link UnivariateFeatureSelector}.
  */
-public class VarianceThresholdSelectorModel
-        implements Model<VarianceThresholdSelectorModel>,
-                VarianceThresholdSelectorModelParams<VarianceThresholdSelectorModel> {
+public class UnivariateFeatureSelectorModel
+        implements Model<UnivariateFeatureSelectorModel>,
+                UnivariateFeatureSelectorModelParams<UnivariateFeatureSelectorModel> {
 
     private final Map<Param<?>, Object> paramMap = new HashMap<>();
     private Table modelDataTable;
 
-    public VarianceThresholdSelectorModel() {
+    public UnivariateFeatureSelectorModel() {
         ParamUtils.initializeMapWithDefaultValues(paramMap, this);
     }
 
     @Override
-    public VarianceThresholdSelectorModel setModelData(Table... inputs) {
+    public UnivariateFeatureSelectorModel setModelData(Table... inputs) {
         Preconditions.checkArgument(inputs.length == 1);
         modelDataTable = inputs[0];
         return this;
@@ -72,29 +71,7 @@ public class VarianceThresholdSelectorModel
         return new Table[] {modelDataTable};
     }
 
-    @Override
-    public Map<Param<?>, Object> getParamMap() {
-        return paramMap;
-    }
-
-    @Override
-    public void save(String path) throws IOException {
-        ReadWriteUtils.saveMetadata(this, path);
-        ReadWriteUtils.saveModelData(
-                VarianceThresholdSelectorModelData.getModelDataStream(modelDataTable),
-                path,
-                new VarianceThresholdSelectorModelData.ModelDataEncoder());
-    }
-
-    public static VarianceThresholdSelectorModel load(StreamTableEnvironment tEnv, String path)
-            throws IOException {
-        VarianceThresholdSelectorModel model = ReadWriteUtils.loadStageParam(path);
-        Table modelDataTable =
-                ReadWriteUtils.loadModelData(
-                        tEnv, path, new VarianceThresholdSelectorModelData.ModelDataDecoder());
-        return model.setModelData(modelDataTable);
-    }
-
+    @SuppressWarnings({"unchecked", "rawtypes"})
     @Override
     public Table[] transform(Table... inputs) {
         Preconditions.checkArgument(inputs.length == 1);
@@ -102,8 +79,8 @@ public class VarianceThresholdSelectorModel
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
         DataStream<Row> data = tEnv.toDataStream(inputs[0]);
-        DataStream<VarianceThresholdSelectorModelData> varianceThresholdSelectorModel =
-                VarianceThresholdSelectorModelData.getModelDataStream(modelDataTable);
+        DataStream<UnivariateFeatureSelectorModelData> modelData =
+                UnivariateFeatureSelectorModelData.getModelDataStream(modelDataTable);
 
         final String broadcastModelKey = "broadcastModelKey";
         RowTypeInfo inputTypeInfo = TableUtils.getRowTypeInfo(inputs[0].getResolvedSchema());
@@ -112,18 +89,18 @@ public class VarianceThresholdSelectorModel
                         ArrayUtils.addAll(inputTypeInfo.getFieldTypes(), VectorTypeInfo.INSTANCE),
                         ArrayUtils.addAll(inputTypeInfo.getFieldNames(), getOutputCol()));
 
-        DataStream<Row> output =
+        DataStream<Row> outputStream =
                 BroadcastUtils.withBroadcastStream(
                         Collections.singletonList(data),
-                        Collections.singletonMap(broadcastModelKey, varianceThresholdSelectorModel),
+                        Collections.singletonMap(broadcastModelKey, modelData),
                         inputList -> {
                             DataStream input = inputList.get(0);
                             return input.map(
-                                    new PredictOutputFunction(getInputCol(), broadcastModelKey),
+                                    new PredictOutputFunction(getFeaturesCol(), broadcastModelKey),
                                     outputTypeInfo);
                         });
 
-        return new Table[] {tEnv.fromDataStream(output)};
+        return new Table[] {tEnv.fromDataStream(outputStream)};
     }
 
     /** This operator loads model data and predicts result. */
@@ -131,8 +108,7 @@ public class VarianceThresholdSelectorModel
 
         private final String inputCol;
         private final String broadcastKey;
-        private int expectedNumOfFeatures;
-        private int[] indices = null;
+        private int[] indices;
 
         public PredictOutputFunction(String inputCol, String broadcastKey) {
             this.inputCol = inputCol;
@@ -142,29 +118,48 @@ public class VarianceThresholdSelectorModel
         @Override
         public Row map(Row row) {
             if (indices == null) {
-                VarianceThresholdSelectorModelData varianceThresholdSelectorModelData =
-                        (VarianceThresholdSelectorModelData)
+                UnivariateFeatureSelectorModelData modelData =
+                        (UnivariateFeatureSelectorModelData)
                                 getRuntimeContext().getBroadcastVariable(broadcastKey).get(0);
-                expectedNumOfFeatures = varianceThresholdSelectorModelData.numOfFeatures;
-                indices =
-                        Arrays.stream(varianceThresholdSelectorModelData.indices)
-                                .sorted()
-                                .toArray();
+                indices = Arrays.stream(modelData.indices).sorted().toArray();
             }
 
-            Vector inputVec = ((Vector) row.getField(inputCol));
-            Preconditions.checkArgument(
-                    inputVec.size() == expectedNumOfFeatures,
-                    "%s has %s features, but VarianceThresholdSelector is expecting %s features as input.",
-                    inputCol,
-                    inputVec.size(),
-                    expectedNumOfFeatures);
             if (indices.length == 0) {
                 return Row.join(row, Row.of(Vectors.dense()));
             } else {
+                Vector inputVec = ((Vector) row.getField(inputCol));
+                Preconditions.checkArgument(
+                        inputVec.size() > indices[indices.length - 1],
+                        "Input %s features, but UnivariateFeatureSelector is "
+                                + "expecting at least %s features as input.",
+                        inputVec.size(),
+                        indices[indices.length - 1] + 1);
                 Vector outputVec = VectorUtils.selectByIndices(inputVec, indices);
                 return Row.join(row, Row.of(outputVec));
             }
         }
+    }
+
+    @Override
+    public void save(String path) throws IOException {
+        ReadWriteUtils.saveMetadata(this, path);
+        ReadWriteUtils.saveModelData(
+                UnivariateFeatureSelectorModelData.getModelDataStream(modelDataTable),
+                path,
+                new UnivariateFeatureSelectorModelData.ModelDataEncoder());
+    }
+
+    public static UnivariateFeatureSelectorModel load(StreamTableEnvironment tEnv, String path)
+            throws IOException {
+        UnivariateFeatureSelectorModel model = ReadWriteUtils.loadStageParam(path);
+        Table modelDataTable =
+                ReadWriteUtils.loadModelData(
+                        tEnv, path, new UnivariateFeatureSelectorModelData.ModelDataDecoder());
+        return model.setModelData(modelDataTable);
+    }
+
+    @Override
+    public Map<Param<?>, Object> getParamMap() {
+        return paramMap;
     }
 }

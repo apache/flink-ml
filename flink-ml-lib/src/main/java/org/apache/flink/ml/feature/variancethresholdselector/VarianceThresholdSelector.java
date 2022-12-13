@@ -63,11 +63,11 @@ public class VarianceThresholdSelector
         final String inputCol = getInputCol();
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
-        DataStream<DenseVector> inputData =
+        DataStream<Vector> inputData =
                 tEnv.toDataStream(inputs[0])
                         .map(
-                                (MapFunction<Row, DenseVector>)
-                                        value -> ((Vector) value.getField(inputCol)).toDense());
+                                (MapFunction<Row, Vector>)
+                                        value -> ((Vector) value.getField(inputCol)));
 
         DataStream<VarianceThresholdSelectorModelData> modelData =
                 DataStreamUtils.aggregate(
@@ -85,7 +85,7 @@ public class VarianceThresholdSelector
      */
     private static class VarianceThresholdSelectorAggregator
             implements AggregateFunction<
-                    DenseVector,
+                    Vector,
                     Tuple3<Long, DenseVector, DenseVector>,
                     VarianceThresholdSelectorModelData> {
 
@@ -102,7 +102,7 @@ public class VarianceThresholdSelector
 
         @Override
         public Tuple3<Long, DenseVector, DenseVector> add(
-                DenseVector vector, Tuple3<Long, DenseVector, DenseVector> numAndSums) {
+                Vector vector, Tuple3<Long, DenseVector, DenseVector> numAndSums) {
             if (numAndSums.f0 == 0) {
                 numAndSums.f1 = new DenseVector(vector.size());
                 numAndSums.f2 = new DenseVector(vector.size());
@@ -110,7 +110,7 @@ public class VarianceThresholdSelector
             numAndSums.f0 += 1L;
             BLAS.axpy(1.0, vector, numAndSums.f1);
             for (int i = 0; i < vector.size(); i++) {
-                numAndSums.f2.values[i] += vector.values[i] * vector.values[i];
+                numAndSums.f2.values[i] += vector.get(i) * vector.get(i);
             }
             return numAndSums;
         }
