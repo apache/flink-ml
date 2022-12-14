@@ -26,8 +26,11 @@ import org.apache.flink.api.common.functions.MapPartitionFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
+import org.apache.flink.api.common.state.ValueState;
+import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.base.IntSerializer;
 import org.apache.flink.api.dag.Transformation;
 import org.apache.flink.api.java.tuple.Tuple2;
@@ -44,16 +47,22 @@ import org.apache.flink.ml.common.window.ProcessingTimeTumblingWindows;
 import org.apache.flink.ml.common.window.Windows;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
+import org.apache.flink.runtime.state.VoidNamespace;
+import org.apache.flink.runtime.state.VoidNamespaceSerializer;
 import org.apache.flink.streaming.api.datastream.AllWindowedStream;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.KeyedStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.functions.windowing.AllWindowFunction;
 import org.apache.flink.streaming.api.functions.windowing.ProcessAllWindowFunction;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator;
 import org.apache.flink.streaming.api.operators.BoundedOneInput;
+import org.apache.flink.streaming.api.operators.InternalTimer;
+import org.apache.flink.streaming.api.operators.InternalTimerService;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.TimestampedCollector;
+import org.apache.flink.streaming.api.operators.Triggerable;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingProcessingTimeWindows;
 import org.apache.flink.streaming.api.windowing.assigners.WindowAssigner;
@@ -131,6 +140,25 @@ public class DataStreamUtils {
                     .transform("reduce", input.getType(), new ReduceOperator<>(func))
                     .setParallelism(1);
         }
+    }
+
+    /**
+     * Apply a {@link ReduceFunction} on a bounded keyed data stream. The output stream contains one
+     * stream record for each key.
+     *
+     * @param input The input keyed data stream.
+     * @param func The user defined reduce function.
+     * @return The result data stream.
+     * @param <T> The class type of input.
+     * @param <K> The key type of input.
+     */
+    public static <T, K> DataStream<T> reduce(KeyedStream<T, K> input, ReduceFunction<T> func) {
+        return input.transform(
+                        "Keyed Reduce",
+                        input.getType(),
+                        new KeyedReduceOperator<>(
+                                func, input.getType().createSerializer(input.getExecutionConfig())))
+                .setParallelism(input.getParallelism());
     }
 
     /**
@@ -369,6 +397,69 @@ public class DataStreamUtils {
                 state.add(result);
             }
         }
+    }
+
+    /**
+     * A stream operator to apply {@link ReduceFunction} on the input bounded keyed data stream.
+     *
+     * <p>Note: this class is a copy of {@link
+     * org.apache.flink.streaming.api.operators.BatchGroupedReduceOperator} in case of unexpected
+     * changes of its implementation.
+     */
+    private static class KeyedReduceOperator<IN, KEY>
+            extends AbstractUdfStreamOperator<IN, ReduceFunction<IN>>
+            implements OneInputStreamOperator<IN, IN>, Triggerable<KEY, VoidNamespace> {
+
+        private static final long serialVersionUID = 1L;
+
+        private static final String STATE_NAME = "_op_state";
+
+        private transient ValueState<IN> values;
+
+        private final TypeSerializer<IN> serializer;
+
+        private InternalTimerService<VoidNamespace> timerService;
+
+        public KeyedReduceOperator(ReduceFunction<IN> reducer, TypeSerializer<IN> serializer) {
+            super(reducer);
+            this.serializer = serializer;
+        }
+
+        @Override
+        public void open() throws Exception {
+            super.open();
+            ValueStateDescriptor<IN> stateId = new ValueStateDescriptor<>(STATE_NAME, serializer);
+            values = getPartitionedState(stateId);
+            timerService =
+                    getInternalTimerService("end-key-timers", new VoidNamespaceSerializer(), this);
+        }
+
+        @Override
+        public void processElement(StreamRecord<IN> element) throws Exception {
+            IN value = element.getValue();
+            IN currentValue = values.value();
+
+            if (currentValue == null) {
+                // register a timer for emitting the result at the end when this is the
+                // first input for this key
+                timerService.registerEventTimeTimer(VoidNamespace.INSTANCE, Long.MAX_VALUE);
+            } else {
+                // otherwise, reduce things
+                value = userFunction.reduce(currentValue, value);
+            }
+            values.update(value);
+        }
+
+        @Override
+        public void onEventTime(InternalTimer<KEY, VoidNamespace> timer) throws Exception {
+            IN currentValue = values.value();
+            if (currentValue != null) {
+                output.collect(new StreamRecord<>(currentValue, Long.MAX_VALUE));
+            }
+        }
+
+        @Override
+        public void onProcessingTime(InternalTimer<KEY, VoidNamespace> timer) throws Exception {}
     }
 
     /**
