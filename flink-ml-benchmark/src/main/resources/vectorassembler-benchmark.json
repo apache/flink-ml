@@ -17,7 +17,7 @@
   "version": 1,
   "vectorassembler1000000": {
     "inputData": {
-      "className": "org.apache.flink.ml.benchmark.datagenerator.common.ColsWithLabelGenerator",
+      "className": "org.apache.flink.ml.benchmark.datagenerator.common.DoubleGenerator",
       "paramMap": {
         "colNames": [
           [
