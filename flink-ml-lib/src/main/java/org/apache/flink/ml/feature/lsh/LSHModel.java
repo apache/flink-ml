@@ -123,7 +123,7 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
 
     /**
      * Approximately finds at most k items from a dataset which have the closest distance to a given
-     * item . If the `outputCol` is missing in the given dataset, this method transforms the dataset
+     * item. If the `outputCol` is missing in the given dataset, this method transforms the dataset
      * with the model at first.
      *
      * @param dataset The dataset in which to to search for nearest neighbors.
