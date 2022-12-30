@@ -18,9 +18,6 @@
 
 package org.apache.flink.ml.feature.lsh;
 
-import org.apache.flink.ml.common.param.HasInputCol;
-import org.apache.flink.ml.common.param.HasOutputCol;
-import org.apache.flink.ml.common.param.HasSeed;
 import org.apache.flink.ml.param.IntParam;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.param.ParamValidators;
@@ -30,7 +27,7 @@ import org.apache.flink.ml.param.ParamValidators;
  *
  * @param <T> The class type of this instance.
  */
-public interface LSHParams<T> extends HasInputCol<T>, HasOutputCol<T>, HasSeed<T> {
+public interface LSHParams<T> extends LSHModelParams<T> {
 
     /**
      * Param for the number of hash tables used in LSH OR-amplification.

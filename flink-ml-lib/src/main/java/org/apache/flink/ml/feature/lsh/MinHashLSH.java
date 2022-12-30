@@ -18,6 +18,7 @@
 
 package org.apache.flink.ml.feature.lsh;
 
+import org.apache.flink.ml.common.param.HasSeed;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -33,7 +34,7 @@ import java.io.IOException;
  *
  * <p>See: <a href="https://en.wikipedia.org/wiki/MinHash">MinHash</a>.
  */
-public class MinHashLSH extends LSH<MinHashLSH, MinHashLSHModel> {
+public class MinHashLSH extends LSH<MinHashLSH, MinHashLSHModel> implements HasSeed<MinHashLSH> {
 
     @Override
     protected MinHashLSHModel createModel(

@@ -29,12 +29,18 @@ from pyflink.ml.lib.feature.common import JavaFeatureEstimator, JavaFeatureModel
 from pyflink.ml.lib.param import HasInputCol, HasOutputCol, HasSeed
 
 
-class _LSHParams(
-    JavaWithParams,
-    HasInputCol,
-    HasOutputCol,
-    HasSeed
-):
+class _LSHModelParams(JavaWithParams,
+                      HasInputCol,
+                      HasOutputCol):
+    """
+    Params for :class:`LSHModel`
+    """
+
+    def __init__(self, java_params):
+        super(_LSHModelParams, self).__init__(java_params)
+
+
+class _LSHParams(_LSHModelParams):
     """
     Params for :class:`LSH`
     """
@@ -71,12 +77,6 @@ class _LSHParams(
     @property
     def num_hash_functions_per_table(self):
         return self.get_num_hash_functions_per_table()
-
-
-class _LSHModelParams(JavaWithParams,
-                      HasInputCol,
-                      HasOutputCol):
-    ...
 
 
 class _LSH(JavaFeatureEstimator, ABC):
@@ -171,7 +171,7 @@ class MinHashLSHModel(_LSHModel, _LSHModelParams):
         return "MinHashLSHModel"
 
 
-class MinHashLSH(_LSH, _LSHParams):
+class MinHashLSH(_LSH, _LSHParams, HasSeed):
     """
     An Estimator which implements the MinHash LSH algorithm, with Jaccard distance as its distance
     metric.
