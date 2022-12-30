@@ -27,7 +27,7 @@ import java.io.IOException;
 /**
  * An Estimator that implements the MinHash LSH algorithm, which supports LSH for Jaccard distance.
  *
- * <p>The input could be dense or sparse vectors. Each input vector must hava at least one non-zero
+ * <p>The input could be dense or sparse vectors. Each input vector must have at least one non-zero
  * index and all non-zero values are treated as binary "1" values. The sizes of input vectors should
  * be same and not too large (not larger than a large prime 2038074743).
  *
