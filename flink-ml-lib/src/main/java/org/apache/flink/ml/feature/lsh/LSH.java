@@ -40,7 +40,7 @@ import java.util.Map;
  * metrics (e.g., Jaccard distance).
  *
  * <p>The basic idea of LSH is to use to a set of hash functions to map input vectors into different
- * buckets, where closer vectors are expected to be in same bucket with higher probabilities. In
+ * buckets, where closer vectors are expected to be in the same bucket with higher probabilities. In
  * detail, each input vector is hashed by all functions. To decide whether two input vectors are
  * mapped into the same bucket, two mechanisms for assigning buckets are proposed as follows.
  *
