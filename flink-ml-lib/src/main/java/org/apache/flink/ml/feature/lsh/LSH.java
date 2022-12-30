@@ -39,7 +39,7 @@ import java.util.Map;
  * Base class for estimators that support LSH (Locality-sensitive hashing) algorithm for different
  * metrics (e.g., Jaccard distance).
  *
- * <p>The basic idea of LSH is to use to a set of hash functions to map input vectors into different
+ * <p>The basic idea of LSH is to use a set of hash functions to map input vectors into different
  * buckets, where closer vectors are expected to be in the same bucket with higher probabilities. In
  * detail, each input vector is hashed by all functions. To decide whether two input vectors are
  * mapped into the same bucket, two mechanisms for assigning buckets are proposed as follows.
