@@ -31,6 +31,10 @@ MinHash LSH is a Locality Sensitive Hashing (LSH) scheme for Jaccard distance me
 The input features are sets of natural numbers represented as non-zero indices of vectors,
 either dense vectors or sparse vectors. Typically, sparse vectors are more efficient.
 
+In addition to transforming input feature vectors to multiple hash values, the MinHash LSH 
+model also supports approximate nearest neighbors search within a dataset regarding a key 
+vector and approximate similarity join between two datasets.
+
 ### Input Columns
 
 | Param name | Type   | Default   | Description            |
@@ -45,13 +49,13 @@ either dense vectors or sparse vectors. Typically, sparse vectors are more effic
 
 ### Parameters
 
-| Key                     | Default                                                   | Type    | Required | Description                                                        |
-|-------------------------|-----------------------------------------------------------|---------|----------|--------------------------------------------------------------------|
-| inputCol                | `"input"`                                                 | String  | no       | Input column name.                                                 |
-| outputCol               | `"output"`                                                | String  | no       | Output column name.                                                |
-| seed                    | `"org.apache.flink.ml.feature.lsh.MinHashLSH".hashCode()` | Long    | no       | The random seed.                                                   |
-| numHashTables           | `1`                                                       | Integer | no       | Default number of hash tables, for OR-amplification.               |
-| numHashFunctionPerTable | `1`                                                       | Integer | no       | Default number of hash functions per table, for AND-amplification. |
+| Key                     | Default    | Type    | Required | Description                                                        |
+|-------------------------|------------|---------|----------|--------------------------------------------------------------------|
+| inputCol                | `"input"`  | String  | no       | Input column name.                                                 |
+| outputCol               | `"output"` | String  | no       | Output column name.                                                |
+| seed                    | `null`     | Long    | no       | The random seed.                                                   |
+| numHashTables           | `1`        | Integer | no       | Default number of hash tables, for OR-amplification.               |
+| numHashFunctionPerTable | `1`        | Integer | no       | Default number of hash functions per table, for AND-amplification. |
 
 ### Examples
 
