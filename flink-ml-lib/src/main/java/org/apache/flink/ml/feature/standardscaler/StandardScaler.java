@@ -56,7 +56,7 @@ import java.util.Map;
  * An Estimator which implements the standard scaling algorithm.
  *
  * <p>Standardization is a common requirement for machine learning training because they may behave
- * badly if the individual features of a input do not look like standard normally distributed data
+ * badly if the individual features of an input do not look like standard normally distributed data
  * (e.g. Gaussian with 0 mean and unit variance).
  *
  * <p>This estimator standardizes the input features by removing the mean and scaling each dimension

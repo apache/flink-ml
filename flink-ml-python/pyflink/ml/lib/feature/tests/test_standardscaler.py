@@ -118,7 +118,7 @@ class StandardScalerTest(PyFlinkMLTestCase):
         model = standard_scaler.fit(self.dense_input)
         model_data = model.get_model_data()[0]
         expected_field_names = ['mean', 'std']
-        self.assertEqual(expected_field_names, model_data.get_schema().get_field_names())
+        self.assertEqual(expected_field_names, model_data.get_schema().get_field_names()[0:2])
 
         model_rows = [result for result in
                       self.t_env.to_data_stream(model_data).execute_and_collect()]

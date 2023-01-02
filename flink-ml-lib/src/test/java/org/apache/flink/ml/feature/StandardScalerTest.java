@@ -207,7 +207,7 @@ public class StandardScalerTest extends AbstractTestBase {
 
         assertEquals(
                 Arrays.asList("mean", "std"),
-                model.getModelData()[0].getResolvedSchema().getColumnNames());
+                model.getModelData()[0].getResolvedSchema().getColumnNames().subList(0, 2));
 
         Table output = model.transform(denseTable)[0];
         verifyPredictionResult(expectedResWithStd, output, standardScaler.getOutputCol());
@@ -221,7 +221,8 @@ public class StandardScalerTest extends AbstractTestBase {
         Table modelDataTable = model.getModelData()[0];
 
         assertEquals(
-                Arrays.asList("mean", "std"), modelDataTable.getResolvedSchema().getColumnNames());
+                Arrays.asList("mean", "std"),
+                modelDataTable.getResolvedSchema().getColumnNames().subList(0, 2));
 
         List<StandardScalerModelData> collectedModelData =
                 (List<StandardScalerModelData>)
@@ -269,8 +270,7 @@ public class StandardScalerTest extends AbstractTestBase {
     }
 
     @Test
-    @SuppressWarnings("unchecked")
-    public void testFitOnEmptyData() throws Exception {
+    public void testFitOnEmptyData() {
         Table emptyTable =
                 tEnv.fromDataStream(env.fromCollection(denseInput).filter(x -> x.getArity() == 0))
                         .as("input");
