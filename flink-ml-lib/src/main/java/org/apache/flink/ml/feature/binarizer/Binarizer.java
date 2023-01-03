@@ -26,6 +26,7 @@ import org.apache.flink.ml.api.Transformer;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.linalg.typeinfo.SparseVectorTypeInfo;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
@@ -70,11 +71,12 @@ public class Binarizer implements Transformer<Binarizer>, BinarizerParams<Binari
 
         for (int i = 0; i < inputCols.length; ++i) {
             int idx = inputTypeInfo.getFieldIndex(inputCols[i]);
-            if (inputTypeInfo.getFieldTypes()[idx] instanceof SparseVectorTypeInfo) {
+            Class<?> typeClass = inputTypeInfo.getTypeAt(idx).getTypeClass();
+            if (typeClass.equals(SparseVector.class)) {
                 outputTypes[i] = SparseVectorTypeInfo.INSTANCE;
-            } else if (inputTypeInfo.getFieldTypes()[idx] instanceof DenseVectorTypeInfo) {
+            } else if (typeClass.equals(DenseVector.class)) {
                 outputTypes[i] = DenseVectorTypeInfo.INSTANCE;
-            } else if (inputTypeInfo.getFieldTypes()[idx] instanceof VectorTypeInfo) {
+            } else if (typeClass.equals(Vector.class)) {
                 outputTypes[i] = VectorTypeInfo.INSTANCE;
             } else {
                 outputTypes[i] = Types.DOUBLE;
