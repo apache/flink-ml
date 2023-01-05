@@ -15,26 +15,29 @@
 
 {
   "version": 1,
-  "standardscaler10000000": {
+  "univariatefeatureselector10000000": {
     "inputData": {
-      "className": "org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator",
+      "className": "org.apache.flink.ml.benchmark.datagenerator.common.LabeledPointWithWeightGenerator",
       "paramMap": {
-        "vectorDim": 100,
         "colNames": [
           [
-            "features"
+            "features",
+            "label",
+            "weight"
           ]
         ],
-        "seed": 2,
-        "numValues": 10000000
+        "labelArity": 10,
+        "numValues": 10000000,
+        "vectorDim": 100
       }
     },
     "stage": {
-      "className": "org.apache.flink.ml.feature.standardscaler.StandardScaler",
+      "className": "org.apache.flink.ml.feature.univariatefeatureselector.UnivariateFeatureSelector",
       "paramMap": {
-        "inputCol": "features",
-        "withMean": true,
-        "withStd": true
+        "featuresCol": "features",
+        "labelCol": "label",
+        "featureType": "continuous",
+        "labelType": "categorical"
       }
     }
   }

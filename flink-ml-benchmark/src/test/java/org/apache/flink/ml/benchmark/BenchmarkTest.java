@@ -18,40 +18,85 @@
 
 package org.apache.flink.ml.benchmark;
 
+import org.apache.flink.ml.api.Stage;
+import org.apache.flink.ml.benchmark.datagenerator.DataGenerator;
 import org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator;
 import org.apache.flink.ml.clustering.kmeans.KMeans;
+import org.apache.flink.ml.param.WithParams;
+import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.test.util.AbstractTestBase;
 
-import org.apache.commons.io.FileUtils;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
-import java.io.InputStream;
+import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /** Tests benchmarks. */
 public class BenchmarkTest extends AbstractTestBase {
-    @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
 
     @Test
     public void testParseJsonFile() throws Exception {
-        File configFile = new File(tempFolder.newFolder().getAbsolutePath() + "/test-conf.json");
-        InputStream inputStream =
-                this.getClass().getClassLoader().getResourceAsStream("benchmark-demo.json");
-        FileUtils.copyInputStreamToFile(inputStream, configFile);
+        File configFile =
+                new File(
+                        Objects.requireNonNull(
+                                        this.getClass()
+                                                .getClassLoader()
+                                                .getResource("benchmark-demo.json"))
+                                .getPath());
 
         Map<String, ?> benchmarks = BenchmarkUtils.parseJsonFile(configFile.getAbsolutePath());
         assertEquals(benchmarks.size(), 8);
         assertTrue(benchmarks.containsKey("KMeans-1"));
         assertTrue(benchmarks.containsKey("KMeansModel-1"));
+    }
+
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public void testJsonFileLegality() throws IOException, ClassNotFoundException {
+        File resourcesDir =
+                new File(
+                                Objects.requireNonNull(
+                                                this.getClass()
+                                                        .getClassLoader()
+                                                        .getResource("benchmark-demo.json"))
+                                        .getPath())
+                        .getParentFile();
+        File[] jsonFiles =
+                resourcesDir.listFiles(
+                        (dir, name) ->
+                                name.endsWith(".json") && !name.equals("benchmark-demo.json"));
+
+        for (File file : jsonFiles) {
+            Map<String, Map<String, Map<String, ?>>> benchmarks =
+                    BenchmarkUtils.parseJsonFile(file.getAbsolutePath());
+            for (Map<String, Map<String, ?>> params : benchmarks.values()) {
+                assertTrue(
+                        Arrays.asList("stage", "inputData", "modelData")
+                                .containsAll(params.keySet()));
+
+                WithParams stage = ReadWriteUtils.instantiateWithParams(params.get("stage"));
+                assertTrue(stage instanceof Stage);
+
+                WithParams inputData =
+                        ReadWriteUtils.instantiateWithParams(params.get("inputData"));
+                assertTrue(inputData instanceof DataGenerator);
+
+                if (params.containsKey("modelData")) {
+                    WithParams modelData =
+                            ReadWriteUtils.instantiateWithParams(params.get("modelData"));
+                    assertTrue(modelData instanceof DataGenerator);
+                }
+            }
+        }
     }
 
     @Test

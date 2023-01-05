@@ -15,7 +15,7 @@
 
 {
   "version": 1,
-  "standardscaler10000000": {
+  "robustscaler10000000": {
     "inputData": {
       "className": "org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator",
       "paramMap": {
@@ -30,11 +30,11 @@
       }
     },
     "stage": {
-      "className": "org.apache.flink.ml.feature.standardscaler.StandardScaler",
+      "className": "org.apache.flink.ml.feature.robustscaler.RobustScaler",
       "paramMap": {
         "inputCol": "features",
-        "withMean": true,
-        "withStd": true
+        "withCentering": true,
+        "withScaling": true
       }
     }
   }
