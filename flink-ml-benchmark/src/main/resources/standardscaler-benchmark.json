@@ -22,7 +22,7 @@
         "vectorDim": 100,
         "colNames": [
           [
-            "features"
+            "input"
           ]
         ],
         "seed": 2,
@@ -32,7 +32,6 @@
     "stage": {
       "className": "org.apache.flink.ml.feature.standardscaler.StandardScaler",
       "paramMap": {
-        "inputCol": "features",
         "withMean": true,
         "withStd": true
       }

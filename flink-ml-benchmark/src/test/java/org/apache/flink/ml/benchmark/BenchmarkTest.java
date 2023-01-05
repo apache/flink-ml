@@ -18,30 +18,41 @@
 
 package org.apache.flink.ml.benchmark;
 
-import org.apache.flink.ml.api.Stage;
-import org.apache.flink.ml.benchmark.datagenerator.DataGenerator;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator;
 import org.apache.flink.ml.clustering.kmeans.KMeans;
-import org.apache.flink.ml.param.WithParams;
-import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.test.util.AbstractTestBase;
 
+import org.junit.Before;
 import org.junit.Test;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /** Tests benchmarks. */
 public class BenchmarkTest extends AbstractTestBase {
+
+    private StreamExecutionEnvironment env;
+    private StreamTableEnvironment tEnv;
+
+    @Before
+    public void before() {
+        Configuration config = new Configuration();
+        env = StreamExecutionEnvironment.getExecutionEnvironment(config);
+        env.getConfig().enableObjectReuse();
+        tEnv = StreamTableEnvironment.create(env);
+    }
 
     @Test
     public void testParseJsonFile() throws Exception {
@@ -60,40 +71,43 @@ public class BenchmarkTest extends AbstractTestBase {
     }
 
     @Test
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    public void testJsonFileLegality() throws IOException, ClassNotFoundException {
+    public void testJsonFileLegality() throws Exception {
+        final String demoJsonFileName = "benchmark-demo.json";
+        final List<String> illegalBenchmarks =
+                Arrays.asList("Undefined-Parameter", "Unmatch-Input");
+
         File resourcesDir =
                 new File(
                                 Objects.requireNonNull(
                                                 this.getClass()
                                                         .getClassLoader()
-                                                        .getResource("benchmark-demo.json"))
+                                                        .getResource(demoJsonFileName))
                                         .getPath())
                         .getParentFile();
-        File[] jsonFiles =
-                resourcesDir.listFiles(
-                        (dir, name) ->
-                                name.endsWith(".json") && !name.equals("benchmark-demo.json"));
+        File[] jsonFiles = resourcesDir.listFiles((dir, name) -> name.endsWith(".json"));
 
         for (File file : jsonFiles) {
             Map<String, Map<String, Map<String, ?>>> benchmarks =
                     BenchmarkUtils.parseJsonFile(file.getAbsolutePath());
-            for (Map<String, Map<String, ?>> params : benchmarks.values()) {
+
+            for (Map.Entry<String, Map<String, Map<String, ?>>> entry : benchmarks.entrySet()) {
+                String benchmarkName = entry.getKey();
+                Map<String, Map<String, ?>> params = entry.getValue();
+
                 assertTrue(
                         Arrays.asList("stage", "inputData", "modelData")
                                 .containsAll(params.keySet()));
 
-                WithParams stage = ReadWriteUtils.instantiateWithParams(params.get("stage"));
-                assertTrue(stage instanceof Stage);
-
-                WithParams inputData =
-                        ReadWriteUtils.instantiateWithParams(params.get("inputData"));
-                assertTrue(inputData instanceof DataGenerator);
-
-                if (params.containsKey("modelData")) {
-                    WithParams modelData =
-                            ReadWriteUtils.instantiateWithParams(params.get("modelData"));
-                    assertTrue(modelData instanceof DataGenerator);
+                if (demoJsonFileName.equals(file.getName())
+                        && illegalBenchmarks.contains(benchmarkName)) {
+                    try {
+                        BenchmarkUtils.runBenchmark(tEnv, benchmarkName, params, true);
+                        fail("Expected exception was not thrown");
+                    } catch (Exception e) {
+                        assertNotNull(e);
+                    }
+                } else {
+                    BenchmarkUtils.runBenchmark(tEnv, benchmarkName, params, true);
                 }
             }
         }
@@ -101,10 +115,6 @@ public class BenchmarkTest extends AbstractTestBase {
 
     @Test
     public void testRunBenchmark() throws Exception {
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.getConfig().enableObjectReuse();
-        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
-
         Map<String, Map<String, ?>> params = new HashMap<>();
 
         Map<String, Object> stageParams = new HashMap<>();
@@ -133,7 +143,8 @@ public class BenchmarkTest extends AbstractTestBase {
         params.put("inputData", inputDataParams);
 
         long estimatedTime = System.currentTimeMillis();
-        BenchmarkResult result = BenchmarkUtils.runBenchmark(tEnv, "testBenchmarkName", params);
+        BenchmarkResult result =
+                BenchmarkUtils.runBenchmark(tEnv, "testBenchmarkName", params, false);
         estimatedTime = System.currentTimeMillis() - estimatedTime;
 
         assertEquals("testBenchmarkName", result.name);

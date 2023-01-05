@@ -22,7 +22,7 @@
         "vectorDim": 100,
         "colNames": [
           [
-            "features"
+            "input"
           ]
         ],
         "seed": 2,
@@ -32,7 +32,6 @@
     "stage": {
       "className": "org.apache.flink.ml.feature.robustscaler.RobustScaler",
       "paramMap": {
-        "inputCol": "features",
         "withCentering": true,
         "withScaling": true
       }

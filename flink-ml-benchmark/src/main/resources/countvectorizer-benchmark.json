@@ -21,7 +21,7 @@
       "paramMap": {
         "colNames": [
           [
-            "inputCol"
+            "input"
           ]
         ],
         "seed": 2,
@@ -31,10 +31,7 @@
       }
     },
     "stage": {
-      "className": "org.apache.flink.ml.feature.countvectorizer.CountVectorizer",
-      "paramMap": {
-        "inputCol": "inputCol"
-      }
+      "className": "org.apache.flink.ml.feature.countvectorizer.CountVectorizer"
     }
   }
 }
