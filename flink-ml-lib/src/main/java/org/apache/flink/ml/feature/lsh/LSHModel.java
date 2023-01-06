@@ -80,6 +80,7 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
 
     @Override
     public T setModelData(Table... inputs) {
+        Preconditions.checkArgument(inputs.length == 1);
         modelDataTable = inputs[0];
         return (T) this;
     }

@@ -53,7 +53,7 @@ class _LSHParams(_LSHModelParams):
         "num_hash_functions_per_table",
         "Number of hash functions per table.",
         1,
-        ParamValidators.gt_eq(1.))
+        ParamValidators.gt_eq(1))
 
     def __init__(self, java_params):
         super(_LSHParams, self).__init__(java_params)
@@ -114,10 +114,9 @@ class _LSHModel(JavaFeatureModel, ABC):
         :param dataset: The dataset in which to to search for nearest neighbors.
         :param key: The item to search for.
         :param k: The maximum number of nearest neighbors.
-        :param dist_col: The output column storing the distance between each neighbor and the
-        key.
+        :param dist_col: The output column storing the distance between each neighbor and the key.
         :return: A dataset containing at most k items closest to the key with a column named
-        `distCol` appended.
+                 `distCol` appended.
         """
         j_vectors = get_gateway().jvm.org.apache.flink.ml.linalg.Vectors
         if isinstance(key, (DenseVector,)):
@@ -149,8 +148,8 @@ class _LSHModel(JavaFeatureModel, ABC):
         :param id_col: A column in the two datasets to identify each row.
         :param dist_col: The output column storing the distance between each pair of rows.
         :return: A joined dataset containing pairs of rows. The original rows are in columns
-        "dataset_a" and "dataset_b", and a column "distCol" is added to show the distance
-        between each pair.
+                 "dataset_a" and "dataset_b", and a column "distCol" is added to show the distance
+                 between each pair.
         """
         # noinspection PyProtectedMember
         return Table(self._java_obj.approxSimilarityJoin(

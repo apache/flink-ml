@@ -52,7 +52,7 @@ public class MinHashLSHExample {
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         // Generates two datasets
-        Table data =
+        Table dataA =
                 tEnv.fromDataStream(
                         env.fromCollection(
                                 Arrays.asList(
@@ -115,10 +115,10 @@ public class MinHashLSHExample {
                         .setNumHashTables(5);
 
         // Trains the MinHashLSH model
-        MinHashLSHModel model = lsh.fit(data);
+        MinHashLSHModel model = lsh.fit(dataA);
 
         // Uses the MinHashLSH model for transformation
-        Table output = model.transform(data)[0];
+        Table output = model.transform(dataA)[0];
 
         // Extracts and displays the results
         List<String> fieldNames = output.getResolvedSchema().getColumnNames();
@@ -132,7 +132,7 @@ public class MinHashLSHExample {
 
         // Finds approximate nearest neighbors of the key
         Vector key = Vectors.sparse(6, new int[] {1, 3}, new double[] {1., 1.});
-        output = model.approxNearestNeighbors(data, key, 2).select($("id"), $("distCol"));
+        output = model.approxNearestNeighbors(dataA, key, 2).select($("id"), $("distCol"));
         for (Row result :
                 (List<Row>) IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect())) {
             int idValue = result.getFieldAs(fieldNames.indexOf("id"));
@@ -141,7 +141,7 @@ public class MinHashLSHExample {
         }
 
         // Approximately finds pairs from two datasets with distances smaller than the threshold
-        output = model.approxSimilarityJoin(data, dataB, .6, "id");
+        output = model.approxSimilarityJoin(dataA, dataB, .6, "id");
         for (Row result :
                 (List<Row>) IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect())) {
             int idAValue = result.getFieldAs(0);
@@ -149,7 +149,7 @@ public class MinHashLSHExample {
             double distValue = result.getFieldAs(2);
             System.out.printf(
                     "ID from left: %d \tID from right: %d \t Distance: %f\n",
-                    idAValue, idAValue, distValue);
+                    idAValue, idBValue, distValue);
         }
     }
 }

@@ -49,10 +49,17 @@ vector and approximate similarity join between two datasets.
 
 ### Parameters
 
+Below are the parameters required by `MinHashLSHModel`.
+
 | Key                     | Default    | Type    | Required | Description                                                        |
 |-------------------------|------------|---------|----------|--------------------------------------------------------------------|
 | inputCol                | `"input"`  | String  | no       | Input column name.                                                 |
 | outputCol               | `"output"` | String  | no       | Output column name.                                                |
+
+`MinHashLSH` needs parameters above and also below.
+
+| Key                     | Default    | Type    | Required | Description                                                        |
+|-------------------------|------------|---------|----------|--------------------------------------------------------------------|
 | seed                    | `null`     | Long    | no       | The random seed.                                                   |
 | numHashTables           | `1`        | Integer | no       | Default number of hash tables, for OR-amplification.               |
 | numHashFunctionPerTable | `1`        | Integer | no       | Default number of hash functions per table, for AND-amplification. |
@@ -98,7 +105,7 @@ public class MinHashLSHExample {
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         // Generates two datasets
-        Table data =
+        Table dataA =
                 tEnv.fromDataStream(
                         env.fromCollection(
                                 Arrays.asList(
@@ -161,10 +168,10 @@ public class MinHashLSHExample {
                         .setNumHashTables(5);
 
         // Trains the MinHashLSH model
-        MinHashLSHModel model = lsh.fit(data);
+        MinHashLSHModel model = lsh.fit(dataA);
 
         // Uses the MinHashLSH model for transformation
-        Table output = model.transform(data)[0];
+        Table output = model.transform(dataA)[0];
 
         // Extracts and displays the results
         List<String> fieldNames = output.getResolvedSchema().getColumnNames();
@@ -178,7 +185,7 @@ public class MinHashLSHExample {
 
         // Finds approximate nearest neighbors of the key
         Vector key = Vectors.sparse(6, new int[] {1, 3}, new double[] {1., 1.});
-        output = model.approxNearestNeighbors(data, key, 2).select($("id"), $("distCol"));
+        output = model.approxNearestNeighbors(dataA, key, 2).select($("id"), $("distCol"));
         for (Row result :
                 (List<Row>) IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect())) {
             int idValue = result.getFieldAs(fieldNames.indexOf("id"));
@@ -187,7 +194,7 @@ public class MinHashLSHExample {
         }
 
         // Approximately finds pairs from two datasets with distances smaller than the threshold
-        output = model.approxSimilarityJoin(data, dataB, .6, "id");
+        output = model.approxSimilarityJoin(dataA, dataB, .6, "id");
         for (Row result :
                 (List<Row>) IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect())) {
             int idAValue = result.getFieldAs(0);
@@ -225,7 +232,7 @@ env = StreamExecutionEnvironment.get_execution_environment()
 t_env = StreamTableEnvironment.create(env)
 
 # Generates two datasets
-data = t_env.from_data_stream(
+data_a = t_env.from_data_stream(
     env.from_collection([
         (0, Vectors.sparse(6, [0, 1, 2], [1., 1., 1.])),
         (1, Vectors.sparse(6, [2, 3, 4], [1., 1., 1.])),
@@ -247,10 +254,10 @@ lsh = MinHashLSH() \
     .set_num_hash_tables(5)
 
 # Trains the MinHashLSH model
-model = lsh.fit(data)
+model = lsh.fit(data_a)
 
 # Uses the MinHashLSH model for transformation
-output = model.transform(data)[0]
+output = model.transform(data_a)[0]
 
 # Extracts and displays the results
 field_names = output.get_schema().get_field_names()
@@ -261,14 +268,14 @@ for result in t_env.to_data_stream(output).execute_and_collect():
 
 # Finds approximate nearest neighbors of the key
 key = Vectors.sparse(6, [1, 3], [1., 1.])
-output = model.approx_nearest_neighbors(data, key, 2).select("id, distCol")
+output = model.approx_nearest_neighbors(data_a, key, 2).select("id, distCol")
 for result in t_env.to_data_stream(output).execute_and_collect():
     id_value = result[field_names.index("id")]
     dist_value = result[-1]
     print(f'ID: {id_value} \tDistance: {dist_value}')
 
 # Approximately finds pairs from two datasets with distances smaller than the threshold
-output = model.approx_similarity_join(data, data_b, .6, "id")
+output = model.approx_similarity_join(data_a, data_b, .6, "id")
 for result in t_env.to_data_stream(output).execute_and_collect():
     id_a_value, id_b_value, dist_value = result
     print(f'ID from left: {id_a_value} \tID from right: {id_b_value} \t Distance: {dist_value}')
