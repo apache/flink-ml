@@ -24,8 +24,8 @@ import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Stage;
 import org.apache.flink.ml.common.datastream.TableUtils;
+import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vector;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.linalg.typeinfo.SparseVectorTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -75,9 +75,9 @@ public class TestUtils {
         RowTypeInfo inputTypeInfo = TableUtils.getRowTypeInfo(table.getResolvedSchema());
         TypeInformation<?>[] fieldTypes = inputTypeInfo.getFieldTypes();
         for (int i = 0; i < fieldTypes.length; i++) {
-            if (fieldTypes[i].equals(DenseVectorTypeInfo.INSTANCE)) {
+            if (fieldTypes[i].getTypeClass().equals(DenseVector.class)) {
                 fieldTypes[i] = SparseVectorTypeInfo.INSTANCE;
-            } else if (fieldTypes[i].equals(Types.DOUBLE)) {
+            } else if (fieldTypes[i].getTypeClass().equals(Double.class)) {
                 fieldTypes[i] = Types.INT;
             }
         }

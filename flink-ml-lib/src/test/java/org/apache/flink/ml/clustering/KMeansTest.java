@@ -33,8 +33,6 @@ import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.test.util.AbstractTestBase;
@@ -168,8 +166,7 @@ public class KMeansTest extends AbstractTestBase {
                 Arrays.asList(
                         Vectors.dense(0.0, 0.1), Vectors.dense(0.0, 0.1), Vectors.dense(0.0, 0.1));
 
-        Schema schema = Schema.newBuilder().column("f0", DataTypes.of(DenseVector.class)).build();
-        Table input = tEnv.fromDataStream(env.fromCollection(data), schema).as("features");
+        Table input = tEnv.fromDataStream(env.fromCollection(data)).as("features");
 
         KMeans kmeans = new KMeans().setK(2);
         KMeansModel model = kmeans.fit(input);

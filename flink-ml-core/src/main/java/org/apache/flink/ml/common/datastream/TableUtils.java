@@ -26,18 +26,49 @@ import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ResolvedSchema;
+import org.apache.flink.table.runtime.typeutils.ExternalTypeInfo;
+import org.apache.flink.table.types.DataType;
+import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.types.Row;
+
+import java.util.HashSet;
+import java.util.Set;
 
 /** Utility class for operations related to Table API. */
 public class TableUtils {
-    // Constructs a RowTypeInfo from the given schema.
+
+    // Logical type roots that may cause wrong type conversion between Table and DataStream.
+    private static final Set<LogicalTypeRoot> LOGICAL_TYPE_ROOTS_USING_EXTERNAL_TYPE_INFO =
+            new HashSet<>();
+
+    static {
+        LOGICAL_TYPE_ROOTS_USING_EXTERNAL_TYPE_INFO.add(LogicalTypeRoot.CHAR);
+        LOGICAL_TYPE_ROOTS_USING_EXTERNAL_TYPE_INFO.add(LogicalTypeRoot.VARCHAR);
+        LOGICAL_TYPE_ROOTS_USING_EXTERNAL_TYPE_INFO.add(LogicalTypeRoot.BINARY);
+        LOGICAL_TYPE_ROOTS_USING_EXTERNAL_TYPE_INFO.add(LogicalTypeRoot.VARBINARY);
+        LOGICAL_TYPE_ROOTS_USING_EXTERNAL_TYPE_INFO.add(LogicalTypeRoot.DECIMAL);
+        LOGICAL_TYPE_ROOTS_USING_EXTERNAL_TYPE_INFO.add(LogicalTypeRoot.DATE);
+        LOGICAL_TYPE_ROOTS_USING_EXTERNAL_TYPE_INFO.add(LogicalTypeRoot.TIME_WITHOUT_TIME_ZONE);
+        LOGICAL_TYPE_ROOTS_USING_EXTERNAL_TYPE_INFO.add(
+                LogicalTypeRoot.TIMESTAMP_WITH_LOCAL_TIME_ZONE);
+        LOGICAL_TYPE_ROOTS_USING_EXTERNAL_TYPE_INFO.add(LogicalTypeRoot.INTERVAL_DAY_TIME);
+        LOGICAL_TYPE_ROOTS_USING_EXTERNAL_TYPE_INFO.add(
+                LogicalTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE);
+        LOGICAL_TYPE_ROOTS_USING_EXTERNAL_TYPE_INFO.add(LogicalTypeRoot.ARRAY);
+        LOGICAL_TYPE_ROOTS_USING_EXTERNAL_TYPE_INFO.add(LogicalTypeRoot.MAP);
+        LOGICAL_TYPE_ROOTS_USING_EXTERNAL_TYPE_INFO.add(LogicalTypeRoot.MULTISET);
+        LOGICAL_TYPE_ROOTS_USING_EXTERNAL_TYPE_INFO.add(LogicalTypeRoot.ROW);
+    }
+
+    // Constructs a RowTypeInfo from the given schema. Currently, this function does not support
+    // the case when the input contains DataTypes.TIMESTAMP_WITH_TIME_ZONE().
     public static RowTypeInfo getRowTypeInfo(ResolvedSchema schema) {
         TypeInformation<?>[] types = new TypeInformation<?>[schema.getColumnCount()];
         String[] names = new String[schema.getColumnCount()];
 
         for (int i = 0; i < schema.getColumnCount(); i++) {
             Column column = schema.getColumn(i).get();
-            types[i] = TypeInformation.of(column.getDataType().getConversionClass());
+            types[i] = getTypeInformationFromDataType(column.getDataType());
             names[i] = column.getName();
         }
         return new RowTypeInfo(types, names);
@@ -48,7 +79,7 @@ public class TableUtils {
     public static TypeInformation<?> getTypeInfoByName(ResolvedSchema schema, String name) {
         for (Column column : schema.getColumns()) {
             if (column.getName().equals(name)) {
-                return TypeInformation.of(column.getDataType().getConversionClass());
+                return getTypeInformationFromDataType(column.getDataType());
             }
         }
         return null;
@@ -58,5 +89,13 @@ public class TableUtils {
         Table table = tEnv.fromValues();
         DataStream<Row> dataStream = tEnv.toDataStream(table);
         return dataStream.getExecutionEnvironment();
+    }
+
+    private static TypeInformation<?> getTypeInformationFromDataType(DataType dataType) {
+        if (LOGICAL_TYPE_ROOTS_USING_EXTERNAL_TYPE_INFO.contains(
+                dataType.getLogicalType().getTypeRoot())) {
+            return ExternalTypeInfo.of(dataType);
+        }
+        return TypeInformation.of(dataType.getConversionClass());
     }
 }
