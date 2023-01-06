@@ -139,7 +139,7 @@ class _LSHModel(JavaFeatureModel, ABC):
     def approx_similarity_join(self, dataset_a: Table, dataset_b: Table, threshold: float,
                                id_col: str, dist_col: str = 'distCol'):
         """
-        Join two datasets to approximately find all pairs of rows whose distance are smaller
+        Joins two datasets to approximately find all pairs of rows whose distances are smaller
         than or equal to the threshold. If the `outputCol` is missing in either dataset, this
         method transforms the dataset at first.
 
