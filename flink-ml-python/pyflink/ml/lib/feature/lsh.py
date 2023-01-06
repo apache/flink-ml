@@ -79,6 +79,11 @@ class _LSHParams(_LSHModelParams):
         return self.get_num_hash_functions_per_table()
 
 
+class _MinHashLSHParams(_LSHParams, HasSeed):
+    def __init__(self, java_params):
+        super(_MinHashLSHParams, self).__init__(java_params)
+
+
 class _LSH(JavaFeatureEstimator, ABC):
     """
     Base class for estimators which implement LSH (Locality-sensitive hashing) algorithms.
@@ -170,7 +175,7 @@ class MinHashLSHModel(_LSHModel, _LSHModelParams):
         return "MinHashLSHModel"
 
 
-class MinHashLSH(_LSH, _LSHParams, HasSeed):
+class MinHashLSH(_LSH, _MinHashLSHParams):
     """
     An Estimator which implements the MinHash LSH algorithm, with Jaccard distance as its distance
     metric.
