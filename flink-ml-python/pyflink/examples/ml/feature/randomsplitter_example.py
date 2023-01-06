@@ -48,7 +48,7 @@ input_table = t_env.from_data_stream(
             [Types.INT(), Types.INT(), Types.INT()])))
 
 # Creates a RandomSplitter object and initializes its parameters.
-splitter = RandomSplitter().set_weights(4.0, 6.0)
+splitter = RandomSplitter().set_weights(4.0, 6.0).set_seed(0)
 
 # Uses the RandomSplitter to split the dataset.
 output = splitter.transform(input_table)

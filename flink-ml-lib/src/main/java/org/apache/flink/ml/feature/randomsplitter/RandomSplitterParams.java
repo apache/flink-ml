@@ -18,17 +18,17 @@
 
 package org.apache.flink.ml.feature.randomsplitter;
 
+import org.apache.flink.ml.common.param.HasSeed;
 import org.apache.flink.ml.param.DoubleArrayParam;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.param.ParamValidator;
-import org.apache.flink.ml.param.WithParams;
 
 /**
  * Params of {@link RandomSplitter}.
  *
  * @param <T> The class type of this instance.
  */
-public interface RandomSplitterParams<T> extends WithParams<T> {
+public interface RandomSplitterParams<T> extends HasSeed<T> {
     /**
      * Weights should be a non-empty array with all elements greater than zero. The weights will be
      * normalized such that the sum of all elements equals to one.
@@ -40,12 +40,12 @@ public interface RandomSplitterParams<T> extends WithParams<T> {
                     new Double[] {1.0, 1.0},
                     weightsValidator());
 
-    default Double[] getWeights() {
-        return get(WEIGHTS);
-    }
-
     default T setWeights(Double... value) {
         return set(WEIGHTS, value);
+    }
+
+    default Double[] getWeights() {
+        return get(WEIGHTS);
     }
 
     // Checks the weights parameter.
