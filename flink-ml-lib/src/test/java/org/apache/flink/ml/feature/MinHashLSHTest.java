@@ -19,7 +19,6 @@
 package org.apache.flink.ml.feature;
 
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
-import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.ml.feature.lsh.MinHashLSH;
 import org.apache.flink.ml.feature.lsh.MinHashLSHModel;
@@ -58,22 +57,75 @@ import static org.apache.flink.table.api.Expressions.$;
 /** Tests {@link MinHashLSH} and {@link MinHashLSHModel}. */
 public class MinHashLSHTest extends AbstractTestBase {
     @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
+    private final List<Row> outputRows =
+            convertToOutputFormat(
+                    Arrays.asList(
+                            new double[][] {
+                                {1.73046954E8, 1.57275425E8, 6.90717571E8},
+                                {5.02301169E8, 7.967141E8, 4.06089319E8},
+                                {2.83652171E8, 1.97714719E8, 6.04731316E8},
+                                {5.2181506E8, 6.36933726E8, 6.13894128E8},
+                                {3.04301769E8, 1.113672955E9, 6.1388711E8}
+                            },
+                            new double[][] {
+                                {1.73046954E8, 1.57275425E8, 6.7798584E7},
+                                {6.38582806E8, 1.78703694E8, 4.06089319E8},
+                                {6.232638E8, 9.28867E7, 9.92010642E8},
+                                {2.461064E8, 1.12787481E8, 1.92180297E8},
+                                {2.38162496E8, 1.552933319E9, 2.77995137E8}
+                            },
+                            new double[][] {
+                                {1.73046954E8, 1.57275425E8, 6.90717571E8},
+                                {1.453197722E9, 7.967141E8, 4.06089319E8},
+                                {6.232638E8, 1.97714719E8, 6.04731316E8},
+                                {2.461064E8, 1.12787481E8, 1.92180297E8},
+                                {1.224130231E9, 1.113672955E9, 2.77995137E8}
+                            }));
     private StreamExecutionEnvironment env;
     private StreamTableEnvironment tEnv;
+    private Table inputTable;
 
     /**
-     * Default case for most tests.
-     *
-     * @return a tuple including the estimator, input data table, and output rows.
+     * Convert a list of 2d double arrays to a list of rows with each of which containing a
+     * DenseVector array.
      */
-    private Tuple3<MinHashLSH, Table, List<Row>> getDefaultCase() {
-        MinHashLSH lsh =
-                new MinHashLSH()
-                        .setInputCol("vec")
-                        .setOutputCol("hashes")
-                        .setSeed(2022L)
-                        .setNumHashTables(5)
-                        .setNumHashFunctionsPerTable(3);
+    private static List<Row> convertToOutputFormat(List<double[][]> arrays) {
+        return arrays.stream()
+                .map(
+                        array -> {
+                            DenseVector[] denseVectors =
+                                    Arrays.stream(array)
+                                            .map(Vectors::dense)
+                                            .toArray(DenseVector[]::new);
+                            return Row.of((Object) denseVectors);
+                        })
+                .collect(Collectors.toList());
+    }
+
+    private static void verifyPredictionResult(Table output, List<Row> expected) throws Exception {
+        StreamTableEnvironment tEnv =
+                (StreamTableEnvironment) ((TableImpl) output).getTableEnvironment();
+        List<Row> results = IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect());
+        compareResultCollections(
+                expected,
+                results,
+                (d0, d1) -> {
+                    DenseVectorArrayComparator denseVectorArrayComparator =
+                            new DenseVectorArrayComparator();
+                    return denseVectorArrayComparator.compare(d0.getFieldAs(0), d1.getFieldAs(0));
+                });
+    }
+
+    @Before
+    public void before() {
+        Configuration config = new Configuration();
+        config.set(ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
+        env = StreamExecutionEnvironment.getExecutionEnvironment(config);
+        env.getConfig().enableObjectReuse();
+        env.setParallelism(4);
+        env.enableCheckpointing(100);
+        env.setRestartStrategy(RestartStrategies.noRestart());
+        tEnv = StreamTableEnvironment.create(env);
 
         List<Row> inputRows =
                 Arrays.asList(
@@ -93,93 +145,8 @@ public class MinHashLSHTest extends AbstractTestBase {
                         .column("f1", DataTypes.of(SparseVector.class))
                         .build();
         DataStream<Row> dataStream = env.fromCollection(inputRows);
-        Table inputTable = tEnv.fromDataStream(dataStream, schema).as("id", "vec");
 
-        List<Row> outputRows =
-                convertToOutputFormat(
-                        Arrays.asList(
-                                new double[][] {
-                                    {1.73046954E8, 1.57275425E8, 6.90717571E8},
-                                    {5.02301169E8, 7.967141E8, 4.06089319E8},
-                                    {2.83652171E8, 1.97714719E8, 6.04731316E8},
-                                    {5.2181506E8, 6.36933726E8, 6.13894128E8},
-                                    {3.04301769E8, 1.113672955E9, 6.1388711E8}
-                                },
-                                new double[][] {
-                                    {1.73046954E8, 1.57275425E8, 6.7798584E7},
-                                    {6.38582806E8, 1.78703694E8, 4.06089319E8},
-                                    {6.232638E8, 9.28867E7, 9.92010642E8},
-                                    {2.461064E8, 1.12787481E8, 1.92180297E8},
-                                    {2.38162496E8, 1.552933319E9, 2.77995137E8}
-                                },
-                                new double[][] {
-                                    {1.73046954E8, 1.57275425E8, 6.90717571E8},
-                                    {1.453197722E9, 7.967141E8, 4.06089319E8},
-                                    {6.232638E8, 1.97714719E8, 6.04731316E8},
-                                    {2.461064E8, 1.12787481E8, 1.92180297E8},
-                                    {1.224130231E9, 1.113672955E9, 2.77995137E8}
-                                }));
-
-        return Tuple3.of(lsh, inputTable, outputRows);
-    }
-
-    @Before
-    public void before() {
-        Configuration config = new Configuration();
-        config.set(ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
-        env = StreamExecutionEnvironment.getExecutionEnvironment(config);
-        env.getConfig().enableObjectReuse();
-        env.setParallelism(4);
-        env.enableCheckpointing(100);
-        env.setRestartStrategy(RestartStrategies.noRestart());
-        tEnv = StreamTableEnvironment.create(env);
-    }
-
-    /**
-     * Convert a list of 2d double arrays to a list of rows with each of which containing a
-     * DenseVector array.
-     */
-    private static List<Row> convertToOutputFormat(List<double[][]> arrays) {
-        return arrays.stream()
-                .map(
-                        array -> {
-                            DenseVector[] denseVectors =
-                                    Arrays.stream(array)
-                                            .map(Vectors::dense)
-                                            .toArray(DenseVector[]::new);
-                            return Row.of((Object) denseVectors);
-                        })
-                .collect(Collectors.toList());
-    }
-
-    private static class DenseVectorArrayComparator implements Comparator<DenseVector[]> {
-        @Override
-        public int compare(DenseVector[] o1, DenseVector[] o2) {
-            if (o1.length != o2.length) {
-                return o1.length - o2.length;
-            }
-            for (int i = 0; i < o1.length; i += 1) {
-                int cmp = TestUtils.compare(o1[i], o2[i]);
-                if (0 != cmp) {
-                    return cmp;
-                }
-            }
-            return 0;
-        }
-    }
-
-    private static void verifyPredictionResult(Table output, List<Row> expected) throws Exception {
-        StreamTableEnvironment tEnv =
-                (StreamTableEnvironment) ((TableImpl) output).getTableEnvironment();
-        List<Row> results = IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect());
-        compareResultCollections(
-                expected,
-                results,
-                (d0, d1) -> {
-                    DenseVectorArrayComparator denseVectorArrayComparator =
-                            new DenseVectorArrayComparator();
-                    return denseVectorArrayComparator.compare(d0.getFieldAs(0), d1.getFieldAs(0));
-                });
+        inputTable = tEnv.fromDataStream(dataStream, schema).as("id", "vec");
     }
 
     @Test
@@ -236,25 +203,31 @@ public class MinHashLSHTest extends AbstractTestBase {
 
     @Test
     public void testOutputSchema() throws Exception {
-        Tuple3<MinHashLSH, Table, List<Row>> defaultCase = getDefaultCase();
-        MinHashLSH lsh = defaultCase.f0;
-        Table data = defaultCase.f1;
-        MinHashLSHModel model = lsh.fit(data);
-        Table output = model.transform(data)[0];
+        MinHashLSH lsh =
+                new MinHashLSH()
+                        .setInputCol("vec")
+                        .setOutputCol("hashes")
+                        .setSeed(2022L)
+                        .setNumHashTables(5)
+                        .setNumHashFunctionsPerTable(3);
+        MinHashLSHModel model = lsh.fit(inputTable);
+        Table output = model.transform(inputTable)[0];
         Assert.assertEquals(
                 Arrays.asList("id", "vec", "hashes"), output.getResolvedSchema().getColumnNames());
     }
 
     @Test
     public void testFitAndPredict() throws Exception {
-        Tuple3<MinHashLSH, Table, List<Row>> defaultCase = getDefaultCase();
-        MinHashLSH lsh = defaultCase.f0;
-        Table data = defaultCase.f1;
-        List<Row> expected = defaultCase.f2;
-
-        MinHashLSHModel lshModel = lsh.fit(data);
-        Table output = lshModel.transform(data)[0].select($(lsh.getOutputCol()));
-        verifyPredictionResult(output, expected);
+        MinHashLSH lsh =
+                new MinHashLSH()
+                        .setInputCol("vec")
+                        .setOutputCol("hashes")
+                        .setSeed(2022L)
+                        .setNumHashTables(5)
+                        .setNumHashFunctionsPerTable(3);
+        MinHashLSHModel lshModel = lsh.fit(inputTable);
+        Table output = lshModel.transform(inputTable)[0].select($(lsh.getOutputCol()));
+        verifyPredictionResult(output, outputRows);
     }
 
     @Test
@@ -286,28 +259,30 @@ public class MinHashLSHTest extends AbstractTestBase {
                                     {7.967141E8}
                                 }));
         // only use the input table
-        Table data = getDefaultCase().f1;
         MinHashLSH lsh =
                 new MinHashLSH()
                         .setInputCol("vec")
                         .setOutputCol("hashes")
                         .setSeed(2022L)
                         .setNumHashTables(5);
-        MinHashLSHModel lshModel = lsh.fit(data);
-        Table output = lshModel.transform(data)[0].select($(lsh.getOutputCol()));
+        MinHashLSHModel lshModel = lsh.fit(inputTable);
+        Table output = lshModel.transform(inputTable)[0].select($(lsh.getOutputCol()));
         verifyPredictionResult(output, expected);
     }
 
     @Test
     public void testEstimatorSaveLoadAndPredict() throws Exception {
-        Tuple3<MinHashLSH, Table, List<Row>> defaultCase = getDefaultCase();
-        MinHashLSH lsh = defaultCase.f0;
-        Table data = defaultCase.f1;
-        List<Row> expected = defaultCase.f2;
+        MinHashLSH lsh =
+                new MinHashLSH()
+                        .setInputCol("vec")
+                        .setOutputCol("hashes")
+                        .setSeed(2022L)
+                        .setNumHashTables(5)
+                        .setNumHashFunctionsPerTable(3);
 
         MinHashLSH loadedLsh =
                 TestUtils.saveAndReload(tEnv, lsh, tempFolder.newFolder().getAbsolutePath());
-        MinHashLSHModel lshModel = loadedLsh.fit(data);
+        MinHashLSHModel lshModel = loadedLsh.fit(inputTable);
         Assert.assertEquals(
                 Arrays.asList(
                         "numHashTables",
@@ -315,31 +290,37 @@ public class MinHashLSHTest extends AbstractTestBase {
                         "randCoefficientA",
                         "randCoefficientB"),
                 lshModel.getModelData()[0].getResolvedSchema().getColumnNames());
-        Table output = lshModel.transform(data)[0].select($(lsh.getOutputCol()));
-        verifyPredictionResult(output, expected);
+        Table output = lshModel.transform(inputTable)[0].select($(lsh.getOutputCol()));
+        verifyPredictionResult(output, outputRows);
     }
 
     @Test
     public void testModelSaveLoadAndPredict() throws Exception {
-        Tuple3<MinHashLSH, Table, List<Row>> defaultCase = getDefaultCase();
-        MinHashLSH lsh = defaultCase.f0;
-        Table data = defaultCase.f1;
-        List<Row> expected = defaultCase.f2;
-
-        MinHashLSHModel lshModel = lsh.fit(data);
+        MinHashLSH lsh =
+                new MinHashLSH()
+                        .setInputCol("vec")
+                        .setOutputCol("hashes")
+                        .setSeed(2022L)
+                        .setNumHashTables(5)
+                        .setNumHashFunctionsPerTable(3);
+        MinHashLSHModel lshModel = lsh.fit(inputTable);
         MinHashLSHModel loadedModel =
                 TestUtils.saveAndReload(tEnv, lshModel, tempFolder.newFolder().getAbsolutePath());
-        Table output = loadedModel.transform(data)[0].select($(lsh.getOutputCol()));
-        verifyPredictionResult(output, expected);
+        Table output = loadedModel.transform(inputTable)[0].select($(lsh.getOutputCol()));
+        verifyPredictionResult(output, outputRows);
     }
 
     @Test
     public void testGetModelData() throws Exception {
-        Tuple3<MinHashLSH, Table, List<Row>> defaultCase = getDefaultCase();
-        MinHashLSH lsh = defaultCase.f0;
-        Table data = defaultCase.f1;
+        MinHashLSH lsh =
+                new MinHashLSH()
+                        .setInputCol("vec")
+                        .setOutputCol("hashes")
+                        .setSeed(2022L)
+                        .setNumHashTables(5)
+                        .setNumHashFunctionsPerTable(3);
 
-        MinHashLSHModel lshModel = lsh.fit(data);
+        MinHashLSHModel lshModel = lsh.fit(inputTable);
         Table modelDataTable = lshModel.getModelData()[0];
         List<String> modelDataColumnNames = modelDataTable.getResolvedSchema().getColumnNames();
         DataStream<Row> output = tEnv.toDataStream(modelDataTable);
@@ -372,38 +353,50 @@ public class MinHashLSHTest extends AbstractTestBase {
 
     @Test
     public void testSetModelData() throws Exception {
-        Tuple3<MinHashLSH, Table, List<Row>> defaultCase = getDefaultCase();
-        MinHashLSH lsh = defaultCase.f0;
-        Table data = defaultCase.f1;
-        List<Row> expected = defaultCase.f2;
-
-        MinHashLSHModel modelA = lsh.fit(data);
+        MinHashLSH lsh =
+                new MinHashLSH()
+                        .setInputCol("vec")
+                        .setOutputCol("hashes")
+                        .setSeed(2022L)
+                        .setNumHashTables(5)
+                        .setNumHashFunctionsPerTable(3);
+        MinHashLSHModel modelA = lsh.fit(inputTable);
         Table modelDataData = modelA.getModelData()[0];
         MinHashLSHModel modelB = new MinHashLSHModel().setModelData(modelDataData);
         ReadWriteUtils.updateExistingParams(modelB, modelA.getParamMap());
-        Table output = modelB.transform(data)[0].select($(lsh.getOutputCol()));
-        verifyPredictionResult(output, expected);
+        Table output = modelB.transform(inputTable)[0].select($(lsh.getOutputCol()));
+        verifyPredictionResult(output, outputRows);
     }
 
     @Test
     public void testApproxNearestNeighbors() {
-        Tuple3<MinHashLSH, Table, List<Row>> defaultCase = getDefaultCase();
-        MinHashLSH lsh = defaultCase.f0.setNumHashFunctionsPerTable(1);
-        Table data = defaultCase.f1;
-        MinHashLSHModel lshModel = lsh.fit(data);
+        MinHashLSH lsh =
+                new MinHashLSH()
+                        .setInputCol("vec")
+                        .setOutputCol("hashes")
+                        .setSeed(2022L)
+                        .setNumHashTables(5)
+                        .setNumHashFunctionsPerTable(1);
+        MinHashLSHModel lshModel = lsh.fit(inputTable);
         List<Row> expected = Arrays.asList(Row.of(0, .75), Row.of(1, .75));
 
         Vector key = Vectors.sparse(6, new int[] {1, 3}, new double[] {1.0, 1.0});
-        Table output = lshModel.approxNearestNeighbors(data, key, 2).select($("id"), $("distCol"));
+        Table output =
+                lshModel.approxNearestNeighbors(inputTable, key, 2).select($("id"), $("distCol"));
         List<Row> results = IteratorUtils.toList(output.execute().collect());
         compareResultCollections(expected, results, Comparator.comparing(r -> r.getFieldAs(0)));
     }
 
     @Test
     public void testApproxSimilarityJoin() {
-        Tuple3<MinHashLSH, Table, List<Row>> defaultCase = getDefaultCase();
-        MinHashLSH lsh = defaultCase.f0.setNumHashFunctionsPerTable(1);
-        Table dataA = defaultCase.f1;
+        MinHashLSH lsh =
+                new MinHashLSH()
+                        .setInputCol("vec")
+                        .setOutputCol("hashes")
+                        .setSeed(2022L)
+                        .setNumHashTables(5)
+                        .setNumHashFunctionsPerTable(1);
+        Table dataA = inputTable;
         MinHashLSHModel lshModel = lsh.fit(dataA);
 
         List<Row> inputRowsB =
@@ -436,5 +429,21 @@ public class MinHashLSHTest extends AbstractTestBase {
                 Comparator.<Row>comparingInt(r -> r.getFieldAs(0))
                         .thenComparingInt(r -> r.getFieldAs(1))
                         .thenComparingDouble(r -> r.getFieldAs(2)));
+    }
+
+    private static class DenseVectorArrayComparator implements Comparator<DenseVector[]> {
+        @Override
+        public int compare(DenseVector[] o1, DenseVector[] o2) {
+            if (o1.length != o2.length) {
+                return o1.length - o2.length;
+            }
+            for (int i = 0; i < o1.length; i += 1) {
+                int cmp = TestUtils.compare(o1[i], o2[i]);
+                if (0 != cmp) {
+                    return cmp;
+                }
+            }
+            return 0;
+        }
     }
 }

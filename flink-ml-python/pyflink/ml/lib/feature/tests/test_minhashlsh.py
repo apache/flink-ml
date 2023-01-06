@@ -17,7 +17,7 @@
 ################################################################################
 import functools
 import os
-from typing import List, Tuple
+from typing import List
 
 from pyflink.common import Row, Types
 from pyflink.java_gateway import get_gateway
@@ -31,16 +31,7 @@ from pyflink.table import Table
 class MinHashLSHTest(PyFlinkMLTestCase):
     def setUp(self):
         super(MinHashLSHTest, self).setUp()
-
-    def _get_default_case(self) -> Tuple[MinHashLSH, Table, List[Row]]:
-        lsh = MinHashLSH() \
-            .set_input_col('vec') \
-            .set_output_col('hashes') \
-            .set_seed(2022) \
-            .set_num_hash_tables(5) \
-            .set_num_hash_functions_per_table(3)
-
-        data = self.t_env.from_data_stream(
+        self.data = self.t_env.from_data_stream(
             self.env.from_collection([
                 (0, Vectors.sparse(6, [0, 1, 2], [1., 1., 1.])),
                 (1, Vectors.sparse(6, [2, 3, 4], [1., 1., 1.])),
@@ -50,7 +41,7 @@ class MinHashLSHTest(PyFlinkMLTestCase):
                     ['id', 'vec'],
                     [Types.INT(), SparseVectorTypeInfo()])))
 
-        expected = [
+        self.expected = [
             Row([
                 Vectors.dense(1.73046954E8, 1.57275425E8, 6.90717571E8),
                 Vectors.dense(5.02301169E8, 7.967141E8, 4.06089319E8),
@@ -72,7 +63,6 @@ class MinHashLSHTest(PyFlinkMLTestCase):
                 Vectors.dense(2.461064E8, 1.12787481E8, 1.92180297E8),
                 Vectors.dense(1.224130231E9, 1.113672955E9, 2.77995137E8),
             ])]
-        return lsh, data, expected
 
     def test_param(self):
         lsh = MinHashLSH()
@@ -95,39 +85,64 @@ class MinHashLSHTest(PyFlinkMLTestCase):
         self.assertEqual(4, lsh.get_num_hash_functions_per_table())
 
     def test_output_schema(self):
-        lsh, data, _ = self._get_default_case()
-        model = lsh.fit(data)
-        output = model.transform(data)[0]
+        lsh = MinHashLSH() \
+            .set_input_col('vec') \
+            .set_output_col('hashes') \
+            .set_seed(2022) \
+            .set_num_hash_tables(5) \
+            .set_num_hash_functions_per_table(3)
+        model = lsh.fit(self.data)
+        output = model.transform(self.data)[0]
         self.assertEqual(['id', 'vec', 'hashes'], output.get_schema().get_field_names())
 
     def test_fit_and_transform(self):
-        lsh, data, expected = self._get_default_case()
-        model = lsh.fit(data)
-        output = model.transform(data)[0].select("hashes")
-        self.verify_output_hashes(output, expected)
+        lsh = MinHashLSH() \
+            .set_input_col('vec') \
+            .set_output_col('hashes') \
+            .set_seed(2022) \
+            .set_num_hash_tables(5) \
+            .set_num_hash_functions_per_table(3)
+        model = lsh.fit(self.data)
+        output = model.transform(self.data)[0].select("hashes")
+        self.verify_output_hashes(output, self.expected)
 
     def test_estimator_save_load_transform(self):
         path = os.path.join(self.temp_dir, 'test_estimator_save_load_transform_minhashlsh')
-        lsh, data, expected = self._get_default_case()
+        lsh = MinHashLSH() \
+            .set_input_col('vec') \
+            .set_output_col('hashes') \
+            .set_seed(2022) \
+            .set_num_hash_tables(5) \
+            .set_num_hash_functions_per_table(3)
         lsh.save(path)
         lsh = MinHashLSH.load(self.t_env, path)
-        model = lsh.fit(data)
-        output = model.transform(data)[0].select(lsh.get_output_col())
-        self.verify_output_hashes(output, expected)
+        model = lsh.fit(self.data)
+        output = model.transform(self.data)[0].select(lsh.get_output_col())
+        self.verify_output_hashes(output, self.expected)
 
     def test_model_save_load_transform(self):
         path = os.path.join(self.temp_dir, 'test_model_save_load_transform_minhashlsh')
-        lsh, data, expected = self._get_default_case()
-        model = lsh.fit(data)
+        lsh = MinHashLSH() \
+            .set_input_col('vec') \
+            .set_output_col('hashes') \
+            .set_seed(2022) \
+            .set_num_hash_tables(5) \
+            .set_num_hash_functions_per_table(3)
+        model = lsh.fit(self.data)
         model.save(path)
         self.env.execute('save_model')
         model = MinHashLSHModel.load(self.t_env, path)
-        output = model.transform(data)[0].select(lsh.get_output_col())
-        self.verify_output_hashes(output, expected)
+        output = model.transform(self.data)[0].select(lsh.get_output_col())
+        self.verify_output_hashes(output, self.expected)
 
     def test_get_model_data(self):
-        lsh, data, _ = self._get_default_case()
-        model = lsh.fit(data)
+        lsh = MinHashLSH() \
+            .set_input_col('vec') \
+            .set_output_col('hashes') \
+            .set_seed(2022) \
+            .set_num_hash_tables(5) \
+            .set_num_hash_functions_per_table(3)
+        model = lsh.fit(self.data)
         model_data_table: Table = model.get_model_data()[0]
         self.assertEqual(
             ['numHashTables', 'numHashFunctionsPerTable', 'randCoefficientA', 'randCoefficientB'],
@@ -142,45 +157,66 @@ class MinHashLSHTest(PyFlinkMLTestCase):
                          len(model_data_row[3]))
 
     def test_set_model_data(self):
-        lsh, data, expected = self._get_default_case()
-        model_a = lsh.fit(data)
+        lsh = MinHashLSH() \
+            .set_input_col('vec') \
+            .set_output_col('hashes') \
+            .set_seed(2022) \
+            .set_num_hash_tables(5) \
+            .set_num_hash_functions_per_table(3)
+        model_a = lsh.fit(self.data)
         model_data_table = model_a.get_model_data()[0]
         model_b: MinHashLSHModel = MinHashLSHModel().set_model_data(model_data_table)
         self.update_existing_params(model_b, model_a)
-        output = model_b.transform(data)[0].select(lsh.get_output_col())
-        self.verify_output_hashes(output, expected)
+        output = model_b.transform(self.data)[0].select(lsh.get_output_col())
+        self.verify_output_hashes(output, self.expected)
 
     def test_approx_nearest_neighbors(self):
-        lsh, data, _ = self._get_default_case()
+        lsh = MinHashLSH() \
+            .set_input_col('vec') \
+            .set_output_col('hashes') \
+            .set_seed(2022) \
+            .set_num_hash_tables(5) \
+            .set_num_hash_functions_per_table(1)
         expected = [
             Row(0, 0.75),
             Row(1, 0.75),
         ]
 
-        model: MinHashLSHModel = lsh.set_num_hash_functions_per_table(1).fit(data)
+        model: MinHashLSHModel = lsh.fit(self.data)
         key = Vectors.sparse(6, [1, 3], [1., 1.])
-        output = model.approx_nearest_neighbors(data, key, 2).select("id, distCol")
+        output = model.approx_nearest_neighbors(self.data, key, 2).select("id, distCol")
         actual_result = [r for r in self.t_env.to_data_stream(output).execute_and_collect()]
         actual_result.sort(key=lambda r: r[0])
         self.assertEqual(expected, actual_result)
 
     def test_approx_nearest_neighbors_dense_vector(self):
-        lsh, data, _ = self._get_default_case()
+        lsh = MinHashLSH() \
+            .set_input_col('vec') \
+            .set_output_col('hashes') \
+            .set_seed(2022) \
+            .set_num_hash_tables(5) \
+            .set_num_hash_functions_per_table(1)
         expected = [
             Row(0, 0.75),
             Row(1, 0.75),
         ]
 
-        model: MinHashLSHModel = lsh.set_num_hash_functions_per_table(1).fit(data)
+        model: MinHashLSHModel = lsh.fit(self.data)
         key = Vectors.dense([0., 1., 0., 1., 0., 0.])
-        output = model.approx_nearest_neighbors(data, key, 2).select("id, distCol")
+        output = model.approx_nearest_neighbors(self.data, key, 2).select("id, distCol")
         actual_result = [r for r in self.t_env.to_data_stream(output).execute_and_collect()]
         actual_result.sort(key=lambda r: r[0])
         self.assertEqual(expected, actual_result)
 
     def test_approx_similarity_join(self):
-        lsh, data_a, _ = self._get_default_case()
-        model: MinHashLSHModel = lsh.set_num_hash_functions_per_table(1).fit(data_a)
+        lsh = MinHashLSH() \
+            .set_input_col('vec') \
+            .set_output_col('hashes') \
+            .set_seed(2022) \
+            .set_num_hash_tables(5) \
+            .set_num_hash_functions_per_table(1)
+        data_a = self.data
+        model: MinHashLSHModel = lsh.fit(data_a)
         data_b = self.t_env.from_data_stream(
             self.env.from_collection([
                 (3, Vectors.sparse(6, [1, 3, 5], [1., 1., 1.])),
