@@ -107,7 +107,7 @@ class _LSHModel(JavaFeatureModel, ABC):
     def approx_nearest_neighbors(self, dataset: Table, key: Vector, k: int,
                                  dist_col: str = 'distCol'):
         """
-        Given a dataset and an item, approximately find at most k items which have the closest
+        Given a dataset and an item, approximately finds at most k items that have the closest
         distance to the item. If the `outputCol` is missing in the given dataset, this method
         transforms the dataset with the model at first.
 
