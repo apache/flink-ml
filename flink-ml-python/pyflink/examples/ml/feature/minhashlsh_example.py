@@ -19,7 +19,6 @@
 # Simple program that trains a MinHashLSH model and uses it for approximate nearest neighbors
 # and similarity join.
 
-
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.table import StreamTableEnvironment
