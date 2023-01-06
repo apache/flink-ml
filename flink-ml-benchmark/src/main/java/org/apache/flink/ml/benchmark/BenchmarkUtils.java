@@ -72,7 +72,10 @@ public class BenchmarkUtils {
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static BenchmarkResult runBenchmark(
-            StreamTableEnvironment tEnv, String name, Map<String, Map<String, ?>> params)
+            StreamTableEnvironment tEnv,
+            String name,
+            Map<String, Map<String, ?>> params,
+            boolean dryRun)
             throws Exception {
         Stage stage = ReadWriteUtils.instantiateWithParams(params.get("stage"));
         InputDataGenerator inputDataGenerator =
@@ -82,7 +85,7 @@ public class BenchmarkUtils {
             modelDataGenerator = ReadWriteUtils.instantiateWithParams(params.get("modelData"));
         }
 
-        return runBenchmark(tEnv, name, stage, inputDataGenerator, modelDataGenerator);
+        return runBenchmark(tEnv, name, stage, inputDataGenerator, modelDataGenerator, dryRun);
     }
 
     /**
@@ -96,7 +99,8 @@ public class BenchmarkUtils {
             String name,
             Stage<?> stage,
             InputDataGenerator<?> inputDataGenerator,
-            DataGenerator<?> modelDataGenerator)
+            DataGenerator<?> modelDataGenerator,
+            boolean dryRun)
             throws Exception {
         StreamExecutionEnvironment env = TableUtils.getExecutionEnvironment(tEnv);
 
@@ -116,6 +120,10 @@ public class BenchmarkUtils {
 
         for (Table table : outputTables) {
             tEnv.toDataStream(table).addSink(new CountingAndDiscardingSink<>());
+        }
+
+        if (dryRun) {
+            return null;
         }
 
         JobExecutionResult executionResult = env.execute("Flink ML Benchmark Job " + name);

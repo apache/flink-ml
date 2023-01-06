@@ -24,6 +24,7 @@ import org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorArrayGenera
 import org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator;
 import org.apache.flink.ml.benchmark.datagenerator.common.DoubleGenerator;
 import org.apache.flink.ml.benchmark.datagenerator.common.LabeledPointWithWeightGenerator;
+import org.apache.flink.ml.benchmark.datagenerator.common.RandomStringArrayGenerator;
 import org.apache.flink.ml.benchmark.datagenerator.common.RandomStringGenerator;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
@@ -150,7 +151,7 @@ public class DataGeneratorTest {
                         .setColNames(new String[] {col1, col2})
                         .setSeed(2L)
                         .setNumValues(5)
-                        .setNumDistinctValue(2);
+                        .setNumDistinctValues(2);
 
         int count = 0;
         for (CloseableIterator<Row> it = generator.getData(tEnv)[0].execute().collect();
@@ -159,8 +160,38 @@ public class DataGeneratorTest {
             count++;
             String value1 = (String) row.getField(col1);
             String value2 = (String) row.getField(col2);
-            assertTrue(Integer.parseInt(value1) < generator.getNumDistinctValue());
-            assertTrue(Integer.parseInt(value2) < generator.getNumDistinctValue());
+            assertTrue(Integer.parseInt(value1) < generator.getNumDistinctValues());
+            assertTrue(Integer.parseInt(value2) < generator.getNumDistinctValues());
+        }
+        assertEquals(generator.getNumValues(), count);
+    }
+
+    @Test
+    public void testRandomStringArrayGenerator() {
+        String col1 = "col1";
+        String col2 = "col2";
+
+        RandomStringArrayGenerator generator =
+                new RandomStringArrayGenerator()
+                        .setColNames(new String[] {col1, col2})
+                        .setSeed(2L)
+                        .setNumValues(5)
+                        .setNumDistinctValues(2)
+                        .setArraySize(3);
+
+        int count = 0;
+        for (CloseableIterator<Row> it = generator.getData(tEnv)[0].execute().collect();
+                it.hasNext(); ) {
+            Row row = it.next();
+            count++;
+            String[] value1 = (String[]) row.getField(col1);
+            String[] value2 = (String[]) row.getField(col2);
+            assertEquals(generator.getArraySize(), value1.length);
+            assertEquals(generator.getArraySize(), value2.length);
+            for (int i = 0; i < generator.getArraySize(); i++) {
+                assertTrue(Integer.parseInt(value1[i]) < generator.getNumDistinctValues());
+                assertTrue(Integer.parseInt(value2[i]) < generator.getNumDistinctValues());
+            }
         }
         assertEquals(generator.getNumValues(), count);
     }

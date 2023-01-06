@@ -15,26 +15,23 @@
 
 {
   "version": 1,
-  "standardscaler10000000": {
+  "countvectorizer10000000": {
     "inputData": {
-      "className": "org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator",
+      "className": "org.apache.flink.ml.benchmark.datagenerator.common.RandomStringArrayGenerator",
       "paramMap": {
-        "vectorDim": 100,
         "colNames": [
           [
             "input"
           ]
         ],
         "seed": 2,
-        "numValues": 10000000
+        "numValues": 10000000,
+        "arraySize": 100,
+        "numDistinctValues": 100
       }
     },
     "stage": {
-      "className": "org.apache.flink.ml.feature.standardscaler.StandardScaler",
-      "paramMap": {
-        "withMean": true,
-        "withStd": true
-      }
+      "className": "org.apache.flink.ml.feature.countvectorizer.CountVectorizer"
     }
   }
 }

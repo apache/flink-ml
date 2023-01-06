@@ -15,31 +15,71 @@
 
 {
   "version": 1,
-  "stringindexer100000000": {
+  "imputer10000000": {
     "inputData": {
-      "className": "org.apache.flink.ml.benchmark.datagenerator.common.RandomStringGenerator",
+      "className": "org.apache.flink.ml.benchmark.datagenerator.common.DoubleGenerator",
       "paramMap": {
         "colNames": [
           [
-            "col0"
+            "f0",
+            "f1",
+            "f2",
+            "f3",
+            "f4",
+            "f5",
+            "f6",
+            "f7",
+            "f8",
+            "f9",
+            "f10",
+            "f11",
+            "f12",
+            "f13",
+            "f14"
           ]
         ],
         "seed": 2,
-        "numValues": 100000000,
-        "numDistinctValues": 100
+        "arity": 100,
+        "numValues": 10000000
       }
     },
     "stage": {
-      "className": "org.apache.flink.ml.feature.stringindexer.StringIndexer",
+      "className": "org.apache.flink.ml.feature.imputer.Imputer",
       "paramMap": {
-        "outputCols": [
-          "outputCol0"
-        ],
-        "handleInvalid": "skip",
         "inputCols": [
-          "col0"
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4",
+          "f5",
+          "f6",
+          "f7",
+          "f8",
+          "f9",
+          "f10",
+          "f11",
+          "f12",
+          "f13",
+          "f14"
         ],
-        "stringOrderType": "arbitrary"
+        "outputCols": [
+          "o0",
+          "o1",
+          "o2",
+          "o3",
+          "o4",
+          "o5",
+          "o6",
+          "o7",
+          "o8",
+          "o9",
+          "o10",
+          "o11",
+          "o12",
+          "o13",
+          "o14"
+        ]
       }
     }
   }

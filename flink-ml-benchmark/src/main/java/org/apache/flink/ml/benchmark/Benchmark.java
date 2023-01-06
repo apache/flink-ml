@@ -92,7 +92,7 @@ public class Benchmark {
 
             try {
                 BenchmarkResult result =
-                        BenchmarkUtils.runBenchmark(tEnv, benchmarkName, benchmarkMap);
+                        BenchmarkUtils.runBenchmark(tEnv, benchmarkName, benchmarkMap, false);
                 benchmarkMap.put("results", result.toMap());
                 LOG.info(String.format("Benchmark %s finished.\n%s", benchmarkName, benchmarkMap));
             } catch (Exception e) {

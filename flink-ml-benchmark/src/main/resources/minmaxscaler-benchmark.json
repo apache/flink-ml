@@ -22,7 +22,7 @@
         "vectorDim": 100,
         "colNames": [
           [
-            "features"
+            "input"
           ]
         ],
         "seed": 2,
@@ -30,11 +30,7 @@
       }
     },
     "stage": {
-      "className": "org.apache.flink.ml.feature.minmaxscaler.MinMaxScaler",
-      "paramMap": {
-        "inputCol": "features",
-        "outputCol": "outputCol"
-      }
+      "className": "org.apache.flink.ml.feature.minmaxscaler.MinMaxScaler"
     }
   }
 }

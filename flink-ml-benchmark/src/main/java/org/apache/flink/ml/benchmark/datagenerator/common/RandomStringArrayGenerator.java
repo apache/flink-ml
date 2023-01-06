@@ -21,15 +21,17 @@ package org.apache.flink.ml.benchmark.datagenerator.common;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
+import org.apache.flink.ml.benchmark.datagenerator.param.HasArraySize;
 import org.apache.flink.ml.benchmark.datagenerator.param.HasNumDistinctValues;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.Preconditions;
 
 import java.util.Arrays;
 
-/** A DataGenerator which creates a table of random strings. */
-public class RandomStringGenerator extends InputTableGenerator<RandomStringGenerator>
-        implements HasNumDistinctValues<RandomStringGenerator> {
+/** A DataGenerator which creates a table of random string arrays. */
+public class RandomStringArrayGenerator extends InputTableGenerator<RandomStringArrayGenerator>
+        implements HasArraySize<RandomStringArrayGenerator>,
+                HasNumDistinctValues<RandomStringArrayGenerator> {
 
     @Override
     protected RowGenerator[] getRowGenerators() {
@@ -37,14 +39,20 @@ public class RandomStringGenerator extends InputTableGenerator<RandomStringGener
         Preconditions.checkState(colNames.length == 1);
         int numOutputCols = colNames[0].length;
         int numDistinctValues = getNumDistinctValues();
+        int arraySize = getArraySize();
 
         return new RowGenerator[] {
             new RowGenerator(getNumValues(), getSeed()) {
                 @Override
                 public Row nextRow() {
                     Row r = new Row(numOutputCols);
+
                     for (int i = 0; i < numOutputCols; i++) {
-                        r.setField(i, Integer.toString(random.nextInt(numDistinctValues)));
+                        String[] item = new String[arraySize];
+                        for (int j = 0; j < arraySize; j++) {
+                            item[j] = Integer.toString(random.nextInt(numDistinctValues));
+                        }
+                        r.setField(i, item);
                     }
                     return r;
                 }
@@ -52,7 +60,7 @@ public class RandomStringGenerator extends InputTableGenerator<RandomStringGener
                 @Override
                 protected RowTypeInfo getRowTypeInfo() {
                     TypeInformation[] outputTypes = new TypeInformation[colNames[0].length];
-                    Arrays.fill(outputTypes, Types.STRING);
+                    Arrays.fill(outputTypes, Types.OBJECT_ARRAY(Types.STRING));
                     return new RowTypeInfo(outputTypes, colNames[0]);
                 }
             }

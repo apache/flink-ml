@@ -18,23 +18,29 @@
 
 package org.apache.flink.ml.benchmark.datagenerator.clustering;
 
-import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.ml.benchmark.datagenerator.DataGenerator;
 import org.apache.flink.ml.benchmark.datagenerator.InputDataGenerator;
 import org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorArrayGenerator;
 import org.apache.flink.ml.benchmark.datagenerator.param.HasArraySize;
 import org.apache.flink.ml.benchmark.datagenerator.param.HasVectorDim;
-import org.apache.flink.ml.clustering.kmeans.KMeansModelData;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
-import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
+import org.apache.flink.table.catalog.DataTypeFactory;
+import org.apache.flink.table.functions.ScalarFunction;
+import org.apache.flink.table.types.inference.TypeInference;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
+
+import static org.apache.flink.table.api.Expressions.$;
+import static org.apache.flink.table.api.Expressions.call;
 
 /**
  * A DataGenerator which creates a table containing one {@link
@@ -55,20 +61,36 @@ public class KMeansModelDataGenerator
         InputDataGenerator<?> vectorArrayGenerator = new DenseVectorArrayGenerator();
         ReadWriteUtils.updateExistingParams(vectorArrayGenerator, paramMap);
         vectorArrayGenerator.setNumValues(1);
+        vectorArrayGenerator.setColNames(new String[] {"centroids"});
 
-        Table vectorArrayTable = vectorArrayGenerator.getData(tEnv)[0];
-        DataStream<KMeansModelData> modelDataStream =
-                tEnv.toDataStream(vectorArrayTable, DenseVector[].class)
-                        .map(new GenerateKMeansModelDataFunction());
+        Table centroidsTable = vectorArrayGenerator.getData(tEnv)[0];
 
-        return new Table[] {tEnv.fromDataStream(modelDataStream)};
+        Table modelDataTable =
+                centroidsTable.select(
+                        $("centroids"),
+                        call(GenerateWeightsFunction.class, $("centroids")).as("weights"));
+
+        return new Table[] {modelDataTable};
     }
 
-    private static class GenerateKMeansModelDataFunction
-            implements MapFunction<DenseVector[], KMeansModelData> {
+    /**
+     * A scalar function that generates the weights vector for KMeansModelData from the centroids
+     * information.
+     */
+    public static class GenerateWeightsFunction extends ScalarFunction {
+        public DenseVector eval(DenseVector[] centroids) {
+            return new DenseVector(centroids.length);
+        }
+
         @Override
-        public KMeansModelData map(DenseVector[] vectors) {
-            return new KMeansModelData(vectors, new DenseVector(vectors.length));
+        public TypeInference getTypeInference(DataTypeFactory typeFactory) {
+            return TypeInference.newBuilder()
+                    .outputTypeStrategy(
+                            callContext ->
+                                    Optional.of(
+                                            DataTypes.of(DenseVectorTypeInfo.INSTANCE)
+                                                    .toDataType(typeFactory)))
+                    .build();
         }
     }
 

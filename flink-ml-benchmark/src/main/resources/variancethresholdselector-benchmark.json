@@ -15,7 +15,7 @@
 
 {
   "version": 1,
-  "standardscaler10000000": {
+  "variancethresholdselector10000000": {
     "inputData": {
       "className": "org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator",
       "paramMap": {
@@ -30,11 +30,7 @@
       }
     },
     "stage": {
-      "className": "org.apache.flink.ml.feature.standardscaler.StandardScaler",
-      "paramMap": {
-        "withMean": true,
-        "withStd": true
-      }
+      "className": "org.apache.flink.ml.feature.variancethresholdselector.VarianceThresholdSelector"
     }
   }
 }
