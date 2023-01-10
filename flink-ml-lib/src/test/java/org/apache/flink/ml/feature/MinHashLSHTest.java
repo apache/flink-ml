@@ -86,7 +86,7 @@ public class MinHashLSHTest extends AbstractTestBase {
     private Table inputTable;
 
     /**
-     * Convert a list of 2d double arrays to a list of rows with each of which containing a
+     * Converts a list of 2d double arrays to a list of rows with each of which containing a
      * DenseVector array.
      */
     private static List<Row> convertToOutputFormat(List<double[][]> arrays) {
@@ -232,7 +232,7 @@ public class MinHashLSHTest extends AbstractTestBase {
 
     @Test
     public void testFitAndPredictWithNumHashFunctionPerTableIsOne() throws Exception {
-        // when numHashFunctionPerTable = 1 and other parameters are same, the results should be the
+        // When numHashFunctionPerTable = 1 and other parameters are same, the results should be the
         // same with SparkML.
         final List<Row> expected =
                 convertToOutputFormat(
@@ -258,7 +258,6 @@ public class MinHashLSHTest extends AbstractTestBase {
                                     {1.453197722E9},
                                     {7.967141E8}
                                 }));
-        // only use the input table
         MinHashLSH lsh =
                 new MinHashLSH()
                         .setInputCol("vec")

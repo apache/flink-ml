@@ -45,10 +45,24 @@ class _LSHParams(_LSHModelParams):
     Params for :class:`LSH`
     """
 
+    """
+    Param for the number of hash tables used in LSH OR-amplification.
+
+    OR-amplification can be used to reduce the false negative rate. Higher values of this
+    param lead to a reduced false negative rate, at the expense of added computational
+    complexity.
+    """
     NUM_HASH_TABLES: Param[int] = IntParam(
         "num_hash_tables", "Number of hash tables.", 1, ParamValidators.gt_eq(1)
     )
 
+    """
+    Param for the number of hash functions per hash table used in LSH AND-amplification.
+
+    AND-amplification can be used to reduce the false positive rate. Higher values of this
+    param lead to a reduced false positive rate, at the expense of added computational
+    complexity.
+    """
     NUM_HASH_FUNCTIONS_PER_TABLE: Param[int] = IntParam(
         "num_hash_functions_per_table",
         "Number of hash functions per table.",
@@ -80,13 +94,33 @@ class _LSHParams(_LSHModelParams):
 
 
 class _MinHashLSHParams(_LSHParams, HasSeed):
+    """
+    Params for :class:`MinHashLSH`
+    """
+
     def __init__(self, java_params):
         super(_MinHashLSHParams, self).__init__(java_params)
 
 
 class _LSH(JavaFeatureEstimator, ABC):
     """
-    Base class for estimators which implement LSH (Locality-sensitive hashing) algorithms.
+    Base class for estimators that support LSH (Locality-sensitive hashing) algorithm for different
+    metrics (e.g., Jaccard distance).
+
+    The basic idea of LSH is to use a set of hash functions to map input vectors into different
+    buckets, where closer vectors are expected to be in the same bucket with higher probabilities.
+    In detail, each input vector is hashed by all functions. To decide whether two input vectors
+    are mapped into the same bucket, two mechanisms for assigning buckets are proposed as follows.
+
+    <ul>
+        <li>AND-amplification: The two input vectors are defined to be in the same bucket as long as
+        ALL of the hash value matches.
+        <li>OR-amplification: The two input vectors are defined to be in the same bucket as long as
+        ANY of the hash value matches.
+    </ul>
+
+    See: <a href="https://en.wikipedia.org/wiki/Locality-sensitive_hashing">
+    Locality-sensitive_hashing</a>.
     """
 
     def __init__(self):
@@ -100,6 +134,10 @@ class _LSH(JavaFeatureEstimator, ABC):
 class _LSHModel(JavaFeatureModel, ABC):
     """
     Base class for LSH model.
+
+    In addition to transforming input feature vectors to multiple hash values, it also supports
+    approximate nearest neighbors search within a dataset regarding a key vector and approximate
+    similarity join between two datasets.
     """
 
     def __init__(self, java_model):
@@ -112,9 +150,9 @@ class _LSHModel(JavaFeatureModel, ABC):
     def approx_nearest_neighbors(self, dataset: Table, key: Vector, k: int,
                                  dist_col: str = 'distCol'):
         """
-        Given a dataset and an item, approximately finds at most k items that have the closest
-        distance to the item. If the `outputCol` is missing in the given dataset, this method
-        transforms the dataset with the model at first.
+        Approximately finds at most k items from a dataset which have the closest distance to a
+        given item. If the `outputCol` is missing in the given dataset, this method transforms the
+        dataset with the model at first.
 
         :param dataset: The dataset in which to to search for nearest neighbors.
         :param key: The item to search for.
@@ -143,9 +181,9 @@ class _LSHModel(JavaFeatureModel, ABC):
     def approx_similarity_join(self, dataset_a: Table, dataset_b: Table, threshold: float,
                                id_col: str, dist_col: str = 'distCol'):
         """
-        Joins two datasets to approximately find all pairs of rows whose distances are smaller
-        than or equal to the threshold. If the `outputCol` is missing in either dataset, this
-        method transforms the dataset at first.
+        Joins two datasets to approximately find all pairs of rows whose distance are smaller than
+        or equal to the threshold. If the `outputCol` is missing in either dataset, this method
+        transforms the dataset at first.
 
         :param dataset_a: One dataset.
         :param dataset_b: The other dataset.
@@ -177,10 +215,13 @@ class MinHashLSHModel(_LSHModel, _LSHModelParams):
 
 class MinHashLSH(_LSH, _MinHashLSHParams):
     """
-    An Estimator which implements the MinHash LSH algorithm, with Jaccard distance as its distance
-    metric.
+    An Estimator that implements the MinHash LSH algorithm, which supports LSH for Jaccard distance.
 
-    See: https://en.wikipedia.org/wiki/MinHash.
+    The input could be dense or sparse vectors. Each input vector must have at least one non-zero
+    index and all non-zero values are treated as binary "1" values. The sizes of input vectors
+    should be same and not larger than a predefined prime (i.e., 2038074743).
+
+    See: <a href="https://en.wikipedia.org/wiki/MinHash">MinHash</a>.
     """
 
     def __init__(self):
