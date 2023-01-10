@@ -398,7 +398,7 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
         public PriorityQueue<Row> merge(PriorityQueue<Row> a, PriorityQueue<Row> b) {
             PriorityQueue<Row> merged = new PriorityQueue<>(a);
             for (Row row : b) {
-                merged = add(row, merged);
+                add(row, merged);
             }
             return merged;
         }

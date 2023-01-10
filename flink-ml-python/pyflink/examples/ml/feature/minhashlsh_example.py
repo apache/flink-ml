@@ -26,13 +26,13 @@ from pyflink.table import StreamTableEnvironment
 from pyflink.ml.core.linalg import Vectors, SparseVectorTypeInfo
 from pyflink.ml.lib.feature.lsh import MinHashLSH
 
-# Creates a new StreamExecutionEnvironment
+# Creates a new StreamExecutionEnvironment.
 env = StreamExecutionEnvironment.get_execution_environment()
 
-# Creates a StreamTableEnvironment
+# Creates a StreamTableEnvironment.
 t_env = StreamTableEnvironment.create(env)
 
-# Generates two datasets
+# Generates two datasets.
 data_a = t_env.from_data_stream(
     env.from_collection([
         (0, Vectors.sparse(6, [0, 1, 2], [1., 1., 1.])),
@@ -47,27 +47,27 @@ data_b = t_env.from_data_stream(
         (5, Vectors.sparse(6, [1, 2, 4], [1., 1., 1.])),
     ], type_info=Types.ROW_NAMED(['id', 'vec'], [Types.INT(), SparseVectorTypeInfo()])))
 
-# Creates a MinHashLSH estimator object and initializes its parameters
+# Creates a MinHashLSH estimator object and initializes its parameters.
 lsh = MinHashLSH() \
     .set_input_col('vec') \
     .set_output_col('hashes') \
     .set_seed(2022) \
     .set_num_hash_tables(5)
 
-# Trains the MinHashLSH model
+# Trains the MinHashLSH model.
 model = lsh.fit(data_a)
 
-# Uses the MinHashLSH model for transformation
+# Uses the MinHashLSH model for transformation.
 output = model.transform(data_a)[0]
 
-# Extracts and displays the results
+# Extracts and displays the results.
 field_names = output.get_schema().get_field_names()
 for result in t_env.to_data_stream(output).execute_and_collect():
     input_value = result[field_names.index(lsh.get_input_col())]
     output_value = result[field_names.index(lsh.get_output_col())]
     print(f'Vector: {input_value} \tHash Values: {output_value}')
 
-# Finds approximate nearest neighbors of the key
+# Finds approximate nearest neighbors of the key.
 key = Vectors.sparse(6, [1, 3], [1., 1.])
 output = model.approx_nearest_neighbors(data_a, key, 2).select("id, distCol")
 for result in t_env.to_data_stream(output).execute_and_collect():
@@ -75,7 +75,7 @@ for result in t_env.to_data_stream(output).execute_and_collect():
     dist_value = result[-1]
     print(f'ID: {id_value} \tDistance: {dist_value}')
 
-# Approximately finds pairs from two datasets with distances smaller than the threshold
+# Approximately finds pairs from two datasets with distances smaller than the threshold.
 output = model.approx_similarity_join(data_a, data_b, .6, "id")
 for result in t_env.to_data_stream(output).execute_and_collect():
     id_a_value, id_b_value, dist_value = result

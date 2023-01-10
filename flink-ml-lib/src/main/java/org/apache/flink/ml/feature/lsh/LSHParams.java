@@ -39,14 +39,6 @@ public interface LSHParams<T> extends LSHModelParams<T> {
     Param<Integer> NUM_HASH_TABLES =
             new IntParam("numHashTables", "Number of hash tables.", 1, ParamValidators.gtEq(1));
 
-    default int getNumHashTables() {
-        return get(NUM_HASH_TABLES);
-    }
-
-    default T setNumHashTables(Integer value) {
-        return set(NUM_HASH_TABLES, value);
-    }
-
     /**
      * Param for the number of hash functions per hash table used in LSH AND-amplification.
      *
@@ -60,6 +52,14 @@ public interface LSHParams<T> extends LSHModelParams<T> {
                     "Number of hash functions per table.",
                     1,
                     ParamValidators.gtEq(1));
+
+    default int getNumHashTables() {
+        return get(NUM_HASH_TABLES);
+    }
+
+    default T setNumHashTables(Integer value) {
+        return set(NUM_HASH_TABLES, value);
+    }
 
     default int getNumHashFunctionsPerTable() {
         return get(NUM_HASH_FUNCTIONS_PER_TABLE);

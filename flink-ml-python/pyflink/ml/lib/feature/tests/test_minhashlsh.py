@@ -66,11 +66,11 @@ class MinHashLSHTest(PyFlinkMLTestCase):
 
     def test_param(self):
         lsh = MinHashLSH()
-        self.assertEqual('input', lsh.get_input_col())
-        self.assertEqual('output', lsh.get_output_col())
-        self.assertEqual(-1229568175, lsh.get_seed())
-        self.assertEqual(1, lsh.get_num_hash_tables())
-        self.assertEqual(1, lsh.get_num_hash_functions_per_table())
+        self.assertEqual('input', lsh.input_col)
+        self.assertEqual('output', lsh.output_col)
+        self.assertEqual(-1229568175, lsh.seed)
+        self.assertEqual(1, lsh.num_hash_tables)
+        self.assertEqual(1, lsh.num_hash_functions_per_table)
 
         lsh.set_input_col('test_input') \
             .set_output_col('test_output') \
@@ -78,11 +78,11 @@ class MinHashLSHTest(PyFlinkMLTestCase):
             .set_num_hash_tables(3) \
             .set_num_hash_functions_per_table(4)
 
-        self.assertEqual('test_input', lsh.get_input_col())
-        self.assertEqual('test_output', lsh.get_output_col())
-        self.assertEqual(2022, lsh.get_seed())
-        self.assertEqual(3, lsh.get_num_hash_tables())
-        self.assertEqual(4, lsh.get_num_hash_functions_per_table())
+        self.assertEqual('test_input', lsh.input_col)
+        self.assertEqual('test_output', lsh.output_col)
+        self.assertEqual(2022, lsh.seed)
+        self.assertEqual(3, lsh.num_hash_tables)
+        self.assertEqual(4, lsh.num_hash_functions_per_table)
 
     def test_output_schema(self):
         lsh = MinHashLSH() \
@@ -117,7 +117,7 @@ class MinHashLSHTest(PyFlinkMLTestCase):
         lsh.save(path)
         lsh = MinHashLSH.load(self.t_env, path)
         model = lsh.fit(self.data)
-        output = model.transform(self.data)[0].select(lsh.get_output_col())
+        output = model.transform(self.data)[0].select(lsh.output_col)
         self.verify_output_hashes(output, self.expected)
 
     def test_model_save_load_transform(self):
@@ -132,7 +132,7 @@ class MinHashLSHTest(PyFlinkMLTestCase):
         model.save(path)
         self.env.execute('save_model')
         model = MinHashLSHModel.load(self.t_env, path)
-        output = model.transform(self.data)[0].select(lsh.get_output_col())
+        output = model.transform(self.data)[0].select(lsh.output_col)
         self.verify_output_hashes(output, self.expected)
 
     def test_get_model_data(self):
@@ -149,11 +149,11 @@ class MinHashLSHTest(PyFlinkMLTestCase):
             model_data_table.get_schema().get_field_names())
 
         model_data_row = list(self.t_env.to_data_stream(model_data_table).execute_and_collect())[0]
-        self.assertEqual(lsh.get_num_hash_tables(), model_data_row[0])
-        self.assertEqual(lsh.get_num_hash_functions_per_table(), model_data_row[1])
-        self.assertEqual(lsh.get_num_hash_tables() * lsh.get_num_hash_functions_per_table(),
+        self.assertEqual(lsh.num_hash_tables, model_data_row[0])
+        self.assertEqual(lsh.num_hash_functions_per_table, model_data_row[1])
+        self.assertEqual(lsh.num_hash_tables * lsh.num_hash_functions_per_table,
                          len(model_data_row[2]))
-        self.assertEqual(lsh.get_num_hash_tables() * lsh.get_num_hash_functions_per_table(),
+        self.assertEqual(lsh.num_hash_tables * lsh.num_hash_functions_per_table,
                          len(model_data_row[3]))
 
     def test_set_model_data(self):
@@ -167,7 +167,7 @@ class MinHashLSHTest(PyFlinkMLTestCase):
         model_data_table = model_a.get_model_data()[0]
         model_b: MinHashLSHModel = MinHashLSHModel().set_model_data(model_data_table)
         self.update_existing_params(model_b, model_a)
-        output = model_b.transform(self.data)[0].select(lsh.get_output_col())
+        output = model_b.transform(self.data)[0].select(lsh.output_col)
         self.verify_output_hashes(output, self.expected)
 
     def test_approx_nearest_neighbors(self):

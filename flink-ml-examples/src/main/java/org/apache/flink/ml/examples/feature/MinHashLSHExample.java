@@ -45,13 +45,13 @@ import static org.apache.flink.table.api.Expressions.$;
 public class MinHashLSHExample {
     public static void main(String[] args) throws Exception {
 
-        // Creates a new StreamExecutionEnvironment
+        // Creates a new StreamExecutionEnvironment.
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
-        // Creates a StreamTableEnvironment
+        // Creates a StreamTableEnvironment.
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
-        // Generates two datasets
+        // Generates two datasets.
         Table dataA =
                 tEnv.fromDataStream(
                         env.fromCollection(
@@ -106,7 +106,7 @@ public class MinHashLSHExample {
                                         Types.INT,
                                         TypeInformation.of(SparseVector.class))));
 
-        // Creates a MinHashLSH estimator object and initializes its parameters
+        // Creates a MinHashLSH estimator object and initializes its parameters.
         MinHashLSH lsh =
                 new MinHashLSH()
                         .setInputCol("vec")
@@ -114,13 +114,13 @@ public class MinHashLSHExample {
                         .setSeed(2022)
                         .setNumHashTables(5);
 
-        // Trains the MinHashLSH model
+        // Trains the MinHashLSH model.
         MinHashLSHModel model = lsh.fit(dataA);
 
-        // Uses the MinHashLSH model for transformation
+        // Uses the MinHashLSH model for transformation.
         Table output = model.transform(dataA)[0];
 
-        // Extracts and displays the results
+        // Extracts and displays the results.
         List<String> fieldNames = output.getResolvedSchema().getColumnNames();
         for (Row result :
                 (List<Row>) IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect())) {
@@ -130,7 +130,7 @@ public class MinHashLSHExample {
                     "Vector: %s \tHash values: %s\n", inputValue, Arrays.toString(outputValue));
         }
 
-        // Finds approximate nearest neighbors of the key
+        // Finds approximate nearest neighbors of the key.
         Vector key = Vectors.sparse(6, new int[] {1, 3}, new double[] {1., 1.});
         output = model.approxNearestNeighbors(dataA, key, 2).select($("id"), $("distCol"));
         for (Row result :
@@ -140,7 +140,7 @@ public class MinHashLSHExample {
             System.out.printf("ID: %d \tDistance: %f\n", idValue, distValue);
         }
 
-        // Approximately finds pairs from two datasets with distances smaller than the threshold
+        // Approximately finds pairs from two datasets with distances smaller than the threshold.
         output = model.approxSimilarityJoin(dataA, dataB, .6, "id");
         for (Row result :
                 (List<Row>) IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect())) {

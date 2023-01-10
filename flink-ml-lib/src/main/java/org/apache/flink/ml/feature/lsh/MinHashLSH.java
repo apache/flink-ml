@@ -29,7 +29,7 @@ import java.io.IOException;
  *
  * <p>The input could be dense or sparse vectors. Each input vector must have at least one non-zero
  * index and all non-zero values are treated as binary "1" values. The sizes of input vectors should
- * be same and not too large (not larger than a large prime 2038074743).
+ * be same and not larger than a predefined prime (i.e., 2038074743).
  *
  * <p>See: <a href="https://en.wikipedia.org/wiki/MinHash">MinHash</a>.
  */
