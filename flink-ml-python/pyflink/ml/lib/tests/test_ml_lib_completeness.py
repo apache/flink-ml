@@ -20,6 +20,7 @@ import importlib
 import os
 import pkgutil
 import unittest
+import inspect
 from abc import abstractmethod
 from typing import List
 
@@ -69,7 +70,8 @@ class MLLibTest(PyFlinkMLTestCase):
     @classmethod
     def _load_stages_from_module(cls, module):
         return [(name, obj) for name, obj in module.__dict__.items()
-                if hasattr(obj, '_java_stage_path') and name not in (
+                if hasattr(obj, '_java_stage_path') and not inspect.isabstract(obj)
+                and name not in (
                     'JavaClassificationEstimator', 'JavaClassificationModel',
                     'JavaClusteringEstimator', 'JavaClusteringModel',
                     'JavaClusteringAlgoOperator', 'JavaEvaluationAlgoOperator',
