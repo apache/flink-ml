@@ -163,8 +163,8 @@ public class MinHashLSHTest extends AbstractTestBase {
 
     @Test
     public void testHashFunctionEqualWithSparseDenseVector() {
-        // Use randomly generate coefficients, so that the hash values are not always from the least
-        // non-zero index.
+        // Uses randomly generate coefficients, so that the hash values are not always from the
+        // least non-zero index.
         MinHashLSHModelData lshModelData = MinHashLSHModelData.generateModelData(3, 1, 10, 2022L);
         new MinHashLSHModelData(3, 1, new int[] {0, 1, 3}, new int[] {1, 2, 0});
         Vector vec = Vectors.sparse(10, new int[] {2, 3, 5, 7}, new double[] {1., 1., 1., 1.});

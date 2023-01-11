@@ -151,7 +151,7 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
                         ArrayUtils.addAll(inputTypeInfo.getFieldTypes(), Types.DOUBLE),
                         ArrayUtils.addAll(inputTypeInfo.getFieldNames(), distCol));
 
-        // Fetch items in the same bucket with key's, and calculate their distances to key.
+        // Fetches items in the same bucket with key's, and calculates their distances to key.
         DataStream<Row> filteredData =
                 BroadcastUtils.withBroadcastStream(
                         Collections.singletonList(tEnv.toDataStream(transformedTable)),

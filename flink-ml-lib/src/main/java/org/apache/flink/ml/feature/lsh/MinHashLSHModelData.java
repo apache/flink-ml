@@ -45,7 +45,7 @@ import java.util.Random;
  */
 public class MinHashLSHModelData extends LSHModelData {
 
-    // A large prime smaller than sqrt(2^63 − 1)
+    // A large prime smaller than sqrt(2^63 − 1).
     private static final int HASH_PRIME = 2038074743;
 
     public int numHashTables;
@@ -128,8 +128,8 @@ public class MinHashLSHModelData extends LSHModelData {
         double[][] hashValues = new double[numHashTables][numHashFunctionsPerTable];
         for (int i = 0; i < numHashTables; i += 1) {
             for (int j = 0; j < numHashFunctionsPerTable; j += 1) {
-                // for each hash function, the hash value is computed by
-                // min(((1 + index) * randCoefficientA + randCoefficientB) % HASH_PRIME)
+                // For each hash function, the hash value is computed by
+                // min(((1 + index) * randCoefficientA + randCoefficientB) % HASH_PRIME).
                 int coeffA = randCoefficientA[i * numHashFunctionsPerTable + j];
                 int coeffB = randCoefficientB[i * numHashFunctionsPerTable + j];
                 long minv = HASH_PRIME;

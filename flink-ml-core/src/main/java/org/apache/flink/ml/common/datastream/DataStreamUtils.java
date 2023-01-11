@@ -143,8 +143,8 @@ public class DataStreamUtils {
     }
 
     /**
-     * Apply a {@link ReduceFunction} on a bounded keyed data stream. The output stream contains one
-     * stream record for each key.
+     * Applies a {@link ReduceFunction} on a bounded keyed data stream. The output stream contains
+     * one stream record for each key.
      *
      * @param input The input keyed data stream.
      * @param func The user defined reduce function.
@@ -440,11 +440,11 @@ public class DataStreamUtils {
             IN currentValue = values.value();
 
             if (currentValue == null) {
-                // register a timer for emitting the result at the end when this is the
-                // first input for this key
+                // Registers a timer for emitting the result at the end when this is the
+                // first input for this key.
                 timerService.registerEventTimeTimer(VoidNamespace.INSTANCE, Long.MAX_VALUE);
             } else {
-                // otherwise, reduce things
+                // Otherwise, reduces things.
                 value = userFunction.reduce(currentValue, value);
             }
             values.update(value);
