@@ -43,7 +43,6 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.util.InstantiationUtil;
 import org.apache.flink.util.Preconditions;
 
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonParser;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.BufferedReader;
@@ -63,8 +62,7 @@ import java.util.Set;
 
 /** Utility methods for reading and writing stages. */
 public class ReadWriteUtils {
-    public static final ObjectMapper OBJECT_MAPPER =
-            new ObjectMapper().enable(JsonParser.Feature.ALLOW_COMMENTS);
+    public static final ObjectMapper OBJECT_MAPPER = ReadWriteUtilsV2.OBJECT_MAPPER;
 
     // A helper method that calls encodes the given parameter value to a json string. We can not
     // call param.jsonEncode(value) directly because Param::jsonEncode(...) needs the actual type

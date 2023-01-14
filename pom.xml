@@ -61,6 +61,8 @@ under the License.
     <module>flink-ml-dist</module>
     <module>flink-ml-examples</module>
     <module>flink-ml-python</module>
+    <module>flink-ml-servable-core</module>
+    <module>flink-ml-servable-lib</module>
   </modules>
 
   <properties>
