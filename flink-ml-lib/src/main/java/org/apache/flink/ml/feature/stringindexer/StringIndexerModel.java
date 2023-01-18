@@ -167,7 +167,9 @@ public class StringIndexerModel
             for (int i = 0; i < inputCols.length; i++) {
                 Object objVal = input.getField(inputCols[i]);
                 String stringVal;
-                if (objVal instanceof String) {
+                if (null == objVal) {
+                    stringVal = null;
+                } else if (objVal instanceof String) {
                     stringVal = (String) objVal;
                 } else if (objVal instanceof Number) {
                     stringVal = String.valueOf(objVal);
