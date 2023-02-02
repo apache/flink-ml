@@ -581,3 +581,49 @@ class HasFlatten(WithParams, ABC):
     @property
     def flatten(self):
         return self.get(self.FLATTEN)
+
+
+class HasModelVersionCol(WithParams, ABC):
+    """
+    Interface for the shared model version column param.
+    """
+    MODEL_VERSION_COL: Param[str] = StringParam(
+        "model_version_col",
+        "The name of the column which contains the version of the model data that "
+        "the input data is predicted with. The version should be a 64-bit integer.",
+        "version"
+    )
+
+    def set_model_version_col(self, value: str):
+        return self.set(self.MODEL_VERSION_COL, value)
+
+    def get_model_version_col(self) -> str:
+        return self.get(self.MODEL_VERSION_COL)
+
+    @property
+    def model_version_col(self):
+        return self.get_model_version_col()
+
+
+class HasMaxAllowedModelDelayMs(WithParams, ABC):
+    """
+    Interface for the shared max allowed model delay in milliseconds param.
+    """
+    MAX_ALLOWED_MODEL_DELAY_MS: Param[int] = IntParam(
+        "max_allowed_model_delay_ms",
+        "The maximum difference allowed between the timestamps of the input record "
+        "and the model data that is used to predict that input record. "
+        "This param only works when the input contains event time.",
+        0,
+        ParamValidators.gt_eq(0)
+    )
+
+    def set_max_allowed_model_delay_ms(self, value: int):
+        return self.set(self.MAX_ALLOWED_MODEL_DELAY_MS, value)
+
+    def get_max_allowed_model_delay_ms(self) -> int:
+        return self.get(self.MAX_ALLOWED_MODEL_DELAY_MS)
+
+    @property
+    def max_allowed_model_delay_ms(self):
+        return self.get_max_allowed_model_delay_ms()

@@ -21,6 +21,7 @@ package org.apache.flink.ml.feature.standardscaler;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.serialization.Encoder;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeutils.base.LongSerializer;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.file.src.reader.SimpleStreamFormat;
 import org.apache.flink.core.fs.FSDataInputStream;
@@ -49,12 +50,23 @@ public class StandardScalerModelData {
     public DenseVector mean;
     /** Standard deviation of each dimension. */
     public DenseVector std;
+    /** Model version. */
+    public long version;
+    /** Model timestamp. */
+    public long timestamp;
 
     public StandardScalerModelData() {}
 
     public StandardScalerModelData(DenseVector mean, DenseVector std) {
+        this(mean, std, 0, Long.MAX_VALUE);
+    }
+
+    public StandardScalerModelData(
+            DenseVector mean, DenseVector std, long version, long timestamp) {
         this.mean = mean;
         this.std = std;
+        this.version = version;
+        this.timestamp = timestamp;
     }
 
     /**
@@ -72,8 +84,11 @@ public class StandardScalerModelData {
                         (MapFunction<Row, StandardScalerModelData>)
                                 row ->
                                         new StandardScalerModelData(
-                                                (DenseVector) row.getField("mean"),
-                                                (DenseVector) row.getField("std")));
+                                                row.getFieldAs("mean"),
+                                                row.getFieldAs("std"),
+                                                row.getFieldAs("version"),
+                                                row.getFieldAs("timestamp")))
+                .setParallelism(1);
     }
 
     /** Data encoder for the {@link StandardScalerModel} model data. */
@@ -88,6 +103,8 @@ public class StandardScalerModelData {
 
             serializer.serialize(modelData.mean, outputViewStreamWrapper);
             serializer.serialize(modelData.std, outputViewStreamWrapper);
+            LongSerializer.INSTANCE.serialize(modelData.version, outputViewStreamWrapper);
+            LongSerializer.INSTANCE.serialize(modelData.timestamp, outputViewStreamWrapper);
         }
     }
 
@@ -107,7 +124,10 @@ public class StandardScalerModelData {
                     try {
                         DenseVector mean = serializer.deserialize(inputViewStreamWrapper);
                         DenseVector std = serializer.deserialize(inputViewStreamWrapper);
-                        return new StandardScalerModelData(mean, std);
+                        long version = LongSerializer.INSTANCE.deserialize(inputViewStreamWrapper);
+                        long timestamp =
+                                LongSerializer.INSTANCE.deserialize(inputViewStreamWrapper);
+                        return new StandardScalerModelData(mean, std, version, timestamp);
                     } catch (EOFException e) {
                         return null;
                     }
