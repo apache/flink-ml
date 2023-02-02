@@ -175,6 +175,7 @@ public class BroadcastOutputTest extends TestLogger {
         } else {
             env.getConfig().disableObjectReuse();
         }
+        env.getConfig().disableGenericTypes();
         env.setParallelism(1);
 
         return env;

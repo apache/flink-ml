@@ -27,6 +27,7 @@ import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -71,17 +72,18 @@ public class MaxAbsScaler
                 tEnv.toDataStream(inputs[0])
                         .map(
                                 (MapFunction<Row, Vector>)
-                                        value -> ((Vector) value.getField(inputCol)));
+                                        value -> ((Vector) value.getField(inputCol)),
+                                VectorTypeInfo.INSTANCE);
 
         DataStream<Vector> maxAbsValues =
                 inputData
                         .transform(
                                 "reduceInEachPartition",
-                                inputData.getType(),
+                                VectorTypeInfo.INSTANCE,
                                 new MaxAbsReduceFunctionOperator())
                         .transform(
                                 "reduceInFinalPartition",
-                                inputData.getType(),
+                                VectorTypeInfo.INSTANCE,
                                 new MaxAbsReduceFunctionOperator())
                         .setParallelism(1);
 
@@ -115,9 +117,6 @@ public class MaxAbsScaler
         @Override
         public void processElement(StreamRecord<Vector> streamRecord) {
             Vector currentValue = streamRecord.getValue();
-            if (currentValue == null) {
-                throw new RuntimeException("Input column data cannot be null.");
-            }
 
             maxAbsVector =
                     maxAbsVector == null ? new DenseVector(currentValue.size()) : maxAbsVector;

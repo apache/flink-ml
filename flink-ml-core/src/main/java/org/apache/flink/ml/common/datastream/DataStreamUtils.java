@@ -104,7 +104,8 @@ public class DataStreamUtils {
     }
 
     /**
-     * Applies a {@link MapPartitionFunction} on a bounded data stream.
+     * Applies a {@link MapPartitionFunction} on a bounded data stream. The type of the output is
+     * inferred automatically.
      *
      * @param input The input data stream.
      * @param func The user defined mapPartition function.
@@ -114,10 +115,42 @@ public class DataStreamUtils {
      */
     public static <IN, OUT> DataStream<OUT> mapPartition(
             DataStream<IN> input, MapPartitionFunction<IN, OUT> func) {
-        TypeInformation<OUT> resultType =
-                TypeExtractor.getMapPartitionReturnTypes(func, input.getType(), null, true);
-        return input.transform("mapPartition", resultType, new MapPartitionOperator<>(func))
+        return mapPartition(input, func, null);
+    }
+
+    /**
+     * Applies a {@link MapPartitionFunction} on a bounded data stream.
+     *
+     * @param input The input data stream.
+     * @param func The user defined mapPartition function.
+     * @param outType The type information of the output.
+     * @param <IN> The class type of the input.
+     * @param <OUT> The class type of output.
+     * @return The result data stream.
+     */
+    public static <IN, OUT> DataStream<OUT> mapPartition(
+            DataStream<IN> input,
+            MapPartitionFunction<IN, OUT> func,
+            TypeInformation<OUT> outType) {
+        if (outType == null) {
+            outType = TypeExtractor.getMapPartitionReturnTypes(func, input.getType(), null, true);
+        }
+        return input.transform("mapPartition", outType, new MapPartitionOperator<>(func))
                 .setParallelism(input.getParallelism());
+    }
+
+    /**
+     * Applies a {@link ReduceFunction} on a bounded data stream. The output stream contains at most
+     * one stream record and its parallelism is one. The type of the output is inferred
+     * automatically.
+     *
+     * @param input The input data stream.
+     * @param func The user defined reduce function.
+     * @param <T> The class type of the input.
+     * @return The result data stream.
+     */
+    public static <T> DataStream<T> reduce(DataStream<T> input, ReduceFunction<T> func) {
+        return reduce(input, func, null);
     }
 
     /**
@@ -126,20 +159,39 @@ public class DataStreamUtils {
      *
      * @param input The input data stream.
      * @param func The user defined reduce function.
+     * @param outType The type information of the output.
      * @param <T> The class type of the input.
      * @return The result data stream.
      */
-    public static <T> DataStream<T> reduce(DataStream<T> input, ReduceFunction<T> func) {
+    public static <T> DataStream<T> reduce(
+            DataStream<T> input, ReduceFunction<T> func, TypeInformation<T> outType) {
+        if (outType == null) {
+            outType = input.getType();
+        }
         DataStream<T> partialReducedStream =
-                input.transform("reduce", input.getType(), new ReduceOperator<>(func))
+                input.transform("reduce", outType, new ReduceOperator<>(func))
                         .setParallelism(input.getParallelism());
         if (partialReducedStream.getParallelism() == 1) {
             return partialReducedStream;
         } else {
             return partialReducedStream
-                    .transform("reduce", input.getType(), new ReduceOperator<>(func))
+                    .transform("reduce", outType, new ReduceOperator<>(func))
                     .setParallelism(1);
         }
+    }
+
+    /**
+     * Applies a {@link ReduceFunction} on a bounded keyed data stream. The output stream contains
+     * one stream record for each key. The type of the output is inferred automatically.
+     *
+     * @param input The input keyed data stream.
+     * @param func The user defined reduce function.
+     * @param <T> The class type of input.
+     * @param <K> The key type of input.
+     * @return The result data stream.
+     */
+    public static <T, K> DataStream<T> reduce(KeyedStream<T, K> input, ReduceFunction<T> func) {
+        return reduce(input, func, null);
     }
 
     /**
@@ -148,23 +200,29 @@ public class DataStreamUtils {
      *
      * @param input The input keyed data stream.
      * @param func The user defined reduce function.
-     * @return The result data stream.
+     * @param outType The type information of the output.
      * @param <T> The class type of input.
      * @param <K> The key type of input.
+     * @return The result data stream.
      */
-    public static <T, K> DataStream<T> reduce(KeyedStream<T, K> input, ReduceFunction<T> func) {
+    public static <T, K> DataStream<T> reduce(
+            KeyedStream<T, K> input, ReduceFunction<T> func, TypeInformation<T> outType) {
+        if (outType == null) {
+            outType = input.getType();
+        }
         return input.transform(
                         "Keyed Reduce",
-                        input.getType(),
+                        outType,
                         new KeyedReduceOperator<>(
-                                func, input.getType().createSerializer(input.getExecutionConfig())))
+                                func, outType.createSerializer(input.getExecutionConfig())))
                 .setParallelism(input.getParallelism());
     }
 
     /**
      * Aggregates the elements in each partition of the input bounded stream, and then merges the
      * partial results of all partitions. The output stream contains the aggregated result and its
-     * parallelism is one.
+     * parallelism is one. The types of the accumulated values and the output are inferred
+     * automatically.
      *
      * <p>Note: If the parallelism of the input stream is N, this method would invoke {@link
      * AggregateFunction#createAccumulator()} N times and {@link AggregateFunction#merge(Object,
@@ -181,12 +239,43 @@ public class DataStreamUtils {
      */
     public static <IN, ACC, OUT> DataStream<OUT> aggregate(
             DataStream<IN> input, AggregateFunction<IN, ACC, OUT> func) {
-        TypeInformation<ACC> accType =
-                TypeExtractor.getAggregateFunctionAccumulatorType(
-                        func, input.getType(), null, true);
-        TypeInformation<OUT> outType =
-                TypeExtractor.getAggregateFunctionReturnType(func, input.getType(), null, true);
+        return aggregate(input, func, null, null);
+    }
 
+    /**
+     * Aggregates the elements in each partition of the input bounded stream, and then merges the
+     * partial results of all partitions. The output stream contains the aggregated result and its
+     * parallelism is one.
+     *
+     * <p>Note: If the parallelism of the input stream is N, this method would invoke {@link
+     * AggregateFunction#createAccumulator()} N times and {@link AggregateFunction#merge(Object,
+     * Object)} N - 1 times. Thus the initial accumulator should be neutral (e.g. empty list for
+     * list concatenation or `0` for summation), otherwise the aggregation result would be affected
+     * by the parallelism of the input stream.
+     *
+     * @param input The input data stream.
+     * @param func The user defined aggregate function.
+     * @param accType The type of the accumulated values.
+     * @param outType The types of the output.
+     * @param <IN> The class type of the input.
+     * @param <ACC> The class type of the accumulated values.
+     * @param <OUT> The class type of the output values.
+     * @return The result data stream.
+     */
+    public static <IN, ACC, OUT> DataStream<OUT> aggregate(
+            DataStream<IN> input,
+            AggregateFunction<IN, ACC, OUT> func,
+            TypeInformation<ACC> accType,
+            TypeInformation<OUT> outType) {
+        if (accType == null) {
+            accType =
+                    TypeExtractor.getAggregateFunctionAccumulatorType(
+                            func, input.getType(), null, true);
+        }
+        if (outType == null) {
+            outType =
+                    TypeExtractor.getAggregateFunctionReturnType(func, input.getType(), null, true);
+        }
         DataStream<ACC> partialAggregatedStream =
                 input.transform(
                         "partialAggregate", accType, new PartialAggregateOperator<>(func, accType));

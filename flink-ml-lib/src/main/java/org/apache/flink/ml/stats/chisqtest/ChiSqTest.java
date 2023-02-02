@@ -22,7 +22,6 @@ import org.apache.flink.api.common.functions.RichFlatMapFunction;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
-import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
@@ -314,7 +313,7 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
         private HashSet<Double> distinctLabels = new HashSet<>();
 
         private ListState<Map<Tuple2<Integer, Double>, List<Tuple2<Double, Long>>>> valuesMapState;
-        private ListState<HashSet<Double>> distinctLabelsState;
+        private ListState<List<Double>> distinctLabelsState;
 
         @Override
         public void endInput() {
@@ -391,22 +390,20 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
                     context.getOperatorStateStore()
                             .getListState(
                                     new ListStateDescriptor<>(
-                                            "distinctLabelsState",
-                                            TypeInformation.of(
-                                                    new TypeHint<HashSet<Double>>() {})));
+                                            "distinctLabelsState", Types.LIST(Types.DOUBLE)));
 
             OperatorStateUtils.getUniqueElement(valuesMapState, "valuesMapState")
                     .ifPresent(x -> valuesMap = x);
 
             OperatorStateUtils.getUniqueElement(distinctLabelsState, "distinctLabelsState")
-                    .ifPresent(x -> distinctLabels = x);
+                    .ifPresent(x -> distinctLabels = new HashSet<>(x));
         }
 
         @Override
         public void snapshotState(StateSnapshotContext context) throws Exception {
             super.snapshotState(context);
             valuesMapState.update(Collections.singletonList(valuesMap));
-            distinctLabelsState.update(Collections.singletonList(distinctLabels));
+            distinctLabelsState.update(Collections.singletonList(new ArrayList<>(distinctLabels)));
         }
     }
 

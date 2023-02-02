@@ -104,10 +104,20 @@ public class ANOVATest implements AlgoOperator<ANOVATest>, ANOVATestParams<ANOVA
                                             return new Tuple2<>(
                                                     ((Vector) row.getField(featuresCol)),
                                                     number.doubleValue());
-                                        })
-                        .returns(Types.TUPLE(VectorTypeInfo.INSTANCE, Types.DOUBLE));
+                                        },
+                                Types.TUPLE(VectorTypeInfo.INSTANCE, Types.DOUBLE));
         DataStream<List<Row>> streamWithANOVA =
-                DataStreamUtils.aggregate(inputData, new ANOVAAggregator());
+                DataStreamUtils.aggregate(
+                        inputData,
+                        new ANOVAAggregator(),
+                        Types.OBJECT_ARRAY(
+                                Types.TUPLE(
+                                        Types.DOUBLE,
+                                        Types.DOUBLE,
+                                        Types.MAP(
+                                                Types.DOUBLE,
+                                                Types.TUPLE(Types.DOUBLE, Types.LONG)))),
+                        Types.LIST(Types.ROW(Types.INT, Types.DOUBLE, Types.LONG, Types.DOUBLE)));
         return new Table[] {convertToTable(tEnv, streamWithANOVA, getFlatten())};
     }
 

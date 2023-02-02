@@ -22,11 +22,9 @@ import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.api.common.functions.MapPartitionFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.functions.RichMapPartitionFunction;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeinfo.Types;
-import org.apache.flink.configuration.Configuration;
+import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.NumberSequenceIterator;
@@ -47,13 +45,7 @@ public class DataStreamUtilsTest {
 
     @Before
     public void before() {
-        Configuration config = new Configuration();
-        config.set(ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
-        env = StreamExecutionEnvironment.getExecutionEnvironment(config);
-        env.getConfig().enableObjectReuse();
-        env.setParallelism(4);
-        env.enableCheckpointing(100);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        env = TestUtils.getExecutionEnvironment();
     }
 
     @Test

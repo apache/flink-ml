@@ -21,6 +21,7 @@ package org.apache.flink.ml.classification.naivebayes;
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.MapPartitionFunction;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.tuple.Tuple4;
@@ -29,6 +30,7 @@ import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -75,20 +77,20 @@ public class NaiveBayes
         DataStream<Tuple2<Vector, Double>> input =
                 tEnv.toDataStream(inputs[0])
                         .map(
-                                new MapFunction<Row, Tuple2<Vector, Double>>() {
-                                    @Override
-                                    public Tuple2<Vector, Double> map(Row row) throws Exception {
-                                        Number number = (Number) row.getField(labelCol);
-                                        Preconditions.checkNotNull(
-                                                number, "Input data should contain label value.");
-                                        Preconditions.checkArgument(
-                                                number.intValue() == number.doubleValue(),
-                                                "Label value should be indexed number.");
-                                        return new Tuple2<>(
-                                                (Vector) row.getField(featuresCol),
-                                                number.doubleValue());
-                                    }
-                                });
+                                (MapFunction<Row, Tuple2<Vector, Double>>)
+                                        row -> {
+                                            Number number = (Number) row.getField(labelCol);
+                                            Preconditions.checkNotNull(
+                                                    number,
+                                                    "Input data should contain label value.");
+                                            Preconditions.checkArgument(
+                                                    number.intValue() == number.doubleValue(),
+                                                    "Label value should be indexed number.");
+                                            return new Tuple2<>(
+                                                    (Vector) row.getField(featuresCol),
+                                                    number.doubleValue());
+                                        },
+                                Types.TUPLE(VectorTypeInfo.INSTANCE, Types.DOUBLE));
 
         DataStream<Tuple3<Double, Integer, Double>> feature =
                 input.flatMap(new ExtractFeatureFunction());
@@ -96,15 +98,27 @@ public class NaiveBayes
         DataStream<Tuple4<Double, Integer, Map<Double, Double>, Integer>> featureWeight =
                 DataStreamUtils.mapPartition(
                         feature.keyBy(value -> new Tuple2<>(value.f0, value.f1).hashCode()),
-                        new GenerateFeatureWeightMapFunction());
+                        new GenerateFeatureWeightMapFunction(),
+                        Types.TUPLE(
+                                Types.DOUBLE,
+                                Types.INT,
+                                Types.MAP(Types.DOUBLE, Types.DOUBLE),
+                                Types.INT));
 
         DataStream<Tuple3<Double, Integer, Map<Double, Double>[]>> aggregatedArrays =
                 DataStreamUtils.mapPartition(
-                        featureWeight.keyBy(value -> value.f0), new AggregateIntoArrayFunction());
+                        featureWeight.keyBy(value -> value.f0),
+                        new AggregateIntoArrayFunction(),
+                        Types.TUPLE(
+                                Types.DOUBLE,
+                                Types.INT,
+                                Types.OBJECT_ARRAY(Types.MAP(Types.DOUBLE, Types.DOUBLE))));
 
         DataStream<NaiveBayesModelData> modelData =
                 DataStreamUtils.mapPartition(
-                        aggregatedArrays, new GenerateModelFunction(smoothing));
+                        aggregatedArrays,
+                        new GenerateModelFunction(smoothing),
+                        NaiveBayesModelData.TYPE_INFO);
         modelData.getTransformation().setParallelism(1);
 
         Schema schema =

@@ -265,9 +265,7 @@ public class ImputerTest extends AbstractTestBase {
         final List<Row> trainData =
                 new ArrayList<>(
                         Arrays.asList(
-                                Row.of(Double.NaN, Float.NaN),
-                                Row.of(null, null),
-                                Row.of(1.0, 1.0f)));
+                                Row.of(Double.NaN, 3.0f), Row.of(null, 2.0f), Row.of(1.0, 1.0f)));
         trainDataTable = tEnv.fromDataStream(env.fromCollection(trainData)).as("f1", "f2");
         Imputer imputer =
                 new Imputer()

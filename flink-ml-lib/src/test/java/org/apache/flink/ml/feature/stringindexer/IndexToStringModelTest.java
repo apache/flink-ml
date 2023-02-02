@@ -18,10 +18,7 @@
 
 package org.apache.flink.ml.feature.stringindexer;
 
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.ml.util.TestUtils;
-import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -60,13 +57,7 @@ public class IndexToStringModelTest extends AbstractTestBase {
 
     @Before
     public void before() {
-        Configuration config = new Configuration();
-        config.set(ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
-        env = StreamExecutionEnvironment.getExecutionEnvironment(config);
-        env.getConfig().enableObjectReuse();
-        env.setParallelism(4);
-        env.enableCheckpointing(100);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        env = TestUtils.getExecutionEnvironment();
         tEnv = StreamTableEnvironment.create(env);
 
         modelTable =

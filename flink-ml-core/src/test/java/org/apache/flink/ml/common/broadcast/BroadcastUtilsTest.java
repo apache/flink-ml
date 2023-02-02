@@ -108,7 +108,7 @@ public class BroadcastUtilsTest {
                                         true);
                             }
                         });
-        env.getConfig().enableObjectReuse();
+        env.getConfig().enableObjectReuse().disableGenericTypes();
         env.enableCheckpointing(500, CheckpointingMode.EXACTLY_ONCE);
         env.setParallelism(NUM_SLOT * NUM_TM);
 

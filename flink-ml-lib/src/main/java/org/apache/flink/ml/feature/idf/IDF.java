@@ -28,6 +28,7 @@ import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
+import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -70,7 +71,8 @@ public class IDF implements Estimator<IDF, IDFModel>, IDFParams<IDF> {
                 tEnv.toDataStream(inputs[0])
                         .map(
                                 (MapFunction<Row, Vector>)
-                                        value -> ((Vector) value.getField(inputCol)));
+                                        value -> ((Vector) value.getField(inputCol)),
+                                VectorTypeInfo.INSTANCE);
 
         DataStream<IDFModelData> modelData =
                 DataStreamUtils.aggregate(inputData, new IDFAggregator(getMinDocFreq()));

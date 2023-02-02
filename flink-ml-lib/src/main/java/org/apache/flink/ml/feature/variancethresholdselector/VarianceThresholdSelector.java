@@ -20,12 +20,16 @@ package org.apache.flink.ml.feature.variancethresholdselector;
 
 import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.linalg.BLAS;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -67,11 +71,18 @@ public class VarianceThresholdSelector
                 tEnv.toDataStream(inputs[0])
                         .map(
                                 (MapFunction<Row, Vector>)
-                                        value -> ((Vector) value.getField(inputCol)));
+                                        value -> ((Vector) value.getField(inputCol)),
+                                VectorTypeInfo.INSTANCE);
 
         DataStream<VarianceThresholdSelectorModelData> modelData =
                 DataStreamUtils.aggregate(
-                        inputData, new VarianceThresholdSelectorAggregator(getVarianceThreshold()));
+                        inputData,
+                        new VarianceThresholdSelectorAggregator(getVarianceThreshold()),
+                        Types.TUPLE(
+                                Types.LONG,
+                                DenseVectorTypeInfo.INSTANCE,
+                                DenseVectorTypeInfo.INSTANCE),
+                        TypeInformation.of(VarianceThresholdSelectorModelData.class));
 
         VarianceThresholdSelectorModel model =
                 new VarianceThresholdSelectorModel().setModelData(tEnv.fromDataStream(modelData));

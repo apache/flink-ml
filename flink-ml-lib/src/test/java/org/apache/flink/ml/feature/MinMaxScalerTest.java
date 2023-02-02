@@ -19,8 +19,6 @@
 package org.apache.flink.ml.feature;
 
 import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.ml.feature.minmaxscaler.MinMaxScaler;
 import org.apache.flink.ml.feature.minmaxscaler.MinMaxScalerModel;
 import org.apache.flink.ml.linalg.DenseVector;
@@ -29,7 +27,6 @@ import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -48,7 +45,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import static org.apache.flink.test.util.TestBaseUtils.compareResultCollections;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
@@ -83,13 +79,7 @@ public class MinMaxScalerTest extends AbstractTestBase {
 
     @Before
     public void before() {
-        Configuration config = new Configuration();
-        config.set(ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
-        env = StreamExecutionEnvironment.getExecutionEnvironment(config);
-        env.getConfig().enableObjectReuse();
-        env.setParallelism(4);
-        env.enableCheckpointing(100);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        env = TestUtils.getExecutionEnvironment();
         tEnv = StreamTableEnvironment.create(env);
         trainDataTable = tEnv.fromDataStream(env.fromCollection(TRAIN_DATA)).as("input");
         predictDataTable = tEnv.fromDataStream(env.fromCollection(PREDICT_DATA)).as("input");

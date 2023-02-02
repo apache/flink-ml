@@ -20,6 +20,7 @@ package org.apache.flink.ml.feature.vectorindexer;
 
 import org.apache.flink.api.common.serialization.Encoder;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.common.typeutils.base.DoubleSerializer;
 import org.apache.flink.api.common.typeutils.base.IntSerializer;
 import org.apache.flink.api.common.typeutils.base.MapSerializer;
@@ -36,6 +37,7 @@ import org.apache.flink.table.api.internal.TableImpl;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Collections;
 import java.util.Map;
 
 /**
@@ -45,6 +47,13 @@ import java.util.Map;
  * to save/load model data.
  */
 public class VectorIndexerModelData {
+    public static final TypeInformation<VectorIndexerModelData> TYPE_INFO =
+            Types.POJO(
+                    VectorIndexerModelData.class,
+                    Collections.singletonMap(
+                            "categoryMaps",
+                            Types.MAP(Types.INT, Types.MAP(Types.DOUBLE, Types.INT))));
+
     /**
      * Index of feature values. Keys are column indices. Values are mapping from original continuous
      * features values to 0-based categorical indices. If a feature is not in this map, it is
@@ -71,7 +80,8 @@ public class VectorIndexerModelData {
                 .map(
                         x ->
                                 new VectorIndexerModelData(
-                                        (Map<Integer, Map<Double, Integer>>) x.getField(0)));
+                                        (Map<Integer, Map<Double, Integer>>) x.getField(0)),
+                        TYPE_INFO);
     }
 
     /** Data encoder for {@link VectorIndexerModel}. */
@@ -127,7 +137,7 @@ public class VectorIndexerModelData {
 
         @Override
         public TypeInformation<VectorIndexerModelData> getProducedType() {
-            return TypeInformation.of(VectorIndexerModelData.class);
+            return TYPE_INFO;
         }
     }
 }

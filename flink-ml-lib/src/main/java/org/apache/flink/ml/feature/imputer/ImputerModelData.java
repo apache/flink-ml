@@ -20,6 +20,7 @@ package org.apache.flink.ml.feature.imputer;
 
 import org.apache.flink.api.common.serialization.Encoder;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.common.typeutils.base.DoubleSerializer;
 import org.apache.flink.api.common.typeutils.base.MapSerializer;
 import org.apache.flink.api.common.typeutils.base.StringSerializer;
@@ -38,6 +39,7 @@ import org.apache.flink.table.api.internal.TableImpl;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Collections;
 import java.util.Map;
 
 /**
@@ -47,6 +49,11 @@ import java.util.Map;
  * classes to save/load model data.
  */
 public class ImputerModelData {
+
+    public static final TypeInformation<ImputerModelData> TYPE_INFO =
+            Types.POJO(
+                    ImputerModelData.class,
+                    Collections.singletonMap("surrogates", Types.MAP(Types.STRING, Types.DOUBLE)));
 
     public Map<String, Double> surrogates;
 
@@ -66,7 +73,7 @@ public class ImputerModelData {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) modelDataTable).getTableEnvironment();
         return tEnv.toDataStream(modelDataTable)
-                .map(x -> new ImputerModelData((Map<String, Double>) x.getField(0)));
+                .map(x -> new ImputerModelData((Map<String, Double>) x.getField(0)), TYPE_INFO);
     }
 
     /** Encoder for {@link ImputerModelData}. */
@@ -111,7 +118,7 @@ public class ImputerModelData {
 
         @Override
         public TypeInformation<ImputerModelData> getProducedType() {
-            return TypeInformation.of(ImputerModelData.class);
+            return TYPE_INFO;
         }
     }
 }

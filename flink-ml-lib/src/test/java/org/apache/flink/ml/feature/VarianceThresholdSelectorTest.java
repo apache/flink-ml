@@ -112,7 +112,9 @@ public class VarianceThresholdSelectorTest extends AbstractTestBase {
                 (StreamTableEnvironment) ((TableImpl) output).getTableEnvironment();
         DataStream<Vector> stream =
                 tEnv.toDataStream(output)
-                        .map((MapFunction<Row, Vector>) row -> (Vector) row.getField(outputCol));
+                        .map(
+                                (MapFunction<Row, Vector>) row -> (Vector) row.getField(outputCol),
+                                VectorTypeInfo.INSTANCE);
         List<Vector> result = IteratorUtils.toList(stream.executeAndCollect());
         compareResultCollections(expected, result, TestUtils::compare);
     }
