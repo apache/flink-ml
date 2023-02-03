@@ -26,6 +26,7 @@ import org.apache.flink.ml.builder.GraphBuilder;
 import org.apache.flink.ml.builder.GraphModel;
 import org.apache.flink.ml.builder.TableId;
 import org.apache.flink.ml.common.datastream.TableUtils;
+import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.test.util.AbstractTestBase;

@@ -670,13 +670,13 @@ public class BinaryClassificationEvaluator
 
     /** Binary Summary of data in one worker. */
     public static class BinarySummary implements Serializable {
-        private Integer taskId;
+        public Integer taskId;
         // maximum score in this partition
-        private double maxScore;
+        public double maxScore;
         // real positives in this partition
-        private long curPositive;
+        public long curPositive;
         // real negatives in this partition
-        private long curNegative;
+        public long curNegative;
 
         public BinarySummary() {}
 
@@ -686,56 +686,24 @@ public class BinaryClassificationEvaluator
             this.curPositive = curPositive;
             this.curNegative = curNegative;
         }
-
-        public Integer getTaskId() {
-            return taskId;
-        }
-
-        public void setTaskId(Integer taskId) {
-            this.taskId = taskId;
-        }
-
-        public double getMaxScore() {
-            return maxScore;
-        }
-
-        public void setMaxScore(double maxScore) {
-            this.maxScore = maxScore;
-        }
-
-        public long getCurPositive() {
-            return curPositive;
-        }
-
-        public void setCurPositive(long curPositive) {
-            this.curPositive = curPositive;
-        }
-
-        public long getCurNegative() {
-            return curNegative;
-        }
-
-        public void setCurNegative(long curNegative) {
-            this.curNegative = curNegative;
-        }
     }
 
     /** The evaluation metrics for binary classification. */
     public static class BinaryMetrics {
         /* The count of samples. */
-        private long count;
+        public long count;
 
         /* Area under ROC */
-        private double areaUnderROC;
+        public double areaUnderROC;
 
         /* Area under Lorenz */
-        private double areaUnderLorenz;
+        public double areaUnderLorenz;
 
         /* Area under PRC */
-        private double areaUnderPR;
+        public double areaUnderPR;
 
         /* KS */
-        private double ks;
+        public double ks;
 
         public BinaryMetrics() {}
 
@@ -756,46 +724,6 @@ public class BinaryClassificationEvaluator
             areaUnderPR += binaryClassMetrics.areaUnderPR;
             areaUnderLorenz += binaryClassMetrics.areaUnderLorenz;
             return this;
-        }
-
-        public long getCount() {
-            return count;
-        }
-
-        public void setCount(long count) {
-            this.count = count;
-        }
-
-        public double getAreaUnderROC() {
-            return areaUnderROC;
-        }
-
-        public void setAreaUnderROC(double areaUnderROC) {
-            this.areaUnderROC = areaUnderROC;
-        }
-
-        public double getAreaUnderLorenz() {
-            return areaUnderLorenz;
-        }
-
-        public void setAreaUnderLorenz(double areaUnderLorenz) {
-            this.areaUnderLorenz = areaUnderLorenz;
-        }
-
-        public double getAreaUnderPR() {
-            return areaUnderPR;
-        }
-
-        public void setAreaUnderPR(double areaUnderPR) {
-            this.areaUnderPR = areaUnderPR;
-        }
-
-        public double getKs() {
-            return ks;
-        }
-
-        public void setKs(double ks) {
-            this.ks = ks;
         }
     }
 }

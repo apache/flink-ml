@@ -61,7 +61,8 @@ public class OperatorEpochWatermarkTrackerFactoryTest extends TestLogger {
     @Before
     public void before() {
         env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.getConfig().enableObjectReuse().disableGenericTypes();
+        env.getConfig().enableObjectReuse();
+        env.getConfig().disableGenericTypes();
     }
 
     @Test

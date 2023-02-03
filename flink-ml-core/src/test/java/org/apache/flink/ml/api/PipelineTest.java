@@ -22,6 +22,7 @@ import org.apache.flink.ml.api.ExampleStages.SumEstimator;
 import org.apache.flink.ml.api.ExampleStages.SumModel;
 import org.apache.flink.ml.builder.Pipeline;
 import org.apache.flink.ml.builder.PipelineModel;
+import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.test.util.AbstractTestBase;
