@@ -42,7 +42,7 @@ public class PipelineTest extends AbstractTestBase {
 
     @Before
     public void before() {
-        env = org.apache.flink.ml.util.TestUtils.getExecutionEnvironment();
+        env = TestUtils.getExecutionEnvironment();
         tEnv = StreamTableEnvironment.create(env);
     }
 
