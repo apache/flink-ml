@@ -195,7 +195,8 @@ public class BinaryClassificationEvaluator
                         });
 
         DataStream<Map<String, Double>> metrics =
-                DataStreamUtils.mapPartition(localMetrics, new MergeMetrics());
+                DataStreamUtils.mapPartition(
+                        localMetrics, new MergeMetrics(), Types.MAP(Types.STRING, Types.DOUBLE));
         metrics.getTransformation().setParallelism(1);
 
         final String[] metricsNames = getMetricsNames();
@@ -668,14 +669,16 @@ public class BinaryClassificationEvaluator
     }
 
     /** Binary Summary of data in one worker. */
-    private static class BinarySummary implements Serializable {
-        private final Integer taskId;
+    public static class BinarySummary implements Serializable {
+        public Integer taskId;
         // maximum score in this partition
-        private double maxScore;
+        public double maxScore;
         // real positives in this partition
-        private long curPositive;
+        public long curPositive;
         // real negatives in this partition
-        private long curNegative;
+        public long curNegative;
+
+        public BinarySummary() {}
 
         public BinarySummary(Integer taskId, double maxScore, long curPositive, long curNegative) {
             this.taskId = taskId;
@@ -686,21 +689,23 @@ public class BinaryClassificationEvaluator
     }
 
     /** The evaluation metrics for binary classification. */
-    private static class BinaryMetrics {
+    public static class BinaryMetrics {
         /* The count of samples. */
-        private long count;
+        public long count;
 
         /* Area under ROC */
-        private final double areaUnderROC;
+        public double areaUnderROC;
 
         /* Area under Lorenz */
-        private double areaUnderLorenz;
+        public double areaUnderLorenz;
 
         /* Area under PRC */
-        private double areaUnderPR;
+        public double areaUnderPR;
 
         /* KS */
-        private double ks;
+        public double ks;
+
+        public BinaryMetrics() {}
 
         public BinaryMetrics(long count, double areaUnderROC) {
             this.count = count;

@@ -18,10 +18,7 @@
 
 package org.apache.flink.ml.util;
 
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.ml.api.ExampleStages;
-import org.apache.flink.ml.api.TestUtils;
-import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.test.util.AbstractTestBase;
@@ -49,15 +46,7 @@ public class ReadWriteUtilsTest extends AbstractTestBase {
 
     @Before
     public void before() throws IOException {
-
-        org.apache.flink.configuration.Configuration config =
-                new org.apache.flink.configuration.Configuration();
-        config.set(ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
-        env = StreamExecutionEnvironment.getExecutionEnvironment(config);
-        env.getConfig().enableObjectReuse();
-        env.setParallelism(4);
-        env.enableCheckpointing(100);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        env = TestUtils.getExecutionEnvironment();
         tEnv = StreamTableEnvironment.create(env);
 
         Configuration conf = new Configuration();

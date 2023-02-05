@@ -20,6 +20,8 @@ package org.apache.flink.ml.feature.countvectorizer;
 
 import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
@@ -78,7 +80,11 @@ public class CountVectorizer
         DataStream<CountVectorizerModelData> modelData =
                 DataStreamUtils.aggregate(
                         inputData,
-                        new VocabularyAggregator(getMinDF(), getMaxDF(), getVocabularySize()));
+                        new VocabularyAggregator(getMinDF(), getMaxDF(), getVocabularySize()),
+                        Types.TUPLE(
+                                Types.LONG,
+                                Types.MAP(Types.STRING, Types.TUPLE(Types.LONG, Types.LONG))),
+                        TypeInformation.of(CountVectorizerModelData.class));
 
         CountVectorizerModel model =
                 new CountVectorizerModel().setModelData(tEnv.fromDataStream(modelData));

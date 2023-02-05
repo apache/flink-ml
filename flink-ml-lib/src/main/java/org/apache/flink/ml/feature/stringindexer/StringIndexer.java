@@ -22,8 +22,7 @@ import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
-import org.apache.flink.api.common.typeinfo.TypeHint;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.api.Estimator;
@@ -100,17 +99,17 @@ public class StringIndexer
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
 
-        DataStream<HashMap<String, Long>[]> localCountedString =
+        DataStream<Map<String, Long>[]> localCountedString =
                 tEnv.toDataStream(inputs[0])
                         .transform(
                                 "countStringOperator",
-                                TypeInformation.of(new TypeHint<HashMap<String, Long>[]>() {}),
+                                Types.OBJECT_ARRAY(Types.MAP(Types.STRING, Types.LONG)),
                                 new CountStringOperator(inputCols));
 
-        DataStream<HashMap<String, Long>[]> countedString =
+        DataStream<Map<String, Long>[]> countedString =
                 DataStreamUtils.reduce(
                         localCountedString,
-                        (ReduceFunction<HashMap<String, Long>[]>)
+                        (ReduceFunction<Map<String, Long>[]>)
                                 (value1, value2) -> {
                                     for (int i = 0; i < value1.length; i++) {
                                         for (Entry<String, Long> stringAndCnt :
@@ -124,7 +123,8 @@ public class StringIndexer
                                         }
                                     }
                                     return value1;
-                                });
+                                },
+                        Types.OBJECT_ARRAY(Types.MAP(Types.STRING, Types.LONG)));
 
         DataStream<StringIndexerModelData> modelData =
                 countedString.map(new ModelGenerator(getStringOrderType()));
@@ -137,14 +137,14 @@ public class StringIndexer
     }
 
     /** Computes the occurrence time of each string by columns. */
-    private static class CountStringOperator extends AbstractStreamOperator<HashMap<String, Long>[]>
-            implements OneInputStreamOperator<Row, HashMap<String, Long>[]>, BoundedOneInput {
+    private static class CountStringOperator extends AbstractStreamOperator<Map<String, Long>[]>
+            implements OneInputStreamOperator<Row, Map<String, Long>[]>, BoundedOneInput {
         /** The name of input columns. */
         private final String[] inputCols;
         /** The occurrence time of each string by column. */
-        private HashMap<String, Long>[] stringCntByColumn;
+        private Map<String, Long>[] stringCntByColumn;
         /** The state of stringCntByColumn. */
-        private ListState<HashMap<String, Long>[]> stringCntByColumnState;
+        private ListState<Map<String, Long>[]> stringCntByColumnState;
 
         public CountStringOperator(String[] inputCols) {
             this.inputCols = inputCols;
@@ -186,8 +186,8 @@ public class StringIndexer
                             .getListState(
                                     new ListStateDescriptor<>(
                                             "stringCntByColumnState",
-                                            TypeInformation.of(
-                                                    new TypeHint<HashMap<String, Long>[]>() {})));
+                                            Types.OBJECT_ARRAY(
+                                                    Types.MAP(Types.STRING, Types.LONG))));
 
             OperatorStateUtils.getUniqueElement(stringCntByColumnState, "stringCntByColumnState")
                     .ifPresent(x -> stringCntByColumn = x);
@@ -205,7 +205,7 @@ public class StringIndexer
      * to the specified string order type.
      */
     private static class ModelGenerator
-            implements MapFunction<HashMap<String, Long>[], StringIndexerModelData> {
+            implements MapFunction<Map<String, Long>[], StringIndexerModelData> {
         private final String stringOrderType;
 
         public ModelGenerator(String stringOrderType) {
@@ -213,7 +213,7 @@ public class StringIndexer
         }
 
         @Override
-        public StringIndexerModelData map(HashMap<String, Long>[] value) {
+        public StringIndexerModelData map(Map<String, Long>[] value) {
             int numCols = value.length;
             String[][] stringArrays = new String[numCols][];
             ArrayList<Tuple2<String, Long>> stringsAndCnts = new ArrayList<>();

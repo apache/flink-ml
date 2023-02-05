@@ -22,8 +22,7 @@ import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
-import org.apache.flink.api.common.typeinfo.TypeHint;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
@@ -48,10 +47,12 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.Preconditions;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -93,30 +94,33 @@ public class VectorIndexer
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
 
-        DataStream<HashSet<Double>[]> localDistinctDoubles =
+        DataStream<List<Double>[]> localDistinctDoubles =
                 tEnv.toDataStream(inputs[0])
                         .transform(
                                 "computeDistinctDoublesOperator",
-                                TypeInformation.of(new TypeHint<HashSet<Double>[]>() {}),
+                                Types.OBJECT_ARRAY(Types.LIST(Types.DOUBLE)),
                                 new ComputeDistinctDoublesOperator(getInputCol(), maxCategories));
 
-        DataStream<HashSet<Double>[]> distinctDoubles =
+        DataStream<List<Double>[]> distinctDoubles =
                 DataStreamUtils.reduce(
                         localDistinctDoubles,
-                        (ReduceFunction<HashSet<Double>[]>)
+                        (ReduceFunction<List<Double>[]>)
                                 (value1, value2) -> {
                                     for (int i = 0; i < value1.length; i++) {
                                         if (value1[i] == null || value2[i] == null) {
                                             value1[i] = null;
                                         } else {
-                                            value1[i].addAll(value2[i]);
+                                            HashSet<Double> tmp = new HashSet<>(value1[i]);
+                                            tmp.addAll(value2[i]);
+                                            value1[i] = new ArrayList<>(tmp);
                                         }
                                     }
                                     return value1;
                                 });
 
         DataStream<VectorIndexerModelData> modelData =
-                distinctDoubles.map(new ModelGenerator(maxCategories));
+                distinctDoubles.map(
+                        new ModelGenerator(maxCategories), VectorIndexerModelData.TYPE_INFO);
         modelData.getTransformation().setParallelism(1);
 
         Schema schema =
@@ -153,8 +157,8 @@ public class VectorIndexer
      * greater than maxCategories, the corresponding returned HashSet is null.
      */
     private static class ComputeDistinctDoublesOperator
-            extends AbstractStreamOperator<HashSet<Double>[]>
-            implements OneInputStreamOperator<Row, HashSet<Double>[]>, BoundedOneInput {
+            extends AbstractStreamOperator<List<Double>[]>
+            implements OneInputStreamOperator<Row, List<Double>[]>, BoundedOneInput {
         /** The name of input column. */
         private final String inputCol;
         /** Max number of categories. */
@@ -162,7 +166,7 @@ public class VectorIndexer
         /** The distinct doubles of each column. */
         private HashSet<Double>[] doublesByColumn;
         /** The state of doublesByColumn. */
-        private ListState<HashSet<Double>[]> doublesByColumnState;
+        private ListState<List<Double>[]> doublesByColumnState;
 
         public ComputeDistinctDoublesOperator(String inputCol, int maxCategories) {
             this.inputCol = inputCol;
@@ -172,7 +176,7 @@ public class VectorIndexer
         @Override
         public void endInput() {
             if (doublesByColumn != null) {
-                output.collect(new StreamRecord<>(doublesByColumn));
+                output.collect(new StreamRecord<>(convertToListArray(doublesByColumn)));
             }
             doublesByColumnState.clear();
         }
@@ -211,17 +215,33 @@ public class VectorIndexer
                             .getListState(
                                     new ListStateDescriptor<>(
                                             "doublesByColumnState",
-                                            TypeInformation.of(
-                                                    new TypeHint<HashSet<Double>[]>() {})));
+                                            Types.OBJECT_ARRAY(Types.LIST(Types.DOUBLE))));
 
             OperatorStateUtils.getUniqueElement(doublesByColumnState, "doublesByColumnState")
-                    .ifPresent(x -> doublesByColumn = x);
+                    .ifPresent(x -> doublesByColumn = convertToHashSetArray(x));
         }
 
         @Override
         public void snapshotState(StateSnapshotContext context) throws Exception {
             super.snapshotState(context);
-            doublesByColumnState.update(Collections.singletonList(doublesByColumn));
+            doublesByColumnState.update(
+                    Collections.singletonList(convertToListArray(doublesByColumn)));
+        }
+
+        private List<Double>[] convertToListArray(HashSet<Double>[] array) {
+            List<Double>[] results = new ArrayList[array.length];
+            for (int i = 0; i < array.length; i++) {
+                results[i] = new ArrayList<>(array[i]);
+            }
+            return results;
+        }
+
+        private HashSet<Double>[] convertToHashSetArray(List<Double>[] array) {
+            HashSet<Double>[] results = new HashSet[array.length];
+            for (int i = 0; i < array.length; i++) {
+                results[i] = new HashSet<>(array[i]);
+            }
+            return results;
         }
     }
 
@@ -229,7 +249,7 @@ public class VectorIndexer
      * Merges all the distinct doubles by columns and generates the {@link VectorIndexerModelData}.
      */
     private static class ModelGenerator
-            implements MapFunction<HashSet<Double>[], VectorIndexerModelData> {
+            implements MapFunction<List<Double>[], VectorIndexerModelData> {
         private final int maxCategories;
 
         public ModelGenerator(int maxCategories) {
@@ -237,7 +257,7 @@ public class VectorIndexer
         }
 
         @Override
-        public VectorIndexerModelData map(HashSet<Double>[] distinctDoubles) {
+        public VectorIndexerModelData map(List<Double>[] distinctDoubles) {
             Map<Integer, Map<Double, Integer>> categoryMaps = new HashMap<>();
             for (int i = 0; i < distinctDoubles.length; i++) {
                 if (distinctDoubles[i] != null && distinctDoubles[i].size() <= maxCategories) {

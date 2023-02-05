@@ -19,6 +19,8 @@
 package org.apache.flink.ml.feature.imputer;
 
 import org.apache.flink.api.common.functions.AggregateFunction;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
@@ -73,21 +75,27 @@ public class Imputer implements Estimator<Imputer, ImputerModel>, ImputerParams<
                 modelData =
                         DataStreamUtils.aggregate(
                                 inputData,
-                                new MeanStrategyAggregator(getInputCols(), getMissingValue()));
+                                new MeanStrategyAggregator(getInputCols(), getMissingValue()),
+                                Types.MAP(Types.STRING, Types.TUPLE(Types.DOUBLE, Types.LONG)),
+                                ImputerModelData.TYPE_INFO);
                 break;
             case MEDIAN:
                 modelData =
                         DataStreamUtils.aggregate(
                                 inputData,
                                 new MedianStrategyAggregator(
-                                        getInputCols(), getMissingValue(), getRelativeError()));
+                                        getInputCols(), getMissingValue(), getRelativeError()),
+                                Types.MAP(Types.STRING, TypeInformation.of(QuantileSummary.class)),
+                                ImputerModelData.TYPE_INFO);
                 break;
             case MOST_FREQUENT:
                 modelData =
                         DataStreamUtils.aggregate(
                                 inputData,
                                 new MostFrequentStrategyAggregator(
-                                        getInputCols(), getMissingValue()));
+                                        getInputCols(), getMissingValue()),
+                                Types.MAP(Types.STRING, Types.MAP(Types.DOUBLE, Types.LONG)),
+                                ImputerModelData.TYPE_INFO);
                 break;
             default:
                 throw new RuntimeException("Unsupported strategy of Imputer: " + getStrategy());

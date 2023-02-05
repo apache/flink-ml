@@ -55,6 +55,7 @@ public class DraftExecutionEnvironmentSwitchWrapperTest extends TestLogger {
     public void testSwitchingOperatorWrappers() {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.getConfig().enableObjectReuse();
+        env.getConfig().disableGenericTypes();
         DataStream<Integer> source =
                 env.addSource(new DraftExecutionEnvironment.EmptySource<Integer>() {});
 

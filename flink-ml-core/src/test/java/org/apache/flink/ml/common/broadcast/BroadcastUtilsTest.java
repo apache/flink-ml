@@ -19,12 +19,14 @@
 package org.apache.flink.ml.common.broadcast;
 
 import org.apache.flink.api.common.functions.AbstractRichFunction;
+import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.RestOptions;
 import org.apache.flink.iteration.config.IterationOptions;
 import org.apache.flink.ml.common.broadcast.operator.TestOneInputOp;
 import org.apache.flink.ml.common.broadcast.operator.TestTwoInputOp;
+import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.minicluster.MiniClusterConfiguration;
@@ -98,17 +100,8 @@ public class BroadcastUtilsTest {
     }
 
     private JobGraph getJobGraph(int numNonBroadcastInputs) {
-        StreamExecutionEnvironment env =
-                StreamExecutionEnvironment.getExecutionEnvironment(
-                        new Configuration() {
-                            {
-                                this.set(
-                                        ExecutionCheckpointingOptions
-                                                .ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH,
-                                        true);
-                            }
-                        });
-        env.getConfig().enableObjectReuse();
+        StreamExecutionEnvironment env = TestUtils.getExecutionEnvironment();
+        env.setRestartStrategy(RestartStrategies.fallBackRestart());
         env.enableCheckpointing(500, CheckpointingMode.EXACTLY_ONCE);
         env.setParallelism(NUM_SLOT * NUM_TM);
 

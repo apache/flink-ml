@@ -24,6 +24,7 @@ import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
+import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -76,8 +77,7 @@ public class FunctionsTest extends AbstractTestBase {
 
     @Before
     public void before() {
-        env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.getConfig().enableObjectReuse();
+        env = TestUtils.getExecutionEnvironment();
         tEnv = StreamTableEnvironment.create(env);
     }
 
