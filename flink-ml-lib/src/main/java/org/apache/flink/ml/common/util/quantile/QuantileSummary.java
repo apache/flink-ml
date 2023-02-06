@@ -16,8 +16,9 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.util;
+package org.apache.flink.ml.common.util.quantile;
 
+import org.apache.flink.api.common.typeinfo.TypeInfo;
 import org.apache.flink.util.Preconditions;
 
 import java.io.Serializable;
@@ -36,6 +37,7 @@ import java.util.stream.IntStream;
  * algorithm proposed in the paper: "Space-efficient Online Computation of Quantile Summaries" by
  * Greenwald, Michael and Khanna, Sanjeev. (https://doi.org/10.1145/375663.375670)
  */
+@TypeInfo(QuantileSummaryTypeInfoFactory.class)
 public class QuantileSummary implements Serializable {
 
     /** The default size of head buffer. */
@@ -45,25 +47,28 @@ public class QuantileSummary implements Serializable {
     private static final int DEFAULT_COMPRESS_THRESHOLD = 10000;
 
     /** The target relative error. */
-    private final double relativeError;
+    public double relativeError;
 
     /**
      * The compression threshold. After the internal buffer of statistics crosses this size, it
      * attempts to compress the statistics together.
      */
-    private final int compressThreshold;
+    public int compressThreshold;
 
     /** The count of all the elements inserted to be calculated. */
-    private final long count;
+    public long count;
 
     /** A buffer of quantile statistics. */
-    private final List<StatsTuple> sampled;
+    public List<StatsTuple> sampled;
 
     /** A buffer of the latest samples seen so far. */
-    private final List<Double> headBuffer = new ArrayList<>();
+    public List<Double> headBuffer = new ArrayList<>();
 
     /** Whether the quantile summary has been compressed. */
-    private boolean compressed;
+    public boolean compressed;
+
+    /** Empty QuantileSummary Constructor. */
+    public QuantileSummary() {}
 
     /**
      * QuantileSummary Constructor.
@@ -395,11 +400,13 @@ public class QuantileSummary implements Serializable {
      *   <li>delta: the maximum span of the rank.
      * </ul>
      */
-    private static class StatsTuple implements Serializable {
+    public static class StatsTuple implements Serializable {
         private static final long serialVersionUID = 1L;
-        private final double value;
+        private double value;
         private long g;
         private long delta;
+
+        public StatsTuple() {}
 
         public StatsTuple(double value, long g, long delta) {
             this.value = value;

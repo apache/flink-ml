@@ -18,6 +18,8 @@
 
 package org.apache.flink.ml.common.util;
 
+import org.apache.flink.ml.common.util.quantile.QuantileSummary;
+
 import org.apache.commons.lang3.ArrayUtils;
 import org.junit.Before;
 import org.junit.Test;

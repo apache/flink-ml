@@ -29,7 +29,7 @@ public class VectorTypeInfo extends TypeInformation<Vector> {
 
     public static final VectorTypeInfo INSTANCE = new VectorTypeInfo();
 
-    private VectorTypeInfo() {}
+    public VectorTypeInfo() {}
 
     @Override
     public boolean isBasicType() {

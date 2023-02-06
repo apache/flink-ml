@@ -34,6 +34,8 @@ import org.apache.flink.ml.common.datastream.EndOfStreamWindows;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -164,7 +166,11 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
                                     outputTypeInfo);
                         });
         DataStream<List<Row>> topKList =
-                DataStreamUtils.aggregate(filteredData, new TopKFunction(distCol, k));
+                DataStreamUtils.aggregate(
+                        filteredData,
+                        new TopKFunction(distCol, k),
+                        Types.LIST(outputTypeInfo),
+                        Types.LIST(outputTypeInfo));
         DataStream<Row> topKData =
                 topKList.flatMap(
                         (value, out) -> {
@@ -206,6 +212,14 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
         DataStream<Row> explodedA = preprocessData(datasetA, idCol);
         DataStream<Row> explodedB = preprocessData(datasetB, idCol);
 
+        RowTypeInfo inputTypeInfo = getOutputType(datasetA, idCol);
+        RowTypeInfo outputTypeInfo =
+                new RowTypeInfo(
+                        inputTypeInfo.getTypeAt(0),
+                        inputTypeInfo.getTypeAt(0),
+                        inputTypeInfo.getTypeAt(1),
+                        inputTypeInfo.getTypeAt(1));
+
         DataStream<? extends LSHModelData> modelData =
                 tEnv.toDataStream(modelDataTable, modelDataClass);
         DataStream<Row> sameBucketPairs =
@@ -220,7 +234,9 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
                                                 r0.getField(0),
                                                 r1.getField(0),
                                                 r0.getField(1),
-                                                r1.getField(1)));
+                                                r1.getField(1)),
+                                outputTypeInfo);
+
         DataStream<Row> distinctSameBucketPairs =
                 DataStreamUtils.reduce(
                         sameBucketPairs.keyBy(
@@ -230,10 +246,11 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
                                         return Tuple2.of(r.getFieldAs(0), r.getFieldAs(1));
                                     }
                                 }),
-                        (r0, r1) -> r0);
+                        (r0, r1) -> r0,
+                        outputTypeInfo);
 
-        RowTypeInfo inputTypeInfo = TableUtils.getRowTypeInfo(datasetA.getResolvedSchema());
-        TypeInformation<?> idColType = inputTypeInfo.getTypeAt(idCol);
+        TypeInformation<?> idColType =
+                TableUtils.getRowTypeInfo(datasetA.getResolvedSchema()).getTypeAt(idCol);
         DataStream<Row> pairsWithDists =
                 BroadcastUtils.withBroadcastStream(
                         Collections.singletonList(distinctSameBucketPairs),
@@ -268,25 +285,30 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
                 (dataTable.getResolvedSchema().getColumnNames().contains(getOutputCol()))
                         ? dataTable
                         : transform(dataTable)[0];
-
-        RowTypeInfo inputTypeInfo = TableUtils.getRowTypeInfo(dataTable.getResolvedSchema());
-        TypeInformation<?> idColType = inputTypeInfo.getTypeAt(idCol);
-        final String indexCol = "index";
-        final String hashValueCol = "hashValue";
-        RowTypeInfo outputTypeInfo =
-                new RowTypeInfo(
-                        new TypeInformation[] {
-                            idColType,
-                            TypeInformation.of(Vector.class),
-                            Types.INT,
-                            TypeInformation.of(DenseVector.class)
-                        },
-                        new String[] {idCol, getInputCol(), indexCol, hashValueCol});
+        RowTypeInfo outputTypeInfo = getOutputType(dataTable, idCol);
 
         return tEnv.toDataStream(dataTable)
                 .flatMap(
                         new ExplodeHashValuesFunction(idCol, getInputCol(), getOutputCol()),
                         outputTypeInfo);
+    }
+
+    private RowTypeInfo getOutputType(Table dataTable, String idCol) {
+        final String indexCol = "index";
+        final String hashValueCol = "hashValue";
+        RowTypeInfo inputTypeInfo = TableUtils.getRowTypeInfo(dataTable.getResolvedSchema());
+        TypeInformation<?> idColType = inputTypeInfo.getTypeAt(idCol);
+
+        RowTypeInfo outputTypeInfo =
+                new RowTypeInfo(
+                        new TypeInformation[] {
+                            idColType,
+                            VectorTypeInfo.INSTANCE,
+                            Types.INT,
+                            DenseVectorTypeInfo.INSTANCE
+                        },
+                        new String[] {idCol, getInputCol(), indexCol, hashValueCol});
+        return outputTypeInfo;
     }
 
     private static class PredictFunction extends RichMapFunction<Row, Row> {
@@ -348,10 +370,10 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
         }
     }
 
-    private static class TopKFunction
-            implements AggregateFunction<Row, PriorityQueue<Row>, List<Row>> {
+    private static class TopKFunction implements AggregateFunction<Row, List<Row>, List<Row>> {
         private final int numNearestNeighbors;
         private final String distCol;
+        private PriorityQueue<Row> topKRows;
 
         private static class DistColComparator implements Comparator<Row> {
 
@@ -373,34 +395,45 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
         }
 
         @Override
-        public PriorityQueue<Row> createAccumulator() {
-            return new PriorityQueue<>(numNearestNeighbors, new DistColComparator(distCol));
+        public List<Row> createAccumulator() {
+            return new ArrayList<>(numNearestNeighbors);
         }
 
         @Override
-        public PriorityQueue<Row> add(Row value, PriorityQueue<Row> accumulator) {
-            if (accumulator.size() == numNearestNeighbors) {
-                Row peek = accumulator.peek();
-                if (accumulator.comparator().compare(value, peek) < 0) {
-                    accumulator.poll();
-                }
+        public List<Row> add(Row value, List<Row> accumulator) {
+            if (topKRows == null) {
+                topKRows = new PriorityQueue<>(numNearestNeighbors, new DistColComparator(distCol));
+                topKRows.addAll(accumulator);
             }
-            accumulator.add(value);
+            insert(value, topKRows);
+            return new ArrayList<>(topKRows);
+        }
+
+        @Override
+        public List<Row> getResult(List<Row> accumulator) {
             return accumulator;
         }
 
         @Override
-        public List<Row> getResult(PriorityQueue<Row> accumulator) {
-            return new ArrayList<>(accumulator);
+        public List<Row> merge(List<Row> a, List<Row> b) {
+            PriorityQueue<Row> merged =
+                    new PriorityQueue<>(numNearestNeighbors, new DistColComparator(distCol));
+            merged.addAll(a);
+            for (Row value : b) {
+                insert(value, merged);
+            }
+
+            return new ArrayList<>(merged);
         }
 
-        @Override
-        public PriorityQueue<Row> merge(PriorityQueue<Row> a, PriorityQueue<Row> b) {
-            PriorityQueue<Row> merged = new PriorityQueue<>(a);
-            for (Row row : b) {
-                add(row, merged);
+        private void insert(Row value, PriorityQueue<Row> queue) {
+            if (queue.size() == numNearestNeighbors) {
+                Row peek = queue.peek();
+                if (queue.comparator().compare(value, peek) < 0) {
+                    queue.poll();
+                }
             }
-            return merged;
+            queue.add(value);
         }
     }
 

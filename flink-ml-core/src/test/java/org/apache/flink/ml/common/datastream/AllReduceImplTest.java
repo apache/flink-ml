@@ -21,12 +21,14 @@ package org.apache.flink.ml.common.datastream;
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.PrimitiveArrayTypeInfo;
+import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.NumberSequenceIterator;
 
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.experimental.runners.Enclosed;
 import org.junit.runner.RunWith;
@@ -61,6 +63,12 @@ public class AllReduceImplTest {
     public static class ParameterizedTest {
 
         private static int numElements;
+        private StreamExecutionEnvironment env;
+
+        @Before
+        public void before() {
+            env = TestUtils.getExecutionEnvironment();
+        }
 
         @Parameterized.Parameters
         public static Collection<Object[]> params() {
@@ -79,9 +87,6 @@ public class AllReduceImplTest {
 
         @Test
         public void testAllReduce() throws Exception {
-            StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-            env.getConfig().enableObjectReuse();
-            env.setParallelism(parallelism);
             DataStream<double[]> elements =
                     env.fromParallelCollection(
                                     new NumberSequenceIterator(1L, parallelism),
@@ -114,13 +119,16 @@ public class AllReduceImplTest {
     /** Non-parameterized test for {@link AllReduceImpl}. */
     public static class NonParameterizedTest {
 
+        private StreamExecutionEnvironment env;
+
+        @Before
+        public void before() {
+            env = TestUtils.getExecutionEnvironment();
+        }
+
         @Test
         public void testAllReduceWithMoreThanOneArray() {
             try {
-                StreamExecutionEnvironment env =
-                        StreamExecutionEnvironment.getExecutionEnvironment();
-                env.getConfig().enableObjectReuse();
-                env.setParallelism(parallelism);
                 DataStream<double[]> elements =
                         env.fromParallelCollection(
                                         new NumberSequenceIterator(1L, parallelism),
@@ -148,10 +156,6 @@ public class AllReduceImplTest {
         @Test
         public void testAllReduceWithDifferentLength() {
             try {
-                StreamExecutionEnvironment env =
-                        StreamExecutionEnvironment.getExecutionEnvironment();
-                env.getConfig().enableObjectReuse();
-                env.setParallelism(parallelism);
                 DataStream<double[]> elements =
                         env.fromParallelCollection(
                                         new NumberSequenceIterator(1L, parallelism),
@@ -170,9 +174,6 @@ public class AllReduceImplTest {
 
         @Test
         public void testAllReduceWithEmptyInput() throws Exception {
-            StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-            env.getConfig().enableObjectReuse();
-            env.setParallelism(parallelism);
             DataStream<double[]> elements =
                     env.fromParallelCollection(
                                     new NumberSequenceIterator(1L, parallelism),
