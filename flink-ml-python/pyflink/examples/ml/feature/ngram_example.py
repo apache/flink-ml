@@ -21,7 +21,7 @@
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.lib.feature.ngram import NGram
+from pyflink.ml.feature.ngram import NGram
 from pyflink.table import StreamTableEnvironment
 
 env = StreamExecutionEnvironment.get_execution_environment()

@@ -87,16 +87,14 @@ try:
 
     PACKAGES = ['pyflink',
                 'pyflink.ml',
-                'pyflink.ml.core',
-                'pyflink.ml.lib',
-                'pyflink.ml.lib.classification',
-                'pyflink.ml.lib.clustering',
-                'pyflink.ml.lib.evaluation',
-                'pyflink.ml.lib.feature',
-                'pyflink.ml.lib.regression',
-                'pyflink.ml.lib.stats',
-                'pyflink.ml.lib',
+                'pyflink.ml.classification',
+                'pyflink.ml.clustering',
+                'pyflink.ml.evaluation',
+                'pyflink.ml.feature',
+                'pyflink.ml.regression',
+                'pyflink.ml.stats',
                 'pyflink.ml.util',
+                'pyflink.ml.common',
                 'pyflink.lib',
                 'pyflink.examples']
 

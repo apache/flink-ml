@@ -20,7 +20,7 @@
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.lib.functions import array_to_vector
+from pyflink.ml.functions import array_to_vector
 from pyflink.table import StreamTableEnvironment
 from pyflink.table.expressions import col
 

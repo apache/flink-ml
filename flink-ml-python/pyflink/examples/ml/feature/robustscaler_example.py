@@ -23,9 +23,9 @@ from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.table import StreamTableEnvironment
 
-from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
+from pyflink.ml.linalg import Vectors, DenseVectorTypeInfo
 
-from pyflink.ml.lib.feature.robustscaler import RobustScaler
+from pyflink.ml.feature.robustscaler import RobustScaler
 
 # Creates a new StreamExecutionEnvironment.
 env = StreamExecutionEnvironment.get_execution_environment()

@@ -21,8 +21,8 @@
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
-from pyflink.ml.lib.feature.maxabsscaler import MaxAbsScaler
+from pyflink.ml.linalg import Vectors, DenseVectorTypeInfo
+from pyflink.ml.feature.maxabsscaler import MaxAbsScaler
 from pyflink.table import StreamTableEnvironment
 
 # create a new StreamExecutionEnvironment

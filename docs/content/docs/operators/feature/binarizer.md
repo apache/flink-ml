@@ -135,8 +135,8 @@ public class BinarizerExample {
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
-from pyflink.ml.lib.feature.binarizer import Binarizer
+from pyflink.ml.linalg import Vectors, DenseVectorTypeInfo
+from pyflink.ml.feature.binarizer import Binarizer
 from pyflink.table import StreamTableEnvironment
 
 # create a new StreamExecutionEnvironment

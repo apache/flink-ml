@@ -27,8 +27,8 @@
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
-from pyflink.ml.lib.clustering.agglomerativeclustering import AgglomerativeClustering
+from pyflink.ml.linalg import Vectors, DenseVectorTypeInfo
+from pyflink.ml.clustering.agglomerativeclustering import AgglomerativeClustering
 from pyflink.table import StreamTableEnvironment
 
 # Creates a new StreamExecutionEnvironment.

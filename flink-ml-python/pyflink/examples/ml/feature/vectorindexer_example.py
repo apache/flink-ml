@@ -20,9 +20,9 @@
 # engineering.
 
 from pyflink.common import Types
-from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
+from pyflink.ml.linalg import Vectors, DenseVectorTypeInfo
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.lib.feature.vectorindexer import VectorIndexer
+from pyflink.ml.feature.vectorindexer import VectorIndexer
 from pyflink.table import StreamTableEnvironment
 
 # Creates a new StreamExecutionEnvironment.

@@ -117,7 +117,7 @@ public class OneHotEncoderExample {
 
 from pyflink.common import Row
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.lib.feature.onehotencoder import OneHotEncoder
+from pyflink.ml.feature.onehotencoder import OneHotEncoder
 from pyflink.table import StreamTableEnvironment, DataTypes
 
 # create a new StreamExecutionEnvironment

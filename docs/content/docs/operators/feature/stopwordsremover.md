@@ -123,7 +123,7 @@ public class StopWordsRemoverExample {
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.lib.feature.stopwordsremover import StopWordsRemover
+from pyflink.ml.feature.stopwordsremover import StopWordsRemover
 from pyflink.table import StreamTableEnvironment
 
 # create a new StreamExecutionEnvironment

@@ -23,8 +23,8 @@ from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.table import StreamTableEnvironment
 
-from pyflink.ml.core.linalg import Vectors, SparseVectorTypeInfo
-from pyflink.ml.lib.feature.lsh import MinHashLSH
+from pyflink.ml.linalg import Vectors, SparseVectorTypeInfo
+from pyflink.ml.feature.lsh import MinHashLSH
 
 # Creates a new StreamExecutionEnvironment.
 env = StreamExecutionEnvironment.get_execution_environment()

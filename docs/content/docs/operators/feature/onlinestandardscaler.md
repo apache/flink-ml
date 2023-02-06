@@ -190,9 +190,9 @@ from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.table import StreamTableEnvironment
 from pyflink.table.expressions import col
 
-from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
-from pyflink.ml.lib.feature.onlinestandardscaler import OnlineStandardScaler
-from pyflink.ml.core.windows import EventTimeTumblingWindows
+from pyflink.ml.linalg import Vectors, DenseVectorTypeInfo
+from pyflink.ml.feature.onlinestandardscaler import OnlineStandardScaler
+from pyflink.ml.common.window import EventTimeTumblingWindows
 
 # Creates a new StreamExecutionEnvironment.
 env = StreamExecutionEnvironment.get_execution_environment()

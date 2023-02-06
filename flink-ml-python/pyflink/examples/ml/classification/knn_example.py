@@ -20,8 +20,8 @@
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
-from pyflink.ml.lib.classification.knn import KNN
+from pyflink.ml.linalg import Vectors, DenseVectorTypeInfo
+from pyflink.ml.classification.knn import KNN
 from pyflink.table import StreamTableEnvironment
 
 # create a new StreamExecutionEnvironment

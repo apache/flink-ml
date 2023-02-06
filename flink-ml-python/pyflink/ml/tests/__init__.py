@@ -15,6 +15,7 @@
 #  See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
+import os
 import sys
 from pathlib import Path
 
@@ -23,3 +24,7 @@ from pathlib import Path
 # the order of package search.
 flink_ml_python_dir = Path(__file__).parents[3]
 sys.path.append(str(flink_ml_python_dir))
+
+import pyflink
+
+pyflink.__path__.insert(0, os.path.join(flink_ml_python_dir, 'pyflink'))

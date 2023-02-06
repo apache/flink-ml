@@ -60,8 +60,8 @@ jobs:
       - name: Test the source code
         working-directory: flink-ml-python
         run: |
-          pytest pyflink/ml/lib/feature
-          pytest pyflink/ml --ignore=pyflink/ml/lib/feature/tests/
+          pytest pyflink/ml/feature
+          pytest pyflink/ml --ignore=pyflink/ml/feature/tests/
           pytest pyflink/examples
 
 

@@ -100,7 +100,7 @@ public class RandomSplitterExample {
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.lib.feature.randomsplitter import RandomSplitter
+from pyflink.ml.feature.randomsplitter import RandomSplitter
 from pyflink.table import StreamTableEnvironment
 
 # Creates a new StreamExecutionEnvironment.

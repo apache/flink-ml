@@ -24,7 +24,7 @@ from typing import List, Dict, Any
 import cloudpickle
 from pyflink.table import StreamTableEnvironment
 
-from pyflink.ml.core.api import Stage
+from pyflink.ml.api import Stage
 
 
 def save_pipeline(pipeline: Stage, stages: List[Stage], path: str) -> None:

@@ -20,8 +20,8 @@
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
-from pyflink.ml.lib.classification.linearsvc import LinearSVC
+from pyflink.ml.linalg import Vectors, DenseVectorTypeInfo
+from pyflink.ml.classification.linearsvc import LinearSVC
 from pyflink.table import StreamTableEnvironment
 
 # create a new StreamExecutionEnvironment

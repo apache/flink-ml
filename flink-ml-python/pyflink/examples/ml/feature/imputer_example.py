@@ -21,7 +21,7 @@
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.lib.feature.imputer import Imputer
+from pyflink.ml.feature.imputer import Imputer
 from pyflink.table import StreamTableEnvironment
 
 env = StreamExecutionEnvironment.get_execution_environment()
