@@ -135,7 +135,7 @@ public class CountVectorizerExample {
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.lib.feature.countvectorizer import CountVectorizer
+from pyflink.ml.feature.countvectorizer import CountVectorizer
 from pyflink.table import StreamTableEnvironment
 
 # Creates a new StreamExecutionEnvironment.

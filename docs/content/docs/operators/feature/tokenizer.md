@@ -110,7 +110,7 @@ public class TokenizerExample {
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.lib.feature.tokenizer import Tokenizer
+from pyflink.ml.feature.tokenizer import Tokenizer
 from pyflink.table import StreamTableEnvironment
 
 env = StreamExecutionEnvironment.get_execution_environment()

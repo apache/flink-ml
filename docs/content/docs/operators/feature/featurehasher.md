@@ -132,7 +132,7 @@ public class FeatureHasherExample {
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.lib.feature.featurehasher import FeatureHasher
+from pyflink.ml.feature.featurehasher import FeatureHasher
 from pyflink.table import StreamTableEnvironment
 
 # create a new StreamExecutionEnvironment

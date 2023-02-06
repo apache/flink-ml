@@ -30,7 +30,7 @@ from pyflink.ml import add_jars_to_context_class_loader
 from pyflink.table import StreamTableEnvironment
 from pyflink.util.java_utils import get_j_env_configuration
 
-from pyflink.ml.core.wrapper import JavaWithParams
+from pyflink.ml.wrapper import JavaWithParams
 
 
 def update_existing_params(target: JavaWithParams, source: JavaWithParams):

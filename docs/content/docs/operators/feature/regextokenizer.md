@@ -117,7 +117,7 @@ public class RegexTokenizerExample {
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.lib.feature.regextokenizer import RegexTokenizer
+from pyflink.ml.feature.regextokenizer import RegexTokenizer
 from pyflink.table import StreamTableEnvironment
 
 env = StreamExecutionEnvironment.get_execution_environment()

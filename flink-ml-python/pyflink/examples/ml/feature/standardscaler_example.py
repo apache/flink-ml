@@ -21,8 +21,8 @@
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
-from pyflink.ml.lib.feature.standardscaler import StandardScaler
+from pyflink.ml.linalg import Vectors, DenseVectorTypeInfo
+from pyflink.ml.feature.standardscaler import StandardScaler
 from pyflink.table import StreamTableEnvironment
 
 # create a new StreamExecutionEnvironment

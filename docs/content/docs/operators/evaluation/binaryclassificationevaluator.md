@@ -137,8 +137,8 @@ public class BinaryClassificationEvaluatorExample {
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
-from pyflink.ml.lib.evaluation.binaryclassificationevaluator import BinaryClassificationEvaluator
+from pyflink.ml.linalg import Vectors, DenseVectorTypeInfo
+from pyflink.ml.evaluation.binaryclassification import BinaryClassificationEvaluator
 from pyflink.table import StreamTableEnvironment
 
 # create a new StreamExecutionEnvironment

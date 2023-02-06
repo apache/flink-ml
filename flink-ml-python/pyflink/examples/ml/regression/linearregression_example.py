@@ -21,8 +21,8 @@
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
-from pyflink.ml.lib.regression.linearregression import LinearRegression
+from pyflink.ml.linalg import Vectors, DenseVectorTypeInfo
+from pyflink.ml.regression.linearregression import LinearRegression
 from pyflink.table import StreamTableEnvironment
 
 # create a new StreamExecutionEnvironment

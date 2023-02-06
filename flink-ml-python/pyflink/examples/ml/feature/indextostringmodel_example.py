@@ -21,7 +21,7 @@
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.lib.feature.stringindexer import IndexToStringModel
+from pyflink.ml.feature.stringindexer import IndexToStringModel
 from pyflink.table import StreamTableEnvironment
 
 # create a new StreamExecutionEnvironment

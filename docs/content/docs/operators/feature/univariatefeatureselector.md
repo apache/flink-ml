@@ -173,10 +173,10 @@ public class UnivariateFeatureSelectorExample {
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.lib.feature.univariatefeatureselector import UnivariateFeatureSelector
+from pyflink.ml.feature.univariatefeatureselector import UnivariateFeatureSelector
 from pyflink.table import StreamTableEnvironment
 
-from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo
+from pyflink.ml.linalg import Vectors, DenseVectorTypeInfo
 
 env = StreamExecutionEnvironment.get_execution_environment()
 

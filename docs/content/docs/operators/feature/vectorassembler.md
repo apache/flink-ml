@@ -142,8 +142,8 @@ public class VectorAssemblerExample {
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.core.linalg import Vectors, DenseVectorTypeInfo, SparseVectorTypeInfo
-from pyflink.ml.lib.feature.vectorassembler import VectorAssembler
+from pyflink.ml.linalg import Vectors, DenseVectorTypeInfo, SparseVectorTypeInfo
+from pyflink.ml.feature.vectorassembler import VectorAssembler
 from pyflink.table import StreamTableEnvironment
 
 # create a new StreamExecutionEnvironment

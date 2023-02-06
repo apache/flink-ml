@@ -21,7 +21,7 @@
 
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.ml.lib.feature.bucketizer import Bucketizer
+from pyflink.ml.feature.bucketizer import Bucketizer
 from pyflink.table import StreamTableEnvironment
 
 # create a new StreamExecutionEnvironment

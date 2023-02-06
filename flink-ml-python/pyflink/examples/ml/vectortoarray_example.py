@@ -22,9 +22,9 @@ from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.table import StreamTableEnvironment
 
-from pyflink.ml.core.linalg import Vectors, VectorTypeInfo
+from pyflink.ml.linalg import Vectors, VectorTypeInfo
 
-from pyflink.ml.lib.functions import vector_to_array
+from pyflink.ml.functions import vector_to_array
 from pyflink.table.expressions import col
 
 # create a new StreamExecutionEnvironment
