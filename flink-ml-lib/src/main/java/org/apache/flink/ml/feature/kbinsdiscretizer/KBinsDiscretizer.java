@@ -217,8 +217,13 @@ public class KBinsDiscretizer
                 features[i] = input.get(i).get(columnId);
             }
             Arrays.sort(features);
+            int n = numData;
 
-            if (features[0] == features[numData - 1]) {
+            while (n > 0 && Double.isNaN(features[n - 1])) {
+                n -= 1;
+            }
+
+            if (features[0] == features[n - 1]) {
                 LOG.warn("Feature " + columnId + " is constant and the output will all be zero.");
                 binEdges[columnId] =
                         new double[] {Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY};
@@ -231,7 +236,7 @@ public class KBinsDiscretizer
                     for (int binEdgeId = 0; binEdgeId < numBins; binEdgeId++) {
                         tempBinEdges[binEdgeId] = features[(int) (binEdgeId * width)];
                     }
-                    tempBinEdges[numBins] = features[numData - 1];
+                    tempBinEdges[numBins] = features[n - 1];
                 } else {
                     tempBinEdges = features;
                 }
