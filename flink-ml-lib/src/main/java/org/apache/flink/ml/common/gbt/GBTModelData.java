@@ -37,6 +37,7 @@ import org.apache.flink.ml.common.gbt.typeinfo.GBTModelDataTypeInfoFactory;
 import org.apache.flink.ml.feature.stringindexer.StringIndexerModel;
 import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.regression.gbtregressor.GBTRegressorModel;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -53,7 +54,7 @@ import java.util.BitSet;
 import java.util.List;
 
 /**
- * Model data of gradient boosting trees.
+ * Model data of {@link GBTClassifierModel}.
  *
  * <p>This class also provides methods to convert model data from Table to Datastream, and classes
  * to save/load model data.

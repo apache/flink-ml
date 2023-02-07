@@ -34,6 +34,7 @@ import org.apache.flink.ml.common.gbt.defs.GbtParams;
 import org.apache.flink.ml.common.gbt.defs.LocalState;
 import org.apache.flink.ml.common.gbt.defs.TaskType;
 import org.apache.flink.ml.param.Param;
+import org.apache.flink.ml.regression.gbtregressor.GBTRegressorParams;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -173,8 +174,7 @@ public class GBTRunner {
         if (TaskType.CLASSIFICATION.equals(p.taskType)) {
             p.lossType = estimator.get(GBTClassifierParams.LOSS_TYPE);
         } else {
-            // TODO: add GBTRegressorParams.LOSS_TYPE in next PR.
-            p.lossType = estimator.get(GBTClassifierParams.LOSS_TYPE);
+            p.lossType = estimator.get(GBTRegressorParams.LOSS_TYPE);
         }
         p.maxNumLeaves = 1 << p.maxDepth - 1;
         p.useMissing = true;

@@ -25,9 +25,10 @@ import org.apache.flink.ml.common.param.HasLabelCol;
 import org.apache.flink.ml.common.param.HasPredictionCol;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.param.StringArrayParam;
+import org.apache.flink.ml.regression.gbtregressor.GBTRegressorModel;
 
 /**
- * Params of {@link GBTClassifierModel}.
+ * Params of {@link GBTClassifierModel} and {@link GBTRegressorModel}.
  *
  * <p>If the input features come from 1 column of vector type, `featuresCol` should be used, and all
  * features are treated as continuous features. Otherwise, `inputCols` should be used for multiple

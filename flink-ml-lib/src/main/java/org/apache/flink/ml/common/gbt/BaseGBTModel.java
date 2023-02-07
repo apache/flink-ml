@@ -21,6 +21,7 @@ package org.apache.flink.ml.common.gbt;
 import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.classification.gbtclassifier.GBTClassifier;
 import org.apache.flink.ml.param.Param;
+import org.apache.flink.ml.regression.gbtregressor.GBTRegressor;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.table.api.Table;
@@ -29,7 +30,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-/** Base model computed by {@link GBTClassifier}. */
+/** Base model computed by {@link GBTClassifier} or {@link GBTRegressor}. */
 public abstract class BaseGBTModel<T extends BaseGBTModel<T>>
         implements Model<T>, GBTModelParams<T> {
 
