@@ -223,6 +223,13 @@ class Vector(ABC):
         pass
 
     @abstractmethod
+    def set(self, i: int, value: np.float64):
+        """
+        Sets the value of the ith element.
+        """
+        pass
+
+    @abstractmethod
     def get(self, i: int):
         """
         Gets the value of the ith element.

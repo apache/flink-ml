@@ -19,4 +19,5 @@ target
 *.pyc
 .vscode
 flink-ml-python/dist/
+flink-ml-python/docs/_build
 flink-ml-python/apache_flink_ml.egg-info/

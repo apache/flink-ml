@@ -58,6 +58,7 @@ pygmentsUseClasses = true
   MenuLinks = [
     ["Project Homepage", "//flink.apache.org"],
     ["JavaDocs", "//nightlies.apache.org/flink/flink-ml-docs-master/api/java/"],
+    ["PyDocs", "//nightlies.apache.org/flink/flink-ml-docs-master/api/python/"],
   ]
 
   PreviousDocs = [

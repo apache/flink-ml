@@ -72,7 +72,7 @@ class AlgoOperator(Stage[T], ABC):
 
 class Transformer(AlgoOperator[T], ABC):
     """
-    A Transformer is an AlgoOperator with the semantic difference that it encodes the Transformation
+    A Transformer is an AlgoOperator with the semantic difference that it encodes the transformation
     logic, such that a record in the output typically corresponds to one record in the input. In
     contrast, an AlgoOperator is a better fit to express aggregation logic where a record in the
     output could be computed from an arbitrary number of records in the input.
