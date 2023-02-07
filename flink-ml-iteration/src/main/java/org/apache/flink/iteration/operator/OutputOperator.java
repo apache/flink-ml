@@ -19,9 +19,11 @@
 package org.apache.flink.iteration.operator;
 
 import org.apache.flink.iteration.IterationRecord;
+import org.apache.flink.iteration.IterationRecord.Type;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
+import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 /**
@@ -48,6 +50,9 @@ public class OutputOperator<T> extends AbstractStreamOperator<T>
         if (streamRecord.getValue().getType() == IterationRecord.Type.RECORD) {
             reusable.replace(streamRecord.getValue().getValue(), streamRecord.getTimestamp());
             output.collect(reusable);
+        } else if (streamRecord.getValue().getType() == Type.EPOCH_WATERMARK
+                && streamRecord.getValue().getEpoch() == Integer.MAX_VALUE) {
+            output.emitWatermark(new Watermark(Long.MAX_VALUE));
         }
     }
 }
