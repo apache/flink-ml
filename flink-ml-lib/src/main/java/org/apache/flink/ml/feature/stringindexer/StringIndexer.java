@@ -166,7 +166,10 @@ public class StringIndexer
             for (int i = 0; i < inputCols.length; i++) {
                 Object objVal = r.getField(inputCols[i]);
                 String stringVal;
-                if (objVal instanceof String) {
+                if (null == objVal) {
+                    // Null values should be ignored.
+                    continue;
+                } else if (objVal instanceof String) {
                     stringVal = (String) objVal;
                 } else if (objVal instanceof Number) {
                     stringVal = String.valueOf(objVal);

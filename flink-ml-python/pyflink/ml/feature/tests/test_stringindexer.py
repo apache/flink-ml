@@ -37,6 +37,9 @@ class StringIndexerTest(PyFlinkMLTestCase):
                 ('b', -1.0),
                 ('a', -1.0),
                 ('c', -1.0),
+                ('d', None),
+                (None, 2.0),
+                (None, None),
             ],
                 type_info=Types.ROW_NAMED(
                     ['input_col1', 'input_col2'],
@@ -47,6 +50,8 @@ class StringIndexerTest(PyFlinkMLTestCase):
                 ('a', 2.0),
                 ('b', 1.0),
                 ('e', 2.0),
+                ('f', None),
+                (None, None),
             ],
                 type_info=Types.ROW_NAMED(
                     ['input_col1', 'input_col2'],
@@ -55,7 +60,9 @@ class StringIndexerTest(PyFlinkMLTestCase):
         self.expected_alphabetic_asc_predict_data = [
             Row('a', 2.0, 0, 3),
             Row('b', 1.0, 1, 2),
-            Row('e', 2.0, 4, 3)
+            Row('e', 2.0, 4, 3),
+            Row('f', None, 4, 4),
+            Row(None, None, 4, 4),
         ]
 
     def test_param(self):
@@ -99,7 +106,7 @@ class StringIndexerTest(PyFlinkMLTestCase):
         predicted_results = [result for result in
                              self.t_env.to_data_stream(output).execute_and_collect()]
 
-        predicted_results.sort(key=lambda x: x[0])
+        predicted_results.sort(key=lambda x: (x[0] is None, x[0]))
 
         self.assertEqual(predicted_results, self.expected_alphabetic_asc_predict_data)
 
@@ -115,7 +122,7 @@ class StringIndexerTest(PyFlinkMLTestCase):
         predicted_results = [result for result in
                              self.t_env.to_data_stream(output).execute_and_collect()]
 
-        predicted_results.sort(key=lambda x: x[0])
+        predicted_results.sort(key=lambda x: (x[0] is None, x[0]))
 
         self.assertEqual(predicted_results, self.expected_alphabetic_asc_predict_data)
 
@@ -153,7 +160,7 @@ class StringIndexerTest(PyFlinkMLTestCase):
         predicted_results = [result for result in
                              self.t_env.to_data_stream(output).execute_and_collect()]
 
-        predicted_results.sort(key=lambda x: x[0])
+        predicted_results.sort(key=lambda x: (x[0] is None, x[0]))
 
         self.assertEqual(predicted_results, self.expected_alphabetic_asc_predict_data)
 
@@ -171,5 +178,5 @@ class StringIndexerTest(PyFlinkMLTestCase):
         output = reloaded_model.transform(self.predict_table)[0]
         predicted_results = [result for result in
                              self.t_env.to_data_stream(output).execute_and_collect()]
-        predicted_results.sort(key=lambda x: x[0])
+        predicted_results.sort(key=lambda x: (x[0] is None, x[0]))
         self.assertEqual(predicted_results, self.expected_alphabetic_asc_predict_data)
