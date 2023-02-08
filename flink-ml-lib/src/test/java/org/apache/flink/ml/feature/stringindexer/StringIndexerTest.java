@@ -242,15 +242,18 @@ public class StringIndexerTest extends AbstractTestBase {
             IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect());
             fail();
         } catch (Throwable e) {
-            List<String> expectedErrMsgs =
-                    Stream.of("f", "null")
+            List<String> expectedMessages =
+                    Stream.of("e", "f", "null")
                             .map(
                                     d ->
                                             String.format(
                                                     "The input contains unseen string: %s. See %s parameter for more options.",
                                                     d, HasHandleInvalid.HANDLE_INVALID))
                             .collect(Collectors.toList());
-            assertTrue(expectedErrMsgs.contains(ExceptionUtils.getRootCause(e).getMessage()));
+            String actualMessage = ExceptionUtils.getRootCause(e).getMessage();
+            assertTrue(
+                    "Actual message is: " + actualMessage,
+                    expectedMessages.contains(actualMessage));
         }
     }
 
