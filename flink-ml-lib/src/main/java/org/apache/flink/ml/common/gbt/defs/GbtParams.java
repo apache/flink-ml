@@ -22,9 +22,34 @@ import java.io.Serializable;
 
 /** Internal parameters of a gradient boosting trees algorithm. */
 public class GbtParams implements Serializable {
+    public TaskType taskType;
+
+    // Parameters related with input data.
     public String[] featureCols;
     public String vectorCol;
+    public boolean isInputVector;
     public String labelCol;
+    public String weightCol;
     public String[] categoricalCols;
+
+    // Parameters related with algorithms.
+    public int maxDepth;
     public int maxBins;
+    public int minInstancesPerNode;
+    public double minWeightFractionPerNode;
+    public double minInfoGain;
+    public int maxIter;
+    public double stepSize;
+    public long seed;
+    public double subsamplingRate;
+    public String featureSubsetStrategy;
+    public double validationTol;
+    public double lambda;
+    public double gamma;
+
+    // Derived parameters.
+    public String lossType;
+    public int maxNumLeaves;
+    // useMissing is always true right now.
+    public boolean useMissing;
 }

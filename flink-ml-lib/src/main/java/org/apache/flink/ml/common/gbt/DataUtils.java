@@ -21,9 +21,39 @@ package org.apache.flink.ml.common.gbt;
 import org.apache.flink.ml.feature.kbinsdiscretizer.KBinsDiscretizerModel;
 
 import java.util.Arrays;
+import java.util.Random;
 
 /** Some data utilities. */
 public class DataUtils {
+
+    // Stores 4 values for one histogram bin, i.e., gradient, hessian, weight, and count.
+    public static final int BIN_SIZE = 4;
+
+    public static void shuffle(int[] array, Random random) {
+        int n = array.length;
+        for (int i = 0; i < n; i += 1) {
+            int index = i + random.nextInt(n - i);
+            int tmp = array[index];
+            array[index] = array[i];
+            array[i] = tmp;
+        }
+    }
+
+    public static int[] sample(int[] values, int numSamples, Random random) {
+        int n = values.length;
+        int[] sampled = new int[numSamples];
+
+        for (int i = 0; i < numSamples; i += 1) {
+            int index = i + random.nextInt(n - i);
+            sampled[i] = values[index];
+
+            int temp = values[i];
+            values[i] = values[index];
+            values[index] = temp;
+        }
+        return sampled;
+    }
+
     /** The mapping computation is from {@link KBinsDiscretizerModel}. */
     public static int findBin(double[] binEdges, double v) {
         int index = Arrays.binarySearch(binEdges, v);
