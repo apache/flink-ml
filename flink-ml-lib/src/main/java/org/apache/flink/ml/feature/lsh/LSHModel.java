@@ -32,6 +32,7 @@ import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.common.datastream.EndOfStreamWindows;
 import org.apache.flink.ml.common.datastream.TableUtils;
+import org.apache.flink.ml.common.typeinfo.PriorityQueueTypeInfo;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
@@ -48,6 +49,7 @@ import org.apache.flink.util.Preconditions;
 
 import org.apache.commons.lang3.ArrayUtils;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -165,11 +167,12 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
                                     new FilterByBucketFunction(getInputCol(), getOutputCol(), key),
                                     outputTypeInfo);
                         });
+        TopKFunction topKFunction = new TopKFunction(distCol, k);
         DataStream<List<Row>> topKList =
                 DataStreamUtils.aggregate(
                         filteredData,
-                        new TopKFunction(distCol, k),
-                        Types.LIST(outputTypeInfo),
+                        topKFunction,
+                        new PriorityQueueTypeInfo(topKFunction.getComparator(), outputTypeInfo),
                         Types.LIST(outputTypeInfo));
         DataStream<Row> topKData =
                 topKList.flatMap(
@@ -370,12 +373,12 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
         }
     }
 
-    private static class TopKFunction implements AggregateFunction<Row, List<Row>, List<Row>> {
+    private static class TopKFunction
+            implements AggregateFunction<Row, PriorityQueue<Row>, List<Row>> {
         private final int numNearestNeighbors;
         private final String distCol;
-        private PriorityQueue<Row> topKRows;
 
-        private static class DistColComparator implements Comparator<Row> {
+        private static class DistColComparator implements Comparator<Row>, Serializable {
 
             private final String distCol;
 
@@ -395,45 +398,38 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
         }
 
         @Override
-        public List<Row> createAccumulator() {
-            return new ArrayList<>(numNearestNeighbors);
+        public PriorityQueue<Row> createAccumulator() {
+            return new PriorityQueue<>(numNearestNeighbors, getComparator());
         }
 
         @Override
-        public List<Row> add(Row value, List<Row> accumulator) {
-            if (topKRows == null) {
-                topKRows = new PriorityQueue<>(numNearestNeighbors, new DistColComparator(distCol));
-                topKRows.addAll(accumulator);
+        public PriorityQueue<Row> add(Row value, PriorityQueue<Row> accumulator) {
+            if (accumulator.size() == numNearestNeighbors) {
+                Row peek = accumulator.peek();
+                if (accumulator.comparator().compare(value, peek) < 0) {
+                    accumulator.poll();
+                }
             }
-            insert(value, topKRows);
-            return new ArrayList<>(topKRows);
-        }
-
-        @Override
-        public List<Row> getResult(List<Row> accumulator) {
+            accumulator.add(value);
             return accumulator;
         }
 
         @Override
-        public List<Row> merge(List<Row> a, List<Row> b) {
-            PriorityQueue<Row> merged =
-                    new PriorityQueue<>(numNearestNeighbors, new DistColComparator(distCol));
-            merged.addAll(a);
-            for (Row value : b) {
-                insert(value, merged);
-            }
-
-            return new ArrayList<>(merged);
+        public List<Row> getResult(PriorityQueue<Row> accumulator) {
+            return new ArrayList<>(accumulator);
         }
 
-        private void insert(Row value, PriorityQueue<Row> queue) {
-            if (queue.size() == numNearestNeighbors) {
-                Row peek = queue.peek();
-                if (queue.comparator().compare(value, peek) < 0) {
-                    queue.poll();
-                }
+        @Override
+        public PriorityQueue<Row> merge(PriorityQueue<Row> a, PriorityQueue<Row> b) {
+            PriorityQueue<Row> merged = new PriorityQueue<>(a);
+            for (Row row : b) {
+                add(row, merged);
             }
-            queue.add(value);
+            return merged;
+        }
+
+        private Comparator<Row> getComparator() {
+            return new DistColComparator(distCol);
         }
     }
 

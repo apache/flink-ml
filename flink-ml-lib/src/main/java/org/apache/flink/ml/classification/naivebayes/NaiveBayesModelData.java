@@ -53,7 +53,7 @@ import java.util.Map;
  */
 public class NaiveBayesModelData {
 
-    private static Map<String, TypeInformation<?>> fields;
+    private static final Map<String, TypeInformation<?>> fields;
 
     static {
         fields = new HashMap<>();

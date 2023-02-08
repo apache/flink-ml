@@ -16,12 +16,13 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.util.quantile;
+package org.apache.flink.ml.common.typeinfo;
 
 import org.apache.flink.api.common.typeinfo.TypeInfoFactory;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.typeutils.TypeExtractor;
+import org.apache.flink.ml.common.util.QuantileSummary;
 
 import java.lang.reflect.Type;
 import java.util.HashMap;
@@ -33,26 +34,14 @@ import java.util.Map;
  */
 public class QuantileSummaryTypeInfoFactory extends TypeInfoFactory<QuantileSummary> {
 
-    private static Map<String, TypeInformation<?>> statsTupleFields;
-
-    private static Map<String, TypeInformation<?>> fields;
-
-    static {
-        statsTupleFields = new HashMap<>();
-        statsTupleFields.put("value", Types.DOUBLE);
-        statsTupleFields.put("g", Types.LONG);
-        statsTupleFields.put("delta", Types.LONG);
-    }
-
-    private static final TypeInformation<QuantileSummary.StatsTuple> STATS_TUPLE_TYPE_INFO =
-            Types.POJO(QuantileSummary.StatsTuple.class, statsTupleFields);
+    private static final Map<String, TypeInformation<?>> fields;
 
     static {
         fields = new HashMap<>();
         fields.put("relativeError", Types.DOUBLE);
         fields.put("compressThreshold", Types.INT);
         fields.put("count", Types.LONG);
-        fields.put("sampled", Types.LIST(STATS_TUPLE_TYPE_INFO));
+        fields.put("sampled", Types.LIST(TypeInformation.of(QuantileSummary.StatsTuple.class)));
         fields.put("headBuffer", Types.LIST(Types.DOUBLE));
         fields.put("compressed", Types.BOOLEAN);
     }

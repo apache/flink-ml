@@ -22,7 +22,7 @@ import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
-import org.apache.flink.ml.common.util.quantile.QuantileSummary;
+import org.apache.flink.ml.common.util.QuantileSummary;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.param.Param;
