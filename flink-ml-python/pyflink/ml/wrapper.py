@@ -92,7 +92,7 @@ utils.convert_to_python_obj = convert_to_python_obj_wrapper
 
 class JavaWrapper(ABC):
     """
-    Wrapper class for a Java object
+    Wrapper class for a Java object.
     """
 
     def __init__(self, java_obj):

@@ -2,7 +2,7 @@ Flink ML is a library which provides machine learning (ML) APIs and infrastructu
 
 Flink ML is developed under the umbrella of [Apache Flink](https://flink.apache.org/).
 
-## <a name="build"></a>Python Packaging
+## Python Packaging
 
 Prerequisites for building apache-flink-ml:
 
