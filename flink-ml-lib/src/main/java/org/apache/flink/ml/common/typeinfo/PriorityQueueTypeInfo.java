@@ -29,22 +29,22 @@ import java.util.PriorityQueue;
 /**
  * TypeInformation for {@link java.util.PriorityQueue}.
  *
- * @param <T> The type of inner objects.
+ * @param <T> The type of elements in the PriorityQueue.
  */
 public class PriorityQueueTypeInfo<T> extends TypeInformation<PriorityQueue<T>> {
 
     private final Comparator<? super T> comparator;
 
-    private final TypeInformation<T> innerTypeInfo;
+    private final TypeInformation<T> elementTypeInfo;
 
     public PriorityQueueTypeInfo(
-            Comparator<? super T> comparator, TypeInformation<T> innerTypeInfo) {
+            Comparator<? super T> comparator, TypeInformation<T> elementTypeInfo) {
         this.comparator = comparator;
-        this.innerTypeInfo = innerTypeInfo;
+        this.elementTypeInfo = elementTypeInfo;
     }
 
-    public TypeInformation<T> getInnerTypeInfo() {
-        return innerTypeInfo;
+    public TypeInformation<T> getElementTypeInfo() {
+        return elementTypeInfo;
     }
 
     @Override
@@ -79,7 +79,7 @@ public class PriorityQueueTypeInfo<T> extends TypeInformation<PriorityQueue<T>> 
 
     @Override
     public TypeSerializer<PriorityQueue<T>> createSerializer(ExecutionConfig config) {
-        return new PriorityQueueSerializer<>(comparator, innerTypeInfo.createSerializer(config));
+        return new PriorityQueueSerializer<>(comparator, elementTypeInfo.createSerializer(config));
     }
 
     @Override
@@ -99,14 +99,14 @@ public class PriorityQueueTypeInfo<T> extends TypeInformation<PriorityQueue<T>> 
 
         PriorityQueueTypeInfo<T> that = (PriorityQueueTypeInfo<T>) obj;
         return Objects.equals(comparator, that.comparator)
-                && Objects.equals(innerTypeInfo, that.innerTypeInfo);
+                && Objects.equals(elementTypeInfo, that.elementTypeInfo);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(
                 comparator != null ? comparator.hashCode() : 0,
-                innerTypeInfo != null ? innerTypeInfo.hashCode() : 0);
+                elementTypeInfo != null ? elementTypeInfo.hashCode() : 0);
     }
 
     @Override

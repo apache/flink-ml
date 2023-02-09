@@ -38,18 +38,18 @@ import java.util.PriorityQueue;
 /**
  * TypeSerializer for {@link java.util.PriorityQueue}.
  *
- * @param <T> The type of inner objects.
+ * @param <T> The type of elements in the PriorityQueue.
  */
 public class PriorityQueueSerializer<T> extends TypeSerializer<PriorityQueue<T>> {
 
     private final Comparator<? super T> comparator;
 
-    private final TypeSerializer<T> innerSerializer;
+    private final TypeSerializer<T> elementSerializer;
 
     public PriorityQueueSerializer(
-            Comparator<? super T> comparator, TypeSerializer<T> innerSerializer) {
+            Comparator<? super T> comparator, TypeSerializer<T> elementSerializer) {
         this.comparator = comparator;
-        this.innerSerializer = innerSerializer;
+        this.elementSerializer = elementSerializer;
     }
 
     @Override
@@ -59,7 +59,7 @@ public class PriorityQueueSerializer<T> extends TypeSerializer<PriorityQueue<T>>
 
     @Override
     public TypeSerializer<PriorityQueue<T>> duplicate() {
-        return new PriorityQueueSerializer<>(comparator, innerSerializer.duplicate());
+        return new PriorityQueueSerializer<>(comparator, elementSerializer.duplicate());
     }
 
     @Override
@@ -85,13 +85,13 @@ public class PriorityQueueSerializer<T> extends TypeSerializer<PriorityQueue<T>>
     @Override
     public void serialize(PriorityQueue<T> queue, DataOutputView target) throws IOException {
         List<T> tmpList = new ArrayList<>(queue);
-        ListSerializer<T> listSerializer = new ListSerializer<>(innerSerializer);
+        ListSerializer<T> listSerializer = new ListSerializer<>(elementSerializer);
         listSerializer.serialize(tmpList, target);
     }
 
     @Override
     public PriorityQueue<T> deserialize(DataInputView source) throws IOException {
-        ListSerializer<T> listSerializer = new ListSerializer<>(innerSerializer);
+        ListSerializer<T> listSerializer = new ListSerializer<>(elementSerializer);
         List<T> tmpList = listSerializer.deserialize(source);
         PriorityQueue<T> queue = new PriorityQueue<>(comparator);
         queue.addAll(tmpList);
@@ -106,8 +106,8 @@ public class PriorityQueueSerializer<T> extends TypeSerializer<PriorityQueue<T>>
 
     @Override
     public void copy(DataInputView source, DataOutputView target) throws IOException {
-        PriorityQueue<T> queue = deserialize(source);
-        serialize(queue, target);
+        ListSerializer<T> listSerializer = new ListSerializer<>(elementSerializer);
+        listSerializer.copy(source, target);
     }
 
     @Override
@@ -121,7 +121,7 @@ public class PriorityQueueSerializer<T> extends TypeSerializer<PriorityQueue<T>>
         }
 
         PriorityQueueSerializer<?> that = (PriorityQueueSerializer<?>) o;
-        return Objects.equals(innerSerializer, that.innerSerializer)
+        return Objects.equals(elementSerializer, that.elementSerializer)
                 && Objects.equals(comparator, that.comparator);
     }
 
@@ -129,7 +129,7 @@ public class PriorityQueueSerializer<T> extends TypeSerializer<PriorityQueue<T>>
     public int hashCode() {
         return Objects.hash(
                 comparator != null ? comparator.hashCode() : 0,
-                innerSerializer != null ? innerSerializer.hashCode() : 0);
+                elementSerializer != null ? elementSerializer.hashCode() : 0);
     }
 
     @Override
@@ -161,7 +161,7 @@ public class PriorityQueueSerializer<T> extends TypeSerializer<PriorityQueue<T>>
         @Override
         protected TypeSerializer<?>[] getNestedSerializers(
                 PriorityQueueSerializer<T> outerSerializer) {
-            return new TypeSerializer[] {outerSerializer.innerSerializer};
+            return new TypeSerializer[] {outerSerializer.elementSerializer};
         }
 
         @Override
