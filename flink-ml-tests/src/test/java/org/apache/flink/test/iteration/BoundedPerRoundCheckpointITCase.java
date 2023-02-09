@@ -20,7 +20,6 @@ package org.apache.flink.test.iteration;
 
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.iteration.DataStreamList;
 import org.apache.flink.iteration.IterationBody;
 import org.apache.flink.iteration.IterationBodyResult;
@@ -32,7 +31,6 @@ import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
-import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.test.iteration.operators.EpochRecord;
@@ -124,16 +122,7 @@ public class BoundedPerRoundCheckpointITCase extends TestLogger {
             int maxRound,
             int failoverCount,
             SinkFunction<OutputRecord<Integer>> sinkFunction) {
-        StreamExecutionEnvironment env =
-                StreamExecutionEnvironment.getExecutionEnvironment(
-                        new Configuration() {
-                            {
-                                this.set(
-                                        ExecutionCheckpointingOptions
-                                                .ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH,
-                                        true);
-                            }
-                        });
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.getConfig().enableObjectReuse();
         env.enableCheckpointing(500, CheckpointingMode.EXACTLY_ONCE);
         env.setParallelism(1);

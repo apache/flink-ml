@@ -20,9 +20,9 @@ package org.apache.flink.ml.clustering;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobSubmissionResult;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.CoreOptions;
 import org.apache.flink.configuration.RestOptions;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.ml.clustering.kmeans.KMeans;
@@ -43,7 +43,6 @@ import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.minicluster.MiniClusterConfiguration;
 import org.apache.flink.runtime.testutils.InMemoryReporter;
-import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -152,7 +151,7 @@ public class OnlineKMeansTest extends TestLogger {
     public static void beforeClass() throws Exception {
         Configuration config = new Configuration();
         config.set(RestOptions.BIND_PORT, "18081-19091");
-        config.set(ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
+        config.set(CoreOptions.DEFAULT_PARALLELISM, defaultParallelism);
         reporter = InMemoryReporter.create();
         reporter.addToConfiguration(config);
 
@@ -165,12 +164,7 @@ public class OnlineKMeansTest extends TestLogger {
                                 .build());
 
         miniCluster.start();
-
-        env = StreamExecutionEnvironment.getExecutionEnvironment(config);
-        env.getConfig().enableObjectReuse();
-        env.setParallelism(defaultParallelism);
-        env.enableCheckpointing(100);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        env = TestUtils.getExecutionEnvironment(config);
         tEnv = StreamTableEnvironment.create(env);
     }
 

@@ -226,7 +226,8 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
                 context.getOperatorStateStore()
                         .getListState(
                                 new ListStateDescriptor<>(
-                                        "processorState", HeadOperatorState.class));
+                                        "processorState", HeadOperatorState.TYPE_INFO));
+
         OperatorStateUtils.getUniqueElement(processorState, "processorState")
                 .ifPresent(
                         headOperatorState ->

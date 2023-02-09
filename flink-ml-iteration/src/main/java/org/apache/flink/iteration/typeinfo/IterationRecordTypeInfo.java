@@ -74,7 +74,7 @@ public class IterationRecordTypeInfo<T> extends TypeInformation<IterationRecord<
 
     @Override
     public String toString() {
-        return "IterationRecord Type";
+        return "IterationRecord<" + innerTypeInfo + ">";
     }
 
     @Override

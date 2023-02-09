@@ -19,7 +19,6 @@
 package org.apache.flink.ml.benchmark;
 
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorArrayGenerator;
 import org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator;
 import org.apache.flink.ml.benchmark.datagenerator.common.DoubleGenerator;
@@ -27,7 +26,6 @@ import org.apache.flink.ml.benchmark.datagenerator.common.LabeledPointWithWeight
 import org.apache.flink.ml.benchmark.datagenerator.common.RandomStringArrayGenerator;
 import org.apache.flink.ml.benchmark.datagenerator.common.RandomStringGenerator;
 import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
@@ -49,9 +47,7 @@ public class DataGeneratorTest {
 
     @Before
     public void before() {
-        Configuration config = new Configuration();
-        config.set(ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment(config);
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.getConfig().enableObjectReuse();
         env.setParallelism(4);
         env.enableCheckpointing(100);

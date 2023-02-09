@@ -23,7 +23,9 @@ import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.typeutils.ObjectArrayTypeInfo;
+import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.iteration.DataStreamList;
 import org.apache.flink.iteration.IterationBody;
 import org.apache.flink.iteration.IterationBodyResult;
@@ -31,6 +33,7 @@ import org.apache.flink.iteration.Iterations;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
+import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.BLAS;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.SparseVector;
@@ -88,11 +91,28 @@ public class OnlineLogisticRegression
         DataStream<LogisticRegressionModelData> modelDataStream =
                 LogisticRegressionModelData.getModelDataStream(initModelDataTable);
 
+        RowTypeInfo inputTypeInfo = TableUtils.getRowTypeInfo(inputs[0].getResolvedSchema());
+        TypeInformation pointTypeInfo;
+
+        if (getWeightCol() == null) {
+            pointTypeInfo =
+                    Types.ROW(
+                            inputTypeInfo.getTypeAt(getFeaturesCol()),
+                            inputTypeInfo.getTypeAt(getLabelCol()));
+        } else {
+            pointTypeInfo =
+                    Types.ROW(
+                            inputTypeInfo.getTypeAt(getFeaturesCol()),
+                            inputTypeInfo.getTypeAt(getLabelCol()),
+                            inputTypeInfo.getTypeAt(getWeightCol()));
+        }
+
         DataStream<Row> points =
                 tEnv.toDataStream(inputs[0])
                         .map(
                                 new FeaturesLabelExtractor(
-                                        getFeaturesCol(), getLabelCol(), getWeightCol()));
+                                        getFeaturesCol(), getLabelCol(), getWeightCol()),
+                                pointTypeInfo);
 
         DataStream<DenseVector> initModelData =
                 modelDataStream.map(
