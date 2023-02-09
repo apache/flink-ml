@@ -18,6 +18,8 @@
 
 package org.apache.flink.ml.common.util;
 
+import org.apache.flink.api.common.typeinfo.TypeInfo;
+import org.apache.flink.ml.common.typeinfo.QuantileSummaryTypeInfoFactory;
 import org.apache.flink.util.Preconditions;
 
 import java.io.Serializable;
@@ -36,6 +38,7 @@ import java.util.stream.IntStream;
  * algorithm proposed in the paper: "Space-efficient Online Computation of Quantile Summaries" by
  * Greenwald, Michael and Khanna, Sanjeev. (https://doi.org/10.1145/375663.375670)
  */
+@TypeInfo(QuantileSummaryTypeInfoFactory.class)
 public class QuantileSummary implements Serializable {
 
     /** The default size of head buffer. */
@@ -45,25 +48,28 @@ public class QuantileSummary implements Serializable {
     private static final int DEFAULT_COMPRESS_THRESHOLD = 10000;
 
     /** The target relative error. */
-    private final double relativeError;
+    private double relativeError;
 
     /**
      * The compression threshold. After the internal buffer of statistics crosses this size, it
      * attempts to compress the statistics together.
      */
-    private final int compressThreshold;
+    private int compressThreshold;
 
     /** The count of all the elements inserted to be calculated. */
-    private final long count;
+    private long count;
 
     /** A buffer of quantile statistics. */
-    private final List<StatsTuple> sampled;
+    private List<StatsTuple> sampled;
 
     /** A buffer of the latest samples seen so far. */
-    private final List<Double> headBuffer = new ArrayList<>();
+    private List<Double> headBuffer = new ArrayList<>();
 
     /** Whether the quantile summary has been compressed. */
     private boolean compressed;
+
+    /** Empty QuantileSummary Constructor. */
+    public QuantileSummary() {}
 
     /**
      * QuantileSummary Constructor.
@@ -95,7 +101,7 @@ public class QuantileSummary implements Serializable {
      * @param count The count of all the elements inserted in the sampled buffer.
      * @param compressed Whether the statistics have been compressed.
      */
-    private QuantileSummary(
+    public QuantileSummary(
             double relativeError,
             int compressThreshold,
             List<StatsTuple> sampled,
@@ -367,6 +373,26 @@ public class QuantileSummary implements Serializable {
         return relativeError;
     }
 
+    public int getCompressThreshold() {
+        return compressThreshold;
+    }
+
+    public long getCount() {
+        return count;
+    }
+
+    public List<StatsTuple> getSampled() {
+        return sampled;
+    }
+
+    public List<Double> getHeadBuffer() {
+        return headBuffer;
+    }
+
+    public boolean isCompressed() {
+        return compressed;
+    }
+
     private QuantileSummary shallowCopy() {
         return new QuantileSummary(relativeError, compressThreshold, sampled, count, compressed);
     }
@@ -395,11 +421,13 @@ public class QuantileSummary implements Serializable {
      *   <li>delta: the maximum span of the rank.
      * </ul>
      */
-    private static class StatsTuple implements Serializable {
+    public static class StatsTuple implements Serializable {
         private static final long serialVersionUID = 1L;
-        private final double value;
-        private long g;
-        private long delta;
+        public double value;
+        public long g;
+        public long delta;
+
+        public StatsTuple() {}
 
         public StatsTuple(double value, long g, long delta) {
             this.value = value;

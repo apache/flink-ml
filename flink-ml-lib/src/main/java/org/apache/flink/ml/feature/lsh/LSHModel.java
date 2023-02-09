@@ -32,8 +32,11 @@ import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.common.datastream.EndOfStreamWindows;
 import org.apache.flink.ml.common.datastream.TableUtils;
+import org.apache.flink.ml.common.typeinfo.PriorityQueueTypeInfo;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -46,6 +49,7 @@ import org.apache.flink.util.Preconditions;
 
 import org.apache.commons.lang3.ArrayUtils;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -163,8 +167,13 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
                                     new FilterByBucketFunction(getInputCol(), getOutputCol(), key),
                                     outputTypeInfo);
                         });
+        TopKFunction topKFunction = new TopKFunction(distCol, k);
         DataStream<List<Row>> topKList =
-                DataStreamUtils.aggregate(filteredData, new TopKFunction(distCol, k));
+                DataStreamUtils.aggregate(
+                        filteredData,
+                        topKFunction,
+                        new PriorityQueueTypeInfo(topKFunction.getComparator(), outputTypeInfo),
+                        Types.LIST(outputTypeInfo));
         DataStream<Row> topKData =
                 topKList.flatMap(
                         (value, out) -> {
@@ -206,6 +215,14 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
         DataStream<Row> explodedA = preprocessData(datasetA, idCol);
         DataStream<Row> explodedB = preprocessData(datasetB, idCol);
 
+        RowTypeInfo inputTypeInfo = getOutputType(datasetA, idCol);
+        RowTypeInfo outputTypeInfo =
+                new RowTypeInfo(
+                        inputTypeInfo.getTypeAt(0),
+                        inputTypeInfo.getTypeAt(0),
+                        inputTypeInfo.getTypeAt(1),
+                        inputTypeInfo.getTypeAt(1));
+
         DataStream<? extends LSHModelData> modelData =
                 tEnv.toDataStream(modelDataTable, modelDataClass);
         DataStream<Row> sameBucketPairs =
@@ -220,7 +237,9 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
                                                 r0.getField(0),
                                                 r1.getField(0),
                                                 r0.getField(1),
-                                                r1.getField(1)));
+                                                r1.getField(1)),
+                                outputTypeInfo);
+
         DataStream<Row> distinctSameBucketPairs =
                 DataStreamUtils.reduce(
                         sameBucketPairs.keyBy(
@@ -230,10 +249,11 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
                                         return Tuple2.of(r.getFieldAs(0), r.getFieldAs(1));
                                     }
                                 }),
-                        (r0, r1) -> r0);
+                        (r0, r1) -> r0,
+                        outputTypeInfo);
 
-        RowTypeInfo inputTypeInfo = TableUtils.getRowTypeInfo(datasetA.getResolvedSchema());
-        TypeInformation<?> idColType = inputTypeInfo.getTypeAt(idCol);
+        TypeInformation<?> idColType =
+                TableUtils.getRowTypeInfo(datasetA.getResolvedSchema()).getTypeAt(idCol);
         DataStream<Row> pairsWithDists =
                 BroadcastUtils.withBroadcastStream(
                         Collections.singletonList(distinctSameBucketPairs),
@@ -268,25 +288,30 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
                 (dataTable.getResolvedSchema().getColumnNames().contains(getOutputCol()))
                         ? dataTable
                         : transform(dataTable)[0];
-
-        RowTypeInfo inputTypeInfo = TableUtils.getRowTypeInfo(dataTable.getResolvedSchema());
-        TypeInformation<?> idColType = inputTypeInfo.getTypeAt(idCol);
-        final String indexCol = "index";
-        final String hashValueCol = "hashValue";
-        RowTypeInfo outputTypeInfo =
-                new RowTypeInfo(
-                        new TypeInformation[] {
-                            idColType,
-                            TypeInformation.of(Vector.class),
-                            Types.INT,
-                            TypeInformation.of(DenseVector.class)
-                        },
-                        new String[] {idCol, getInputCol(), indexCol, hashValueCol});
+        RowTypeInfo outputTypeInfo = getOutputType(dataTable, idCol);
 
         return tEnv.toDataStream(dataTable)
                 .flatMap(
                         new ExplodeHashValuesFunction(idCol, getInputCol(), getOutputCol()),
                         outputTypeInfo);
+    }
+
+    private RowTypeInfo getOutputType(Table dataTable, String idCol) {
+        final String indexCol = "index";
+        final String hashValueCol = "hashValue";
+        RowTypeInfo inputTypeInfo = TableUtils.getRowTypeInfo(dataTable.getResolvedSchema());
+        TypeInformation<?> idColType = inputTypeInfo.getTypeAt(idCol);
+
+        RowTypeInfo outputTypeInfo =
+                new RowTypeInfo(
+                        new TypeInformation[] {
+                            idColType,
+                            VectorTypeInfo.INSTANCE,
+                            Types.INT,
+                            DenseVectorTypeInfo.INSTANCE
+                        },
+                        new String[] {idCol, getInputCol(), indexCol, hashValueCol});
+        return outputTypeInfo;
     }
 
     private static class PredictFunction extends RichMapFunction<Row, Row> {
@@ -353,7 +378,7 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
         private final int numNearestNeighbors;
         private final String distCol;
 
-        private static class DistColComparator implements Comparator<Row> {
+        private static class DistColComparator implements Comparator<Row>, Serializable {
 
             private final String distCol;
 
@@ -374,7 +399,7 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
 
         @Override
         public PriorityQueue<Row> createAccumulator() {
-            return new PriorityQueue<>(numNearestNeighbors, new DistColComparator(distCol));
+            return new PriorityQueue<>(numNearestNeighbors, getComparator());
         }
 
         @Override
@@ -401,6 +426,10 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
                 add(row, merged);
             }
             return merged;
+        }
+
+        private Comparator<Row> getComparator() {
+            return new DistColComparator(distCol);
         }
     }
 

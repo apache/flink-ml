@@ -334,18 +334,41 @@ public class DataStreamUtils {
      * @param function The user defined process function.
      * @return The data stream that is the result of applying the window function to each window.
      */
-    @SuppressWarnings({"rawtypes", "unchecked"})
     public static <IN, OUT, W extends Window> SingleOutputStreamOperator<OUT> windowAllAndProcess(
             DataStream<IN> input, Windows windows, ProcessAllWindowFunction<IN, OUT, W> function) {
-        AllWindowedStream<IN, W> allWindowedStream;
+        AllWindowedStream<IN, W> allWindowedStream = getAllWindowedStream(input, windows);
+        return allWindowedStream.process(function);
+    }
+
+    /**
+     * Creates windows from data in the non key grouped input stream and applies the given window
+     * function to each window.
+     *
+     * @param input The input data stream to be windowed and processed.
+     * @param windows The windowing strategy that defines how input data would be sliced into
+     *     batches.
+     * @param function The user defined process function.
+     * @param outType The type information of the output.
+     * @return The data stream that is the result of applying the window function to each window.
+     */
+    public static <IN, OUT, W extends Window> SingleOutputStreamOperator<OUT> windowAllAndProcess(
+            DataStream<IN> input,
+            Windows windows,
+            ProcessAllWindowFunction<IN, OUT, W> function,
+            TypeInformation<OUT> outType) {
+        AllWindowedStream<IN, W> allWindowedStream = getAllWindowedStream(input, windows);
+        return allWindowedStream.process(function, outType);
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static <IN, W extends Window> AllWindowedStream<IN, W> getAllWindowedStream(
+            DataStream<IN> input, Windows windows) {
         if (windows instanceof CountTumblingWindows) {
             long countWindowSize = ((CountTumblingWindows) windows).getSize();
-            allWindowedStream = (AllWindowedStream<IN, W>) input.countWindowAll(countWindowSize);
+            return (AllWindowedStream<IN, W>) input.countWindowAll(countWindowSize);
         } else {
-            allWindowedStream =
-                    input.windowAll((WindowAssigner) getDataStreamTimeWindowAssigner(windows));
+            return input.windowAll((WindowAssigner) getDataStreamTimeWindowAssigner(windows));
         }
-        return allWindowedStream.process(function);
     }
 
     private static WindowAssigner<Object, TimeWindow> getDataStreamTimeWindowAssigner(
