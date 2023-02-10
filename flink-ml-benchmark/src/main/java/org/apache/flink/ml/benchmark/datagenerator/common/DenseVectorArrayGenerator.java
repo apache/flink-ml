@@ -42,7 +42,7 @@ public class DenseVectorArrayGenerator extends InputTableGenerator<DenseVectorAr
         return new RowGenerator[] {
             new RowGenerator(getNumValues(), getSeed()) {
                 @Override
-                protected Row nextRow() {
+                protected Row getRow() {
                     DenseVector[] result = new DenseVector[arraySize];
                     for (int i = 0; i < arraySize; i++) {
                         result[i] = new DenseVector(vectorDim);

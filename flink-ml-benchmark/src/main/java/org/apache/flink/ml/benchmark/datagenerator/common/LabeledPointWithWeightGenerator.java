@@ -96,7 +96,7 @@ public class LabeledPointWithWeightGenerator
         return new RowGenerator[] {
             new RowGenerator(getNumValues(), getSeed()) {
                 @Override
-                protected Row nextRow() {
+                protected Row getRow() {
                     double[] features = new double[vectorDim];
                     for (int i = 0; i < vectorDim; i++) {
                         features[i] = getValue(featureArity);
