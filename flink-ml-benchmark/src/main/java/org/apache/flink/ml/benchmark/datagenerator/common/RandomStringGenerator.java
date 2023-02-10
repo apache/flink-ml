@@ -41,7 +41,7 @@ public class RandomStringGenerator extends InputTableGenerator<RandomStringGener
         return new RowGenerator[] {
             new RowGenerator(getNumValues(), getSeed()) {
                 @Override
-                public Row nextRow() {
+                public Row getRow() {
                     Row r = new Row(numOutputCols);
                     for (int i = 0; i < numOutputCols; i++) {
                         r.setField(i, Integer.toString(random.nextInt(numDistinctValues)));

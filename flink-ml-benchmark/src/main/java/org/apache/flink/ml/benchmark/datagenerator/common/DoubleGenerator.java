@@ -59,7 +59,7 @@ public class DoubleGenerator extends InputTableGenerator<DoubleGenerator> {
         return new RowGenerator[] {
             new RowGenerator(getNumValues(), getSeed()) {
                 @Override
-                public Row nextRow() {
+                public Row getRow() {
                     Row r = new Row(numOutputCols);
                     for (int i = 0; i < numOutputCols; i++) {
                         if (arity > 0) {

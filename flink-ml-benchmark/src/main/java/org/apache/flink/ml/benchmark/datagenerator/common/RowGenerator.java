@@ -26,7 +26,13 @@ import org.apache.flink.types.Row;
 
 import java.util.Random;
 
-/** A parallel source to generate user defined rows. */
+/**
+ * A parallel source to generate user defined rows.
+ *
+ * <p>In order to reduce the impact of source function overhead on the benchmark execution time,
+ * this class will pre-generate 1/1000 of the expected number of output values and re-use these
+ * values as the source function output.
+ */
 public abstract class RowGenerator extends RichParallelSourceFunction<Row> {
     /** Random instance to generate data. */
     protected Random random;
@@ -36,8 +42,10 @@ public abstract class RowGenerator extends RichParallelSourceFunction<Row> {
     private final long initSeed;
     /** Number of tasks to generate in one local task. */
     private long numValuesOnThisTask;
-    /** Whether this source is still running. */
-    private volatile boolean isRunning = true;
+    /** Number of rows to be pre-generated and re-used as the source function output. */
+    private int numPreGeneratedRows;
+    /** An array of rows to be re-used as the source function output. */
+    private Row[] preGeneratedRows;
 
     public RowGenerator(long numValues, long initSeed) {
         this.numValues = numValues;
@@ -53,24 +61,28 @@ public abstract class RowGenerator extends RichParallelSourceFunction<Row> {
         long div = numValues / numTasks;
         long mod = numValues % numTasks;
         numValuesOnThisTask = mod > taskIdx ? div + 1 : div;
+
+        numPreGeneratedRows = (int) Math.max(100, numValuesOnThisTask / 1000);
+        preGeneratedRows = new Row[numPreGeneratedRows];
+        for (int i = 0; i < numPreGeneratedRows; i++) {
+            preGeneratedRows[i] = getRow();
+        }
     }
 
     @Override
-    public final void run(SourceContext<Row> ctx) throws Exception {
+    public final void run(SourceContext<Row> ctx) {
         long cnt = 0;
-        while (isRunning && cnt < numValuesOnThisTask) {
-            ctx.collect(nextRow());
+        while (cnt < numValuesOnThisTask) {
+            ctx.collect(preGeneratedRows[(int) (cnt % numPreGeneratedRows)]);
             cnt++;
         }
     }
 
     @Override
-    public final void cancel() {
-        isRunning = false;
-    }
+    public final void cancel() {}
 
     /** Generates a new data point. */
-    protected abstract Row nextRow();
+    protected abstract Row getRow();
 
     /** Returns the output type information for this generator. */
     protected abstract RowTypeInfo getRowTypeInfo();

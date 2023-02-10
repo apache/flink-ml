@@ -41,7 +41,7 @@ public class DenseVectorGenerator extends InputTableGenerator<DenseVectorGenerat
             new RowGenerator(getNumValues(), getSeed()) {
 
                 @Override
-                protected Row nextRow() {
+                protected Row getRow() {
                     double[] values = new double[vectorDim];
                     for (int i = 0; i < values.length; i++) {
                         values[i] = random.nextDouble();
