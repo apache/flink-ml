@@ -26,11 +26,14 @@ import org.apache.flink.iteration.IterationConfig;
 import org.apache.flink.iteration.IterationID;
 import org.apache.flink.iteration.Iterations;
 import org.apache.flink.iteration.ReplayableDataStreamList;
+import org.apache.flink.ml.classification.gbtclassifier.GBTClassifierParams;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
 import org.apache.flink.ml.common.gbt.defs.GbtParams;
 import org.apache.flink.ml.common.gbt.defs.LocalState;
+import org.apache.flink.ml.common.gbt.defs.TaskType;
+import org.apache.flink.ml.param.Param;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -43,10 +46,27 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /** Runs a gradient boosting trees implementation. */
 public class GBTRunner {
+
+    public static DataStream<GBTModelData> trainClassifier(Table data, BaseGBTParams<?> estimator) {
+        return train(data, estimator, TaskType.CLASSIFICATION);
+    }
+
+    public static DataStream<GBTModelData> trainRegressor(Table data, BaseGBTParams<?> estimator) {
+        return train(data, estimator, TaskType.REGRESSION);
+    }
+
+    static DataStream<GBTModelData> train(
+            Table data, BaseGBTParams<?> estimator, TaskType taskType) {
+        return train(data, fromEstimator(estimator, taskType));
+    }
 
     /** Trains a gradient boosting tree model with given data and parameters. */
     static DataStream<GBTModelData> train(Table dataTable, GbtParams p) {
@@ -104,6 +124,61 @@ public class GBTRunner {
                         new BoostIterationBody(iterationID, p));
         DataStream<LocalState> state = dataStreamList.get(0);
         return state.map(GBTModelData::fromLocalState);
+    }
+
+    public static GbtParams fromEstimator(BaseGBTParams<?> estimator, TaskType taskType) {
+        final Map<Param<?>, Object> paramMap = estimator.getParamMap();
+        final Set<Param<?>> unsupported =
+                new HashSet<>(
+                        Arrays.asList(
+                                BaseGBTParams.WEIGHT_COL,
+                                BaseGBTParams.LEAF_COL,
+                                BaseGBTParams.VALIDATION_INDICATOR_COL));
+        List<Param<?>> unsupportedButSet =
+                unsupported.stream()
+                        .filter(d -> null != paramMap.get(d))
+                        .collect(Collectors.toList());
+        if (!unsupportedButSet.isEmpty()) {
+            throw new UnsupportedOperationException(
+                    String.format(
+                            "Parameters %s are not supported yet right now.",
+                            unsupportedButSet.stream()
+                                    .map(d -> d.name)
+                                    .collect(Collectors.joining(", "))));
+        }
+
+        GbtParams p = new GbtParams();
+        p.taskType = taskType;
+        p.featureCols = estimator.getInputCols();
+        p.vectorCol = estimator.getFeaturesCol();
+        p.isInputVector = (null == p.featureCols);
+        p.labelCol = estimator.getLabelCol();
+        p.weightCol = estimator.getWeightCol();
+        p.categoricalCols = estimator.getCategoricalCols();
+
+        p.maxDepth = estimator.getMaxDepth();
+        p.maxBins = estimator.getMaxBins();
+        p.minInstancesPerNode = estimator.getMinInstancesPerNode();
+        p.minWeightFractionPerNode = estimator.getMinWeightFractionPerNode();
+        p.minInfoGain = estimator.getMinInfoGain();
+        p.maxIter = estimator.getMaxIter();
+        p.stepSize = estimator.getStepSize();
+        p.seed = estimator.getSeed();
+        p.subsamplingRate = estimator.getSubsamplingRate();
+        p.featureSubsetStrategy = estimator.getFeatureSubsetStrategy();
+        p.validationTol = estimator.getValidationTol();
+        p.gamma = estimator.getRegGamma();
+        p.lambda = estimator.getRegLambda();
+
+        if (TaskType.CLASSIFICATION.equals(p.taskType)) {
+            p.lossType = estimator.get(GBTClassifierParams.LOSS_TYPE);
+        } else {
+            // TODO: add GBTRegressorParams.LOSS_TYPE in next PR.
+            p.lossType = estimator.get(GBTClassifierParams.LOSS_TYPE);
+        }
+        p.maxNumLeaves = 1 << p.maxDepth - 1;
+        p.useMissing = true;
+        return p;
     }
 
     private static class InitLocalStateFunction extends RichMapFunction<Integer, LocalState> {

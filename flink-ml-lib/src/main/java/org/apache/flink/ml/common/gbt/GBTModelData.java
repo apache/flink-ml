@@ -18,9 +18,22 @@
 
 package org.apache.flink.ml.common.gbt;
 
+import org.apache.flink.api.common.serialization.Encoder;
+import org.apache.flink.api.common.typeinfo.TypeInfo;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.connector.file.src.reader.SimpleStreamFormat;
+import org.apache.flink.core.fs.FSDataInputStream;
+import org.apache.flink.core.memory.DataInputView;
+import org.apache.flink.core.memory.DataInputViewStreamWrapper;
+import org.apache.flink.core.memory.DataOutputView;
+import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
+import org.apache.flink.ml.classification.gbtclassifier.GBTClassifierModel;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
 import org.apache.flink.ml.common.gbt.defs.LocalState;
 import org.apache.flink.ml.common.gbt.defs.Node;
+import org.apache.flink.ml.common.gbt.typeinfo.GBTModelDataSerializer;
+import org.apache.flink.ml.common.gbt.typeinfo.GBTModelDataTypeInfoFactory;
 import org.apache.flink.ml.feature.stringindexer.StringIndexerModel;
 import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vector;
@@ -34,6 +47,8 @@ import org.eclipse.collections.impl.map.mutable.primitive.IntDoubleHashMap;
 import org.eclipse.collections.impl.map.mutable.primitive.IntObjectHashMap;
 import org.eclipse.collections.impl.map.mutable.primitive.ObjectIntHashMap;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.BitSet;
 import java.util.List;
 
@@ -43,6 +58,7 @@ import java.util.List;
  * <p>This class also provides methods to convert model data from Table to Datastream, and classes
  * to save/load model data.
  */
+@TypeInfo(GBTModelDataTypeInfoFactory.class)
 public class GBTModelData {
 
     public String type;
@@ -172,5 +188,46 @@ public class GBTModelData {
         return String.format(
                 "GBTModelData{type=%s, prior=%s, roots=%s, categoryToIdMaps=%s, featureIdToBinEdges=%s, isCategorical=%s}",
                 type, prior, roots, categoryToIdMaps, featureIdToBinEdges, isCategorical);
+    }
+
+    /** Encoder for {@link GBTModelData}. */
+    public static class ModelDataEncoder implements Encoder<GBTModelData> {
+        @Override
+        public void encode(GBTModelData modelData, OutputStream outputStream) throws IOException {
+            DataOutputView dataOutputView = new DataOutputViewStreamWrapper(outputStream);
+            final GBTModelDataSerializer serializer = GBTModelDataSerializer.INSTANCE;
+            serializer.serialize(modelData, dataOutputView);
+        }
+    }
+
+    /** Decoder for {@link GBTModelData}. */
+    public static class ModelDataDecoder extends SimpleStreamFormat<GBTModelData> {
+        @Override
+        public Reader<GBTModelData> createReader(Configuration config, FSDataInputStream stream) {
+            return new Reader<GBTModelData>() {
+
+                private final GBTModelDataSerializer serializer = GBTModelDataSerializer.INSTANCE;
+
+                @Override
+                public GBTModelData read() {
+                    DataInputView source = new DataInputViewStreamWrapper(stream);
+                    try {
+                        return serializer.deserialize(source);
+                    } catch (IOException e) {
+                        return null;
+                    }
+                }
+
+                @Override
+                public void close() throws IOException {
+                    stream.close();
+                }
+            };
+        }
+
+        @Override
+        public TypeInformation<GBTModelData> getProducedType() {
+            return TypeInformation.of(GBTModelData.class);
+        }
     }
 }
