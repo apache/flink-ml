@@ -18,8 +18,14 @@
 
 package org.apache.flink.ml.common.gbt.operators;
 
+import org.apache.flink.api.common.state.ListState;
+import org.apache.flink.api.common.state.ListStateDescriptor;
+import org.apache.flink.api.common.typeutils.base.GenericArraySerializer;
+import org.apache.flink.api.common.typeutils.base.array.IntPrimitiveArraySerializer;
 import org.apache.flink.iteration.IterationID;
 import org.apache.flink.iteration.IterationListener;
+import org.apache.flink.iteration.datacache.nonkeyed.ListStateWithCache;
+import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.common.gbt.datastorage.IterationSharedStorage;
 import org.apache.flink.ml.common.gbt.defs.BinnedInstance;
 import org.apache.flink.ml.common.gbt.defs.GbtParams;
@@ -27,8 +33,11 @@ import org.apache.flink.ml.common.gbt.defs.Histogram;
 import org.apache.flink.ml.common.gbt.defs.LocalState;
 import org.apache.flink.ml.common.gbt.defs.PredGradHess;
 import org.apache.flink.ml.common.gbt.loss.Loss;
+import org.apache.flink.ml.common.gbt.typeinfo.BinnedInstanceSerializer;
 import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.runtime.state.StateInitializationContext;
+import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -37,12 +46,12 @@ import org.apache.flink.util.Collector;
 import org.apache.flink.util.OutputTag;
 import org.apache.flink.util.Preconditions;
 
+import org.apache.commons.collections.IteratorUtils;
 import org.eclipse.collections.impl.map.mutable.primitive.IntIntHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Collections;
 
 /**
  * Calculates local histograms for local data partition. Specifically in the first round, this
@@ -54,6 +63,10 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
     private static final Logger LOG =
             LoggerFactory.getLogger(CacheDataCalcLocalHistsOperator.class);
 
+    private static final String LOCAL_STATE_STATE_NAME = "local_state";
+    private static final String TREE_INITIALIZER_STATE_NAME = "tree_initializer";
+    private static final String HIST_BUILDER_STATE_NAME = "hist_builder";
+
     private final GbtParams gbtParams;
     private final IterationID iterationID;
     private final String sharedInstancesKey;
@@ -63,10 +76,10 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
     private final OutputTag<LocalState> stateOutputTag;
 
     // States of local data.
-    private transient List<BinnedInstance> instancesCollecting;
-    private transient LocalState localState;
-    private transient TreeInitializer treeInitializer;
-    private transient HistBuilder histBuilder;
+    private transient ListStateWithCache<BinnedInstance> instancesCollecting;
+    private transient ListState<LocalState> localState;
+    private transient ListState<TreeInitializer> treeInitializer;
+    private transient ListState<HistBuilder> histBuilder;
 
     // Readers/writers of shared data.
     private transient IterationSharedStorage.Writer<BinnedInstance[]> instancesWriter;
@@ -93,8 +106,31 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
     }
 
     @Override
-    public void open() throws Exception {
-        instancesCollecting = new ArrayList<>();
+    public void initializeState(StateInitializationContext context) throws Exception {
+        super.initializeState(context);
+
+        instancesCollecting =
+                new ListStateWithCache<>(
+                        BinnedInstanceSerializer.INSTANCE,
+                        getContainingTask(),
+                        getRuntimeContext(),
+                        context,
+                        getOperatorID());
+        localState =
+                context.getOperatorStateStore()
+                        .getListState(
+                                new ListStateDescriptor<>(
+                                        LOCAL_STATE_STATE_NAME, LocalState.class));
+        treeInitializer =
+                context.getOperatorStateStore()
+                        .getListState(
+                                new ListStateDescriptor<>(
+                                        TREE_INITIALIZER_STATE_NAME, TreeInitializer.class));
+        histBuilder =
+                context.getOperatorStateStore()
+                        .getListState(
+                                new ListStateDescriptor<>(
+                                        HIST_BUILDER_STATE_NAME, HistBuilder.class));
 
         int subtaskId = getRuntimeContext().getIndexOfThisSubtask();
         instancesWriter =
@@ -103,7 +139,10 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
                         subtaskId,
                         sharedInstancesKey,
                         getOperatorID(),
+                        new GenericArraySerializer<>(
+                                BinnedInstance.class, BinnedInstanceSerializer.INSTANCE),
                         new BinnedInstance[0]);
+        instancesWriter.initializeState(context);
 
         shuffledIndicesWriter =
                 IterationSharedStorage.getWriter(
@@ -111,12 +150,22 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
                         subtaskId,
                         sharedShuffledIndicesKey,
                         getOperatorID(),
+                        IntPrimitiveArraySerializer.INSTANCE,
                         new int[0]);
+        shuffledIndicesWriter.initializeState(context);
 
         this.pghReader =
                 IterationSharedStorage.getReader(iterationID, subtaskId, sharedPredGradHessKey);
         this.swappedIndicesReader =
                 IterationSharedStorage.getReader(iterationID, subtaskId, sharedSwappedIndicesKey);
+    }
+
+    @Override
+    public void snapshotState(StateSnapshotContext context) throws Exception {
+        super.snapshotState(context);
+        instancesCollecting.snapshotState(context);
+        instancesWriter.snapshotState(context);
+        shuffledIndicesWriter.snapshotState(context);
     }
 
     @Override
@@ -141,37 +190,44 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
 
     @Override
     public void processElement2(StreamRecord<LocalState> streamRecord) throws Exception {
-        localState = streamRecord.getValue();
+        localState.update(Collections.singletonList(streamRecord.getValue()));
     }
 
+    @SuppressWarnings("OptionalGetWithoutIsPresent")
     @Override
     public void onEpochWatermarkIncremented(
             int epochWatermark, Context context, Collector<Histogram> out) throws Exception {
+        LocalState localStateValue =
+                OperatorStateUtils.getUniqueElement(localState, "local_state").get();
         if (0 == epochWatermark) {
             // Initializes local state in first round.
-            instancesWriter.set(instancesCollecting.toArray(new BinnedInstance[0]));
+            instancesWriter.set(
+                    (BinnedInstance[])
+                            IteratorUtils.toArray(
+                                    instancesCollecting.get().iterator(), BinnedInstance.class));
             instancesCollecting.clear();
             new LocalStateInitializer(gbtParams)
                     .init(
-                            localState,
+                            localStateValue,
                             getRuntimeContext().getIndexOfThisSubtask(),
                             getRuntimeContext().getNumberOfParallelSubtasks(),
                             instancesWriter.get());
 
-            treeInitializer = new TreeInitializer(localState.statics);
-            histBuilder = new HistBuilder(localState.statics);
+            treeInitializer.update(
+                    Collections.singletonList(new TreeInitializer(localStateValue.statics)));
+            histBuilder.update(Collections.singletonList(new HistBuilder(localStateValue.statics)));
         }
 
         BinnedInstance[] instances = instancesWriter.get();
         Preconditions.checkArgument(
-                getRuntimeContext().getIndexOfThisSubtask() == localState.statics.subtaskId);
+                getRuntimeContext().getIndexOfThisSubtask() == localStateValue.statics.subtaskId);
         PredGradHess[] pgh = pghReader.get();
 
         // In the first round, use prior as the predictions.
         if (0 == pgh.length) {
             pgh = new PredGradHess[instances.length];
-            double prior = localState.statics.prior;
-            Loss loss = localState.statics.loss;
+            double prior = localStateValue.statics.prior;
+            Loss loss = localStateValue.statics.loss;
             for (int i = 0; i < instances.length; i += 1) {
                 double label = instances[i].label;
                 pgh[i] =
@@ -181,10 +237,12 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
         }
 
         int[] indices;
-        if (!localState.dynamics.inWeakLearner) {
+        if (!localStateValue.dynamics.inWeakLearner) {
             // When last tree is finished, initializes a new tree, and shuffle instance indices.
-            treeInitializer.init(localState.dynamics, shuffledIndicesWriter::set);
-            localState.dynamics.inWeakLearner = true;
+            OperatorStateUtils.getUniqueElement(treeInitializer, TREE_INITIALIZER_STATE_NAME)
+                    .get()
+                    .init(localStateValue.dynamics, shuffledIndicesWriter::set);
+            localStateValue.dynamics.inWeakLearner = true;
             indices = shuffledIndicesWriter.get();
         } else {
             // Otherwise, uses the swapped instance indices.
@@ -193,19 +251,25 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
         }
 
         Histogram localHists =
-                histBuilder.build(
-                        localState.dynamics.layer,
-                        localState.dynamics.nodeFeaturePairs,
-                        indices,
-                        instances,
-                        pgh);
+                OperatorStateUtils.getUniqueElement(histBuilder, HIST_BUILDER_STATE_NAME)
+                        .get()
+                        .build(
+                                localStateValue.dynamics.layer,
+                                localStateValue.dynamics.nodeFeaturePairs,
+                                indices,
+                                instances,
+                                pgh);
         out.collect(localHists);
-        context.output(stateOutputTag, localState);
+        context.output(stateOutputTag, localStateValue);
     }
 
     @Override
     public void onIterationTerminated(Context context, Collector<Histogram> collector) {
         instancesCollecting.clear();
+        localState.clear();
+        treeInitializer.clear();
+        histBuilder.clear();
+
         instancesWriter.set(new BinnedInstance[0]);
         shuffledIndicesWriter.set(new int[0]);
     }

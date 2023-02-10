@@ -18,18 +18,28 @@
 
 package org.apache.flink.ml.common.gbt.operators;
 
+import org.apache.flink.api.common.state.ListState;
+import org.apache.flink.api.common.state.ListStateDescriptor;
+import org.apache.flink.api.common.typeutils.base.GenericArraySerializer;
+import org.apache.flink.api.common.typeutils.base.array.IntPrimitiveArraySerializer;
 import org.apache.flink.iteration.IterationID;
 import org.apache.flink.iteration.IterationListener;
+import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.common.gbt.datastorage.IterationSharedStorage;
 import org.apache.flink.ml.common.gbt.defs.BinnedInstance;
 import org.apache.flink.ml.common.gbt.defs.LocalState;
 import org.apache.flink.ml.common.gbt.defs.PredGradHess;
 import org.apache.flink.ml.common.gbt.defs.Splits;
+import org.apache.flink.ml.common.gbt.typeinfo.PredGradHessSerializer;
+import org.apache.flink.runtime.state.StateInitializationContext;
+import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.OutputTag;
+
+import java.util.Collections;
 
 /**
  * Post-process after global splits obtained, including split instances to left or child nodes, and
@@ -38,6 +48,11 @@ import org.apache.flink.util.OutputTag;
 public class PostSplitsOperator extends AbstractStreamOperator<LocalState>
         implements TwoInputStreamOperator<LocalState, Splits, LocalState>,
                 IterationListener<LocalState> {
+
+    private static final String LOCAL_STATE_STATE_NAME = "local_state";
+    private static final String SPLITS_STATE_NAME = "splits";
+    private static final String NODE_SPLITTER_STATE_NAME = "node_splitter";
+    private static final String INSTANCE_UPDATER_STATE_NAME = "instance_updater";
 
     private final IterationID iterationID;
     private final String sharedInstancesKey;
@@ -51,10 +66,10 @@ public class PostSplitsOperator extends AbstractStreamOperator<LocalState>
     private IterationSharedStorage.Reader<int[]> shuffledIndicesReader;
     private IterationSharedStorage.Writer<int[]> swappedIndicesWriter;
 
-    private transient LocalState localState;
-    private transient Splits splits;
-    private transient NodeSplitter nodeSplitter;
-    private transient InstanceUpdater instanceUpdater;
+    private transient ListState<LocalState> localState;
+    private transient ListState<Splits> splits;
+    private transient ListState<NodeSplitter> nodeSplitter;
+    private transient ListState<InstanceUpdater> instanceUpdater;
 
     public PostSplitsOperator(
             IterationID iterationID,
@@ -72,7 +87,28 @@ public class PostSplitsOperator extends AbstractStreamOperator<LocalState>
     }
 
     @Override
-    public void open() throws Exception {
+    public void initializeState(StateInitializationContext context) throws Exception {
+        super.initializeState(context);
+
+        localState =
+                context.getOperatorStateStore()
+                        .getListState(
+                                new ListStateDescriptor<>(
+                                        LOCAL_STATE_STATE_NAME, LocalState.class));
+        splits =
+                context.getOperatorStateStore()
+                        .getListState(new ListStateDescriptor<>(SPLITS_STATE_NAME, Splits.class));
+        nodeSplitter =
+                context.getOperatorStateStore()
+                        .getListState(
+                                new ListStateDescriptor<>(
+                                        NODE_SPLITTER_STATE_NAME, NodeSplitter.class));
+        instanceUpdater =
+                context.getOperatorStateStore()
+                        .getListState(
+                                new ListStateDescriptor<>(
+                                        INSTANCE_UPDATER_STATE_NAME, InstanceUpdater.class));
+
         int subtaskId = getRuntimeContext().getIndexOfThisSubtask();
         pghWriter =
                 IterationSharedStorage.getWriter(
@@ -80,14 +116,19 @@ public class PostSplitsOperator extends AbstractStreamOperator<LocalState>
                         subtaskId,
                         sharedPredGradHessKey,
                         getOperatorID(),
+                        new GenericArraySerializer<>(
+                                PredGradHess.class, PredGradHessSerializer.INSTANCE),
                         new PredGradHess[0]);
+        pghWriter.initializeState(context);
         swappedIndicesWriter =
                 IterationSharedStorage.getWriter(
                         iterationID,
                         subtaskId,
                         sharedSwappedIndicesKey,
                         getOperatorID(),
+                        IntPrimitiveArraySerializer.INSTANCE,
                         new int[0]);
+        swappedIndicesWriter.initializeState(context);
 
         this.instancesReader =
                 IterationSharedStorage.getReader(iterationID, subtaskId, sharedInstancesKey);
@@ -96,12 +137,23 @@ public class PostSplitsOperator extends AbstractStreamOperator<LocalState>
     }
 
     @Override
+    public void snapshotState(StateSnapshotContext context) throws Exception {
+        super.snapshotState(context);
+        pghWriter.snapshotState(context);
+        swappedIndicesWriter.snapshotState(context);
+    }
+
+    @SuppressWarnings("OptionalGetWithoutIsPresent")
+    @Override
     public void onEpochWatermarkIncremented(
             int epochWatermark, Context context, Collector<LocalState> collector) throws Exception {
-        LocalState localStateValue = localState;
+        LocalState localStateValue =
+                OperatorStateUtils.getUniqueElement(localState, LOCAL_STATE_STATE_NAME).get();
         if (0 == epochWatermark) {
-            nodeSplitter = new NodeSplitter(localStateValue.statics);
-            instanceUpdater = new InstanceUpdater(localStateValue.statics);
+            nodeSplitter.update(
+                    Collections.singletonList(new NodeSplitter(localStateValue.statics)));
+            instanceUpdater.update(
+                    Collections.singletonList(new InstanceUpdater(localStateValue.statics)));
         }
 
         int[] indices = swappedIndicesWriter.get();
@@ -110,17 +162,20 @@ public class PostSplitsOperator extends AbstractStreamOperator<LocalState>
         }
 
         BinnedInstance[] instances = instancesReader.get();
-        nodeSplitter.split(
-                localStateValue.dynamics.layer,
-                localStateValue.dynamics.leaves,
-                splits.splits,
-                indices,
-                instances);
+        OperatorStateUtils.getUniqueElement(nodeSplitter, NODE_SPLITTER_STATE_NAME)
+                .get()
+                .split(
+                        localStateValue.dynamics.layer,
+                        localStateValue.dynamics.leaves,
+                        OperatorStateUtils.getUniqueElement(splits, SPLITS_STATE_NAME).get().splits,
+                        indices,
+                        instances);
 
         if (localStateValue.dynamics.layer.isEmpty()) {
             localStateValue.dynamics.inWeakLearner = false;
-            instanceUpdater.update(
-                    localStateValue.dynamics.leaves, indices, instances, pghWriter::set);
+            OperatorStateUtils.getUniqueElement(instanceUpdater, INSTANCE_UPDATER_STATE_NAME)
+                    .get()
+                    .update(localStateValue.dynamics.leaves, indices, instances, pghWriter::set);
             swappedIndicesWriter.set(new int[0]);
         } else {
             swappedIndicesWriter.set(indices);
@@ -129,22 +184,26 @@ public class PostSplitsOperator extends AbstractStreamOperator<LocalState>
     }
 
     @Override
-    public void onIterationTerminated(Context context, Collector<LocalState> collector) {
+    public void onIterationTerminated(Context context, Collector<LocalState> collector)
+            throws Exception {
         pghWriter.set(new PredGradHess[0]);
         swappedIndicesWriter.set(new int[0]);
         if (0 == getRuntimeContext().getIndexOfThisSubtask()) {
-            context.output(finalStateOutputTag, localState);
+            //noinspection OptionalGetWithoutIsPresent
+            context.output(
+                    finalStateOutputTag,
+                    OperatorStateUtils.getUniqueElement(localState, LOCAL_STATE_STATE_NAME).get());
         }
     }
 
     @Override
     public void processElement1(StreamRecord<LocalState> element) throws Exception {
-        localState = element.getValue();
+        localState.update(Collections.singletonList(element.getValue()));
     }
 
     @Override
     public void processElement2(StreamRecord<Splits> element) throws Exception {
-        splits = element.getValue();
+        splits.update(Collections.singletonList(element.getValue()));
     }
 
     @Override

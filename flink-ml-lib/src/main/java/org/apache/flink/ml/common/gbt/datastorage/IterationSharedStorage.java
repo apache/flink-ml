@@ -18,11 +18,20 @@
 
 package org.apache.flink.ml.common.gbt.datastorage;
 
+import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.core.memory.DataInputViewStreamWrapper;
+import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.iteration.IterationID;
 import org.apache.flink.runtime.jobgraph.OperatorID;
+import org.apache.flink.runtime.state.StateInitializationContext;
+import org.apache.flink.runtime.state.StatePartitionStreamProvider;
+import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.util.Preconditions;
 
+import org.apache.commons.collections.IteratorUtils;
+
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -54,12 +63,18 @@ public class IterationSharedStorage {
      * @param subtaskId The subtask ID.
      * @param key The string key.
      * @param operatorID The owner operator.
+     * @param serializer Serializer of the data.
      * @param initVal Initialize value of the data.
      * @return A {@link Writer} of shared data.
      * @param <T> The type of shared ata.
      */
     public static <T> Writer<T> getWriter(
-            IterationID iterationID, int subtaskId, String key, OperatorID operatorID, T initVal) {
+            IterationID iterationID,
+            int subtaskId,
+            String key,
+            OperatorID operatorID,
+            TypeSerializer<T> serializer,
+            T initVal) {
         Tuple3<IterationID, Integer, String> t = Tuple3.of(iterationID, subtaskId, key);
         OperatorID lastOwner = owners.putIfAbsent(t, operatorID);
         if (null != lastOwner) {
@@ -68,7 +83,7 @@ public class IterationSharedStorage {
                             "The shared data (%s, %s, %s) already has a writer %s.",
                             iterationID, subtaskId, key, operatorID));
         }
-        Writer<T> writer = new Writer<>(t, operatorID);
+        Writer<T> writer = new Writer<>(t, operatorID, serializer);
         writer.set(initVal);
         return writer;
     }
@@ -104,10 +119,15 @@ public class IterationSharedStorage {
      */
     public static class Writer<T> extends Reader<T> {
         private final OperatorID operatorID;
+        private final TypeSerializer<T> serializer;
 
-        public Writer(Tuple3<IterationID, Integer, String> t, OperatorID operatorID) {
+        public Writer(
+                Tuple3<IterationID, Integer, String> t,
+                OperatorID operatorID,
+                TypeSerializer<T> serializer) {
             super(t);
             this.operatorID = operatorID;
+            this.serializer = serializer;
         }
 
         private void ensureOwner() {
@@ -131,6 +151,37 @@ public class IterationSharedStorage {
             ensureOwner();
             m.remove(t);
             owners.remove(t);
+        }
+
+        /**
+         * Initialize the state.
+         *
+         * @param context The state initialization context.
+         * @throws Exception
+         */
+        public void initializeState(StateInitializationContext context) throws Exception {
+            //noinspection unchecked
+            List<StatePartitionStreamProvider> inputs =
+                    IteratorUtils.toList(context.getRawOperatorStateInputs().iterator());
+            Preconditions.checkState(
+                    inputs.size() < 2, "The input from raw operator state should be one or zero.");
+            if (inputs.size() > 0) {
+                T value =
+                        serializer.deserialize(
+                                new DataInputViewStreamWrapper(inputs.get(0).getStream()));
+                set(value);
+            }
+        }
+
+        /**
+         * Snapshot the state.
+         *
+         * @param context The state snapshot context.
+         * @throws Exception
+         */
+        public void snapshotState(StateSnapshotContext context) throws Exception {
+            serializer.serialize(
+                    get(), new DataOutputViewStreamWrapper(context.getRawOperatorStateOutput()));
         }
     }
 }
