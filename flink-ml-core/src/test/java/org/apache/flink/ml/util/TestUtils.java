@@ -341,6 +341,11 @@ public class TestUtils {
         }
     }
 
+    /**
+     * Compare two doubles with specified delta. If the differences between the two doubles are
+     * equal or less than delta, they are considered equal. Otherwise, they are compared with
+     * default comparison.
+     */
     public static class DoubleComparatorWithDelta implements Comparator<Double> {
         private final double delta;
 
@@ -354,6 +359,10 @@ public class TestUtils {
         }
     }
 
+    /**
+     * Compare two dense vectors with specified delta. When comparing their values, {@link
+     * DoubleComparatorWithDelta} is used.
+     */
     public static class DenseVectorComparatorWithDelta implements Comparator<DenseVector> {
         private final DoubleComparatorWithDelta doubleComparatorWithDelta;
 

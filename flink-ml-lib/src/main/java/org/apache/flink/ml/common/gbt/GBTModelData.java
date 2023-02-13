@@ -54,7 +54,7 @@ import java.util.BitSet;
 import java.util.List;
 
 /**
- * Model data of {@link GBTClassifierModel}.
+ * Model data of {@link GBTClassifierModel} and {@link GBTRegressorModel}.
  *
  * <p>This class also provides methods to convert model data from Table to Datastream, and classes
  * to save/load model data.

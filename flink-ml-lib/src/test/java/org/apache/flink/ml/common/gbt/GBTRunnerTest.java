@@ -43,6 +43,7 @@ import org.junit.rules.TemporaryFolder;
 import java.util.Arrays;
 import java.util.List;
 
+/** Tests {@link GBTRunner}. */
 public class GBTRunnerTest extends AbstractTestBase {
     private static final List<Row> inputDataRows =
             Arrays.asList(
