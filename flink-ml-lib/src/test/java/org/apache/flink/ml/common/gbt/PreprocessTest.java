@@ -143,7 +143,7 @@ public class PreprocessTest extends AbstractTestBase {
         // TODO: correct `binEdges` of feature `f0` after FLINK-30734 resolved.
         List<FeatureMeta> expectedMeta =
                 Arrays.asList(
-                        FeatureMeta.continuous("f0", 3, new double[] {1.2, 4.5, 13.9, Double.NaN}),
+                        FeatureMeta.continuous("f0", 3, new double[] {1.2, 4.5, 13.9, 15.3}),
                         FeatureMeta.continuous("f1", 3, new double[] {1.0, 2.0, 4.0, 5.0}),
                         FeatureMeta.categorical("f2", 5, new String[] {"a", "b", "c", "d", "e"}));
 
@@ -154,7 +154,7 @@ public class PreprocessTest extends AbstractTestBase {
                         Row.of(40.0, 0, 2, 2.0),
                         Row.of(40.0, 1, 2, 0.0),
                         Row.of(40.0, 1, 1, 1.0),
-                        Row.of(41.0, 2, 1, 2.0),
+                        Row.of(41.0, 3, 1, 2.0),
                         Row.of(41.0, 1, 2, 4.0),
                         Row.of(41.0, 2, 1, 1.0),
                         Row.of(41.0, 2, 2, 0.0),
@@ -188,19 +188,17 @@ public class PreprocessTest extends AbstractTestBase {
         // TODO: correct `binEdges` of feature `_vec_f0` and `_vec_f2` after FLINK-30734 resolved.
         List<FeatureMeta> expectedMeta =
                 Arrays.asList(
-                        FeatureMeta.continuous(
-                                "_vec_f0", 3, new double[] {1.2, 4.5, 13.9, Double.NaN}),
+                        FeatureMeta.continuous("_vec_f0", 3, new double[] {1.2, 4.5, 13.9, 15.3}),
                         FeatureMeta.continuous("_vec_f1", 3, new double[] {1.0, 2.0, 4.0, 5.0}),
-                        FeatureMeta.continuous(
-                                "_vec_f2", 3, new double[] {1.0, 2.0, 3.0, Double.NaN}));
+                        FeatureMeta.continuous("_vec_f2", 3, new double[] {1.0, 2.0, 3.0, 5.0}));
         List<Row> expectedPreprocessedRows =
                 Arrays.asList(
-                        Row.of(40.0, Vectors.dense(0, 1, 2.0)),
+                        Row.of(40.0, Vectors.dense(0, 1, 3.0)),
                         Row.of(40.0, Vectors.dense(0, 1, 1.0)),
                         Row.of(40.0, Vectors.dense(0, 2, 2.0)),
                         Row.of(40.0, Vectors.dense(1, 2, 0.0)),
                         Row.of(40.0, Vectors.dense(1, 1, 1.0)),
-                        Row.of(41.0, Vectors.dense(2, 1, 2.0)),
+                        Row.of(41.0, Vectors.dense(3, 1, 2.0)),
                         Row.of(41.0, Vectors.dense(1, 2, 2.0)),
                         Row.of(41.0, Vectors.dense(2, 1, 1.0)),
                         Row.of(41.0, Vectors.dense(2, 2, 0.0)),
