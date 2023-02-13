@@ -39,6 +39,7 @@ import org.eclipse.collections.impl.map.mutable.primitive.ObjectIntHashMap;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.List;
 
 /** Specialized serializer for {@link GBTModelData}. */
 public final class GBTModelDataSerializer extends TypeSerializerSingleton<GBTModelData> {
@@ -66,7 +67,10 @@ public final class GBTModelDataSerializer extends TypeSerializerSingleton<GBTMod
         record.prior = from.prior;
         record.stepSize = from.stepSize;
 
-        record.roots = new ArrayList<>(from.roots);
+        record.allTrees = new ArrayList<>(from.allTrees.size());
+        for (int i = 0; i < from.allTrees.size(); i += 1) {
+            record.allTrees.add(new ArrayList<>(from.allTrees.get(i)));
+        }
         record.categoryToIdMaps = new IntObjectHashMap<>(from.categoryToIdMaps);
         record.featureIdToBinEdges = new IntObjectHashMap<>(from.featureIdToBinEdges);
         record.isCategorical = BitSet.valueOf(from.isCategorical.toByteArray());
@@ -91,9 +95,12 @@ public final class GBTModelDataSerializer extends TypeSerializerSingleton<GBTMod
         DoubleSerializer.INSTANCE.serialize(record.prior, target);
         DoubleSerializer.INSTANCE.serialize(record.stepSize, target);
 
-        IntSerializer.INSTANCE.serialize(record.roots.size(), target);
-        for (Node root : record.roots) {
-            NODE_SERIALIZER.serialize(root, target);
+        IntSerializer.INSTANCE.serialize(record.allTrees.size(), target);
+        for (List<Node> treeNodes : record.allTrees) {
+            IntSerializer.INSTANCE.serialize(treeNodes.size(), target);
+            for (Node treeNode : treeNodes) {
+                NodeSerializer.INSTANCE.serialize(treeNode, target);
+            }
         }
 
         IntSerializer.INSTANCE.serialize(record.categoryToIdMaps.size(), target);
@@ -127,10 +134,15 @@ public final class GBTModelDataSerializer extends TypeSerializerSingleton<GBTMod
         record.prior = DoubleSerializer.INSTANCE.deserialize(source);
         record.stepSize = DoubleSerializer.INSTANCE.deserialize(source);
 
-        int numRoots = IntSerializer.INSTANCE.deserialize(source);
-        record.roots = new ArrayList<>();
-        for (int i = 0; i < numRoots; i += 1) {
-            record.roots.add(NODE_SERIALIZER.deserialize(source));
+        int numTrees = IntSerializer.INSTANCE.deserialize(source);
+        record.allTrees = new ArrayList<>(numTrees);
+        for (int k = 0; k < numTrees; k += 1) {
+            int numTreeNodes = IntSerializer.INSTANCE.deserialize(source);
+            List<Node> treeNodes = new ArrayList<>(numTreeNodes);
+            for (int i = 0; i < numTreeNodes; i += 1) {
+                treeNodes.add(NODE_SERIALIZER.deserialize(source));
+            }
+            record.allTrees.add(treeNodes);
         }
 
         int numCategoricalFeatures = IntSerializer.INSTANCE.deserialize(source);

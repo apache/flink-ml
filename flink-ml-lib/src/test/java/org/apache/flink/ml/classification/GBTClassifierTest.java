@@ -468,7 +468,7 @@ public class GBTClassifierTest extends AbstractTestBase {
         Assert.assertFalse(modelData.isInputVector);
         Assert.assertEquals(0., modelData.prior, 1e-12);
         Assert.assertEquals(gbtc.getStepSize(), modelData.stepSize, 1e-12);
-        Assert.assertEquals(gbtc.getMaxIter(), modelData.roots.size());
+        Assert.assertEquals(gbtc.getMaxIter(), modelData.allTrees.size());
         Assert.assertEquals(gbtc.getCategoricalCols().length, modelData.categoryToIdMaps.size());
         Assert.assertEquals(
                 gbtc.getInputCols().length - gbtc.getCategoricalCols().length,

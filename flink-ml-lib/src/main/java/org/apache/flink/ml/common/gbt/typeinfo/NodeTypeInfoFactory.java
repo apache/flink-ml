@@ -16,21 +16,25 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.gbt.defs;
+package org.apache.flink.ml.common.gbt.typeinfo;
 
-import org.apache.flink.api.common.typeinfo.TypeInfo;
-import org.apache.flink.ml.common.gbt.typeinfo.NodeTypeInfoFactory;
+import org.apache.flink.api.common.typeinfo.TypeInfoFactory;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.java.typeutils.TypeExtractor;
+import org.apache.flink.ml.common.gbt.defs.Node;
 
-import java.io.Serializable;
+import java.lang.reflect.Type;
+import java.util.Map;
 
-/** Tree node in the decision tree that will be serialized to json and deserialized from json. */
-@TypeInfo(NodeTypeInfoFactory.class)
-public class Node implements Serializable {
+/**
+ * Used by {@link TypeExtractor} to create a {@link TypeInformation} for implementations of {@link
+ * Node}.
+ */
+public class NodeTypeInfoFactory extends TypeInfoFactory<Node> {
 
-    public Split split;
-    public boolean isLeaf = false;
-    public int left;
-    public int right;
-
-    public Node() {}
+    @Override
+    public TypeInformation<Node> createTypeInfo(
+            Type t, Map<String, TypeInformation<?>> genericParameters) {
+        return NodeTypeInfo.INSTANCE;
+    }
 }

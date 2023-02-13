@@ -20,9 +20,10 @@ package org.apache.flink.ml.common.gbt.operators;
 
 import org.apache.flink.ml.common.gbt.defs.BinnedInstance;
 import org.apache.flink.ml.common.gbt.defs.LearningNode;
-import org.apache.flink.ml.common.gbt.defs.LocalState;
+import org.apache.flink.ml.common.gbt.defs.Node;
 import org.apache.flink.ml.common.gbt.defs.PredGradHess;
 import org.apache.flink.ml.common.gbt.defs.Split;
+import org.apache.flink.ml.common.gbt.defs.TrainContext;
 import org.apache.flink.ml.common.gbt.loss.Loss;
 
 import org.slf4j.Logger;
@@ -42,12 +43,12 @@ class InstanceUpdater {
 
     private boolean initialized;
 
-    public InstanceUpdater(LocalState.Statics statics) {
-        subtaskId = statics.subtaskId;
-        loss = statics.loss;
-        stepSize = statics.params.stepSize;
-        prior = statics.prior;
-        pgh = new PredGradHess[statics.numInstances];
+    public InstanceUpdater(TrainContext trainContext) {
+        subtaskId = trainContext.subtaskId;
+        loss = trainContext.loss;
+        stepSize = trainContext.params.stepSize;
+        prior = trainContext.prior;
+        pgh = new PredGradHess[trainContext.numInstances];
         initialized = false;
     }
 
@@ -55,7 +56,8 @@ class InstanceUpdater {
             List<LearningNode> leaves,
             int[] indices,
             BinnedInstance[] instances,
-            Consumer<PredGradHess[]> pghSetter) {
+            Consumer<PredGradHess[]> pghSetter,
+            List<Node> treeNodes) {
         LOG.info("subtaskId: {}, {} start", subtaskId, InstanceUpdater.class.getSimpleName());
         if (!initialized) {
             for (int i = 0; i < instances.length; i += 1) {
@@ -68,7 +70,7 @@ class InstanceUpdater {
         }
 
         for (LearningNode nodeInfo : leaves) {
-            Split split = nodeInfo.node.split;
+            Split split = treeNodes.get(nodeInfo.nodeIndex).split;
             double pred = split.prediction * stepSize;
             for (int i = nodeInfo.slice.start; i < nodeInfo.slice.end; ++i) {
                 int instanceId = indices[i];

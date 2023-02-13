@@ -21,8 +21,8 @@ package org.apache.flink.ml.common.gbt.operators;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.common.gbt.defs.BinnedInstance;
 import org.apache.flink.ml.common.gbt.defs.GbtParams;
-import org.apache.flink.ml.common.gbt.defs.LocalState;
 import org.apache.flink.ml.common.gbt.defs.TaskType;
+import org.apache.flink.ml.common.gbt.defs.TrainContext;
 import org.apache.flink.ml.common.gbt.loss.AbsoluteError;
 import org.apache.flink.ml.common.gbt.loss.LogLoss;
 import org.apache.flink.ml.common.gbt.loss.Loss;
@@ -39,11 +39,11 @@ import java.util.function.Function;
 
 import static java.util.Arrays.stream;
 
-class LocalStateInitializer {
-    private static final Logger LOG = LoggerFactory.getLogger(LocalStateInitializer.class);
+class TrainContextInitializer {
+    private static final Logger LOG = LoggerFactory.getLogger(TrainContextInitializer.class);
     private final GbtParams params;
 
-    public LocalStateInitializer(GbtParams params) {
+    public TrainContextInitializer(GbtParams params) {
         this.params = params;
     }
 
@@ -52,43 +52,42 @@ class LocalStateInitializer {
      *
      * <p>Note that local state already has some properties set in advance, see GBTRunner#boost.
      */
-    public LocalState init(
-            LocalState localState, int subtaskId, int numSubtasks, BinnedInstance[] instances) {
-        LOG.info("subtaskId: {}, {} start", subtaskId, LocalStateInitializer.class.getSimpleName());
+    public TrainContext init(
+            TrainContext trainContext, int subtaskId, int numSubtasks, BinnedInstance[] instances) {
+        LOG.info(
+                "subtaskId: {}, {} start",
+                subtaskId,
+                TrainContextInitializer.class.getSimpleName());
 
-        LocalState.Statics statics = localState.statics;
-        statics.subtaskId = subtaskId;
-        statics.numSubtasks = numSubtasks;
+        trainContext.subtaskId = subtaskId;
+        trainContext.numSubtasks = numSubtasks;
 
         int numInstances = instances.length;
-        int numFeatures = statics.featureMetas.length;
+        int numFeatures = trainContext.featureMetas.length;
 
         LOG.info(
                 "subtaskId: {}, #samples: {}, #features: {}", subtaskId, numInstances, numFeatures);
 
-        statics.params = params;
-        statics.numInstances = numInstances;
-        statics.numFeatures = numFeatures;
+        trainContext.params = params;
+        trainContext.numInstances = numInstances;
+        trainContext.numFeatures = numFeatures;
 
-        statics.numBaggingInstances = getNumBaggingSamples(numInstances);
-        statics.numBaggingFeatures = getNumBaggingFeatures(numFeatures);
+        trainContext.numBaggingInstances = getNumBaggingSamples(numInstances);
+        trainContext.numBaggingFeatures = getNumBaggingFeatures(numFeatures);
 
-        statics.instanceRandomizer = new Random(subtaskId + params.seed);
-        statics.featureRandomizer = new Random(params.seed);
+        trainContext.instanceRandomizer = new Random(subtaskId + params.seed);
+        trainContext.featureRandomizer = new Random(params.seed);
 
-        statics.loss = getLoss();
-        statics.prior = calcPrior(statics.labelSumCount);
+        trainContext.loss = getLoss();
+        trainContext.prior = calcPrior(trainContext.labelSumCount);
 
-        statics.numFeatureBins =
-                stream(statics.featureMetas)
-                        .mapToInt(d -> d.numBins(statics.params.useMissing))
+        trainContext.numFeatureBins =
+                stream(trainContext.featureMetas)
+                        .mapToInt(d -> d.numBins(trainContext.params.useMissing))
                         .toArray();
 
-        LocalState.Dynamics dynamics = localState.dynamics;
-        dynamics.inWeakLearner = false;
-
-        LOG.info("subtaskId: {}, {} end", subtaskId, LocalStateInitializer.class.getSimpleName());
-        return new LocalState(statics, dynamics);
+        LOG.info("subtaskId: {}, {} end", subtaskId, TrainContextInitializer.class.getSimpleName());
+        return trainContext;
     }
 
     private int getNumBaggingSamples(int numSamples) {

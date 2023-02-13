@@ -35,6 +35,8 @@ public class Histogram implements Serializable {
     // Stores the number of elements received by subtasks in scattering.
     public int[] recvcnts;
 
+    public Histogram() {}
+
     public Histogram(int subtaskId, double[] hists, int[] recvcnts) {
         this.subtaskId = subtaskId;
         this.hists = hists;

@@ -16,33 +16,32 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.gbt.defs;
+package org.apache.flink.ml.common.gbt.typeinfo;
 
-/** A node used in learning procedure. */
-public class LearningNode {
+import org.apache.flink.api.common.typeinfo.TypeInfoFactory;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.java.typeutils.TypeExtractor;
+import org.apache.flink.ml.common.gbt.defs.Split;
 
-    // The node index in `currentTreeNodes` used in `PostSplitsOperator`.
-    public int nodeIndex;
-    // Slice of indices of bagging instances.
-    public Slice slice;
-    // Slice of indices of non-bagging instances.
-    public Slice oob;
-    // Depth of corresponding tree node.
-    public int depth;
+import java.lang.reflect.Type;
+import java.util.HashMap;
+import java.util.Map;
 
-    public LearningNode() {}
+/**
+ * Used by {@link TypeExtractor} to create a {@link TypeInformation} for implementations of {@link
+ * Split}.
+ */
+public class SplitTypeInfoFactory extends TypeInfoFactory<Split> {
 
-    public LearningNode(int nodeIndex, Slice slice, Slice oob, int depth) {
-        this.nodeIndex = nodeIndex;
-        this.slice = slice;
-        this.oob = oob;
-        this.depth = depth;
+    private static final Map<String, TypeInformation<?>> fields;
+
+    static {
+        fields = new HashMap<>();
     }
 
     @Override
-    public String toString() {
-        return String.format(
-                "LearningNode{nodeIndex=%s, slice=%s, oob=%s, depth=%d}",
-                nodeIndex, slice, oob, depth);
+    public TypeInformation<Split> createTypeInfo(
+            Type t, Map<String, TypeInformation<?>> genericParameters) {
+        return SplitTypeInfo.INSTANCE;
     }
 }

@@ -24,11 +24,9 @@ import org.apache.flink.ml.common.gbt.defs.Distributor;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
 import org.apache.flink.ml.common.gbt.defs.Histogram;
 import org.apache.flink.ml.common.gbt.defs.LearningNode;
-import org.apache.flink.ml.common.gbt.defs.LocalState;
 import org.apache.flink.ml.common.gbt.defs.PredGradHess;
+import org.apache.flink.ml.common.gbt.defs.TrainContext;
 
-import org.eclipse.collections.api.tuple.primitive.IntIntPair;
-import org.eclipse.collections.impl.tuple.primitive.PrimitiveTuples;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,23 +52,23 @@ class HistBuilder {
 
     private final double[] hists;
 
-    public HistBuilder(LocalState.Statics statics) {
-        subtaskId = statics.subtaskId;
-        numSubtasks = statics.numSubtasks;
+    public HistBuilder(TrainContext trainContext) {
+        subtaskId = trainContext.subtaskId;
+        numSubtasks = trainContext.numSubtasks;
 
-        numFeatureBins = statics.numFeatureBins;
-        featureMetas = statics.featureMetas;
+        numFeatureBins = trainContext.numFeatureBins;
+        featureMetas = trainContext.featureMetas;
 
-        numBaggingFeatures = statics.numBaggingFeatures;
-        featureRandomizer = statics.featureRandomizer;
-        featureIndicesPool = IntStream.range(0, statics.numFeatures).toArray();
+        numBaggingFeatures = trainContext.numBaggingFeatures;
+        featureRandomizer = trainContext.featureRandomizer;
+        featureIndicesPool = IntStream.range(0, trainContext.numFeatures).toArray();
 
-        isInputVector = statics.params.isInputVector;
+        isInputVector = trainContext.params.isInputVector;
 
         int maxNumNodes =
                 Math.min(
-                        ((int) Math.pow(2, statics.params.maxDepth - 1)),
-                        statics.params.maxNumLeaves);
+                        ((int) Math.pow(2, trainContext.params.maxDepth - 1)),
+                        trainContext.params.maxNumLeaves);
 
         int maxFeatureBins = Arrays.stream(numFeatureBins).max().orElse(0);
         int totalNumFeatureBins = Arrays.stream(numFeatureBins).sum();
@@ -85,7 +83,7 @@ class HistBuilder {
      */
     private static void calcNodeFeaturePairHists(
             List<LearningNode> layer,
-            List<IntIntPair> nodeFeaturePairs,
+            int[] nodeFeaturePairs,
             FeatureMeta[] featureMetas,
             boolean isInputVector,
             int[] numFeatureBins,
@@ -95,9 +93,9 @@ class HistBuilder {
             double[] hists) {
         Arrays.fill(hists, 0.);
         int binOffset = 0;
-        for (IntIntPair nodeFeaturePair : nodeFeaturePairs) {
-            int nodeId = nodeFeaturePair.getOne();
-            int featureId = nodeFeaturePair.getTwo();
+        for (int k = 0; k < nodeFeaturePairs.length; k += 2) {
+            int nodeId = nodeFeaturePairs[k];
+            int featureId = nodeFeaturePairs[k + 1];
             FeatureMeta featureMeta = featureMetas[featureId];
 
             int defaultValue = featureMeta.missingBin;
@@ -131,39 +129,44 @@ class HistBuilder {
      * subtask.
      */
     private static int[] calcRecvCounts(
-            int numSubtasks, List<IntIntPair> nodeFeaturePairs, int[] numFeatureBins) {
+            int numSubtasks, int[] nodeFeaturePairs, int[] numFeatureBins) {
         int[] recvcnts = new int[numSubtasks];
         Distributor.EvenDistributor distributor =
-                new Distributor.EvenDistributor(numSubtasks, nodeFeaturePairs.size());
+                new Distributor.EvenDistributor(numSubtasks, nodeFeaturePairs.length / 2);
         for (int k = 0; k < numSubtasks; k += 1) {
             int pairStart = (int) distributor.start(k);
             int pairCnt = (int) distributor.count(k);
             for (int i = pairStart; i < pairStart + pairCnt; i += 1) {
-                int featureId = nodeFeaturePairs.get(i).getTwo();
+                int featureId = nodeFeaturePairs[2 * i + 1];
                 recvcnts[k] += numFeatureBins[featureId] * DataUtils.BIN_SIZE;
             }
         }
         return recvcnts;
     }
 
+    /** Generates (nodeId, featureId) pairs that are required to build histograms. */
+    int[] getNodeFeaturePairs(int numLayerNodes) {
+        int[] nodeFeaturePairs = new int[numLayerNodes * numBaggingFeatures * 2];
+        int p = 0;
+        for (int k = 0; k < numLayerNodes; k += 1) {
+            int[] sampledFeatures =
+                    DataUtils.sample(featureIndicesPool, numBaggingFeatures, featureRandomizer);
+            for (int featureId : sampledFeatures) {
+                nodeFeaturePairs[p++] = k;
+                nodeFeaturePairs[p++] = featureId;
+            }
+        }
+        return nodeFeaturePairs;
+    }
+
     /** Calculate local histograms for nodes in current layer of tree. */
-    public Histogram build(
+    Histogram build(
             List<LearningNode> layer,
-            List<IntIntPair> nodeFeaturePairs,
+            int[] nodeFeaturePairs,
             int[] indices,
             BinnedInstance[] instances,
             PredGradHess[] pgh) {
         LOG.info("subtaskId: {}, {} start", subtaskId, HistBuilder.class.getSimpleName());
-
-        // Generates (nodeId, featureId) pairs that are required to build histograms.
-        nodeFeaturePairs.clear();
-        for (int k = 0; k < layer.size(); k += 1) {
-            int[] sampledFeatures =
-                    DataUtils.sample(featureIndicesPool, numBaggingFeatures, featureRandomizer);
-            for (int featureId : sampledFeatures) {
-                nodeFeaturePairs.add(PrimitiveTuples.pair(k, featureId));
-            }
-        }
 
         // Calculates histograms for (nodeId, featureId) pairs.
         calcNodeFeaturePairHists(

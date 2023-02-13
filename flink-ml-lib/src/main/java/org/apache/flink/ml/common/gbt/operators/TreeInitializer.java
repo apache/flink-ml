@@ -20,10 +20,8 @@ package org.apache.flink.ml.common.gbt.operators;
 
 import org.apache.flink.ml.common.gbt.DataUtils;
 import org.apache.flink.ml.common.gbt.defs.LearningNode;
-import org.apache.flink.ml.common.gbt.defs.LocalState;
-import org.apache.flink.ml.common.gbt.defs.Node;
 import org.apache.flink.ml.common.gbt.defs.Slice;
-import org.apache.flink.util.Preconditions;
+import org.apache.flink.ml.common.gbt.defs.TrainContext;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,33 +39,28 @@ class TreeInitializer {
     private final int[] shuffledIndices;
     private final Random instanceRandomizer;
 
-    public TreeInitializer(LocalState.Statics statics) {
-        subtaskId = statics.subtaskId;
-        numInstances = statics.numInstances;
-        numBaggingInstances = statics.numBaggingInstances;
-        instanceRandomizer = statics.instanceRandomizer;
+    public TreeInitializer(TrainContext trainContext) {
+        subtaskId = trainContext.subtaskId;
+        numInstances = trainContext.numInstances;
+        numBaggingInstances = trainContext.numBaggingInstances;
+        instanceRandomizer = trainContext.instanceRandomizer;
         shuffledIndices = IntStream.range(0, numInstances).toArray();
     }
 
     /** Calculate local histograms for nodes in current layer of tree. */
-    public void init(LocalState.Dynamics dynamics, Consumer<int[]> shuffledIndicesSetter) {
+    public void init(Consumer<int[]> shuffledIndicesSetter) {
         LOG.info("subtaskId: {}, {} start", subtaskId, TreeInitializer.class.getSimpleName());
-        Preconditions.checkState(!dynamics.inWeakLearner);
-        Preconditions.checkState(dynamics.layer.isEmpty());
-
         // Initializes the root node of a new tree when last tree is finalized.
         DataUtils.shuffle(shuffledIndices, instanceRandomizer);
-        Node root = new Node();
-        dynamics.layer.add(
-                new LearningNode(
-                        root,
-                        new Slice(0, numBaggingInstances),
-                        new Slice(numBaggingInstances, numInstances),
-                        1));
-        dynamics.roots.add(root);
-        dynamics.leaves.clear();
         shuffledIndicesSetter.accept(shuffledIndices);
-
         LOG.info("subtaskId: {}, {} end", this.subtaskId, TreeInitializer.class.getSimpleName());
+    }
+
+    public LearningNode getRootLearningNode() {
+        return new LearningNode(
+                0,
+                new Slice(0, numBaggingInstances),
+                new Slice(numBaggingInstances, numInstances),
+                1);
     }
 }

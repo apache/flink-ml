@@ -18,12 +18,16 @@
 
 package org.apache.flink.ml.common.gbt.defs;
 
+import org.apache.flink.api.common.typeinfo.TypeInfo;
+import org.apache.flink.ml.common.gbt.typeinfo.SplitTypeInfoFactory;
+
 import org.eclipse.collections.impl.map.mutable.primitive.IntDoubleHashMap;
 import org.eclipse.collections.impl.map.mutable.primitive.IntIntHashMap;
 
 import java.util.BitSet;
 
 /** Stores a split on a feature. */
+@TypeInfo(SplitTypeInfoFactory.class)
 public abstract class Split {
     public static final double INVALID_GAIN = 0.0;
 

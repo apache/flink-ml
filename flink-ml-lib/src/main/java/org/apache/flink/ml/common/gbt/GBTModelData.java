@@ -30,14 +30,13 @@ import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.ml.classification.gbtclassifier.GBTClassifierModel;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
-import org.apache.flink.ml.common.gbt.defs.LocalState;
 import org.apache.flink.ml.common.gbt.defs.Node;
+import org.apache.flink.ml.common.gbt.defs.TrainContext;
 import org.apache.flink.ml.common.gbt.typeinfo.GBTModelDataSerializer;
 import org.apache.flink.ml.common.gbt.typeinfo.GBTModelDataTypeInfoFactory;
 import org.apache.flink.ml.feature.stringindexer.StringIndexerModel;
 import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vector;
-import org.apache.flink.ml.regression.gbtregressor.GBTRegressorModel;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -68,19 +67,20 @@ public class GBTModelData {
     public double prior;
     public double stepSize;
 
-    public List<Node> roots;
+    public List<List<Node>> allTrees;
     public IntObjectHashMap<ObjectIntHashMap<String>> categoryToIdMaps;
     public IntObjectHashMap<double[]> featureIdToBinEdges;
     public BitSet isCategorical;
 
     public GBTModelData() {}
 
+    // TODO: !!!
     public GBTModelData(
             String type,
             boolean isInputVector,
             double prior,
             double stepSize,
-            List<Node> roots,
+            List<List<Node>> allTrees,
             IntObjectHashMap<ObjectIntHashMap<String>> categoryToIdMaps,
             IntObjectHashMap<double[]> featureIdToBinEdges,
             BitSet isCategorical) {
@@ -88,18 +88,18 @@ public class GBTModelData {
         this.isInputVector = isInputVector;
         this.prior = prior;
         this.stepSize = stepSize;
-        this.roots = roots;
+        this.allTrees = allTrees;
         this.categoryToIdMaps = categoryToIdMaps;
         this.featureIdToBinEdges = featureIdToBinEdges;
         this.isCategorical = isCategorical;
     }
 
-    public static GBTModelData fromLocalState(LocalState state) {
+    public static GBTModelData from(TrainContext trainContext, List<List<Node>> allTrees) {
         IntObjectHashMap<ObjectIntHashMap<String>> categoryToIdMaps = new IntObjectHashMap<>();
         IntObjectHashMap<double[]> featureIdToBinEdges = new IntObjectHashMap<>();
         BitSet isCategorical = new BitSet();
 
-        FeatureMeta[] featureMetas = state.statics.featureMetas;
+        FeatureMeta[] featureMetas = trainContext.featureMetas;
         for (int k = 0; k < featureMetas.length; k += 1) {
             FeatureMeta featureMeta = featureMetas[k];
             if (featureMeta instanceof FeatureMeta.CategoricalFeatureMeta) {
@@ -116,11 +116,11 @@ public class GBTModelData {
             }
         }
         return new GBTModelData(
-                state.statics.params.taskType.name(),
-                state.statics.params.isInputVector,
-                state.statics.prior,
-                state.statics.params.stepSize,
-                state.dynamics.roots,
+                trainContext.params.taskType.name(),
+                trainContext.params.isInputVector,
+                trainContext.prior,
+                trainContext.params.stepSize,
+                allTrees,
                 categoryToIdMaps,
                 featureIdToBinEdges,
                 isCategorical);
@@ -173,11 +173,11 @@ public class GBTModelData {
 
     public double predictRaw(IntDoubleHashMap rawFeatures) {
         double v = prior;
-        for (Node root : roots) {
-            Node node = root;
+        for (List<Node> treeNodes : allTrees) {
+            Node node = treeNodes.get(0);
             while (!node.isLeaf) {
                 boolean goLeft = node.split.shouldGoLeft(rawFeatures);
-                node = goLeft ? node.left : node.right;
+                node = goLeft ? treeNodes.get(node.left) : treeNodes.get(node.right);
             }
             v += stepSize * node.split.prediction;
         }
@@ -187,8 +187,8 @@ public class GBTModelData {
     @Override
     public String toString() {
         return String.format(
-                "GBTModelData{type=%s, prior=%s, roots=%s, categoryToIdMaps=%s, featureIdToBinEdges=%s, isCategorical=%s}",
-                type, prior, roots, categoryToIdMaps, featureIdToBinEdges, isCategorical);
+                "GBTModelData{type=%s, prior=%s, allTrees=%s, categoryToIdMaps=%s, featureIdToBinEdges=%s, isCategorical=%s}",
+                type, prior, allTrees, categoryToIdMaps, featureIdToBinEdges, isCategorical);
     }
 
     /** Encoder for {@link GBTModelData}. */

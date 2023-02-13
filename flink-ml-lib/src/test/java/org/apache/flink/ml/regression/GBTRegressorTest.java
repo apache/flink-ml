@@ -346,7 +346,7 @@ public class GBTRegressorTest extends AbstractTestBase {
         Assert.assertFalse(modelData.isInputVector);
         Assert.assertEquals(40.5, modelData.prior, .5);
         Assert.assertEquals(gbtr.getStepSize(), modelData.stepSize, 1e-12);
-        Assert.assertEquals(gbtr.getMaxIter(), modelData.roots.size());
+        Assert.assertEquals(gbtr.getMaxIter(), modelData.allTrees.size());
         Assert.assertEquals(gbtr.getCategoricalCols().length, modelData.categoryToIdMaps.size());
         Assert.assertEquals(
                 gbtr.getInputCols().length - gbtr.getCategoricalCols().length,

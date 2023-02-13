@@ -18,19 +18,29 @@
 
 package org.apache.flink.ml.common.gbt.defs;
 
-import org.apache.flink.api.common.typeinfo.TypeInfo;
-import org.apache.flink.ml.common.gbt.typeinfo.NodeTypeInfoFactory;
+import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.ml.common.gbt.loss.Loss;
 
-import java.io.Serializable;
+import java.util.Random;
 
-/** Tree node in the decision tree that will be serialized to json and deserialized from json. */
-@TypeInfo(NodeTypeInfoFactory.class)
-public class Node implements Serializable {
+/** Stores the training context. */
+public class TrainContext {
+    public int subtaskId;
+    public int numSubtasks;
+    public GbtParams params;
 
-    public Split split;
-    public boolean isLeaf = false;
-    public int left;
-    public int right;
+    public int numInstances;
+    public int numBaggingInstances;
+    public Random instanceRandomizer;
 
-    public Node() {}
+    public int numFeatures;
+    public int numBaggingFeatures;
+    public Random featureRandomizer;
+
+    public FeatureMeta[] featureMetas;
+    public int[] numFeatureBins;
+
+    public Tuple2<Double, Long> labelSumCount;
+    public double prior;
+    public Loss loss;
 }

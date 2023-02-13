@@ -31,6 +31,8 @@ public class Splits {
     // Stores splits of nodes in the current layer.
     public Split[] splits;
 
+    public Splits() {}
+
     public Splits(int subtaskId, Split[] splits) {
         this.subtaskId = subtaskId;
         this.splits = splits;

@@ -22,6 +22,7 @@ import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.Partitioner;
 import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.iteration.DataStreamList;
@@ -30,17 +31,17 @@ import org.apache.flink.iteration.IterationBodyResult;
 import org.apache.flink.iteration.IterationID;
 import org.apache.flink.ml.common.gbt.defs.GbtParams;
 import org.apache.flink.ml.common.gbt.defs.Histogram;
-import org.apache.flink.ml.common.gbt.defs.LocalState;
 import org.apache.flink.ml.common.gbt.defs.Splits;
+import org.apache.flink.ml.common.gbt.defs.TrainContext;
 import org.apache.flink.ml.common.gbt.operators.CacheDataCalcLocalHistsOperator;
 import org.apache.flink.ml.common.gbt.operators.CalcLocalSplitsOperator;
 import org.apache.flink.ml.common.gbt.operators.HistogramAggregateFunction;
 import org.apache.flink.ml.common.gbt.operators.PostSplitsOperator;
 import org.apache.flink.ml.common.gbt.operators.SplitsAggregateFunction;
+import org.apache.flink.ml.common.gbt.operators.TerminationOperator;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.types.Row;
-import org.apache.flink.util.Collector;
 import org.apache.flink.util.OutputTag;
 
 import org.apache.commons.lang3.ArrayUtils;
@@ -61,111 +62,54 @@ class BoostIterationBody implements IterationBody {
     @Override
     public IterationBodyResult process(DataStreamList variableStreams, DataStreamList dataStreams) {
         DataStream<Row> data = dataStreams.get(0);
-        DataStream<LocalState> localState = variableStreams.get(0);
-
-        final OutputTag<LocalState> stateOutputTag =
-                new OutputTag<>("state", TypeInformation.of(LocalState.class));
-
-        final OutputTag<LocalState> finalStateOutputTag =
-                new OutputTag<>("final_state", TypeInformation.of(LocalState.class));
-
-        /**
-         * In the iteration, some data needs to be shared between subtasks of different operators
-         * within one machine. We use {@link IterationSharedStorage} with co-location mechanism to
-         * achieve such purpose. The data is stored in JVM static region, and is accessed through
-         * string keys from different operator subtasks. Note the first operator to put the data is
-         * the owner of the data, and only the owner can update or delete the data.
-         *
-         * <p>To be specified, in gradient boosting trees algorithm, there three types of shared
-         * data:
-         *
-         * <ul>
-         *   <li>Instances (after binned) and their corresponding predictions, gradients, and
-         *       hessians are shared to avoid being stored multiple times or communication.
-         *   <li>When initializing every new tree, instances need to be shuffled and split to
-         *       bagging instances and non-bagging ones. To reduce the cost, we shuffle instance
-         *       indices other than instances. Therefore, the shuffle indices need to be shared to
-         *       access actual instances.
-         *   <li>After splitting nodes of each layer, instance indices need to be swapped to
-         *       maintain {@link LearningNode#slice} and {@link LearningNode#oob}. However, we
-         *       cannot directly update the data of shuffle indices above, as it already has an
-         *       owner. So we use another key to store instance indices after swapping.
-         * </ul>
-         */
-        final String sharedInstancesKey = "instances";
-        final String sharedPredGradHessKey = "preds_grads_hessians";
-        final String sharedShuffledIndicesKey = "shuffled_indices";
-        final String sharedSwappedIndicesKey = "swapped_indices";
+        DataStream<TrainContext> trainContext = variableStreams.get(0);
 
         final String coLocationKey = "boosting";
 
         // In 1st round, cache all data. For all rounds calculate local histogram based on
         // current tree layer.
         SingleOutputStreamOperator<Histogram> localHists =
-                data.connect(localState)
+                data.connect(trainContext)
                         .transform(
                                 "CacheDataCalcLocalHists",
                                 TypeInformation.of(Histogram.class),
-                                new CacheDataCalcLocalHistsOperator(
-                                        gbtParams,
-                                        iterationID,
-                                        sharedInstancesKey,
-                                        sharedPredGradHessKey,
-                                        sharedShuffledIndicesKey,
-                                        sharedSwappedIndicesKey,
-                                        stateOutputTag));
+                                new CacheDataCalcLocalHistsOperator(gbtParams, iterationID));
         localHists.getTransformation().setCoLocationGroupKey("coLocationKey");
-        DataStream<LocalState> modelData = localHists.getSideOutput(stateOutputTag);
 
         DataStream<Histogram> globalHists = scatterReduceHistograms(localHists);
 
         SingleOutputStreamOperator<Splits> localSplits =
-                modelData
-                        .connect(globalHists)
-                        .transform(
-                                "CalcLocalSplits",
-                                TypeInformation.of(Splits.class),
-                                new CalcLocalSplitsOperator(stateOutputTag));
+                globalHists.transform(
+                        "CalcLocalSplits",
+                        TypeInformation.of(Splits.class),
+                        new CalcLocalSplitsOperator(iterationID));
         localHists.getTransformation().setCoLocationGroupKey(coLocationKey);
         DataStream<Splits> globalSplits =
                 localSplits.broadcast().flatMap(new SplitsAggregateFunction());
 
-        SingleOutputStreamOperator<LocalState> updatedModelData =
-                modelData
-                        .connect(globalSplits.broadcast())
+        SingleOutputStreamOperator<Integer> updatedModelData =
+                globalSplits
+                        .broadcast()
                         .transform(
                                 "PostSplits",
-                                TypeInformation.of(LocalState.class),
-                                new PostSplitsOperator(
-                                        iterationID,
-                                        sharedInstancesKey,
-                                        sharedPredGradHessKey,
-                                        sharedShuffledIndicesKey,
-                                        sharedSwappedIndicesKey,
-                                        finalStateOutputTag));
+                                TypeInformation.of(Integer.class),
+                                new PostSplitsOperator(iterationID));
         updatedModelData.getTransformation().setCoLocationGroupKey(coLocationKey);
 
-        DataStream<Integer> termination =
-                updatedModelData.flatMap(
-                        new FlatMapFunction<LocalState, Integer>() {
-                            @Override
-                            public void flatMap(LocalState value, Collector<Integer> out) {
-                                LocalState.Dynamics dynamics = value.dynamics;
-                                boolean terminated =
-                                        !dynamics.inWeakLearner
-                                                && dynamics.roots.size()
-                                                        == value.statics.params.maxIter;
-                                // TODO: add validation error rate
-                                if (!terminated) {
-                                    out.collect(0);
-                                }
-                            }
-                        });
+        final OutputTag<GBTModelData> modelDataOutputTag =
+                new OutputTag<>("model_data", TypeInformation.of(GBTModelData.class));
+        SingleOutputStreamOperator<Integer> termination =
+                updatedModelData.transform(
+                        "check_termination",
+                        Types.INT,
+                        new TerminationOperator(iterationID, modelDataOutputTag));
         termination.getTransformation().setCoLocationGroupKey(coLocationKey);
 
         return new IterationBodyResult(
-                DataStreamList.of(updatedModelData),
-                DataStreamList.of(updatedModelData.getSideOutput(finalStateOutputTag)),
+                DataStreamList.of(
+                        updatedModelData.flatMap(
+                                (d, out) -> {}, TypeInformation.of(TrainContext.class))),
+                DataStreamList.of(termination.getSideOutput(modelDataOutputTag)),
                 termination);
     }
 

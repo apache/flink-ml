@@ -110,7 +110,7 @@ public class GBTRunnerTest extends AbstractTestBase {
     private void verifyModelData(GBTModelData modelData, GbtParams p) {
         Assert.assertEquals(p.taskType, TaskType.valueOf(modelData.type));
         Assert.assertEquals(p.stepSize, modelData.stepSize, 1e-12);
-        Assert.assertEquals(p.maxIter, modelData.roots.size());
+        Assert.assertEquals(p.maxIter, modelData.allTrees.size());
     }
 
     @Test

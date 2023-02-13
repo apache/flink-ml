@@ -52,4 +52,6 @@ public class GbtParams implements Serializable {
     public int maxNumLeaves;
     // useMissing is always true right now.
     public boolean useMissing;
+
+    public GbtParams() {}
 }

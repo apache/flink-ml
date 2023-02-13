@@ -31,8 +31,8 @@ import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
 import org.apache.flink.ml.common.gbt.defs.GbtParams;
-import org.apache.flink.ml.common.gbt.defs.LocalState;
 import org.apache.flink.ml.common.gbt.defs.TaskType;
+import org.apache.flink.ml.common.gbt.defs.TrainContext;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.regression.gbtregressor.GBTRegressorParams;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -100,7 +100,7 @@ public class GBTRunner {
         bcMap.put(featureMetaBcName, featureMeta);
         bcMap.put(labelSumCountBcName, labelSumCount);
 
-        DataStream<LocalState> initStates =
+        DataStream<TrainContext> initTrainContext =
                 BroadcastUtils.withBroadcastStream(
                         Collections.singletonList(
                                 tEnv.toDataStream(tEnv.fromValues(0), Integer.class)),
@@ -109,7 +109,7 @@ public class GBTRunner {
                             //noinspection unchecked
                             DataStream<Integer> input = (DataStream<Integer>) (inputs.get(0));
                             return input.map(
-                                    new InitLocalStateFunction(
+                                    new InitTrainContextFunction(
                                             featureMetaBcName, labelSumCountBcName, p));
                         });
 
@@ -117,14 +117,13 @@ public class GBTRunner {
         final IterationID iterationID = new IterationID();
         DataStreamList dataStreamList =
                 Iterations.iterateBoundedStreamsUntilTermination(
-                        DataStreamList.of(initStates.broadcast()),
+                        DataStreamList.of(initTrainContext.broadcast()),
                         ReplayableDataStreamList.notReplay(data, featureMeta),
                         IterationConfig.newBuilder()
                                 .setOperatorLifeCycle(IterationConfig.OperatorLifeCycle.ALL_ROUND)
                                 .build(),
                         new BoostIterationBody(iterationID, p));
-        DataStream<LocalState> state = dataStreamList.get(0);
-        return state.map(GBTModelData::fromLocalState);
+        return dataStreamList.get(0);
     }
 
     public static GbtParams fromEstimator(BaseGBTParams<?> estimator, TaskType taskType) {
@@ -181,12 +180,12 @@ public class GBTRunner {
         return p;
     }
 
-    private static class InitLocalStateFunction extends RichMapFunction<Integer, LocalState> {
+    private static class InitTrainContextFunction extends RichMapFunction<Integer, TrainContext> {
         private final String featureMetaBcName;
         private final String labelSumCountBcName;
         private final GbtParams p;
 
-        private InitLocalStateFunction(
+        private InitTrainContextFunction(
                 String featureMetaBcName, String labelSumCountBcName, GbtParams p) {
             this.featureMetaBcName = featureMetaBcName;
             this.labelSumCountBcName = labelSumCountBcName;
@@ -194,24 +193,24 @@ public class GBTRunner {
         }
 
         @Override
-        public LocalState map(Integer value) {
-            LocalState.Statics statics = new LocalState.Statics();
-            statics.params = p;
-            statics.featureMetas =
+        public TrainContext map(Integer value) {
+            TrainContext trainContext = new TrainContext();
+            trainContext.params = p;
+            trainContext.featureMetas =
                     getRuntimeContext()
                             .<FeatureMeta>getBroadcastVariable(featureMetaBcName)
                             .toArray(new FeatureMeta[0]);
-            if (!statics.params.isInputVector) {
+            if (!trainContext.params.isInputVector) {
                 Arrays.sort(
-                        statics.featureMetas,
+                        trainContext.featureMetas,
                         Comparator.comparing(d -> ArrayUtils.indexOf(p.featureCols, d.name)));
             }
-            statics.numFeatures = statics.featureMetas.length;
-            statics.labelSumCount =
+            trainContext.numFeatures = trainContext.featureMetas.length;
+            trainContext.labelSumCount =
                     getRuntimeContext()
                             .<Tuple2<Double, Long>>getBroadcastVariable(labelSumCountBcName)
                             .get(0);
-            return new LocalState(statics, new LocalState.Dynamics());
+            return trainContext;
         }
     }
 

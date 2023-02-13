@@ -22,16 +22,15 @@ import org.apache.flink.ml.common.gbt.defs.Distributor;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
 import org.apache.flink.ml.common.gbt.defs.Histogram;
 import org.apache.flink.ml.common.gbt.defs.LearningNode;
-import org.apache.flink.ml.common.gbt.defs.LocalState;
 import org.apache.flink.ml.common.gbt.defs.Slice;
 import org.apache.flink.ml.common.gbt.defs.Split;
 import org.apache.flink.ml.common.gbt.defs.Splits;
+import org.apache.flink.ml.common.gbt.defs.TrainContext;
 import org.apache.flink.ml.common.gbt.splitter.CategoricalFeatureSplitter;
 import org.apache.flink.ml.common.gbt.splitter.ContinuousFeatureSplitter;
 import org.apache.flink.ml.common.gbt.splitter.HistogramFeatureSplitter;
 import org.apache.flink.util.Preconditions;
 
-import org.eclipse.collections.api.tuple.primitive.IntIntPair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,44 +46,42 @@ class SplitFinder {
     private final int maxDepth;
     private final int maxNumLeaves;
 
-    public SplitFinder(LocalState.Statics statics) {
-        subtaskId = statics.subtaskId;
-        numSubtasks = statics.numSubtasks;
+    public SplitFinder(TrainContext trainContext) {
+        subtaskId = trainContext.subtaskId;
+        numSubtasks = trainContext.numSubtasks;
 
-        numFeatureBins = statics.numFeatureBins;
-        FeatureMeta[] featureMetas = statics.featureMetas;
-        splitters = new HistogramFeatureSplitter[statics.numFeatures];
-        for (int i = 0; i < statics.numFeatures; ++i) {
+        numFeatureBins = trainContext.numFeatureBins;
+        FeatureMeta[] featureMetas = trainContext.featureMetas;
+        splitters = new HistogramFeatureSplitter[trainContext.numFeatures];
+        for (int i = 0; i < trainContext.numFeatures; ++i) {
             splitters[i] =
                     FeatureMeta.Type.CATEGORICAL == featureMetas[i].type
-                            ? new CategoricalFeatureSplitter(i, featureMetas[i], statics.params)
-                            : new ContinuousFeatureSplitter(i, featureMetas[i], statics.params);
+                            ? new CategoricalFeatureSplitter(
+                                    i, featureMetas[i], trainContext.params)
+                            : new ContinuousFeatureSplitter(
+                                    i, featureMetas[i], trainContext.params);
         }
-        maxDepth = statics.params.maxDepth;
-        maxNumLeaves = statics.params.maxNumLeaves;
+        maxDepth = trainContext.params.maxDepth;
+        maxNumLeaves = trainContext.params.maxNumLeaves;
     }
 
     public Splits calc(
-            List<LearningNode> layer,
-            List<IntIntPair> nodeFeaturePairs,
-            List<LearningNode> leaves,
-            Histogram histogram) {
+            List<LearningNode> layer, int[] nodeFeaturePairs, int numLeaves, Histogram histogram) {
         LOG.info("subtaskId: {}, {} start", subtaskId, SplitFinder.class.getSimpleName());
 
         Distributor distributor =
-                new Distributor.EvenDistributor(numSubtasks, nodeFeaturePairs.size());
-        long start = distributor.start(subtaskId);
-        long cnt = distributor.count(subtaskId);
+                new Distributor.EvenDistributor(numSubtasks, nodeFeaturePairs.length / 2);
+        int start = (int) distributor.start(subtaskId);
+        int cnt = (int) distributor.count(subtaskId);
 
         Split[] nodesBestSplits = new Split[layer.size()];
         int binOffset = 0;
-        for (long i = start; i < start + cnt; i += 1) {
-            IntIntPair nodeFeaturePair = nodeFeaturePairs.get((int) i);
-            int nodeId = nodeFeaturePair.getOne();
-            int featureId = nodeFeaturePair.getTwo();
+        for (int i = start; i < start + cnt; i += 1) {
+            int nodeId = nodeFeaturePairs[2 * i];
+            int featureId = nodeFeaturePairs[2 * i + 1];
             LearningNode node = layer.get(nodeId);
 
-            Preconditions.checkState(node.depth < maxDepth || leaves.size() + 2 <= maxNumLeaves);
+            Preconditions.checkState(node.depth < maxDepth || numLeaves + 2 <= maxNumLeaves);
             splitters[featureId].reset(
                     histogram.hists, new Slice(binOffset, binOffset + numFeatureBins[featureId]));
             Split bestSplit = splitters[featureId].bestSplit();

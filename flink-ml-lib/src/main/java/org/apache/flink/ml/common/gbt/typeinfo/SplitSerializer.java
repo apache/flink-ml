@@ -78,11 +78,13 @@ public final class SplitSerializer extends TypeSerializerSingleton<Split> {
 
     @Override
     public void serialize(Split record, DataOutputView target) throws IOException {
-        if (record instanceof Split.CategoricalSplit) {
+        if (null == record) {
             target.writeByte(0);
+        } else if (record instanceof Split.CategoricalSplit) {
+            target.writeByte(1);
             CATEGORICAL_SPLIT_SERIALIZER.serialize((Split.CategoricalSplit) record, target);
         } else {
-            target.writeByte(1);
+            target.writeByte(2);
             CONTINUOUS_SPLIT_SERIALIZER.serialize((Split.ContinuousSplit) record, target);
         }
     }
@@ -91,6 +93,8 @@ public final class SplitSerializer extends TypeSerializerSingleton<Split> {
     public Split deserialize(DataInputView source) throws IOException {
         byte type = source.readByte();
         if (type == 0) {
+            return null;
+        } else if (type == 1) {
             return CATEGORICAL_SPLIT_SERIALIZER.deserialize(source);
         } else {
             return CONTINUOUS_SPLIT_SERIALIZER.deserialize(source);
@@ -100,9 +104,12 @@ public final class SplitSerializer extends TypeSerializerSingleton<Split> {
     @Override
     public Split deserialize(Split reuse, DataInputView source) throws IOException {
         byte type = source.readByte();
-        assert type == 0 && reuse instanceof Split.CategoricalSplit
-                || type == 1 && reuse instanceof Split.ContinuousSplit;
         if (type == 0) {
+            return null;
+        }
+        assert type == 1 && reuse instanceof Split.CategoricalSplit
+                || type == 2 && reuse instanceof Split.ContinuousSplit;
+        if (type == 1) {
             return CATEGORICAL_SPLIT_SERIALIZER.deserialize((Split.CategoricalSplit) reuse, source);
         } else {
             return CONTINUOUS_SPLIT_SERIALIZER.deserialize((Split.ContinuousSplit) reuse, source);

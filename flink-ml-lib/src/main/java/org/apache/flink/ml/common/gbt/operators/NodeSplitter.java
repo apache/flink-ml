@@ -21,10 +21,10 @@ package org.apache.flink.ml.common.gbt.operators;
 import org.apache.flink.ml.common.gbt.defs.BinnedInstance;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
 import org.apache.flink.ml.common.gbt.defs.LearningNode;
-import org.apache.flink.ml.common.gbt.defs.LocalState;
 import org.apache.flink.ml.common.gbt.defs.Node;
 import org.apache.flink.ml.common.gbt.defs.Slice;
 import org.apache.flink.ml.common.gbt.defs.Split;
+import org.apache.flink.ml.common.gbt.defs.TrainContext;
 import org.apache.flink.util.Preconditions;
 
 import org.slf4j.Logger;
@@ -41,11 +41,11 @@ class NodeSplitter {
     private final int maxLeaves;
     private final int maxDepth;
 
-    public NodeSplitter(LocalState.Statics statics) {
-        subtaskId = statics.subtaskId;
-        featureMetas = statics.featureMetas;
-        maxLeaves = statics.params.maxNumLeaves;
-        maxDepth = statics.params.maxDepth;
+    public NodeSplitter(TrainContext trainContext) {
+        subtaskId = trainContext.subtaskId;
+        featureMetas = trainContext.featureMetas;
+        maxLeaves = trainContext.params.maxNumLeaves;
+        maxDepth = trainContext.params.maxDepth;
     }
 
     private int partitionInstances(
@@ -69,29 +69,36 @@ class NodeSplitter {
     }
 
     private void splitNode(
+            Node treeNode,
             LearningNode nodeInfo,
             int[] indices,
             BinnedInstance[] instances,
-            List<LearningNode> nextLayer) {
-        int mid = partitionInstances(nodeInfo.node.split, nodeInfo.slice, indices, instances);
-        int oobMid = partitionInstances(nodeInfo.node.split, nodeInfo.oob, indices, instances);
-        nodeInfo.node.left = new Node();
-        nodeInfo.node.right = new Node();
+            List<LearningNode> nextLayer,
+            List<Node> treeNodes) {
+        int mid = partitionInstances(treeNode.split, nodeInfo.slice, indices, instances);
+        int oobMid = partitionInstances(treeNode.split, nodeInfo.oob, indices, instances);
+
+        treeNode.left = treeNodes.size();
+        treeNodes.add(new Node());
+        treeNode.right = treeNodes.size();
+        treeNodes.add(new Node());
+
         nextLayer.add(
                 new LearningNode(
-                        nodeInfo.node.left,
+                        treeNode.left,
                         new Slice(nodeInfo.slice.start, mid),
                         new Slice(nodeInfo.oob.start, oobMid),
                         nodeInfo.depth + 1));
         nextLayer.add(
                 new LearningNode(
-                        nodeInfo.node.right,
+                        treeNode.right,
                         new Slice(mid, nodeInfo.slice.end),
                         new Slice(oobMid, nodeInfo.oob.end),
                         nodeInfo.depth + 1));
     }
 
-    public void split(
+    public List<LearningNode> split(
+            List<Node> treeNodes,
             List<LearningNode> layer,
             List<LearningNode> leaves,
             Split[] splits,
@@ -108,15 +115,16 @@ class NodeSplitter {
             LearningNode node = layer.get(i);
             Split split = splits[i];
             numQueued -= 1;
-            node.node.split = split;
+            Node treeNode = treeNodes.get(node.nodeIndex);
+            treeNode.split = split;
             if (!split.isValid()
-                    || node.node.isLeaf
+                    || treeNode.isLeaf
                     || (leaves.size() + numQueued + 2) > maxLeaves
                     || node.depth + 1 > maxDepth) {
-                node.node.isLeaf = true;
+                treeNode.isLeaf = true;
                 leaves.add(node);
             } else {
-                splitNode(node, indices, instances, nextLayer);
+                splitNode(treeNode, node, indices, instances, nextLayer, treeNodes);
                 // Converts splits point from bin id to real feature value after splitting node.
                 if (split instanceof Split.ContinuousSplit) {
                     Split.ContinuousSplit cs = (Split.ContinuousSplit) split;
@@ -127,10 +135,7 @@ class NodeSplitter {
                 numQueued += 2;
             }
         }
-
-        layer.clear();
-        layer.addAll(nextLayer);
-
         LOG.info("subtaskId: {}, {} end", subtaskId, NodeSplitter.class.getSimpleName());
+        return nextLayer;
     }
 }

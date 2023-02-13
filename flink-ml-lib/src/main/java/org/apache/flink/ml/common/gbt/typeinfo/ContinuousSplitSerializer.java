@@ -69,32 +69,34 @@ public final class ContinuousSplitSerializer
 
     @Override
     public int getLength() {
-        return -1;
+        return 3 * IntSerializer.INSTANCE.getLength()
+                + 3 * DoubleSerializer.INSTANCE.getLength()
+                + 2 * BooleanSerializer.INSTANCE.getLength();
     }
 
     @Override
     public void serialize(Split.ContinuousSplit record, DataOutputView target) throws IOException {
-        IntSerializer.INSTANCE.serialize(record.featureId, target);
-        DoubleSerializer.INSTANCE.serialize(record.gain, target);
-        IntSerializer.INSTANCE.serialize(record.missingBin, target);
-        BooleanSerializer.INSTANCE.serialize(record.missingGoLeft, target);
-        DoubleSerializer.INSTANCE.serialize(record.prediction, target);
-        DoubleSerializer.INSTANCE.serialize(record.threshold, target);
-        BooleanSerializer.INSTANCE.serialize(record.isUnseenMissing, target);
-        IntSerializer.INSTANCE.serialize(record.zeroBin, target);
+        target.writeInt(record.featureId);
+        target.writeDouble(record.gain);
+        target.writeInt(record.missingBin);
+        target.writeBoolean(record.missingGoLeft);
+        target.writeDouble(record.prediction);
+        target.writeDouble(record.threshold);
+        target.writeBoolean(record.isUnseenMissing);
+        target.writeInt(record.zeroBin);
     }
 
     @Override
     public Split.ContinuousSplit deserialize(DataInputView source) throws IOException {
         return new Split.ContinuousSplit(
-                IntSerializer.INSTANCE.deserialize(source),
-                DoubleSerializer.INSTANCE.deserialize(source),
-                IntSerializer.INSTANCE.deserialize(source),
-                BooleanSerializer.INSTANCE.deserialize(source),
-                DoubleSerializer.INSTANCE.deserialize(source),
-                DoubleSerializer.INSTANCE.deserialize(source),
-                BooleanSerializer.INSTANCE.deserialize(source),
-                IntSerializer.INSTANCE.deserialize(source));
+                source.readInt(),
+                source.readDouble(),
+                source.readInt(),
+                source.readBoolean(),
+                source.readDouble(),
+                source.readDouble(),
+                source.readBoolean(),
+                source.readInt());
     }
 
     @Override

@@ -24,6 +24,8 @@ public final class Slice {
     public int start;
     public int end;
 
+    public Slice() {}
+
     public Slice(int start, int end) {
         this.start = start;
         this.end = end;

@@ -82,7 +82,7 @@ public final class BinnedInstanceSerializer extends TypeSerializerSingleton<Binn
     public BinnedInstance deserialize(DataInputView source) throws IOException {
         BinnedInstance instance = new BinnedInstance();
         int numFeatures = IntSerializer.INSTANCE.deserialize(source);
-        instance.features = new IntIntHashMap();
+        instance.features = new IntIntHashMap(numFeatures);
         for (int i = 0; i < numFeatures; i += 1) {
             int k = IntSerializer.INSTANCE.deserialize(source);
             int v = IntSerializer.INSTANCE.deserialize(source);
