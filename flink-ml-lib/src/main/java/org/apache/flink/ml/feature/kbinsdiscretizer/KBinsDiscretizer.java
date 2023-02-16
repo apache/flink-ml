@@ -61,8 +61,8 @@ import java.util.Set;
  *
  * <ul>
  *   <li>When the input values of one column are all the same, then they should be mapped to the
- *       same bin (i.e., the zero-th bin). Thus the corresponding bin edges are `{Double.MIN_VALUE,
- *       Double.MAX_VALUE}`.
+ *       same bin (i.e., the zero-th bin). Thus the corresponding bin edges are
+ *       `{Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY}`.
  *   <li>When the number of distinct values of one column is less than the specified number of bins
  *       and the {@link KBinsDiscretizerParams#STRATEGY} is set as {@link
  *       KBinsDiscretizerParams#KMEANS}, we switch to {@link KBinsDiscretizerParams#UNIFORM}.
@@ -188,7 +188,8 @@ public class KBinsDiscretizer
             double max = maxVector.get(columnId);
             if (min == max) {
                 LOG.warn("Feature " + columnId + " is constant and the output will all be zero.");
-                binEdges[columnId] = new double[] {Double.MIN_VALUE, Double.MAX_VALUE};
+                binEdges[columnId] =
+                        new double[] {Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY};
             } else {
                 double width = (max - min) / numBins;
                 binEdges[columnId] = new double[numBins + 1];
@@ -216,7 +217,8 @@ public class KBinsDiscretizer
 
             if (features[0] == features[numData - 1]) {
                 LOG.warn("Feature " + columnId + " is constant and the output will all be zero.");
-                binEdges[columnId] = new double[] {Double.MIN_VALUE, Double.MAX_VALUE};
+                binEdges[columnId] =
+                        new double[] {Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY};
             } else {
                 double width = 1.0 * features.length / numBins;
                 double[] tempBinEdges = new double[numBins + 1];
@@ -256,7 +258,8 @@ public class KBinsDiscretizer
 
             if (features[0] == features[numData - 1]) {
                 LOG.warn("Feature " + columnId + " is constant and the output will all be zero.");
-                binEdges[columnId] = new double[] {Double.MIN_VALUE, Double.MAX_VALUE};
+                binEdges[columnId] =
+                        new double[] {Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY};
             } else {
                 // Checks whether there are more than {numBins} distinct feature values in each
                 // column.

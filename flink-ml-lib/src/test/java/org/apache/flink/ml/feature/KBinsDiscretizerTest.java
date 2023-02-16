@@ -83,7 +83,7 @@ public class KBinsDiscretizerTest extends AbstractTestBase {
     private static final double[][] UNIFORM_MODEL_DATA =
             new double[][] {
                 new double[] {1, 5, 9, 13},
-                new double[] {Double.MIN_VALUE, Double.MAX_VALUE},
+                new double[] {Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY},
                 new double[] {0, 1, 2, 3}
             };
 

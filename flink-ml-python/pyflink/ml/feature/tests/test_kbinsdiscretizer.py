@@ -18,6 +18,7 @@
 
 import os
 
+import numpy as np
 from pyflink.common import Types
 
 from pyflink.ml.linalg import Vectors, DenseVectorTypeInfo
@@ -171,7 +172,7 @@ class KBinsDiscretizerTest(PyFlinkMLTestCase):
         bin_edges = model_rows[0][expected_field_names.index('binEdges')]
         self.assertEqual(3, len(bin_edges))
         self.assertListEqual([1, 5, 9, 13], bin_edges[0])
-        self.assertListEqual([4.9e-324, 1.7976931348623157e+308], bin_edges[1])
+        self.assertListEqual([-np.inf, np.inf], bin_edges[1])
         self.assertListEqual([0, 1, 2, 3], bin_edges[2])
 
     def test_set_model_data(self):

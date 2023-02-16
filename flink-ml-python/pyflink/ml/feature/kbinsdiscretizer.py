@@ -17,10 +17,10 @@
 ################################################################################
 import typing
 
+from pyflink.ml.common.param import HasInputCol, HasOutputCol
+from pyflink.ml.feature.common import JavaFeatureModel, JavaFeatureEstimator
 from pyflink.ml.param import IntParam, StringParam, ParamValidators
 from pyflink.ml.wrapper import JavaWithParams
-from pyflink.ml.feature.common import JavaFeatureModel, JavaFeatureEstimator
-from pyflink.ml.common.param import HasInputCol, HasOutputCol
 
 
 class _KBinsDiscretizerModelParams(
@@ -143,7 +143,7 @@ class KBinsDiscretizer(JavaFeatureEstimator, _KBinsDiscretizerParams):
     <ul>
         <li>When the input values of one column are all the same, then they should be mapped
         to the same bin (i.e., the zero-th bin). Thus the corresponding bin edges are
-        {Double.MIN_VALUE, Double.MAX_VALUE}.
+        {Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY}.
         <li>When the number of distinct values of one column is less than the specified
         number of bins and the {@link KBinsDiscretizerParams#STRATEGY} is set as {@link
         KBinsDiscretizerParams#KMEANS}, we switch to {@link KBinsDiscretizerParams#UNIFORM}.
