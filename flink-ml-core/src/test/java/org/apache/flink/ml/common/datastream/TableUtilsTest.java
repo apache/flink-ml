@@ -27,6 +27,7 @@ import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.typeinfo.DenseMatrixTypeInfo;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.linalg.typeinfo.SparseVectorTypeInfo;
+import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.DataTypes;
@@ -55,7 +56,7 @@ public class TableUtilsTest {
 
     @Before
     public void before() {
-        env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env = TestUtils.getExecutionEnvironment();
         tEnv = StreamTableEnvironment.create(env);
     }
 

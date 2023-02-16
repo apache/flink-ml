@@ -18,6 +18,7 @@
 
 package org.apache.flink.ml.benchmark;
 
+import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -78,6 +79,8 @@ public class Benchmark {
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.getConfig().enableObjectReuse();
+        env.getConfig().disableGenericTypes();
+        env.setRestartStrategy(RestartStrategies.noRestart());
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         int index = 0;

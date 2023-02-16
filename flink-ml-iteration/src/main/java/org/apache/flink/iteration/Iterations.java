@@ -20,7 +20,7 @@ package org.apache.flink.iteration;
 
 import org.apache.flink.annotation.Experimental;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.api.java.typeutils.GenericTypeInfo;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.iteration.compile.DraftExecutionEnvironment;
 import org.apache.flink.iteration.operator.HeadOperator;
 import org.apache.flink.iteration.operator.HeadOperatorFactory;
@@ -278,7 +278,7 @@ public class Iterations {
             tailsAndCriteriaTails.addAll(criteriaTails.getDataStreams());
         }
 
-        DataStream<Object> tailsUnion =
+        DataStream<Integer> tailsUnion =
                 unionAllTails(env, new DataStreamList(tailsAndCriteriaTails));
 
         return addOutputs(
@@ -405,14 +405,15 @@ public class Iterations {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private static DataStream<Object> unionAllTails(
+    private static DataStream<Integer> unionAllTails(
             StreamExecutionEnvironment env, DataStreamList tailsAndCriteriaTails) {
+
         return Iterations.<DataStream>map(
                         tailsAndCriteriaTails,
                         tail ->
                                 tail.filter(r -> false)
                                         .name("filter-tail")
-                                        .returns(new GenericTypeInfo(Object.class))
+                                        .returns((TypeInformation) Types.INT)
                                         .setParallelism(
                                                 tail.getParallelism() > 0
                                                         ? tail.getParallelism()

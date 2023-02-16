@@ -18,11 +18,27 @@
 
 package org.apache.flink.iteration.operator.headprocessor;
 
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeinfo.Types;
+
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
 /** The state entry for the head operator. */
 public class HeadOperatorState {
+
+    private static final Map<String, TypeInformation<?>> fields;
+
+    static {
+        fields = new HashMap<>();
+        fields.put("numFeedbackRecordsEachRound", Types.MAP(Types.INT, Types.LONG));
+        fields.put("latestRoundAligned", Types.INT);
+        fields.put("latestRoundGloballyAligned", Types.INT);
+    }
+
+    public static final TypeInformation<HeadOperatorState> TYPE_INFO =
+            Types.POJO(HeadOperatorState.class, fields);
 
     public static final HeadOperatorState FINISHED_STATE =
             new HeadOperatorState(Collections.emptyMap(), 0, 0);
@@ -32,6 +48,12 @@ public class HeadOperatorState {
     private int latestRoundAligned;
 
     private int latestRoundGloballyAligned;
+
+    public HeadOperatorState() {
+        numFeedbackRecordsEachRound = new HashMap<>();
+        latestRoundAligned = 0;
+        latestRoundGloballyAligned = 0;
+    }
 
     public HeadOperatorState(
             Map<Integer, Long> numFeedbackRecordsEachRound,

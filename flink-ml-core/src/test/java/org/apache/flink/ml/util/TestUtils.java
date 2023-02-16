@@ -37,7 +37,6 @@ import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.typeinfo.SparseVectorTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -62,12 +61,20 @@ public class TestUtils {
 
     /**
      * Gets a {@link StreamExecutionEnvironment} with the most common configurations of the Flink ML
+     * program as well as the given extra configuration.
+     */
+    public static StreamExecutionEnvironment getExecutionEnvironment(Configuration extraConfig) {
+        StreamExecutionEnvironment env = getExecutionEnvironment();
+        env.configure(extraConfig);
+        return env;
+    }
+
+    /**
+     * Gets a {@link StreamExecutionEnvironment} with the most common configurations of the Flink ML
      * program.
      */
     public static StreamExecutionEnvironment getExecutionEnvironment() {
-        Configuration config = new Configuration();
-        config.set(ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment(config);
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.getConfig().enableObjectReuse();
         env.getConfig().disableGenericTypes();
         env.setParallelism(4);

@@ -18,7 +18,6 @@
 
 package org.apache.flink.ml.benchmark;
 
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator;
 import org.apache.flink.ml.clustering.kmeans.KMeans;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -48,8 +47,7 @@ public class BenchmarkTest extends AbstractTestBase {
 
     @Before
     public void before() {
-        Configuration config = new Configuration();
-        env = StreamExecutionEnvironment.getExecutionEnvironment(config);
+        env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.getConfig().enableObjectReuse();
         tEnv = StreamTableEnvironment.create(env);
     }
