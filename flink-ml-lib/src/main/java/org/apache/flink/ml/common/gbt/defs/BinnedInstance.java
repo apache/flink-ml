@@ -22,7 +22,9 @@ import org.apache.flink.ml.feature.kbinsdiscretizer.KBinsDiscretizer;
 import org.apache.flink.ml.feature.stringindexer.StringIndexer;
 import org.apache.flink.ml.linalg.SparseVector;
 
-import org.eclipse.collections.impl.map.mutable.primitive.IntIntHashMap;
+import javax.annotation.Nullable;
+
+import java.util.Arrays;
 
 /**
  * Represents an instance including binned values of all features, weight, and label.
@@ -36,21 +38,28 @@ import org.eclipse.collections.impl.map.mutable.primitive.IntIntHashMap;
  */
 public class BinnedInstance {
 
-    public IntIntHashMap features;
+    @Nullable public int[] featureIds;
+    public int[] featureValues;
     public double weight;
     public double label;
 
     public BinnedInstance() {}
 
-    public BinnedInstance(IntIntHashMap features, double weight, double label) {
-        this.weight = weight;
-        this.label = label;
-        this.features = features;
+    /**
+     * Get the index of `featureId` in `featureValues`.
+     *
+     * @param featureId The feature ID.
+     * @return The index in `featureValues`. If the index is negative, the corresponding feature is
+     *     not stored in `featureValues`.
+     */
+    public int getFeatureIndex(int featureId) {
+        return null == featureIds ? featureId : Arrays.binarySearch(featureIds, featureId);
     }
 
     @Override
     public String toString() {
         return String.format(
-                "BinnedInstance{features=%s, weight=%s, label=%s}", features, weight, label);
+                "BinnedInstance{featureIds=%s, featureValues=%s, weight=%s, label=%s}",
+                Arrays.toString(featureIds), Arrays.toString(featureValues), weight, label);
     }
 }

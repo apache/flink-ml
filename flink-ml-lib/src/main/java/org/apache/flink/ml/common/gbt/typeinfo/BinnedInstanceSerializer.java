@@ -21,13 +21,11 @@ package org.apache.flink.ml.common.gbt.typeinfo;
 import org.apache.flink.api.common.typeutils.SimpleTypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.base.DoubleSerializer;
-import org.apache.flink.api.common.typeutils.base.IntSerializer;
 import org.apache.flink.api.common.typeutils.base.TypeSerializerSingleton;
+import org.apache.flink.api.common.typeutils.base.array.IntPrimitiveArraySerializer;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.ml.common.gbt.defs.BinnedInstance;
-
-import org.eclipse.collections.impl.map.mutable.primitive.IntIntHashMap;
 
 import java.io.IOException;
 
@@ -50,7 +48,8 @@ public final class BinnedInstanceSerializer extends TypeSerializerSingleton<Binn
     @Override
     public BinnedInstance copy(BinnedInstance from) {
         BinnedInstance instance = new BinnedInstance();
-        instance.features = new IntIntHashMap(from.features);
+        instance.featureIds = null == from.featureIds ? null : from.featureIds.clone();
+        instance.featureValues = from.featureValues.clone();
         instance.label = from.label;
         instance.weight = from.weight;
         return instance;
@@ -69,11 +68,13 @@ public final class BinnedInstanceSerializer extends TypeSerializerSingleton<Binn
 
     @Override
     public void serialize(BinnedInstance record, DataOutputView target) throws IOException {
-        IntSerializer.INSTANCE.serialize(record.features.size(), target);
-        for (int k : record.features.keysView().toArray()) {
-            IntSerializer.INSTANCE.serialize(k, target);
-            IntSerializer.INSTANCE.serialize(record.features.get(k), target);
+        if (null == record.featureIds) {
+            target.writeBoolean(true);
+        } else {
+            target.writeBoolean(false);
+            IntPrimitiveArraySerializer.INSTANCE.serialize(record.featureIds, target);
         }
+        IntPrimitiveArraySerializer.INSTANCE.serialize(record.featureValues, target);
         DoubleSerializer.INSTANCE.serialize(record.label, target);
         DoubleSerializer.INSTANCE.serialize(record.weight, target);
     }
@@ -81,13 +82,12 @@ public final class BinnedInstanceSerializer extends TypeSerializerSingleton<Binn
     @Override
     public BinnedInstance deserialize(DataInputView source) throws IOException {
         BinnedInstance instance = new BinnedInstance();
-        int numFeatures = IntSerializer.INSTANCE.deserialize(source);
-        instance.features = new IntIntHashMap(numFeatures);
-        for (int i = 0; i < numFeatures; i += 1) {
-            int k = IntSerializer.INSTANCE.deserialize(source);
-            int v = IntSerializer.INSTANCE.deserialize(source);
-            instance.features.put(k, v);
+        if (source.readBoolean()) {
+            instance.featureIds = null;
+        } else {
+            instance.featureIds = IntPrimitiveArraySerializer.INSTANCE.deserialize(source);
         }
+        instance.featureValues = IntPrimitiveArraySerializer.INSTANCE.deserialize(source);
         instance.label = DoubleSerializer.INSTANCE.deserialize(source);
         instance.weight = DoubleSerializer.INSTANCE.deserialize(source);
         return instance;

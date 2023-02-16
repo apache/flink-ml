@@ -50,10 +50,10 @@ import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
 
 import org.apache.commons.collections.IteratorUtils;
-import org.eclipse.collections.impl.map.mutable.primitive.IntIntHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -204,23 +204,22 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
     @Override
     public void processElement1(StreamRecord<Row> streamRecord) throws Exception {
         Row row = streamRecord.getValue();
-        IntIntHashMap features;
+        BinnedInstance instance = new BinnedInstance();
+        instance.weight = 1.;
+        instance.label = row.getFieldAs(gbtParams.labelCol);
+
         if (gbtParams.isInputVector) {
             Vector vec = row.getFieldAs(gbtParams.vectorCol);
             SparseVector sv = vec.toSparse();
-            features = new IntIntHashMap(sv.indices.length);
-            for (int i = 0; i < sv.indices.length; i += 1) {
-                features.put(sv.indices[i], (int) sv.values[i]);
-            }
+            instance.featureIds = sv.indices.length == sv.size() ? null : sv.indices;
+            instance.featureValues = Arrays.stream(sv.values).mapToInt(d -> (int) d).toArray();
         } else {
-            features = new IntIntHashMap(gbtParams.featureCols.length);
-            for (int i = 0; i < gbtParams.featureCols.length; i += 1) {
-                // Values from StringIndexModel#transform are double.
-                features.put(i, ((Number) row.getFieldAs(gbtParams.featureCols[i])).intValue());
-            }
+            instance.featureValues =
+                    Arrays.stream(gbtParams.featureCols)
+                            .mapToInt(col -> ((Number) row.getFieldAs(col)).intValue())
+                            .toArray();
         }
-        double label = row.getFieldAs(gbtParams.labelCol);
-        instancesCollecting.add(new BinnedInstance(features, 1., label));
+        instancesCollecting.add(instance);
     }
 
     @Override
@@ -301,16 +300,10 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
             layer = Collections.singletonList(rootLearningNodeWriter.get());
         }
 
-        int[] nodeFeaturePairs =
-                OperatorStateUtils.getUniqueElement(histBuilder, HIST_BUILDER_STATE_NAME)
-                        .get()
-                        .getNodeFeaturePairs(layer.size());
-        nodeFeaturePairsWriter.set(nodeFeaturePairs);
-
         Histogram localHists =
                 OperatorStateUtils.getUniqueElement(histBuilder, HIST_BUILDER_STATE_NAME)
                         .get()
-                        .build(layer, nodeFeaturePairs, indices, instances, pgh);
+                        .build(layer, indices, instances, pgh, nodeFeaturePairsWriter::set);
         out.collect(localHists);
     }
 

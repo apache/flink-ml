@@ -22,7 +22,6 @@ import org.apache.flink.api.common.typeinfo.TypeInfo;
 import org.apache.flink.ml.common.gbt.typeinfo.SplitTypeInfoFactory;
 
 import org.eclipse.collections.impl.map.mutable.primitive.IntDoubleHashMap;
-import org.eclipse.collections.impl.map.mutable.primitive.IntIntHashMap;
 
 import java.util.BitSet;
 
@@ -112,11 +111,11 @@ public abstract class Split {
 
         @Override
         public boolean shouldGoLeft(BinnedInstance binnedInstance) {
-            IntIntHashMap features = binnedInstance.features;
-            if (!features.containsKey(featureId) && isUnseenMissing) {
+            int index = binnedInstance.getFeatureIndex(featureId);
+            if (index < 0 && isUnseenMissing) {
                 return missingGoLeft;
             }
-            int binId = features.getIfAbsent(featureId, zeroBin);
+            int binId = index >= 0 ? binnedInstance.featureValues[index] : zeroBin;
             return binId == missingBin ? missingGoLeft : binId <= threshold;
         }
 
@@ -152,11 +151,11 @@ public abstract class Split {
 
         @Override
         public boolean shouldGoLeft(BinnedInstance binnedInstance) {
-            IntIntHashMap features = binnedInstance.features;
-            if (!features.containsKey(featureId)) {
+            int index = binnedInstance.getFeatureIndex(featureId);
+            if (index < 0) {
                 return missingGoLeft;
             }
-            int binId = features.get(featureId);
+            int binId = binnedInstance.featureValues[index];
             return binId == missingBin ? missingGoLeft : categoriesGoLeft.get(binId);
         }
 
