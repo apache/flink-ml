@@ -120,15 +120,25 @@ class HistBuilder {
         }
 
         int[] featureOffset = new int[numFeatures];
+        BitSet featureValid = null;
+        boolean allFeatureValid;
         for (int k = 0; k < numNodes; k += 1) {
             int[] features = nodeToFeatures[k];
             int[] binOffsets = nodeToBinOffsets[k];
             LearningNode node = layer.get(k);
 
-            BitSet featureValid = new BitSet(numFeatures);
-            for (int i = 0; i < features.length; i += 1) {
-                featureValid.set(features[i]);
-                featureOffset[features[i]] = binOffsets[i];
+            if (numFeatures != features.length) {
+                allFeatureValid = false;
+                featureValid = new BitSet(numFeatures);
+                for (int feature : features) {
+                    featureValid.set(feature);
+                }
+                for (int i = 0; i < features.length; i += 1) {
+                    featureOffset[features[i]] = binOffsets[i];
+                }
+            } else {
+                allFeatureValid = true;
+                System.arraycopy(binOffsets, 0, featureOffset, 0, numFeatures);
             }
 
             double[] totalHists = new double[4];
@@ -143,33 +153,41 @@ class HistBuilder {
                 totalHists[1] += hessian;
                 totalHists[2] += weight;
                 totalHists[3] += 1.;
+            }
+
+            for (int i = node.slice.start; i < node.slice.end; i += 1) {
+                int instanceId = indices[i];
+                BinnedInstance binnedInstance = instances[instanceId];
+                double weight = binnedInstance.weight;
+                double gradient = pgh[instanceId].gradient;
+                double hessian = pgh[instanceId].hessian;
 
                 if (null == binnedInstance.featureIds) {
                     for (int j = 0; j < binnedInstance.featureValues.length; j += 1) {
-                        if (!featureValid.get(j)) {
-                            continue;
+                        if (allFeatureValid || featureValid.get(j)) {
+                            add(
+                                    hists,
+                                    featureOffset[j],
+                                    binnedInstance.featureValues[j],
+                                    gradient,
+                                    hessian,
+                                    weight,
+                                    1.);
                         }
-                        int val = binnedInstance.featureValues[j];
-                        int offset = featureOffset[j];
-                        int index = (offset + val) * BIN_SIZE;
-                        hists[index] += gradient;
-                        hists[index + 1] += hessian;
-                        hists[index + 2] += weight;
-                        hists[index + 3] += 1.;
                     }
                 } else {
                     for (int j = 0; j < binnedInstance.featureIds.length; j += 1) {
                         int featureId = binnedInstance.featureIds[j];
-                        if (!featureValid.get(featureId)) {
-                            continue;
+                        if (allFeatureValid || featureValid.get(featureId)) {
+                            add(
+                                    hists,
+                                    featureOffset[featureId],
+                                    binnedInstance.featureValues[j],
+                                    gradient,
+                                    hessian,
+                                    weight,
+                                    1.);
                         }
-                        int val = binnedInstance.featureValues[j];
-                        int offset = featureOffset[featureId];
-                        int index = (offset + val) * BIN_SIZE;
-                        hists[index] += gradient;
-                        hists[index + 1] += hessian;
-                        hists[index + 2] += weight;
-                        hists[index + 3] += 1.;
                     }
                 }
             }
@@ -181,18 +199,30 @@ class HistBuilder {
                 hists[defaultValIndex + 1] = totalHists[1];
                 hists[defaultValIndex + 2] = totalHists[2];
                 hists[defaultValIndex + 3] = totalHists[3];
-
                 for (int i = 0; i < numFeatureBins[featureId]; i += 1) {
                     if (i != defaultVal) {
                         int index = (featureOffset[featureId] + i) * BIN_SIZE;
-                        hists[defaultValIndex] -= hists[index];
-                        hists[defaultValIndex + 1] -= hists[index + 1];
-                        hists[defaultValIndex + 2] -= hists[index + 2];
-                        hists[defaultValIndex + 3] -= hists[index + 3];
+                        add(
+                                hists,
+                                featureOffset[featureId],
+                                defaultVal,
+                                -hists[index],
+                                -hists[index + 1],
+                                -hists[index + 2],
+                                -hists[index + 3]);
                     }
                 }
             }
         }
+    }
+
+    private static void add(
+            double[] hists, int offset, int val, double d0, double d1, double d2, double d3) {
+        int index = (offset + val) * BIN_SIZE;
+        hists[index] += d0;
+        hists[index + 1] += d1;
+        hists[index + 2] += d2;
+        hists[index + 3] += d3;
     }
 
     /**
