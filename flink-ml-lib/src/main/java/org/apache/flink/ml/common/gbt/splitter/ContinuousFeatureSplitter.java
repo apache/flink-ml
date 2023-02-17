@@ -18,14 +18,11 @@
 
 package org.apache.flink.ml.common.gbt.splitter;
 
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
 import org.apache.flink.ml.common.gbt.defs.GbtParams;
 import org.apache.flink.ml.common.gbt.defs.HessianImpurity;
 import org.apache.flink.ml.common.gbt.defs.Split;
-
-import java.util.stream.IntStream;
 
 /** Splitter for a continuous feature. */
 public final class ContinuousFeatureSplitter extends HistogramFeatureSplitter {
@@ -36,16 +33,15 @@ public final class ContinuousFeatureSplitter extends HistogramFeatureSplitter {
 
     @Override
     public Split.ContinuousSplit bestSplit() {
-        Tuple2<HessianImpurity, HessianImpurity> totalMissing = countTotalMissing();
-        HessianImpurity total = totalMissing.f0;
-        HessianImpurity missing = totalMissing.f1;
+        HessianImpurity total = emptyImpurity();
+        HessianImpurity missing = emptyImpurity();
+        countTotalMissing(total, missing);
 
         if (total.getNumInstances() <= minSamplesPerLeaf) {
             return Split.ContinuousSplit.invalid(total.prediction());
         }
 
-        int[] sortedBinIds = IntStream.range(0, slice.size()).toArray();
-        Tuple3<Double, Integer, Boolean> bestSplit = findBestSplit(sortedBinIds, total, missing);
+        Tuple3<Double, Integer, Boolean> bestSplit = findBestSplit(slice.size(), total, missing);
         double bestGain = bestSplit.f0;
         int bestSplitBinId = bestSplit.f1;
         boolean missingGoLeft = bestSplit.f2;

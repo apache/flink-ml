@@ -18,7 +18,6 @@
 
 package org.apache.flink.ml.common.gbt.splitter;
 
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
 import org.apache.flink.ml.common.gbt.defs.GbtParams;
@@ -42,9 +41,9 @@ public class CategoricalFeatureSplitter extends HistogramFeatureSplitter {
 
     @Override
     public Split.CategoricalSplit bestSplit() {
-        Tuple2<HessianImpurity, HessianImpurity> totalMissing = countTotalMissing();
-        HessianImpurity total = totalMissing.f0;
-        HessianImpurity missing = totalMissing.f1;
+        HessianImpurity total = emptyImpurity();
+        HessianImpurity missing = emptyImpurity();
+        countTotalMissing(total, missing);
 
         if (total.getNumInstances() <= minSamplesPerLeaf) {
             return Split.CategoricalSplit.invalid(total.prediction());

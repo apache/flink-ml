@@ -83,6 +83,25 @@ public abstract class HistogramFeatureSplitter extends FeatureSplitter {
         return Tuple2.of(bestGain, bestSplitBinId);
     }
 
+    protected Tuple2<Double, Integer> findBestSplitWithInitial(
+            int numBins, HessianImpurity total, HessianImpurity left, HessianImpurity right) {
+        // Bins [0, bestSplitBinId] go left.
+        int bestSplitBinId = 0;
+        double bestGain = Split.INVALID_GAIN;
+        for (int binId = 0; binId < numBins; binId += 1) {
+            if (useMissing && binId == featureMeta.missingBin) {
+                continue;
+            }
+            addBinToLeft(binId, left, right);
+            double gain = gain(total, left, right);
+            if (gain > bestGain && gain >= minInfoGain) {
+                bestGain = gain;
+                bestSplitBinId = binId;
+            }
+        }
+        return Tuple2.of(bestGain, bestSplitBinId);
+    }
+
     protected Tuple3<Double, Integer, Boolean> findBestSplit(
             int[] sortedBinIds, HessianImpurity total, HessianImpurity missing) {
         double bestGain = Split.INVALID_GAIN;
@@ -101,7 +120,7 @@ public abstract class HistogramFeatureSplitter extends FeatureSplitter {
             }
         }
 
-        if (useMissing) {
+        if (useMissing && missing.getNumInstances() > 0) {
             // The cases where the missing values go left.
             HessianImpurity leftWithMissing = emptyImpurity().add(missing);
             HessianImpurity rightWithoutMissing = (HessianImpurity) total.clone().subtract(missing);
@@ -117,21 +136,51 @@ public abstract class HistogramFeatureSplitter extends FeatureSplitter {
         return Tuple3.of(bestGain, bestSplitBinId, missingGoLeft);
     }
 
+    protected Tuple3<Double, Integer, Boolean> findBestSplit(
+            int numBins, HessianImpurity total, HessianImpurity missing) {
+        double bestGain = Split.INVALID_GAIN;
+        int bestSplitBinId = 0;
+        boolean missingGoLeft = false;
+
+        {
+            // The cases where the missing values go right, or missing values are not allowed.
+            HessianImpurity left = emptyImpurity();
+            HessianImpurity right = (HessianImpurity) total.clone();
+            Tuple2<Double, Integer> bestSplit =
+                    findBestSplitWithInitial(numBins, total, left, right);
+            if (bestSplit.f0 > bestGain) {
+                bestGain = bestSplit.f0;
+                bestSplitBinId = bestSplit.f1;
+            }
+        }
+
+        if (useMissing) {
+            // The cases where the missing values go left.
+            HessianImpurity leftWithMissing = emptyImpurity().add(missing);
+            HessianImpurity rightWithoutMissing = (HessianImpurity) total.clone().subtract(missing);
+            Tuple2<Double, Integer> bestSplitMissingGoLeft =
+                    findBestSplitWithInitial(numBins, total, leftWithMissing, rightWithoutMissing);
+            if (bestSplitMissingGoLeft.f0 > bestGain) {
+                bestGain = bestSplitMissingGoLeft.f0;
+                bestSplitBinId = bestSplitMissingGoLeft.f1;
+                missingGoLeft = true;
+            }
+        }
+        return Tuple3.of(bestGain, bestSplitBinId, missingGoLeft);
+    }
+
     public void reset(double[] hists, Slice slice) {
         this.hists = hists;
         this.slice = slice;
     }
 
-    protected Tuple2<HessianImpurity, HessianImpurity> countTotalMissing() {
-        HessianImpurity total = emptyImpurity();
-        HessianImpurity missing = emptyImpurity();
+    protected void countTotalMissing(HessianImpurity total, HessianImpurity missing) {
         for (int i = 0; i < slice.size(); ++i) {
             addBinToLeft(i, total, null);
         }
         if (useMissing) {
             addBinToLeft(featureMeta.missingBin, missing, null);
         }
-        return Tuple2.of(total, missing);
     }
 
     protected HessianImpurity emptyImpurity() {
