@@ -19,6 +19,8 @@
 package org.apache.flink.ml.common.gbt.defs;
 
 import org.apache.flink.api.common.functions.AggregateFunction;
+import org.apache.flink.api.common.typeinfo.TypeInfo;
+import org.apache.flink.ml.common.gbt.typeinfo.HistogramTypeInfoFactory;
 import org.apache.flink.util.Preconditions;
 
 import java.io.Serializable;
@@ -26,6 +28,7 @@ import java.io.Serializable;
 /**
  * This class stores values of histogram bins, and necessary information of reducing and scattering.
  */
+@TypeInfo(HistogramTypeInfoFactory.class)
 public class Histogram implements Serializable {
 
     // Stores source subtask ID when reducing or target subtask ID when scattering.

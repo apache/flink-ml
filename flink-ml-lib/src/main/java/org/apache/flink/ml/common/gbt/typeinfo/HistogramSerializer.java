@@ -22,11 +22,11 @@ import org.apache.flink.api.common.typeutils.SimpleTypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.base.IntSerializer;
 import org.apache.flink.api.common.typeutils.base.TypeSerializerSingleton;
-import org.apache.flink.api.common.typeutils.base.array.DoublePrimitiveArraySerializer;
 import org.apache.flink.api.common.typeutils.base.array.IntPrimitiveArraySerializer;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.ml.common.gbt.defs.Histogram;
+import org.apache.flink.ml.linalg.typeinfo.OptimizedDoublePrimitiveArraySerializer;
 
 import java.io.IOException;
 
@@ -36,7 +36,8 @@ public final class HistogramSerializer extends TypeSerializerSingleton<Histogram
     public static final HistogramSerializer INSTANCE = new HistogramSerializer();
     private static final long serialVersionUID = 1L;
 
-    private static final SplitSerializer SPLIT_SERIALIZER = SplitSerializer.INSTANCE;
+    private final OptimizedDoublePrimitiveArraySerializer histsSerializer =
+            new OptimizedDoublePrimitiveArraySerializer();
 
     @Override
     public boolean isImmutableType() {
@@ -74,7 +75,7 @@ public final class HistogramSerializer extends TypeSerializerSingleton<Histogram
     @Override
     public void serialize(Histogram record, DataOutputView target) throws IOException {
         IntSerializer.INSTANCE.serialize(record.subtaskId, target);
-        DoublePrimitiveArraySerializer.INSTANCE.serialize(record.hists, target);
+        histsSerializer.serialize(record.hists, target);
         IntPrimitiveArraySerializer.INSTANCE.serialize(record.recvcnts, target);
     }
 
@@ -82,7 +83,7 @@ public final class HistogramSerializer extends TypeSerializerSingleton<Histogram
     public Histogram deserialize(DataInputView source) throws IOException {
         Histogram histogram = new Histogram();
         histogram.subtaskId = IntSerializer.INSTANCE.deserialize(source);
-        histogram.hists = DoublePrimitiveArraySerializer.INSTANCE.deserialize(source);
+        histogram.hists = histsSerializer.deserialize(source);
         histogram.recvcnts = IntPrimitiveArraySerializer.INSTANCE.deserialize(source);
         return histogram;
     }
@@ -90,7 +91,7 @@ public final class HistogramSerializer extends TypeSerializerSingleton<Histogram
     @Override
     public Histogram deserialize(Histogram reuse, DataInputView source) throws IOException {
         reuse.subtaskId = IntSerializer.INSTANCE.deserialize(source);
-        reuse.hists = DoublePrimitiveArraySerializer.INSTANCE.deserialize(source);
+        reuse.hists = histsSerializer.deserialize(source);
         reuse.recvcnts = IntPrimitiveArraySerializer.INSTANCE.deserialize(source);
         return reuse;
     }
