@@ -77,22 +77,24 @@ public class Bucketizer implements Transformer<Bucketizer>, BucketizerParams<Buc
                         ArrayUtils.addAll(inputTypeInfo.getFieldTypes(), outputTypes),
                         ArrayUtils.addAll(inputTypeInfo.getFieldNames(), getOutputCols()));
 
+        int[] inputColumnIndexes =
+                TableUtils.getColumnIndexes(inputs[0].getResolvedSchema(), inputCols);
         DataStream<Row> result =
                 tEnv.toDataStream(inputs[0])
                         .flatMap(
-                                new FindBucketFunction(inputCols, splitsArray, getHandleInvalid()),
+                                new FindBucketFunction(
+                                        inputColumnIndexes, splitsArray, getHandleInvalid()),
                                 outputTypeInfo);
         return new Table[] {tEnv.fromDataStream(result)};
     }
 
     /** Finds the bucket index for each continuous feature of an input data point. */
     private static class FindBucketFunction implements FlatMapFunction<Row, Row> {
-        private final String[] inputCols;
+        private final int[] inputCols;
         private final String handleInvalid;
         private final Double[][] splitsArray;
 
-        public FindBucketFunction(
-                String[] inputCols, Double[][] splitsArray, String handleInvalid) {
+        public FindBucketFunction(int[] inputCols, Double[][] splitsArray, String handleInvalid) {
             this.inputCols = inputCols;
             this.splitsArray = splitsArray;
             this.handleInvalid = handleInvalid;
