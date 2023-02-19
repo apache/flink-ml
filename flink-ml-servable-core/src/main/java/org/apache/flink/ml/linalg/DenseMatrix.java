@@ -18,6 +18,7 @@
 
 package org.apache.flink.ml.linalg;
 
+import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.common.typeinfo.TypeInfo;
 import org.apache.flink.ml.linalg.typeinfo.DenseMatrixTypeInfoFactory;
 import org.apache.flink.util.Preconditions;
@@ -27,6 +28,7 @@ import org.apache.flink.util.Preconditions;
  * listed in sequence.
  */
 @TypeInfo(DenseMatrixTypeInfoFactory.class)
+@PublicEvolving
 public class DenseMatrix implements Matrix {
 
     /** Row dimension. */

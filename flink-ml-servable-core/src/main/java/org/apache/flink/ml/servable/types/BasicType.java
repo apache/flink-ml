@@ -16,25 +16,20 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.linalg;
+package org.apache.flink.ml.servable.types;
 
 import org.apache.flink.annotation.PublicEvolving;
 
-import java.io.Serializable;
-
-/** A matrix of double values. */
+/** This enum class lists primitive types such as boolean, int, long, etc. */
 @PublicEvolving
-public interface Matrix extends Serializable {
-
-    /** Gets number of rows. */
-    int numRows();
-
-    /** Gets number of columns. */
-    int numCols();
-
-    /** Gets value of the (i,j) element. */
-    double get(int i, int j);
-
-    /** Converts the instance to a dense matrix. */
-    DenseMatrix toDense();
+public enum BasicType {
+    BOOLEAN,
+    BYTE,
+    SHORT,
+    INT,
+    LONG,
+    FLOAT,
+    DOUBLE,
+    STRING,
+    BYTE_STRING;
 }

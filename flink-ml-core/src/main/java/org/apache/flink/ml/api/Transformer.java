@@ -19,12 +19,19 @@
 package org.apache.flink.ml.api;
 
 import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.ml.servable.api.TransformerServable;
 
 /**
  * A Transformer is an AlgoOperator with the semantic difference that it encodes the Transformation
  * logic, such that a record in the output typically corresponds to one record in the input. In
  * contrast, an AlgoOperator is a better fit to express aggregation logic where a record in the
  * output could be computed from an arbitrary number of records in the input.
+ *
+ * <p>NOTE: If a Transformer has a corresponding {@link TransformerServable}, it should implement a
+ * static method with the signature {@code static T loadServable(String path)}, where {@code T}
+ * refers to the concrete subclass of {@link TransformerServable}. This static method should
+ * instantiate a new {@link TransformerServable} instance based on the data read from the given
+ * path.
  *
  * @param <T> The class type of the Transformer implementation itself.
  */

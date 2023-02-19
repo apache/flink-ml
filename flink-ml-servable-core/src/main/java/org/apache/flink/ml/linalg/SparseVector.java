@@ -18,6 +18,7 @@
 
 package org.apache.flink.ml.linalg;
 
+import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.common.typeinfo.TypeInfo;
 import org.apache.flink.ml.linalg.typeinfo.SparseVectorTypeInfoFactory;
 import org.apache.flink.util.Preconditions;
@@ -27,6 +28,7 @@ import java.util.Objects;
 
 /** A sparse vector of double values. */
 @TypeInfo(SparseVectorTypeInfoFactory.class)
+@PublicEvolving
 public class SparseVector implements Vector {
     public final int n;
     public int[] indices;

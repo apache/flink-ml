@@ -18,6 +18,7 @@
 
 package org.apache.flink.ml.linalg;
 
+import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.common.typeinfo.TypeInfo;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfoFactory;
 
@@ -25,6 +26,7 @@ import java.util.Arrays;
 
 /** A dense vector of double values. */
 @TypeInfo(DenseVectorTypeInfoFactory.class)
+@PublicEvolving
 public class DenseVector implements Vector {
     public final double[] values;
 

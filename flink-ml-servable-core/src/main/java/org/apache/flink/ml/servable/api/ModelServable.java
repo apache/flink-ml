@@ -16,25 +16,23 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.linalg;
+package org.apache.flink.ml.servable.api;
 
 import org.apache.flink.annotation.PublicEvolving;
 
-import java.io.Serializable;
+import java.io.IOException;
+import java.io.InputStream;
 
-/** A matrix of double values. */
+/**
+ * A ModelServable is a TransformerServable with the extra API to set model data.
+ *
+ * @param <T> The class type of the ModelServable implementation itself.
+ */
 @PublicEvolving
-public interface Matrix extends Serializable {
+public interface ModelServable<T extends ModelServable<T>> extends TransformerServable<T> {
 
-    /** Gets number of rows. */
-    int numRows();
-
-    /** Gets number of columns. */
-    int numCols();
-
-    /** Gets value of the (i,j) element. */
-    double get(int i, int j);
-
-    /** Converts the instance to a dense matrix. */
-    DenseMatrix toDense();
+    /** Sets model data using the serialized model data from the given input streams. */
+    default T setModelData(InputStream... modelDataInputs) throws IOException {
+        throw new UnsupportedOperationException("This operation is not supported.");
+    }
 }
