@@ -18,8 +18,6 @@
 
 package org.apache.flink.ml.common.gbt.operators;
 
-import org.apache.flink.api.common.state.ListState;
-import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeutils.base.BooleanSerializer;
 import org.apache.flink.api.common.typeutils.base.GenericArraySerializer;
 import org.apache.flink.api.common.typeutils.base.array.IntPrimitiveArraySerializer;
@@ -50,8 +48,6 @@ import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
 
 import org.apache.commons.collections.IteratorUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -64,8 +60,6 @@ import java.util.List;
 public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Histogram>
         implements TwoInputStreamOperator<Row, TrainContext, Histogram>,
                 IterationListener<Histogram> {
-    private static final Logger LOG =
-            LoggerFactory.getLogger(CacheDataCalcLocalHistsOperator.class);
 
     private static final String TREE_INITIALIZER_STATE_NAME = "tree_initializer";
     private static final String HIST_BUILDER_STATE_NAME = "hist_builder";
@@ -75,20 +69,22 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
 
     // States of local data.
     private transient ListStateWithCache<BinnedInstance> instancesCollecting;
-    private transient ListState<TreeInitializer> treeInitializer;
-    private transient ListState<HistBuilder> histBuilder;
+    private transient ListStateWithCache<TreeInitializer> treeInitializerState;
+    private transient TreeInitializer treeInitializer;
+    private transient ListStateWithCache<HistBuilder> histBuilderState;
+    private transient HistBuilder histBuilder;
 
     // Readers/writers of shared data.
     private transient IterationSharedStorage.Writer<BinnedInstance[]> instancesWriter;
     private transient IterationSharedStorage.Reader<PredGradHess[]> pghReader;
     private transient IterationSharedStorage.Writer<int[]> shuffledIndicesWriter;
     private transient IterationSharedStorage.Reader<int[]> swappedIndicesReader;
-    private IterationSharedStorage.Writer<int[]> nodeFeaturePairsWriter;
-    private IterationSharedStorage.Reader<List<LearningNode>> layerReader;
-    private IterationSharedStorage.Writer<LearningNode> rootLearningNodeWriter;
-    private IterationSharedStorage.Reader<Boolean> needInitTreeReader;
-    private IterationSharedStorage.Writer<Boolean> hasInitedTreeWriter;
-    private IterationSharedStorage.Writer<TrainContext> trainContextWriter;
+    private transient IterationSharedStorage.Writer<int[]> nodeFeaturePairsWriter;
+    private transient IterationSharedStorage.Reader<List<LearningNode>> layerReader;
+    private transient IterationSharedStorage.Writer<LearningNode> rootLearningNodeWriter;
+    private transient IterationSharedStorage.Reader<Boolean> needInitTreeReader;
+    private transient IterationSharedStorage.Writer<Boolean> hasInitedTreeWriter;
+    private transient IterationSharedStorage.Writer<TrainContext> trainContextWriter;
 
     public CacheDataCalcLocalHistsOperator(GbtParams gbtParams, IterationID iterationID) {
         super();
@@ -107,16 +103,27 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
                         getRuntimeContext(),
                         context,
                         getOperatorID());
+        treeInitializerState =
+                new ListStateWithCache<>(
+                        new KryoSerializer<>(TreeInitializer.class, getExecutionConfig()),
+                        getContainingTask(),
+                        getRuntimeContext(),
+                        context,
+                        getOperatorID());
         treeInitializer =
-                context.getOperatorStateStore()
-                        .getListState(
-                                new ListStateDescriptor<>(
-                                        TREE_INITIALIZER_STATE_NAME, TreeInitializer.class));
+                OperatorStateUtils.getUniqueElement(
+                                treeInitializerState, TREE_INITIALIZER_STATE_NAME)
+                        .orElse(null);
+        histBuilderState =
+                new ListStateWithCache<>(
+                        new KryoSerializer<>(HistBuilder.class, getExecutionConfig()),
+                        getContainingTask(),
+                        getRuntimeContext(),
+                        context,
+                        getOperatorID());
         histBuilder =
-                context.getOperatorStateStore()
-                        .getListState(
-                                new ListStateDescriptor<>(
-                                        HIST_BUILDER_STATE_NAME, HistBuilder.class));
+                OperatorStateUtils.getUniqueElement(histBuilderState, HIST_BUILDER_STATE_NAME)
+                        .orElse(null);
 
         int subtaskId = getRuntimeContext().getIndexOfThisSubtask();
         instancesWriter =
@@ -196,9 +203,15 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
     public void snapshotState(StateSnapshotContext context) throws Exception {
         super.snapshotState(context);
         instancesCollecting.snapshotState(context);
+        treeInitializerState.snapshotState(context);
+        histBuilderState.snapshotState(context);
+
         instancesWriter.snapshotState(context);
         shuffledIndicesWriter.snapshotState(context);
+        nodeFeaturePairsWriter.snapshotState(context);
+        rootLearningNodeWriter.snapshotState(context);
         hasInitedTreeWriter.snapshotState(context);
+        trainContextWriter.snapshotState(context);
     }
 
     @Override
@@ -251,8 +264,10 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
                                     instancesWriter.get());
             trainContextWriter.set(trainContext);
 
-            treeInitializer.update(Collections.singletonList(new TreeInitializer(trainContext)));
-            histBuilder.update(Collections.singletonList(new HistBuilder(trainContext)));
+            treeInitializer = new TreeInitializer(trainContext);
+            treeInitializerState.update(Collections.singletonList(treeInitializer));
+            histBuilder = new HistBuilder(trainContext);
+            histBuilderState.update(Collections.singletonList(histBuilder));
         }
 
         TrainContext trainContext = trainContextWriter.get();
@@ -276,15 +291,9 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
 
         int[] indices;
         if (needInitTreeReader.get()) {
-            TreeInitializer treeInit =
-                    OperatorStateUtils.getUniqueElement(
-                                    treeInitializer, TREE_INITIALIZER_STATE_NAME)
-                            .get();
-
             // When last tree is finished, initializes a new tree, and shuffle instance indices.
-            treeInit.init(shuffledIndicesWriter::set);
-
-            LearningNode rootLearningNode = treeInit.getRootLearningNode();
+            treeInitializer.init(shuffledIndicesWriter::set);
+            LearningNode rootLearningNode = treeInitializer.getRootLearningNode();
             indices = shuffledIndicesWriter.get();
             rootLearningNodeWriter.set(rootLearningNode);
             hasInitedTreeWriter.set(true);
@@ -301,17 +310,15 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
         }
 
         Histogram localHists =
-                OperatorStateUtils.getUniqueElement(histBuilder, HIST_BUILDER_STATE_NAME)
-                        .get()
-                        .build(layer, indices, instances, pgh, nodeFeaturePairsWriter::set);
+                histBuilder.build(layer, indices, instances, pgh, nodeFeaturePairsWriter::set);
         out.collect(localHists);
     }
 
     @Override
     public void onIterationTerminated(Context context, Collector<Histogram> collector) {
         instancesCollecting.clear();
-        treeInitializer.clear();
-        histBuilder.clear();
+        treeInitializerState.clear();
+        histBuilderState.clear();
 
         instancesWriter.set(new BinnedInstance[0]);
         shuffledIndicesWriter.set(new int[0]);
@@ -320,6 +327,10 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
 
     @Override
     public void close() throws Exception {
+        instancesCollecting.clear();
+        treeInitializerState.clear();
+        histBuilderState.clear();
+
         instancesWriter.remove();
         shuffledIndicesWriter.remove();
         nodeFeaturePairsWriter.remove();

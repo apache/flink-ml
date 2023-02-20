@@ -38,35 +38,31 @@ class InstanceUpdater {
     private final int subtaskId;
     private final Loss loss;
     private final double stepSize;
-    private final PredGradHess[] pgh;
     private final double prior;
-
-    private boolean initialized;
 
     public InstanceUpdater(TrainContext trainContext) {
         subtaskId = trainContext.subtaskId;
         loss = trainContext.loss;
         stepSize = trainContext.params.stepSize;
         prior = trainContext.prior;
-        pgh = new PredGradHess[trainContext.numInstances];
-        initialized = false;
     }
 
     public void update(
+            PredGradHess[] pgh,
             List<LearningNode> leaves,
             int[] indices,
             BinnedInstance[] instances,
             Consumer<PredGradHess[]> pghSetter,
             List<Node> treeNodes) {
         LOG.info("subtaskId: {}, {} start", subtaskId, InstanceUpdater.class.getSimpleName());
-        if (!initialized) {
+        if (pgh.length == 0) {
+            pgh = new PredGradHess[instances.length];
             for (int i = 0; i < instances.length; i += 1) {
                 double label = instances[i].label;
                 pgh[i] =
                         new PredGradHess(
                                 prior, loss.gradient(prior, label), loss.hessian(prior, label));
             }
-            initialized = true;
         }
 
         for (LearningNode nodeInfo : leaves) {

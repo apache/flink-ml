@@ -18,14 +18,14 @@
 
 package org.apache.flink.ml.common.gbt.operators;
 
-import org.apache.flink.api.common.state.ListState;
-import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeutils.base.BooleanSerializer;
 import org.apache.flink.api.common.typeutils.base.GenericArraySerializer;
 import org.apache.flink.api.common.typeutils.base.ListSerializer;
 import org.apache.flink.api.common.typeutils.base.array.IntPrimitiveArraySerializer;
+import org.apache.flink.api.java.typeutils.runtime.kryo.KryoSerializer;
 import org.apache.flink.iteration.IterationID;
 import org.apache.flink.iteration.IterationListener;
+import org.apache.flink.iteration.datacache.nonkeyed.ListStateWithCache;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.common.gbt.datastorage.IterationSharedStorage;
 import org.apache.flink.ml.common.gbt.defs.BinnedInstance;
@@ -62,21 +62,26 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
 
     private final IterationID iterationID;
 
-    private IterationSharedStorage.Reader<BinnedInstance[]> instancesReader;
-    private IterationSharedStorage.Writer<PredGradHess[]> pghWriter;
-    private IterationSharedStorage.Reader<int[]> shuffledIndicesReader;
-    private IterationSharedStorage.Writer<int[]> swappedIndicesWriter;
+    // States of local data.
+    private transient ListStateWithCache<Splits> splitsState;
+    private transient Splits splits;
+    private transient ListStateWithCache<NodeSplitter> nodeSplitterState;
+    private transient NodeSplitter nodeSplitter;
+    private transient ListStateWithCache<InstanceUpdater> instanceUpdaterState;
+    private transient InstanceUpdater instanceUpdater;
 
-    private transient ListState<Splits> splits;
-    private transient ListState<NodeSplitter> nodeSplitter;
-    private transient ListState<InstanceUpdater> instanceUpdater;
-    private IterationSharedStorage.Writer<List<LearningNode>> leavesWriter;
-    private IterationSharedStorage.Writer<List<LearningNode>> layerWriter;
-    private IterationSharedStorage.Reader<LearningNode> rootLearningNodeReader;
-    private IterationSharedStorage.Writer<List<List<Node>>> allTreesWriter;
-    private IterationSharedStorage.Writer<List<Node>> currentTreeNodesWriter;
-    private IterationSharedStorage.Writer<Boolean> needInitTreeWriter;
-    private IterationSharedStorage.Reader<TrainContext> trainContextReader;
+    // Readers/writers of shared data.
+    private transient IterationSharedStorage.Reader<BinnedInstance[]> instancesReader;
+    private transient IterationSharedStorage.Writer<PredGradHess[]> pghWriter;
+    private transient IterationSharedStorage.Reader<int[]> shuffledIndicesReader;
+    private transient IterationSharedStorage.Writer<int[]> swappedIndicesWriter;
+    private transient IterationSharedStorage.Writer<List<LearningNode>> leavesWriter;
+    private transient IterationSharedStorage.Writer<List<LearningNode>> layerWriter;
+    private transient IterationSharedStorage.Reader<LearningNode> rootLearningNodeReader;
+    private transient IterationSharedStorage.Writer<List<List<Node>>> allTreesWriter;
+    private transient IterationSharedStorage.Writer<List<Node>> currentTreeNodesWriter;
+    private transient IterationSharedStorage.Writer<Boolean> needInitTreeWriter;
+    private transient IterationSharedStorage.Reader<TrainContext> trainContextReader;
 
     public PostSplitsOperator(IterationID iterationID) {
         this.iterationID = iterationID;
@@ -86,19 +91,35 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
     public void initializeState(StateInitializationContext context) throws Exception {
         super.initializeState(context);
 
-        splits =
-                context.getOperatorStateStore()
-                        .getListState(new ListStateDescriptor<>(SPLITS_STATE_NAME, Splits.class));
+        splitsState =
+                new ListStateWithCache<>(
+                        new KryoSerializer<>(Splits.class, getExecutionConfig()),
+                        getContainingTask(),
+                        getRuntimeContext(),
+                        context,
+                        getOperatorID());
+        splits = OperatorStateUtils.getUniqueElement(splitsState, SPLITS_STATE_NAME).orElse(null);
+        nodeSplitterState =
+                new ListStateWithCache<>(
+                        new KryoSerializer<>(NodeSplitter.class, getExecutionConfig()),
+                        getContainingTask(),
+                        getRuntimeContext(),
+                        context,
+                        getOperatorID());
         nodeSplitter =
-                context.getOperatorStateStore()
-                        .getListState(
-                                new ListStateDescriptor<>(
-                                        NODE_SPLITTER_STATE_NAME, NodeSplitter.class));
+                OperatorStateUtils.getUniqueElement(nodeSplitterState, NODE_SPLITTER_STATE_NAME)
+                        .orElse(null);
+        instanceUpdaterState =
+                new ListStateWithCache<>(
+                        new KryoSerializer<>(InstanceUpdater.class, getExecutionConfig()),
+                        getContainingTask(),
+                        getRuntimeContext(),
+                        context,
+                        getOperatorID());
         instanceUpdater =
-                context.getOperatorStateStore()
-                        .getListState(
-                                new ListStateDescriptor<>(
-                                        INSTANCE_UPDATER_STATE_NAME, InstanceUpdater.class));
+                OperatorStateUtils.getUniqueElement(
+                                instanceUpdaterState, INSTANCE_UPDATER_STATE_NAME)
+                        .orElse(null);
 
         int subtaskId = getRuntimeContext().getIndexOfThisSubtask();
         pghWriter =
@@ -185,9 +206,16 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
     @Override
     public void snapshotState(StateSnapshotContext context) throws Exception {
         super.snapshotState(context);
+        splitsState.snapshotState(context);
+        nodeSplitterState.snapshotState(context);
+        instanceUpdaterState.snapshotState(context);
+
         pghWriter.snapshotState(context);
         swappedIndicesWriter.snapshotState(context);
         leavesWriter.snapshotState(context);
+        layerWriter.snapshotState(context);
+        allTreesWriter.snapshotState(context);
+        currentTreeNodesWriter.snapshotState(context);
         needInitTreeWriter.snapshotState(context);
     }
 
@@ -196,10 +224,10 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
     public void onEpochWatermarkIncremented(
             int epochWatermark, Context context, Collector<Integer> collector) throws Exception {
         if (0 == epochWatermark) {
-            nodeSplitter.update(
-                    Collections.singletonList(new NodeSplitter(trainContextReader.get())));
-            instanceUpdater.update(
-                    Collections.singletonList(new InstanceUpdater(trainContextReader.get())));
+            nodeSplitter = new NodeSplitter(trainContextReader.get());
+            nodeSplitterState.update(Collections.singletonList(nodeSplitter));
+            instanceUpdater = new InstanceUpdater(trainContextReader.get());
+            instanceUpdaterState.update(Collections.singletonList(instanceUpdater));
         }
 
         int[] indices = swappedIndicesWriter.get();
@@ -220,26 +248,16 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
         }
 
         List<LearningNode> nextLayer =
-                OperatorStateUtils.getUniqueElement(nodeSplitter, NODE_SPLITTER_STATE_NAME)
-                        .get()
-                        .split(
-                                currentTreeNodes,
-                                layer,
-                                leaves,
-                                OperatorStateUtils.getUniqueElement(splits, SPLITS_STATE_NAME)
-                                        .get()
-                                        .splits,
-                                indices,
-                                instances);
+                nodeSplitter.split(
+                        currentTreeNodes, layer, leaves, splits.splits, indices, instances);
         leavesWriter.set(leaves);
         layerWriter.set(nextLayer);
         currentTreeNodesWriter.set(currentTreeNodes);
 
         if (nextLayer.isEmpty()) {
             needInitTreeWriter.set(true);
-            OperatorStateUtils.getUniqueElement(instanceUpdater, INSTANCE_UPDATER_STATE_NAME)
-                    .get()
-                    .update(leaves, indices, instances, pghWriter::set, currentTreeNodes);
+            instanceUpdater.update(
+                    pghWriter.get(), leaves, indices, instances, pghWriter::set, currentTreeNodes);
             leaves.clear();
             List<List<Node>> allTrees = allTreesWriter.get();
             allTrees.add(currentTreeNodes);
@@ -264,11 +282,16 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
 
     @Override
     public void processElement(StreamRecord<Splits> element) throws Exception {
-        splits.update(Collections.singletonList(element.getValue()));
+        splits = element.getValue();
+        splitsState.update(Collections.singletonList(splits));
     }
 
     @Override
     public void close() throws Exception {
+        splitsState.clear();
+        nodeSplitterState.clear();
+        instanceUpdaterState.clear();
+
         pghWriter.remove();
         swappedIndicesWriter.remove();
         leavesWriter.remove();

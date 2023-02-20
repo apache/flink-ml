@@ -38,8 +38,8 @@ public class TerminationOperator extends AbstractStreamOperator<Integer>
 
     private final IterationID iterationID;
     private final OutputTag<GBTModelData> modelDataOutputTag;
-    private IterationSharedStorage.Reader<List<List<Node>>> allTreesReader;
-    private IterationSharedStorage.Reader<TrainContext> trainContextReader;
+    private transient IterationSharedStorage.Reader<List<List<Node>>> allTreesReader;
+    private transient IterationSharedStorage.Reader<TrainContext> trainContextReader;
 
     public TerminationOperator(
             IterationID iterationID, OutputTag<GBTModelData> modelDataOutputTag) {

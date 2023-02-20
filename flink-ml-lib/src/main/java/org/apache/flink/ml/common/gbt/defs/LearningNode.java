@@ -24,9 +24,9 @@ public class LearningNode {
     // The node index in `currentTreeNodes` used in `PostSplitsOperator`.
     public int nodeIndex;
     // Slice of indices of bagging instances.
-    public Slice slice;
+    public Slice slice = new Slice();
     // Slice of indices of non-bagging instances.
-    public Slice oob;
+    public Slice oob = new Slice();
     // Depth of corresponding tree node.
     public int depth;
 

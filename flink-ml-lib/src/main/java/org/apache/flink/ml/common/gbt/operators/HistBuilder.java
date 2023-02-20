@@ -54,7 +54,8 @@ class HistBuilder {
 
     private final boolean isInputVector;
 
-    private final double[] hists;
+    private final int maxFeatureBins;
+    private final int totalNumFeatureBins;
 
     public HistBuilder(TrainContext trainContext) {
         subtaskId = trainContext.subtaskId;
@@ -69,16 +70,8 @@ class HistBuilder {
 
         isInputVector = trainContext.params.isInputVector;
 
-        int maxNumNodes =
-                Math.min(
-                        ((int) Math.pow(2, trainContext.params.maxDepth - 1)),
-                        trainContext.params.maxNumLeaves);
-
-        int maxFeatureBins = Arrays.stream(numFeatureBins).max().orElse(0);
-        int totalNumFeatureBins = Arrays.stream(numFeatureBins).sum();
-        int maxNumBins =
-                maxNumNodes * Math.min(maxFeatureBins * numBaggingFeatures, totalNumFeatureBins);
-        hists = new double[maxNumBins * BIN_SIZE];
+        maxFeatureBins = Arrays.stream(numFeatureBins).max().orElse(0);
+        totalNumFeatureBins = Arrays.stream(numFeatureBins).sum();
     }
 
     /**
@@ -95,7 +88,6 @@ class HistBuilder {
             BinnedInstance[] instances,
             PredGradHess[] pgh,
             double[] hists) {
-
         int numNodes = layer.size();
         int numFeatures = featureMetas.length;
 
@@ -272,7 +264,9 @@ class HistBuilder {
         }
         nodeFeaturePairsSetter.accept(nodeFeaturePairs);
 
-        Arrays.fill(hists, 0);
+        int maxNumBins =
+                numNodes * Math.min(maxFeatureBins * numBaggingFeatures, totalNumFeatureBins);
+        double[] hists = new double[maxNumBins * BIN_SIZE];
         // Calculates histograms for (nodeId, featureId) pairs.
         calcNodeFeaturePairHists(
                 layer,
