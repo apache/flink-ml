@@ -16,32 +16,17 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.gbt.defs;
+package org.apache.flink.ml.common.sharedstorage;
 
-import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.ml.common.gbt.loss.Loss;
+import org.apache.flink.util.AbstractID;
 
-import java.io.Serializable;
-import java.util.Random;
+/** ID of a shared storage. */
+class StorageID extends AbstractID {
+    private static final long serialVersionUID = 1L;
 
-/** Stores the training context. */
-public class TrainContext implements Serializable {
-    public int subtaskId;
-    public int numSubtasks;
-    public GbtParams params;
+    public StorageID(byte[] bytes) {
+        super(bytes);
+    }
 
-    public int numInstances;
-    public int numBaggingInstances;
-    public Random instanceRandomizer;
-
-    public int numFeatures;
-    public int numBaggingFeatures;
-    public Random featureRandomizer;
-
-    public FeatureMeta[] featureMetas;
-    public int[] numFeatureBins;
-
-    public Tuple2<Double, Long> labelSumCount;
-    public double prior;
-    public Loss loss;
+    public StorageID() {}
 }

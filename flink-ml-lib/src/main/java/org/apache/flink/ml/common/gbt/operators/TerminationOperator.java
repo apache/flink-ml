@@ -18,42 +18,38 @@
 
 package org.apache.flink.ml.common.gbt.operators;
 
-import org.apache.flink.iteration.IterationID;
 import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.ml.common.gbt.GBTModelData;
-import org.apache.flink.ml.common.gbt.datastorage.IterationSharedStorage;
-import org.apache.flink.ml.common.gbt.defs.Node;
-import org.apache.flink.ml.common.gbt.defs.TrainContext;
+import org.apache.flink.ml.common.sharedstorage.SharedStorageContext;
+import org.apache.flink.ml.common.sharedstorage.SharedStorageStreamOperator;
+import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.OutputTag;
 
-import java.util.List;
+import java.util.UUID;
 
 /** Determines whether to terminated training. */
 public class TerminationOperator extends AbstractStreamOperator<Integer>
-        implements OneInputStreamOperator<Integer, Integer>, IterationListener<GBTModelData> {
+        implements OneInputStreamOperator<Integer, Integer>,
+                IterationListener<GBTModelData>,
+                SharedStorageStreamOperator {
 
-    private final IterationID iterationID;
     private final OutputTag<GBTModelData> modelDataOutputTag;
-    private transient IterationSharedStorage.Reader<List<List<Node>>> allTreesReader;
-    private transient IterationSharedStorage.Reader<TrainContext> trainContextReader;
+    private final String sharedStorageAccessorID;
+    private transient SharedStorageContext sharedStorageContext;
 
-    public TerminationOperator(
-            IterationID iterationID, OutputTag<GBTModelData> modelDataOutputTag) {
-        this.iterationID = iterationID;
+    public TerminationOperator(OutputTag<GBTModelData> modelDataOutputTag) {
         this.modelDataOutputTag = modelDataOutputTag;
+        sharedStorageAccessorID = getClass().getSimpleName() + "-" + UUID.randomUUID();
     }
 
     @Override
-    public void open() throws Exception {
-        int subtaskId = getRuntimeContext().getIndexOfThisSubtask();
-        allTreesReader =
-                IterationSharedStorage.getReader(iterationID, subtaskId, SharedKeys.ALL_TREES);
-        trainContextReader =
-                IterationSharedStorage.getReader(iterationID, subtaskId, SharedKeys.TRAIN_CONTEXT);
+    public void initializeState(StateInitializationContext context) throws Exception {
+        super.initializeState(context);
+        sharedStorageContext.initializeState(this, getRuntimeContext(), context);
     }
 
     @Override
@@ -61,18 +57,41 @@ public class TerminationOperator extends AbstractStreamOperator<Integer>
 
     @Override
     public void onEpochWatermarkIncremented(
-            int epochWatermark, Context context, Collector<GBTModelData> collector) {
-        boolean terminated = allTreesReader.get().size() == trainContextReader.get().params.maxIter;
-        // TODO: add validation error rate
-        if (!terminated) {
-            output.collect(new StreamRecord<>(0));
-        }
+            int epochWatermark, Context context, Collector<GBTModelData> collector)
+            throws Exception {
+        sharedStorageContext.invoke(
+                (getter, setter) -> {
+                    boolean terminated =
+                            getter.get(SharedStorageConstants.ALL_TREES).size()
+                                    == getter.get(SharedStorageConstants.TRAIN_CONTEXT)
+                                            .params
+                                            .maxIter;
+                    // TODO: add validation error rate
+                    if (!terminated) {
+                        output.collect(new StreamRecord<>(0));
+                    }
+                });
     }
 
     @Override
-    public void onIterationTerminated(Context context, Collector<GBTModelData> collector) {
-        context.output(
-                modelDataOutputTag,
-                GBTModelData.from(trainContextReader.get(), allTreesReader.get()));
+    public void onIterationTerminated(Context context, Collector<GBTModelData> collector)
+            throws Exception {
+        sharedStorageContext.invoke(
+                (getter, setter) ->
+                        context.output(
+                                modelDataOutputTag,
+                                GBTModelData.from(
+                                        getter.get(SharedStorageConstants.TRAIN_CONTEXT),
+                                        getter.get(SharedStorageConstants.ALL_TREES))));
+    }
+
+    @Override
+    public void onSharedStorageContextSet(SharedStorageContext context) {
+        sharedStorageContext = context;
+    }
+
+    @Override
+    public String getSharedStorageAccessorID() {
+        return sharedStorageAccessorID;
     }
 }

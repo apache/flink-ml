@@ -119,6 +119,7 @@ public class GBTRunnerTest extends AbstractTestBase {
         p.taskType = TaskType.CLASSIFICATION;
         p.labelCol = "cls_label";
         p.lossType = "logistic";
+        p.useMissing = true;
 
         GBTModelData modelData = GBTRunner.train(inputTable, p).executeAndCollect().next();
         verifyModelData(modelData, p);
@@ -130,6 +131,7 @@ public class GBTRunnerTest extends AbstractTestBase {
         p.taskType = TaskType.REGRESSION;
         p.labelCol = "label";
         p.lossType = "squared";
+        p.useMissing = true;
 
         GBTModelData modelData = GBTRunner.train(inputTable, p).executeAndCollect().next();
         verifyModelData(modelData, p);

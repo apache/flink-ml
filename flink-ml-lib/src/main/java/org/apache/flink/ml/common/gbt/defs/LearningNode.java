@@ -18,8 +18,10 @@
 
 package org.apache.flink.ml.common.gbt.defs;
 
+import java.io.Serializable;
+
 /** A node used in learning procedure. */
-public class LearningNode {
+public class LearningNode implements Serializable {
 
     // The node index in `currentTreeNodes` used in `PostSplitsOperator`.
     public int nodeIndex;

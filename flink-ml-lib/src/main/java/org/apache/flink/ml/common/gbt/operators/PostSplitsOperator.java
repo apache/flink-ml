@@ -18,25 +18,18 @@
 
 package org.apache.flink.ml.common.gbt.operators;
 
-import org.apache.flink.api.common.typeutils.base.BooleanSerializer;
-import org.apache.flink.api.common.typeutils.base.GenericArraySerializer;
-import org.apache.flink.api.common.typeutils.base.ListSerializer;
-import org.apache.flink.api.common.typeutils.base.array.IntPrimitiveArraySerializer;
 import org.apache.flink.api.java.typeutils.runtime.kryo.KryoSerializer;
-import org.apache.flink.iteration.IterationID;
 import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.datacache.nonkeyed.ListStateWithCache;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
-import org.apache.flink.ml.common.gbt.datastorage.IterationSharedStorage;
 import org.apache.flink.ml.common.gbt.defs.BinnedInstance;
 import org.apache.flink.ml.common.gbt.defs.LearningNode;
 import org.apache.flink.ml.common.gbt.defs.Node;
 import org.apache.flink.ml.common.gbt.defs.PredGradHess;
 import org.apache.flink.ml.common.gbt.defs.Splits;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
-import org.apache.flink.ml.common.gbt.typeinfo.LearningNodeSerializer;
-import org.apache.flink.ml.common.gbt.typeinfo.NodeSerializer;
-import org.apache.flink.ml.common.gbt.typeinfo.PredGradHessSerializer;
+import org.apache.flink.ml.common.sharedstorage.SharedStorageContext;
+import org.apache.flink.ml.common.sharedstorage.SharedStorageStreamOperator;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
@@ -47,20 +40,22 @@ import org.apache.flink.util.Collector;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Post-process after global splits obtained, including split instances to left or child nodes, and
  * update instances scores after a tree is complete.
  */
 public class PostSplitsOperator extends AbstractStreamOperator<Integer>
-        implements OneInputStreamOperator<Splits, Integer>, IterationListener<Integer> {
+        implements OneInputStreamOperator<Splits, Integer>,
+                IterationListener<Integer>,
+                SharedStorageStreamOperator {
 
     private static final String SPLITS_STATE_NAME = "splits";
     private static final String NODE_SPLITTER_STATE_NAME = "node_splitter";
     private static final String INSTANCE_UPDATER_STATE_NAME = "instance_updater";
-    private static final String CURRENT_TREE_NODES_STATE_NAME = "current_tree_nodes";
 
-    private final IterationID iterationID;
+    private final String sharedStorageAccessorID;
 
     // States of local data.
     private transient ListStateWithCache<Splits> splitsState;
@@ -69,22 +64,10 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
     private transient NodeSplitter nodeSplitter;
     private transient ListStateWithCache<InstanceUpdater> instanceUpdaterState;
     private transient InstanceUpdater instanceUpdater;
+    private transient SharedStorageContext sharedStorageContext;
 
-    // Readers/writers of shared data.
-    private transient IterationSharedStorage.Reader<BinnedInstance[]> instancesReader;
-    private transient IterationSharedStorage.Writer<PredGradHess[]> pghWriter;
-    private transient IterationSharedStorage.Reader<int[]> shuffledIndicesReader;
-    private transient IterationSharedStorage.Writer<int[]> swappedIndicesWriter;
-    private transient IterationSharedStorage.Writer<List<LearningNode>> leavesWriter;
-    private transient IterationSharedStorage.Writer<List<LearningNode>> layerWriter;
-    private transient IterationSharedStorage.Reader<LearningNode> rootLearningNodeReader;
-    private transient IterationSharedStorage.Writer<List<List<Node>>> allTreesWriter;
-    private transient IterationSharedStorage.Writer<List<Node>> currentTreeNodesWriter;
-    private transient IterationSharedStorage.Writer<Boolean> needInitTreeWriter;
-    private transient IterationSharedStorage.Reader<TrainContext> trainContextReader;
-
-    public PostSplitsOperator(IterationID iterationID) {
-        this.iterationID = iterationID;
+    public PostSplitsOperator() {
+        sharedStorageAccessorID = getClass().getSimpleName() + "-" + UUID.randomUUID();
     }
 
     @Override
@@ -121,86 +104,7 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
                                 instanceUpdaterState, INSTANCE_UPDATER_STATE_NAME)
                         .orElse(null);
 
-        int subtaskId = getRuntimeContext().getIndexOfThisSubtask();
-        pghWriter =
-                IterationSharedStorage.getWriter(
-                        iterationID,
-                        subtaskId,
-                        SharedKeys.PREDS_GRADS_HESSIANS,
-                        getOperatorID(),
-                        new GenericArraySerializer<>(
-                                PredGradHess.class, PredGradHessSerializer.INSTANCE),
-                        new PredGradHess[0]);
-        pghWriter.initializeState(context);
-        swappedIndicesWriter =
-                IterationSharedStorage.getWriter(
-                        iterationID,
-                        subtaskId,
-                        SharedKeys.SWAPPED_INDICES,
-                        getOperatorID(),
-                        IntPrimitiveArraySerializer.INSTANCE,
-                        new int[0]);
-        swappedIndicesWriter.initializeState(context);
-        leavesWriter =
-                IterationSharedStorage.getWriter(
-                        iterationID,
-                        subtaskId,
-                        SharedKeys.LEAVES,
-                        getOperatorID(),
-                        new ListSerializer<>(LearningNodeSerializer.INSTANCE),
-                        new ArrayList<>());
-        leavesWriter.initializeState(context);
-
-        layerWriter =
-                IterationSharedStorage.getWriter(
-                        iterationID,
-                        subtaskId,
-                        SharedKeys.LAYER,
-                        getOperatorID(),
-                        new ListSerializer<>(LearningNodeSerializer.INSTANCE),
-                        new ArrayList<>());
-        layerWriter.initializeState(context);
-
-        allTreesWriter =
-                IterationSharedStorage.getWriter(
-                        iterationID,
-                        subtaskId,
-                        SharedKeys.ALL_TREES,
-                        getOperatorID(),
-                        new ListSerializer<>(new ListSerializer<>(NodeSerializer.INSTANCE)),
-                        new ArrayList<>());
-        allTreesWriter.initializeState(context);
-
-        needInitTreeWriter =
-                IterationSharedStorage.getWriter(
-                        iterationID,
-                        subtaskId,
-                        SharedKeys.NEED_INIT_TREE,
-                        getOperatorID(),
-                        BooleanSerializer.INSTANCE,
-                        true);
-        needInitTreeWriter.initializeState(context);
-
-        currentTreeNodesWriter =
-                IterationSharedStorage.getWriter(
-                        iterationID,
-                        subtaskId,
-                        CURRENT_TREE_NODES_STATE_NAME,
-                        getOperatorID(),
-                        new ListSerializer<>(NodeSerializer.INSTANCE),
-                        new ArrayList<>());
-        currentTreeNodesWriter.initializeState(context);
-
-        instancesReader =
-                IterationSharedStorage.getReader(iterationID, subtaskId, SharedKeys.INSTANCES);
-        shuffledIndicesReader =
-                IterationSharedStorage.getReader(
-                        iterationID, subtaskId, SharedKeys.SHUFFLED_INDICES);
-        rootLearningNodeReader =
-                IterationSharedStorage.getReader(
-                        iterationID, subtaskId, SharedKeys.ROOT_LEARNING_NODE);
-        trainContextReader =
-                IterationSharedStorage.getReader(iterationID, subtaskId, SharedKeys.TRAIN_CONTEXT);
+        sharedStorageContext.initializeState(this, getRuntimeContext(), context);
     }
 
     @Override
@@ -209,75 +113,92 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
         splitsState.snapshotState(context);
         nodeSplitterState.snapshotState(context);
         instanceUpdaterState.snapshotState(context);
-
-        pghWriter.snapshotState(context);
-        swappedIndicesWriter.snapshotState(context);
-        leavesWriter.snapshotState(context);
-        layerWriter.snapshotState(context);
-        allTreesWriter.snapshotState(context);
-        currentTreeNodesWriter.snapshotState(context);
-        needInitTreeWriter.snapshotState(context);
+        sharedStorageContext.snapshotState(context);
     }
 
-    @SuppressWarnings("OptionalGetWithoutIsPresent")
     @Override
     public void onEpochWatermarkIncremented(
             int epochWatermark, Context context, Collector<Integer> collector) throws Exception {
         if (0 == epochWatermark) {
-            nodeSplitter = new NodeSplitter(trainContextReader.get());
-            nodeSplitterState.update(Collections.singletonList(nodeSplitter));
-            instanceUpdater = new InstanceUpdater(trainContextReader.get());
-            instanceUpdaterState.update(Collections.singletonList(instanceUpdater));
+            sharedStorageContext.invoke(
+                    (getter, setter) -> {
+                        TrainContext trainContext =
+                                getter.get(SharedStorageConstants.TRAIN_CONTEXT);
+                        nodeSplitter = new NodeSplitter(trainContext);
+                        nodeSplitterState.update(Collections.singletonList(nodeSplitter));
+                        instanceUpdater = new InstanceUpdater(trainContext);
+                        instanceUpdaterState.update(Collections.singletonList(instanceUpdater));
+                    });
         }
 
-        int[] indices = swappedIndicesWriter.get();
-        if (0 == indices.length) {
-            indices = shuffledIndicesReader.get().clone();
-        }
+        sharedStorageContext.invoke(
+                (getter, setter) -> {
+                    int[] indices = getter.get(SharedStorageConstants.SWAPPED_INDICES);
+                    if (0 == indices.length) {
+                        indices = getter.get(SharedStorageConstants.SHUFFLED_INDICES).clone();
+                    }
 
-        BinnedInstance[] instances = instancesReader.get();
-        List<LearningNode> leaves = leavesWriter.get();
-        List<LearningNode> layer = layerWriter.get();
-        List<Node> currentTreeNodes;
-        if (layer.size() == 0) {
-            layer = Collections.singletonList(rootLearningNodeReader.get());
-            currentTreeNodes = new ArrayList<>();
-            currentTreeNodes.add(new Node());
-        } else {
-            currentTreeNodes = currentTreeNodesWriter.get();
-        }
+                    BinnedInstance[] instances = getter.get(SharedStorageConstants.INSTANCES);
+                    List<LearningNode> leaves = getter.get(SharedStorageConstants.LEAVES);
+                    List<LearningNode> layer = getter.get(SharedStorageConstants.LAYER);
+                    List<Node> currentTreeNodes;
+                    if (layer.size() == 0) {
+                        layer =
+                                Collections.singletonList(
+                                        getter.get(SharedStorageConstants.ROOT_LEARNING_NODE));
+                        currentTreeNodes = new ArrayList<>();
+                        currentTreeNodes.add(new Node());
+                    } else {
+                        currentTreeNodes = getter.get(SharedStorageConstants.CURRENT_TREE_NODES);
+                    }
 
-        List<LearningNode> nextLayer =
-                nodeSplitter.split(
-                        currentTreeNodes, layer, leaves, splits.splits, indices, instances);
-        leavesWriter.set(leaves);
-        layerWriter.set(nextLayer);
-        currentTreeNodesWriter.set(currentTreeNodes);
+                    List<LearningNode> nextLayer =
+                            nodeSplitter.split(
+                                    currentTreeNodes,
+                                    layer,
+                                    leaves,
+                                    splits.splits,
+                                    indices,
+                                    instances);
+                    setter.set(SharedStorageConstants.LEAVES, leaves);
+                    setter.set(SharedStorageConstants.LAYER, nextLayer);
+                    setter.set(SharedStorageConstants.CURRENT_TREE_NODES, currentTreeNodes);
 
-        if (nextLayer.isEmpty()) {
-            needInitTreeWriter.set(true);
-            instanceUpdater.update(
-                    pghWriter.get(), leaves, indices, instances, pghWriter::set, currentTreeNodes);
-            leaves.clear();
-            List<List<Node>> allTrees = allTreesWriter.get();
-            allTrees.add(currentTreeNodes);
+                    if (nextLayer.isEmpty()) {
+                        // Current tree is finished.
+                        setter.set(SharedStorageConstants.NEED_INIT_TREE, true);
+                        instanceUpdater.update(
+                                getter.get(SharedStorageConstants.PREDS_GRADS_HESSIANS),
+                                leaves,
+                                indices,
+                                instances,
+                                d -> setter.set(SharedStorageConstants.PREDS_GRADS_HESSIANS, d),
+                                currentTreeNodes);
+                        leaves.clear();
+                        List<List<Node>> allTrees = getter.get(SharedStorageConstants.ALL_TREES);
+                        allTrees.add(currentTreeNodes);
 
-            leavesWriter.set(new ArrayList<>());
-            swappedIndicesWriter.set(new int[0]);
-            allTreesWriter.set(allTrees);
-        } else {
-            swappedIndicesWriter.set(indices);
-            needInitTreeWriter.set(false);
-        }
+                        setter.set(SharedStorageConstants.LEAVES, new ArrayList<>());
+                        setter.set(SharedStorageConstants.SWAPPED_INDICES, new int[0]);
+                        setter.set(SharedStorageConstants.ALL_TREES, allTrees);
+                    } else {
+                        setter.set(SharedStorageConstants.SWAPPED_INDICES, indices);
+                        setter.set(SharedStorageConstants.NEED_INIT_TREE, false);
+                    }
+                });
     }
 
     @Override
-    public void onIterationTerminated(Context context, Collector<Integer> collector) {
-        pghWriter.set(new PredGradHess[0]);
-        swappedIndicesWriter.set(new int[0]);
-        leavesWriter.set(Collections.emptyList());
-        layerWriter.set(Collections.emptyList());
-        currentTreeNodesWriter.set(Collections.emptyList());
+    public void onIterationTerminated(Context context, Collector<Integer> collector)
+            throws Exception {
+        sharedStorageContext.invoke(
+                (getter, setter) -> {
+                    setter.set(SharedStorageConstants.PREDS_GRADS_HESSIANS, new PredGradHess[0]);
+                    setter.set(SharedStorageConstants.SWAPPED_INDICES, new int[0]);
+                    setter.set(SharedStorageConstants.LEAVES, Collections.emptyList());
+                    setter.set(SharedStorageConstants.LAYER, Collections.emptyList());
+                    setter.set(SharedStorageConstants.CURRENT_TREE_NODES, Collections.emptyList());
+                });
     }
 
     @Override
@@ -291,14 +212,17 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
         splitsState.clear();
         nodeSplitterState.clear();
         instanceUpdaterState.clear();
-
-        pghWriter.remove();
-        swappedIndicesWriter.remove();
-        leavesWriter.remove();
-        layerWriter.remove();
-        allTreesWriter.remove();
-        currentTreeNodesWriter.remove();
-        needInitTreeWriter.remove();
+        sharedStorageContext.clear();
         super.close();
+    }
+
+    @Override
+    public void onSharedStorageContextSet(SharedStorageContext context) {
+        sharedStorageContext = context;
+    }
+
+    @Override
+    public String getSharedStorageAccessorID() {
+        return sharedStorageAccessorID;
     }
 }

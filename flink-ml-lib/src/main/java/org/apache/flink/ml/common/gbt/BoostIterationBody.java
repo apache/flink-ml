@@ -28,7 +28,6 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.iteration.DataStreamList;
 import org.apache.flink.iteration.IterationBody;
 import org.apache.flink.iteration.IterationBodyResult;
-import org.apache.flink.iteration.IterationID;
 import org.apache.flink.ml.common.gbt.defs.GbtParams;
 import org.apache.flink.ml.common.gbt.defs.Histogram;
 import org.apache.flink.ml.common.gbt.defs.Splits;
@@ -37,8 +36,12 @@ import org.apache.flink.ml.common.gbt.operators.CacheDataCalcLocalHistsOperator;
 import org.apache.flink.ml.common.gbt.operators.CalcLocalSplitsOperator;
 import org.apache.flink.ml.common.gbt.operators.HistogramAggregateFunction;
 import org.apache.flink.ml.common.gbt.operators.PostSplitsOperator;
+import org.apache.flink.ml.common.gbt.operators.SharedStorageConstants;
 import org.apache.flink.ml.common.gbt.operators.SplitsAggregateFunction;
 import org.apache.flink.ml.common.gbt.operators.TerminationOperator;
+import org.apache.flink.ml.common.sharedstorage.ItemDescriptor;
+import org.apache.flink.ml.common.sharedstorage.SharedStorageBody;
+import org.apache.flink.ml.common.sharedstorage.SharedStorageUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.types.Row;
@@ -46,35 +49,44 @@ import org.apache.flink.util.OutputTag;
 
 import org.apache.commons.lang3.ArrayUtils;
 
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 /**
  * Implements iteration body for boosting algorithms. This implementation uses horizontal partition
  * of data and row-store storage of instances.
  */
 class BoostIterationBody implements IterationBody {
-    private final IterationID iterationID;
     private final GbtParams gbtParams;
 
-    public BoostIterationBody(IterationID iterationID, GbtParams gbtParams) {
-        this.iterationID = iterationID;
+    public BoostIterationBody(GbtParams gbtParams) {
         this.gbtParams = gbtParams;
     }
 
-    @Override
-    public IterationBodyResult process(DataStreamList variableStreams, DataStreamList dataStreams) {
-        DataStream<Row> data = dataStreams.get(0);
-        DataStream<TrainContext> trainContext = variableStreams.get(0);
+    private SharedStorageBody.SharedStorageBodyResult sharedStorageBody(
+            List<DataStream<?>> inputs) {
+        //noinspection unchecked
+        DataStream<Row> data = (DataStream<Row>) inputs.get(0);
+        //noinspection unchecked
+        DataStream<TrainContext> trainContext = (DataStream<TrainContext>) inputs.get(1);
 
-        final String coLocationKey = "boosting";
+        Map<ItemDescriptor<?>, String> ownerMap = new HashMap<>();
 
         // In 1st round, cache all data. For all rounds calculate local histogram based on
         // current tree layer.
+        CacheDataCalcLocalHistsOperator cacheDataCalcLocalHistsOp =
+                new CacheDataCalcLocalHistsOperator(gbtParams);
         SingleOutputStreamOperator<Histogram> localHists =
                 data.connect(trainContext)
                         .transform(
                                 "CacheDataCalcLocalHists",
                                 TypeInformation.of(Histogram.class),
-                                new CacheDataCalcLocalHistsOperator(gbtParams, iterationID));
-        localHists.getTransformation().setCoLocationGroupKey("coLocationKey");
+                                cacheDataCalcLocalHistsOp);
+        for (ItemDescriptor<?> s : SharedStorageConstants.OWNED_BY_CACHE_DATA_CALC_LOCAL_HISTS_OP) {
+            ownerMap.put(s, cacheDataCalcLocalHistsOp.getSharedStorageAccessorID());
+        }
 
         DataStream<Histogram> globalHists = scatterReduceHistograms(localHists);
 
@@ -82,34 +94,52 @@ class BoostIterationBody implements IterationBody {
                 globalHists.transform(
                         "CalcLocalSplits",
                         TypeInformation.of(Splits.class),
-                        new CalcLocalSplitsOperator(iterationID));
-        localHists.getTransformation().setCoLocationGroupKey(coLocationKey);
+                        new CalcLocalSplitsOperator());
         DataStream<Splits> globalSplits =
                 localSplits.broadcast().flatMap(new SplitsAggregateFunction());
 
+        PostSplitsOperator postSplitsOp = new PostSplitsOperator();
         SingleOutputStreamOperator<Integer> updatedModelData =
                 globalSplits
                         .broadcast()
-                        .transform(
-                                "PostSplits",
-                                TypeInformation.of(Integer.class),
-                                new PostSplitsOperator(iterationID));
-        updatedModelData.getTransformation().setCoLocationGroupKey(coLocationKey);
+                        .transform("PostSplits", TypeInformation.of(Integer.class), postSplitsOp);
+        for (ItemDescriptor<?> descriptor : SharedStorageConstants.OWNED_BY_POST_SPLITS_OP) {
+            ownerMap.put(descriptor, postSplitsOp.getSharedStorageAccessorID());
+        }
 
-        final OutputTag<GBTModelData> modelDataOutputTag =
+        final OutputTag<GBTModelData> finalModelDataOutputTag =
                 new OutputTag<>("model_data", TypeInformation.of(GBTModelData.class));
         SingleOutputStreamOperator<Integer> termination =
                 updatedModelData.transform(
-                        "check_termination",
+                        "CheckTermination",
                         Types.INT,
-                        new TerminationOperator(iterationID, modelDataOutputTag));
-        termination.getTransformation().setCoLocationGroupKey(coLocationKey);
+                        new TerminationOperator(finalModelDataOutputTag));
+        DataStream<GBTModelData> finalModelData =
+                termination.getSideOutput(finalModelDataOutputTag);
 
+        return new SharedStorageBody.SharedStorageBodyResult(
+                Arrays.asList(updatedModelData, finalModelData, termination),
+                Arrays.asList(localHists, localSplits, updatedModelData, termination),
+                ownerMap);
+    }
+
+    @Override
+    public IterationBodyResult process(DataStreamList variableStreams, DataStreamList dataStreams) {
+        DataStream<Row> data = dataStreams.get(0);
+        DataStream<TrainContext> trainContext = variableStreams.get(0);
+
+        List<DataStream<?>> outputs =
+                SharedStorageUtils.withSharedStorage(
+                        Arrays.asList(data, trainContext), this::sharedStorageBody);
+
+        DataStream<?> updatedModelData = outputs.get(0);
+        DataStream<?> finalModelData = outputs.get(1);
+        DataStream<?> termination = outputs.get(2);
         return new IterationBodyResult(
                 DataStreamList.of(
                         updatedModelData.flatMap(
                                 (d, out) -> {}, TypeInformation.of(TrainContext.class))),
-                DataStreamList.of(termination.getSideOutput(modelDataOutputTag)),
+                DataStreamList.of(finalModelData),
                 termination);
     }
 
@@ -143,8 +173,7 @@ class BoostIterationBody implements IterationBody {
                         },
                         new KeySelector<Tuple2<Integer, Histogram>, Integer>() {
                             @Override
-                            public Integer getKey(Tuple2<Integer, Histogram> value)
-                                    throws Exception {
+                            public Integer getKey(Tuple2<Integer, Histogram> value) {
                                 return value.f0;
                             }
                         })

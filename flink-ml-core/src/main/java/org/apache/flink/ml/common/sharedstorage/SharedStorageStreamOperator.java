@@ -16,32 +16,23 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.gbt.defs;
+package org.apache.flink.ml.common.sharedstorage;
 
-import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.ml.common.gbt.loss.Loss;
+/** Interface for all operators that need to access the shared storage. */
+public interface SharedStorageStreamOperator {
 
-import java.io.Serializable;
-import java.util.Random;
+    /**
+     * Set the shared storage context in runtime.
+     *
+     * @param context The shared storage context.
+     */
+    void onSharedStorageContextSet(SharedStorageContext context);
 
-/** Stores the training context. */
-public class TrainContext implements Serializable {
-    public int subtaskId;
-    public int numSubtasks;
-    public GbtParams params;
-
-    public int numInstances;
-    public int numBaggingInstances;
-    public Random instanceRandomizer;
-
-    public int numFeatures;
-    public int numBaggingFeatures;
-    public Random featureRandomizer;
-
-    public FeatureMeta[] featureMetas;
-    public int[] numFeatureBins;
-
-    public Tuple2<Double, Long> labelSumCount;
-    public double prior;
-    public Loss loss;
+    /**
+     * Get a unique ID to represent the operator instance. The ID must be kept unchanged through its
+     * lifetime.
+     *
+     * @return A unique ID.
+     */
+    String getSharedStorageAccessorID();
 }

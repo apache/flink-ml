@@ -18,15 +18,10 @@
 
 package org.apache.flink.ml.common.gbt.operators;
 
-import org.apache.flink.api.common.typeutils.base.BooleanSerializer;
-import org.apache.flink.api.common.typeutils.base.GenericArraySerializer;
-import org.apache.flink.api.common.typeutils.base.array.IntPrimitiveArraySerializer;
 import org.apache.flink.api.java.typeutils.runtime.kryo.KryoSerializer;
-import org.apache.flink.iteration.IterationID;
 import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.datacache.nonkeyed.ListStateWithCache;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
-import org.apache.flink.ml.common.gbt.datastorage.IterationSharedStorage;
 import org.apache.flink.ml.common.gbt.defs.BinnedInstance;
 import org.apache.flink.ml.common.gbt.defs.GbtParams;
 import org.apache.flink.ml.common.gbt.defs.Histogram;
@@ -35,7 +30,8 @@ import org.apache.flink.ml.common.gbt.defs.PredGradHess;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
 import org.apache.flink.ml.common.gbt.loss.Loss;
 import org.apache.flink.ml.common.gbt.typeinfo.BinnedInstanceSerializer;
-import org.apache.flink.ml.common.gbt.typeinfo.LearningNodeSerializer;
+import org.apache.flink.ml.common.sharedstorage.SharedStorageContext;
+import org.apache.flink.ml.common.sharedstorage.SharedStorageStreamOperator;
 import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.runtime.state.StateInitializationContext;
@@ -52,6 +48,7 @@ import org.apache.commons.collections.IteratorUtils;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Calculates local histograms for local data partition. Specifically in the first round, this
@@ -59,13 +56,14 @@ import java.util.List;
  */
 public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Histogram>
         implements TwoInputStreamOperator<Row, TrainContext, Histogram>,
-                IterationListener<Histogram> {
+                IterationListener<Histogram>,
+                SharedStorageStreamOperator {
 
     private static final String TREE_INITIALIZER_STATE_NAME = "tree_initializer";
     private static final String HIST_BUILDER_STATE_NAME = "hist_builder";
 
     private final GbtParams gbtParams;
-    private final IterationID iterationID;
+    private final String sharedStorageAccessorID;
 
     // States of local data.
     private transient ListStateWithCache<BinnedInstance> instancesCollecting;
@@ -73,23 +71,12 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
     private transient TreeInitializer treeInitializer;
     private transient ListStateWithCache<HistBuilder> histBuilderState;
     private transient HistBuilder histBuilder;
+    private transient SharedStorageContext sharedStorageContext;
 
-    // Readers/writers of shared data.
-    private transient IterationSharedStorage.Writer<BinnedInstance[]> instancesWriter;
-    private transient IterationSharedStorage.Reader<PredGradHess[]> pghReader;
-    private transient IterationSharedStorage.Writer<int[]> shuffledIndicesWriter;
-    private transient IterationSharedStorage.Reader<int[]> swappedIndicesReader;
-    private transient IterationSharedStorage.Writer<int[]> nodeFeaturePairsWriter;
-    private transient IterationSharedStorage.Reader<List<LearningNode>> layerReader;
-    private transient IterationSharedStorage.Writer<LearningNode> rootLearningNodeWriter;
-    private transient IterationSharedStorage.Reader<Boolean> needInitTreeReader;
-    private transient IterationSharedStorage.Writer<Boolean> hasInitedTreeWriter;
-    private transient IterationSharedStorage.Writer<TrainContext> trainContextWriter;
-
-    public CacheDataCalcLocalHistsOperator(GbtParams gbtParams, IterationID iterationID) {
+    public CacheDataCalcLocalHistsOperator(GbtParams gbtParams) {
         super();
         this.gbtParams = gbtParams;
-        this.iterationID = iterationID;
+        sharedStorageAccessorID = getClass().getSimpleName() + "-" + UUID.randomUUID();
     }
 
     @Override
@@ -125,78 +112,7 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
                 OperatorStateUtils.getUniqueElement(histBuilderState, HIST_BUILDER_STATE_NAME)
                         .orElse(null);
 
-        int subtaskId = getRuntimeContext().getIndexOfThisSubtask();
-        instancesWriter =
-                IterationSharedStorage.getWriter(
-                        iterationID,
-                        subtaskId,
-                        SharedKeys.INSTANCES,
-                        getOperatorID(),
-                        new GenericArraySerializer<>(
-                                BinnedInstance.class, BinnedInstanceSerializer.INSTANCE),
-                        new BinnedInstance[0]);
-        instancesWriter.initializeState(context);
-
-        shuffledIndicesWriter =
-                IterationSharedStorage.getWriter(
-                        iterationID,
-                        subtaskId,
-                        SharedKeys.SHUFFLED_INDICES,
-                        getOperatorID(),
-                        IntPrimitiveArraySerializer.INSTANCE,
-                        new int[0]);
-        shuffledIndicesWriter.initializeState(context);
-
-        nodeFeaturePairsWriter =
-                IterationSharedStorage.getWriter(
-                        iterationID,
-                        subtaskId,
-                        SharedKeys.NODE_FEATURE_PAIRS,
-                        getOperatorID(),
-                        IntPrimitiveArraySerializer.INSTANCE,
-                        new int[0]);
-        nodeFeaturePairsWriter.initializeState(context);
-
-        rootLearningNodeWriter =
-                IterationSharedStorage.getWriter(
-                        iterationID,
-                        subtaskId,
-                        SharedKeys.ROOT_LEARNING_NODE,
-                        getOperatorID(),
-                        LearningNodeSerializer.INSTANCE,
-                        new LearningNode());
-        rootLearningNodeWriter.initializeState(context);
-
-        hasInitedTreeWriter =
-                IterationSharedStorage.getWriter(
-                        iterationID,
-                        subtaskId,
-                        SharedKeys.HAS_INITED_TREE,
-                        getOperatorID(),
-                        BooleanSerializer.INSTANCE,
-                        false);
-        hasInitedTreeWriter.initializeState(context);
-
-        trainContextWriter =
-                IterationSharedStorage.getWriter(
-                        iterationID,
-                        subtaskId,
-                        SharedKeys.TRAIN_CONTEXT,
-                        getOperatorID(),
-                        new KryoSerializer<>(TrainContext.class, getExecutionConfig()),
-                        new TrainContext());
-        trainContextWriter.initializeState(context);
-
-        this.pghReader =
-                IterationSharedStorage.getReader(
-                        iterationID, subtaskId, SharedKeys.PREDS_GRADS_HESSIANS);
-        this.swappedIndicesReader =
-                IterationSharedStorage.getReader(
-                        iterationID, subtaskId, SharedKeys.SWAPPED_INDICES);
-        this.layerReader =
-                IterationSharedStorage.getReader(iterationID, subtaskId, SharedKeys.LAYER);
-        this.needInitTreeReader =
-                IterationSharedStorage.getReader(iterationID, subtaskId, SharedKeys.NEED_INIT_TREE);
+        sharedStorageContext.initializeState(this, getRuntimeContext(), context);
     }
 
     @Override
@@ -205,13 +121,7 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
         instancesCollecting.snapshotState(context);
         treeInitializerState.snapshotState(context);
         histBuilderState.snapshotState(context);
-
-        instancesWriter.snapshotState(context);
-        shuffledIndicesWriter.snapshotState(context);
-        nodeFeaturePairsWriter.snapshotState(context);
-        rootLearningNodeWriter.snapshotState(context);
-        hasInitedTreeWriter.snapshotState(context);
-        trainContextWriter.snapshotState(context);
+        sharedStorageContext.snapshotState(context);
     }
 
     @Override
@@ -237,92 +147,112 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
 
     @Override
     public void processElement2(StreamRecord<TrainContext> streamRecord) throws Exception {
-        TrainContext trainContext = streamRecord.getValue();
-        if (null != trainContext) {
-            // Not null only in first round.
-            trainContextWriter.set(trainContext);
-        }
+        TrainContext rawTrainContext = streamRecord.getValue();
+        sharedStorageContext.invoke(
+                (getter, setter) ->
+                        setter.set(SharedStorageConstants.TRAIN_CONTEXT, rawTrainContext));
     }
 
-    @SuppressWarnings("OptionalGetWithoutIsPresent")
     @Override
     public void onEpochWatermarkIncremented(
             int epochWatermark, Context context, Collector<Histogram> out) throws Exception {
         if (0 == epochWatermark) {
             // Initializes local state in first round.
-            instancesWriter.set(
-                    (BinnedInstance[])
-                            IteratorUtils.toArray(
-                                    instancesCollecting.get().iterator(), BinnedInstance.class));
-            instancesCollecting.clear();
-            TrainContext trainContext =
-                    new TrainContextInitializer(gbtParams)
-                            .init(
-                                    trainContextWriter.get(),
-                                    getRuntimeContext().getIndexOfThisSubtask(),
-                                    getRuntimeContext().getNumberOfParallelSubtasks(),
-                                    instancesWriter.get());
-            trainContextWriter.set(trainContext);
+            sharedStorageContext.invoke(
+                    (getter, setter) -> {
+                        BinnedInstance[] instances =
+                                (BinnedInstance[])
+                                        IteratorUtils.toArray(
+                                                instancesCollecting.get().iterator(),
+                                                BinnedInstance.class);
+                        setter.set(SharedStorageConstants.INSTANCES, instances);
+                        instancesCollecting.clear();
 
-            treeInitializer = new TreeInitializer(trainContext);
-            treeInitializerState.update(Collections.singletonList(treeInitializer));
-            histBuilder = new HistBuilder(trainContext);
-            histBuilderState.update(Collections.singletonList(histBuilder));
+                        TrainContext rawTrainContext =
+                                getter.get(SharedStorageConstants.TRAIN_CONTEXT);
+                        TrainContext trainContext =
+                                new TrainContextInitializer(gbtParams)
+                                        .init(
+                                                rawTrainContext,
+                                                getRuntimeContext().getIndexOfThisSubtask(),
+                                                getRuntimeContext().getNumberOfParallelSubtasks(),
+                                                instances);
+                        setter.set(SharedStorageConstants.TRAIN_CONTEXT, trainContext);
+
+                        treeInitializer = new TreeInitializer(trainContext);
+                        treeInitializerState.update(Collections.singletonList(treeInitializer));
+                        histBuilder = new HistBuilder(trainContext);
+                        histBuilderState.update(Collections.singletonList(histBuilder));
+                    });
         }
 
-        TrainContext trainContext = trainContextWriter.get();
-        BinnedInstance[] instances = instancesWriter.get();
-        Preconditions.checkArgument(
-                getRuntimeContext().getIndexOfThisSubtask() == trainContext.subtaskId);
-        PredGradHess[] pgh = pghReader.get();
+        sharedStorageContext.invoke(
+                (getter, setter) -> {
+                    TrainContext trainContext = getter.get(SharedStorageConstants.TRAIN_CONTEXT);
+                    Preconditions.checkArgument(
+                            getRuntimeContext().getIndexOfThisSubtask() == trainContext.subtaskId);
+                    BinnedInstance[] instances = getter.get(SharedStorageConstants.INSTANCES);
+                    PredGradHess[] pgh = getter.get(SharedStorageConstants.PREDS_GRADS_HESSIANS);
+                    // In the first round, use prior as the predictions.
+                    if (0 == pgh.length) {
+                        pgh = new PredGradHess[instances.length];
+                        double prior = trainContext.prior;
+                        Loss loss = trainContext.loss;
+                        for (int i = 0; i < instances.length; i += 1) {
+                            double label = instances[i].label;
+                            pgh[i] =
+                                    new PredGradHess(
+                                            prior,
+                                            loss.gradient(prior, label),
+                                            loss.hessian(prior, label));
+                        }
+                    }
 
-        // In the first round, use prior as the predictions.
-        if (0 == pgh.length) {
-            pgh = new PredGradHess[instances.length];
-            double prior = trainContext.prior;
-            Loss loss = trainContext.loss;
-            for (int i = 0; i < instances.length; i += 1) {
-                double label = instances[i].label;
-                pgh[i] =
-                        new PredGradHess(
-                                prior, loss.gradient(prior, label), loss.hessian(prior, label));
-            }
-        }
+                    boolean needInitTree = getter.get(SharedStorageConstants.NEED_INIT_TREE);
+                    int[] indices;
+                    List<LearningNode> layer;
+                    if (needInitTree) {
+                        // When last tree is finished, initializes a new tree, and shuffle instance
+                        // indices.
+                        treeInitializer.init(
+                                d -> setter.set(SharedStorageConstants.SHUFFLED_INDICES, d));
+                        LearningNode rootLearningNode = treeInitializer.getRootLearningNode();
+                        indices = getter.get(SharedStorageConstants.SHUFFLED_INDICES);
+                        layer = Collections.singletonList(rootLearningNode);
+                        setter.set(SharedStorageConstants.ROOT_LEARNING_NODE, rootLearningNode);
+                        setter.set(SharedStorageConstants.HAS_INITED_TREE, true);
+                    } else {
+                        // Otherwise, uses the swapped instance indices.
+                        indices = getter.get(SharedStorageConstants.SWAPPED_INDICES);
+                        layer = getter.get(SharedStorageConstants.LAYER);
+                        setter.set(SharedStorageConstants.SHUFFLED_INDICES, new int[0]);
+                        setter.set(SharedStorageConstants.HAS_INITED_TREE, false);
+                    }
 
-        int[] indices;
-        if (needInitTreeReader.get()) {
-            // When last tree is finished, initializes a new tree, and shuffle instance indices.
-            treeInitializer.init(shuffledIndicesWriter::set);
-            LearningNode rootLearningNode = treeInitializer.getRootLearningNode();
-            indices = shuffledIndicesWriter.get();
-            rootLearningNodeWriter.set(rootLearningNode);
-            hasInitedTreeWriter.set(true);
-        } else {
-            // Otherwise, uses the swapped instance indices.
-            shuffledIndicesWriter.set(new int[0]);
-            indices = swappedIndicesReader.get();
-            hasInitedTreeWriter.set(false);
-        }
-
-        List<LearningNode> layer = layerReader.get();
-        if (layer.size() == 0) {
-            layer = Collections.singletonList(rootLearningNodeWriter.get());
-        }
-
-        Histogram localHists =
-                histBuilder.build(layer, indices, instances, pgh, nodeFeaturePairsWriter::set);
-        out.collect(localHists);
+                    Histogram localHists =
+                            histBuilder.build(
+                                    layer,
+                                    indices,
+                                    instances,
+                                    pgh,
+                                    d -> setter.set(SharedStorageConstants.NODE_FEATURE_PAIRS, d));
+                    out.collect(localHists);
+                });
     }
 
     @Override
-    public void onIterationTerminated(Context context, Collector<Histogram> collector) {
+    public void onIterationTerminated(Context context, Collector<Histogram> collector)
+            throws Exception {
         instancesCollecting.clear();
         treeInitializerState.clear();
         histBuilderState.clear();
 
-        instancesWriter.set(new BinnedInstance[0]);
-        shuffledIndicesWriter.set(new int[0]);
-        nodeFeaturePairsWriter.set(new int[0]);
+        sharedStorageContext.invoke(
+                (getter, setter) -> {
+                    setter.set(SharedStorageConstants.INSTANCES, new BinnedInstance[0]);
+                    setter.set(SharedStorageConstants.SHUFFLED_INDICES, new int[0]);
+                    setter.set(SharedStorageConstants.NODE_FEATURE_PAIRS, new int[0]);
+                });
     }
 
     @Override
@@ -330,13 +260,17 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
         instancesCollecting.clear();
         treeInitializerState.clear();
         histBuilderState.clear();
-
-        instancesWriter.remove();
-        shuffledIndicesWriter.remove();
-        nodeFeaturePairsWriter.remove();
-        rootLearningNodeWriter.remove();
-        hasInitedTreeWriter.remove();
-        trainContextWriter.remove();
+        sharedStorageContext.clear();
         super.close();
+    }
+
+    @Override
+    public void onSharedStorageContextSet(SharedStorageContext context) {
+        this.sharedStorageContext = context;
+    }
+
+    @Override
+    public String getSharedStorageAccessorID() {
+        return sharedStorageAccessorID;
     }
 }

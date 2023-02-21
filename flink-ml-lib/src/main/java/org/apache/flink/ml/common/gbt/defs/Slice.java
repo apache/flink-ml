@@ -18,8 +18,10 @@
 
 package org.apache.flink.ml.common.gbt.defs;
 
+import java.io.Serializable;
+
 /** Represents a slice of an indexable linear structure, like an array. */
-public final class Slice {
+public final class Slice implements Serializable {
 
     public int start;
     public int end;

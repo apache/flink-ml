@@ -23,7 +23,6 @@ import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.iteration.DataStreamList;
 import org.apache.flink.iteration.IterationConfig;
-import org.apache.flink.iteration.IterationID;
 import org.apache.flink.iteration.Iterations;
 import org.apache.flink.iteration.ReplayableDataStreamList;
 import org.apache.flink.ml.classification.gbtclassifier.GBTClassifierParams;
@@ -114,7 +113,6 @@ public class GBTRunner {
                         });
 
         DataStream<Row> data = tEnv.toDataStream(dataTable);
-        final IterationID iterationID = new IterationID();
         DataStreamList dataStreamList =
                 Iterations.iterateBoundedStreamsUntilTermination(
                         DataStreamList.of(initTrainContext.broadcast()),
@@ -122,7 +120,7 @@ public class GBTRunner {
                         IterationConfig.newBuilder()
                                 .setOperatorLifeCycle(IterationConfig.OperatorLifeCycle.ALL_ROUND)
                                 .build(),
-                        new BoostIterationBody(iterationID, p));
+                        new BoostIterationBody(p));
         return dataStreamList.get(0);
     }
 
