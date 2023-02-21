@@ -18,7 +18,7 @@
 
 package org.apache.flink.ml.param;
 
-import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.JsonUtils;
 
 import java.io.IOException;
 
@@ -37,7 +37,7 @@ public class ArrayParam<T> extends Param<T[]> {
     @Override
     public T[] jsonDecode(Object json) throws IOException {
         // Converts Object Mapper's default ArrayList<T> to T[].
-        String jsonStr = ReadWriteUtils.OBJECT_MAPPER.writeValueAsString(json);
-        return ReadWriteUtils.OBJECT_MAPPER.readValue(jsonStr, clazz);
+        String jsonStr = JsonUtils.OBJECT_MAPPER.writeValueAsString(json);
+        return JsonUtils.OBJECT_MAPPER.readValue(jsonStr, clazz);
     }
 }

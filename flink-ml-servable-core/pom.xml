@@ -28,43 +28,28 @@ under the License.
     <version>2.2-SNAPSHOT</version>
   </parent>
 
-  <artifactId>flink-ml-core</artifactId>
-  <name>Flink ML : Core</name>
+  <artifactId>flink-ml-servable-core</artifactId>
+  <name>Flink ML : Servable : Core</name>
 
   <dependencies>
 
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-ml-servable-core</artifactId>
-      <version>${project.version}</version>
-      <scope>provided</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.flink</groupId>
-      <artifactId>flink-ml-iteration</artifactId>
-      <version>${project.version}</version>
-      <scope>provided</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.flink</groupId>
-      <artifactId>flink-table-api-java</artifactId>
+      <artifactId>flink-core</artifactId>
       <version>${flink.version}</version>
       <scope>provided</scope>
     </dependency>
 
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-streaming-java</artifactId>
-      <version>${flink.version}</version>
+      <artifactId>flink-shaded-jackson</artifactId>
       <scope>provided</scope>
     </dependency>
 
     <dependency>
-      <groupId>org.apache.flink</groupId>
-      <artifactId>flink-table-runtime</artifactId>
-      <scope>provided</scope>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <version>3.12.0</version>
     </dependency>
 
     <dependency>
@@ -75,41 +60,9 @@ under the License.
 
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-table-api-java-bridge</artifactId>
-      <version>${flink.version}</version>
-      <scope>provided</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.flink</groupId>
-      <artifactId>flink-connector-files</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.flink</groupId>
-      <artifactId>flink-table-planner-loader</artifactId>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.flink</groupId>
-      <artifactId>flink-streaming-java</artifactId>
-      <version>${flink.version}</version>
-      <scope>test</scope>
-      <type>test-jar</type>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.flink</groupId>
       <artifactId>flink-test-utils</artifactId>
       <version>${flink.version}</version>
       <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.flink</groupId>
-      <artifactId>flink-shaded-jackson</artifactId>
-      <scope>provided</scope>
     </dependency>
 
     <dependency>
@@ -138,15 +91,18 @@ under the License.
       <artifactId>hadoop-minicluster</artifactId>
       <scope>test</scope>
     </dependency>
+
     <!-- enforcing jackson versions -->
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
     </dependency>
+
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-core</artifactId>
     </dependency>
+
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-annotations</artifactId>

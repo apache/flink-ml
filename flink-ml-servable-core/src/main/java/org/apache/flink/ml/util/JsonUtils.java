@@ -16,27 +16,16 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.param;
+package org.apache.flink.ml.util;
 
-import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonParser;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.io.IOException;
-
-/** Class for the array parameter. */
-public class ArrayArrayParam<T> extends Param<T[][]> {
-
-    public ArrayArrayParam(
-            String name,
-            Class<T[][]> clazz,
-            String description,
-            T[][] defaultValue,
-            ParamValidator<T[][]> validator) {
-        super(name, clazz, description, defaultValue, validator);
-    }
-
-    @Override
-    public T[][] jsonDecode(Object json) throws IOException {
-        String jsonStr = ReadWriteUtils.OBJECT_MAPPER.writeValueAsString(json);
-        return ReadWriteUtils.OBJECT_MAPPER.readValue(jsonStr, clazz);
-    }
+/**
+ * Utility methods for reading and writing stages. Methods in this class would not rely on Flink
+ * runtime.
+ */
+public class JsonUtils {
+    public static final ObjectMapper OBJECT_MAPPER =
+            new ObjectMapper().enable(JsonParser.Feature.ALLOW_COMMENTS);
 }
