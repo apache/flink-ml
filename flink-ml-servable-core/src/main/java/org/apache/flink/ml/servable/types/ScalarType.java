@@ -16,25 +16,21 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.linalg;
+package org.apache.flink.ml.servable.types;
 
 import org.apache.flink.annotation.PublicEvolving;
 
-import java.io.Serializable;
-
-/** A matrix of double values. */
+/** A DataType representing a single element of the given BasicType. */
 @PublicEvolving
-public interface Matrix extends Serializable {
+public final class ScalarType extends DataType {
 
-    /** Gets number of rows. */
-    int numRows();
+    private final BasicType elementType;
 
-    /** Gets number of columns. */
-    int numCols();
+    public ScalarType(BasicType elementType) {
+        this.elementType = elementType;
+    }
 
-    /** Gets value of the (i,j) element. */
-    double get(int i, int j);
-
-    /** Converts the instance to a dense matrix. */
-    DenseMatrix toDense();
+    public BasicType getElementType() {
+        return elementType;
+    }
 }

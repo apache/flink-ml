@@ -18,7 +18,10 @@
 
 package org.apache.flink.ml.linalg;
 
+import org.apache.flink.annotation.PublicEvolving;
+
 /** Utility methods for instantiating Vector. */
+@PublicEvolving
 public class Vectors {
 
     /** Creates a dense vector from its values. */

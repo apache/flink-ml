@@ -18,6 +18,7 @@
 
 package org.apache.flink.ml.linalg;
 
+import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.common.typeinfo.TypeInfo;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfoFactory;
 
@@ -25,6 +26,7 @@ import java.io.Serializable;
 
 /** A vector of double values. */
 @TypeInfo(VectorTypeInfoFactory.class)
+@PublicEvolving
 public interface Vector extends Serializable {
 
     /** Gets the size of the vector. */
