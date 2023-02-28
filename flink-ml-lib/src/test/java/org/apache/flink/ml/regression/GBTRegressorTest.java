@@ -133,8 +133,7 @@ public class GBTRegressorTest extends AbstractTestBase {
     @Test
     public void testParam() {
         GBTRegressor gbtr = new GBTRegressor();
-        Assert.assertEquals("features", gbtr.getFeaturesCol());
-        Assert.assertNull(gbtr.getInputCols());
+        Assert.assertArrayEquals(new String[] {"features"}, gbtr.getFeaturesCols());
         Assert.assertEquals("label", gbtr.getLabelCol());
         Assert.assertArrayEquals(new String[] {}, gbtr.getCategoricalCols());
         Assert.assertEquals("prediction", gbtr.getPredictionCol());
@@ -158,8 +157,7 @@ public class GBTRegressorTest extends AbstractTestBase {
 
         Assert.assertEquals("squared", gbtr.getLossType());
 
-        gbtr.setFeaturesCol("vec")
-                .setInputCols("f0", "f1", "f2")
+        gbtr.setFeaturesCols("f0", "f1", "f2")
                 .setLabelCol("label")
                 .setCategoricalCols("f0", "f1")
                 .setPredictionCol("pred")
@@ -180,8 +178,7 @@ public class GBTRegressorTest extends AbstractTestBase {
                 .setRegLambda(.1)
                 .setRegGamma(.1);
 
-        Assert.assertEquals("vec", gbtr.getFeaturesCol());
-        Assert.assertArrayEquals(new String[] {"f0", "f1", "f2"}, gbtr.getInputCols());
+        Assert.assertArrayEquals(new String[] {"f0", "f1", "f2"}, gbtr.getFeaturesCols());
         Assert.assertEquals("label", gbtr.getLabelCol());
         Assert.assertArrayEquals(new String[] {"f0", "f1"}, gbtr.getCategoricalCols());
         Assert.assertEquals("pred", gbtr.getPredictionCol());
@@ -207,7 +204,7 @@ public class GBTRegressorTest extends AbstractTestBase {
     @Test
     public void testOutputSchema() throws Exception {
         GBTRegressor gbtr =
-                new GBTRegressor().setInputCols("f0", "f1", "f2").setCategoricalCols("f2");
+                new GBTRegressor().setFeaturesCols("f0", "f1", "f2").setCategoricalCols("f2");
         GBTRegressorModel model = gbtr.fit(inputTable);
         Table output = model.transform(inputTable)[0];
         Assert.assertArrayEquals(
@@ -221,7 +218,7 @@ public class GBTRegressorTest extends AbstractTestBase {
     public void testFitAndPredict() throws Exception {
         GBTRegressor gbtr =
                 new GBTRegressor()
-                        .setInputCols("f0", "f1", "f2")
+                        .setFeaturesCols("f0", "f1", "f2")
                         .setCategoricalCols("f2")
                         .setLabelCol("label")
                         .setRegGamma(0.)
@@ -236,7 +233,7 @@ public class GBTRegressorTest extends AbstractTestBase {
     public void testFitAndPredictWithVectorCol() throws Exception {
         GBTRegressor gbtr =
                 new GBTRegressor()
-                        .setFeaturesCol("vec")
+                        .setFeaturesCols("vec")
                         .setLabelCol("label")
                         .setRegGamma(0.)
                         .setMaxBins(3)
@@ -262,7 +259,7 @@ public class GBTRegressorTest extends AbstractTestBase {
     public void testFitAndPredictWithNoCategoricalCols() throws Exception {
         GBTRegressor gbtr =
                 new GBTRegressor()
-                        .setInputCols("f0", "f1")
+                        .setFeaturesCols("f0", "f1")
                         .setLabelCol("label")
                         .setRegGamma(0.)
                         .setMaxBins(5)
@@ -288,7 +285,7 @@ public class GBTRegressorTest extends AbstractTestBase {
     public void testEstimatorSaveLoadAndPredict() throws Exception {
         GBTRegressor gbtr =
                 new GBTRegressor()
-                        .setInputCols("f0", "f1", "f2")
+                        .setFeaturesCols("f0", "f1", "f2")
                         .setCategoricalCols("f2")
                         .setLabelCol("label")
                         .setRegGamma(0.)
@@ -308,7 +305,7 @@ public class GBTRegressorTest extends AbstractTestBase {
     public void testModelSaveLoadAndPredict() throws Exception {
         GBTRegressor gbtr =
                 new GBTRegressor()
-                        .setInputCols("f0", "f1", "f2")
+                        .setFeaturesCols("f0", "f1", "f2")
                         .setCategoricalCols("f2")
                         .setLabelCol("label")
                         .setRegGamma(0.)
@@ -325,7 +322,7 @@ public class GBTRegressorTest extends AbstractTestBase {
     public void testGetModelData() throws Exception {
         GBTRegressor gbtr =
                 new GBTRegressor()
-                        .setInputCols("f0", "f1", "f2")
+                        .setFeaturesCols("f0", "f1", "f2")
                         .setCategoricalCols("f2")
                         .setLabelCol("label")
                         .setRegGamma(0.)
@@ -349,7 +346,7 @@ public class GBTRegressorTest extends AbstractTestBase {
         Assert.assertEquals(gbtr.getMaxIter(), modelData.allTrees.size());
         Assert.assertEquals(gbtr.getCategoricalCols().length, modelData.categoryToIdMaps.size());
         Assert.assertEquals(
-                gbtr.getInputCols().length - gbtr.getCategoricalCols().length,
+                gbtr.getFeaturesCols().length - gbtr.getCategoricalCols().length,
                 modelData.featureIdToBinEdges.size());
         Assert.assertEquals(BitSet.valueOf(new byte[] {4}), modelData.isCategorical);
     }
@@ -358,7 +355,7 @@ public class GBTRegressorTest extends AbstractTestBase {
     public void testSetModelData() throws Exception {
         GBTRegressor gbtr =
                 new GBTRegressor()
-                        .setInputCols("f0", "f1", "f2")
+                        .setFeaturesCols("f0", "f1", "f2")
                         .setCategoricalCols("f2")
                         .setLabelCol("label")
                         .setRegGamma(0.)

@@ -128,7 +128,8 @@ public class PreprocessTest extends AbstractTestBase {
     @Test
     public void testPreprocessCols() throws Exception {
         GbtParams p = new GbtParams();
-        p.featureCols = new String[] {"f0", "f1", "f2"};
+        p.isInputVector = false;
+        p.featuresCols = new String[] {"f0", "f1", "f2"};
         p.categoricalCols = new String[] {"f2"};
         p.labelCol = "label";
         p.maxBins = 3;
@@ -174,7 +175,8 @@ public class PreprocessTest extends AbstractTestBase {
     @Test
     public void testPreprocessVectorCol() throws Exception {
         GbtParams p = new GbtParams();
-        p.vectorCol = "vec";
+        p.isInputVector = true;
+        p.featuresCols = new String[] {"vec"};
         p.labelCol = "label";
         p.maxBins = 3;
         Tuple2<Table, DataStream<FeatureMeta>> results = Preprocess.preprocessVecCol(inputTable, p);

@@ -147,17 +147,17 @@ public class GBTModelData {
         return categoryToId.getIfAbsent(s, categoryToId.size());
     }
 
-    public IntDoubleHashMap rowToFeatures(Row row, String[] featureCols, String vectorCol) {
+    public IntDoubleHashMap rowToFeatures(Row row, String[] featuresCols) {
         IntDoubleHashMap features = new IntDoubleHashMap();
         if (isInputVector) {
-            Vector vec = row.getFieldAs(vectorCol);
+            Vector vec = row.getFieldAs(featuresCols[0]);
             SparseVector sv = vec.toSparse();
             for (int i = 0; i < sv.indices.length; i += 1) {
                 features.put(sv.indices[i], sv.values[i]);
             }
         } else {
-            for (int i = 0; i < featureCols.length; i += 1) {
-                Object obj = row.getField(featureCols[i]);
+            for (int i = 0; i < featuresCols.length; i += 1) {
+                Object obj = row.getField(featuresCols[i]);
                 double v;
                 if (isCategorical.get(i)) {
                     v = mapCategoricalFeature(categoryToIdMaps.get(i), obj);

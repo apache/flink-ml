@@ -25,8 +25,7 @@ public class GbtParams implements Serializable {
     public TaskType taskType;
 
     // Parameters related with input data.
-    public String[] featureCols;
-    public String vectorCol;
+    public String[] featuresCols;
     public boolean isInputVector;
     public String labelCol;
     public String weightCol;

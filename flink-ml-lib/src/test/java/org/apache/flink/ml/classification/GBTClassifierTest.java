@@ -166,8 +166,7 @@ public class GBTClassifierTest extends AbstractTestBase {
     @Test
     public void testParam() {
         GBTClassifier gbtc = new GBTClassifier();
-        Assert.assertEquals("features", gbtc.getFeaturesCol());
-        Assert.assertNull(gbtc.getInputCols());
+        Assert.assertArrayEquals(new String[] {"features"}, gbtc.getFeaturesCols());
         Assert.assertEquals("label", gbtc.getLabelCol());
         Assert.assertArrayEquals(new String[] {}, gbtc.getCategoricalCols());
         Assert.assertEquals("prediction", gbtc.getPredictionCol());
@@ -193,8 +192,7 @@ public class GBTClassifierTest extends AbstractTestBase {
         Assert.assertEquals("rawPrediction", gbtc.getRawPredictionCol());
         Assert.assertEquals("probability", gbtc.getProbabilityCol());
 
-        gbtc.setFeaturesCol("vec")
-                .setInputCols("f0", "f1", "f2")
+        gbtc.setFeaturesCols("f0", "f1", "f2")
                 .setLabelCol("cls_label")
                 .setCategoricalCols("f0", "f1")
                 .setPredictionCol("pred")
@@ -217,8 +215,7 @@ public class GBTClassifierTest extends AbstractTestBase {
                 .setRawPredictionCol("raw_pred")
                 .setProbabilityCol("prob");
 
-        Assert.assertEquals("vec", gbtc.getFeaturesCol());
-        Assert.assertArrayEquals(new String[] {"f0", "f1", "f2"}, gbtc.getInputCols());
+        Assert.assertArrayEquals(new String[] {"f0", "f1", "f2"}, gbtc.getFeaturesCols());
         Assert.assertEquals("cls_label", gbtc.getLabelCol());
         Assert.assertArrayEquals(new String[] {"f0", "f1"}, gbtc.getCategoricalCols());
         Assert.assertEquals("pred", gbtc.getPredictionCol());
@@ -247,7 +244,7 @@ public class GBTClassifierTest extends AbstractTestBase {
     @Test
     public void testOutputSchema() throws Exception {
         GBTClassifier gbtc =
-                new GBTClassifier().setInputCols("f0", "f1", "f2").setCategoricalCols("f2");
+                new GBTClassifier().setFeaturesCols("f0", "f1", "f2").setCategoricalCols("f2");
         GBTClassifierModel model = gbtc.fit(inputTable);
         Table output = model.transform(inputTable)[0];
         Assert.assertArrayEquals(
@@ -263,7 +260,7 @@ public class GBTClassifierTest extends AbstractTestBase {
     public void testFitAndPredict() throws Exception {
         GBTClassifier gbtc =
                 new GBTClassifier()
-                        .setInputCols("f0", "f1", "f2")
+                        .setFeaturesCols("f0", "f1", "f2")
                         .setCategoricalCols("f2")
                         .setLabelCol("cls_label")
                         .setRegGamma(0.)
@@ -282,7 +279,7 @@ public class GBTClassifierTest extends AbstractTestBase {
     public void testFitAndPredictWithVectorCol() throws Exception {
         GBTClassifier gbtc =
                 new GBTClassifier()
-                        .setFeaturesCol("vec")
+                        .setFeaturesCols("vec")
                         .setLabelCol("cls_label")
                         .setRegGamma(0.)
                         .setMaxBins(3)
@@ -342,7 +339,7 @@ public class GBTClassifierTest extends AbstractTestBase {
     public void testFitAndPredictWithNoCategoricalCols() throws Exception {
         GBTClassifier gbtc =
                 new GBTClassifier()
-                        .setInputCols("f0", "f1")
+                        .setFeaturesCols("f0", "f1")
                         .setLabelCol("cls_label")
                         .setRegGamma(0.)
                         .setMaxBins(5)
@@ -402,7 +399,7 @@ public class GBTClassifierTest extends AbstractTestBase {
     public void testEstimatorSaveLoadAndPredict() throws Exception {
         GBTClassifier gbtc =
                 new GBTClassifier()
-                        .setInputCols("f0", "f1", "f2")
+                        .setFeaturesCols("f0", "f1", "f2")
                         .setCategoricalCols("f2")
                         .setLabelCol("cls_label")
                         .setRegGamma(0.)
@@ -426,7 +423,7 @@ public class GBTClassifierTest extends AbstractTestBase {
     public void testModelSaveLoadAndPredict() throws Exception {
         GBTClassifier gbtc =
                 new GBTClassifier()
-                        .setInputCols("f0", "f1", "f2")
+                        .setFeaturesCols("f0", "f1", "f2")
                         .setCategoricalCols("f2")
                         .setLabelCol("cls_label")
                         .setRegGamma(0.)
@@ -447,7 +444,7 @@ public class GBTClassifierTest extends AbstractTestBase {
     public void testGetModelData() throws Exception {
         GBTClassifier gbtc =
                 new GBTClassifier()
-                        .setInputCols("f0", "f1", "f2")
+                        .setFeaturesCols("f0", "f1", "f2")
                         .setCategoricalCols("f2")
                         .setLabelCol("cls_label")
                         .setRegGamma(0.)
@@ -471,7 +468,7 @@ public class GBTClassifierTest extends AbstractTestBase {
         Assert.assertEquals(gbtc.getMaxIter(), modelData.allTrees.size());
         Assert.assertEquals(gbtc.getCategoricalCols().length, modelData.categoryToIdMaps.size());
         Assert.assertEquals(
-                gbtc.getInputCols().length - gbtc.getCategoricalCols().length,
+                gbtc.getFeaturesCols().length - gbtc.getCategoricalCols().length,
                 modelData.featureIdToBinEdges.size());
         Assert.assertEquals(BitSet.valueOf(new byte[] {4}), modelData.isCategorical);
     }
@@ -480,7 +477,7 @@ public class GBTClassifierTest extends AbstractTestBase {
     public void testSetModelData() throws Exception {
         GBTClassifier gbtc =
                 new GBTClassifier()
-                        .setInputCols("f0", "f1", "f2")
+                        .setFeaturesCols("f0", "f1", "f2")
                         .setCategoricalCols("f2")
                         .setLabelCol("cls_label")
                         .setRegGamma(0.)

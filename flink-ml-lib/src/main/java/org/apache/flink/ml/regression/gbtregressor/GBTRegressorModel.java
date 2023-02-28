@@ -78,8 +78,7 @@ public class GBTRegressorModel extends BaseGBTModel<GBTRegressorModel> {
                             //noinspection unchecked
                             DataStream<Row> inputData = (DataStream<Row>) inputList.get(0);
                             return inputData.map(
-                                    new PredictLabelFunction(
-                                            broadcastModelKey, getInputCols(), getFeaturesCol()),
+                                    new PredictLabelFunction(broadcastModelKey, getFeaturesCols()),
                                     outputTypeInfo);
                         });
         return new Table[] {tEnv.fromDataStream(predictionResult)};
@@ -88,15 +87,12 @@ public class GBTRegressorModel extends BaseGBTModel<GBTRegressorModel> {
     private static class PredictLabelFunction extends RichMapFunction<Row, Row> {
 
         private final String broadcastModelKey;
-        private final String[] inputCols;
-        private final String featuresCol;
+        private final String[] featuresCols;
         private GBTModelData modelData;
 
-        public PredictLabelFunction(
-                String broadcastModelKey, String[] inputCols, String featuresCol) {
+        public PredictLabelFunction(String broadcastModelKey, String[] featuresCols) {
             this.broadcastModelKey = broadcastModelKey;
-            this.inputCols = inputCols;
-            this.featuresCol = featuresCol;
+            this.featuresCols = featuresCols;
         }
 
         @Override
@@ -106,7 +102,7 @@ public class GBTRegressorModel extends BaseGBTModel<GBTRegressorModel> {
                         (GBTModelData)
                                 getRuntimeContext().getBroadcastVariable(broadcastModelKey).get(0);
             }
-            IntDoubleHashMap features = modelData.rowToFeatures(value, inputCols, featuresCol);
+            IntDoubleHashMap features = modelData.rowToFeatures(value, featuresCols);
             double pred = modelData.predictRaw(features);
             return Row.join(value, Row.of(pred));
         }

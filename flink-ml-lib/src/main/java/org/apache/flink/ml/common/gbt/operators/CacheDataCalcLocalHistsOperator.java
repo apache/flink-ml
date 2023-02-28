@@ -132,13 +132,13 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
         instance.label = row.getFieldAs(gbtParams.labelCol);
 
         if (gbtParams.isInputVector) {
-            Vector vec = row.getFieldAs(gbtParams.vectorCol);
+            Vector vec = row.getFieldAs(gbtParams.featuresCols[0]);
             SparseVector sv = vec.toSparse();
             instance.featureIds = sv.indices.length == sv.size() ? null : sv.indices;
             instance.featureValues = Arrays.stream(sv.values).mapToInt(d -> (int) d).toArray();
         } else {
             instance.featureValues =
-                    Arrays.stream(gbtParams.featureCols)
+                    Arrays.stream(gbtParams.featuresCols)
                             .mapToInt(col -> ((Number) row.getFieldAs(col)).intValue())
                             .toArray();
         }

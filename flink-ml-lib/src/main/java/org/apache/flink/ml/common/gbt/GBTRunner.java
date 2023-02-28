@@ -20,6 +20,7 @@ package org.apache.flink.ml.common.gbt;
 
 import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.api.common.functions.RichMapFunction;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.iteration.DataStreamList;
 import org.apache.flink.iteration.IterationConfig;
@@ -28,10 +29,14 @@ import org.apache.flink.iteration.ReplayableDataStreamList;
 import org.apache.flink.ml.classification.gbtclassifier.GBTClassifierParams;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
+import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
 import org.apache.flink.ml.common.gbt.defs.GbtParams;
 import org.apache.flink.ml.common.gbt.defs.TaskType;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
+import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.SparseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.regression.gbtregressor.GBTRegressorParams;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -39,6 +44,7 @@ import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
 import org.apache.flink.types.Row;
+import org.apache.flink.util.Preconditions;
 
 import org.apache.commons.lang3.ArrayUtils;
 
@@ -63,9 +69,28 @@ public class GBTRunner {
         return train(data, estimator, TaskType.REGRESSION);
     }
 
+    private static boolean isVectorType(TypeInformation<?> typeInfo) {
+        return typeInfo instanceof DenseVectorTypeInfo
+                || typeInfo instanceof SparseVectorTypeInfo
+                || typeInfo instanceof VectorTypeInfo;
+    }
+
     static DataStream<GBTModelData> train(
             Table data, BaseGBTParams<?> estimator, TaskType taskType) {
-        return train(data, fromEstimator(estimator, taskType));
+        String[] featuresCols = estimator.getFeaturesCols();
+        TypeInformation<?>[] featuresTypes =
+                Arrays.stream(featuresCols)
+                        .map(d -> TableUtils.getTypeInfoByName(data.getResolvedSchema(), d))
+                        .toArray(TypeInformation[]::new);
+        for (int i = 0; i < featuresCols.length; i += 1) {
+            Preconditions.checkArgument(
+                    null != featuresTypes[i],
+                    String.format(
+                            "Column name %s not existed in the input data.", featuresCols[i]));
+        }
+
+        boolean isInputVector = featuresCols.length == 1 && isVectorType(featuresTypes[0]);
+        return train(data, fromEstimator(estimator, isInputVector, taskType));
     }
 
     /** Trains a gradient boosting tree model with given data and parameters. */
@@ -124,7 +149,8 @@ public class GBTRunner {
         return dataStreamList.get(0);
     }
 
-    public static GbtParams fromEstimator(BaseGBTParams<?> estimator, TaskType taskType) {
+    public static GbtParams fromEstimator(
+            BaseGBTParams<?> estimator, boolean isInputVector, TaskType taskType) {
         final Map<Param<?>, Object> paramMap = estimator.getParamMap();
         final Set<Param<?>> unsupported =
                 new HashSet<>(
@@ -147,9 +173,8 @@ public class GBTRunner {
 
         GbtParams p = new GbtParams();
         p.taskType = taskType;
-        p.featureCols = estimator.getInputCols();
-        p.vectorCol = estimator.getFeaturesCol();
-        p.isInputVector = (null == p.featureCols);
+        p.featuresCols = estimator.getFeaturesCols();
+        p.isInputVector = isInputVector;
         p.labelCol = estimator.getLabelCol();
         p.weightCol = estimator.getWeightCol();
         p.categoricalCols = estimator.getCategoricalCols();
@@ -201,7 +226,7 @@ public class GBTRunner {
             if (!trainContext.params.isInputVector) {
                 Arrays.sort(
                         trainContext.featureMetas,
-                        Comparator.comparing(d -> ArrayUtils.indexOf(p.featureCols, d.name)));
+                        Comparator.comparing(d -> ArrayUtils.indexOf(p.featuresCols, d.name)));
             }
             trainContext.numFeatures = trainContext.featureMetas.length;
             trainContext.labelSumCount =

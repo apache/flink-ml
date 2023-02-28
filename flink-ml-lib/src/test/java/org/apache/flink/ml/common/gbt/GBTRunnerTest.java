@@ -93,7 +93,7 @@ public class GBTRunnerTest extends AbstractTestBase {
 
     private GbtParams getCommonGbtParams() {
         GbtParams p = new GbtParams();
-        p.featureCols = new String[] {"f0", "f1", "f2"};
+        p.featuresCols = new String[] {"f0", "f1", "f2"};
         p.categoricalCols = new String[] {"f2"};
         p.isInputVector = false;
         p.gamma = 0.;

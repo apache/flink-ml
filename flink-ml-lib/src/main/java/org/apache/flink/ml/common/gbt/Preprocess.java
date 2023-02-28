@@ -64,7 +64,7 @@ class Preprocess {
      */
     static Tuple2<Table, DataStream<FeatureMeta>> preprocessCols(Table dataTable, GbtParams p) {
 
-        final String[] relatedCols = ArrayUtils.add(p.featureCols, p.labelCol);
+        final String[] relatedCols = ArrayUtils.add(p.featuresCols, p.labelCol);
         dataTable =
                 dataTable.select(
                         Arrays.stream(relatedCols)
@@ -72,7 +72,7 @@ class Preprocess {
                                 .toArray(ApiExpression[]::new));
 
         // Maps continuous columns to integers, and obtain corresponding discretizer model.
-        String[] continuousCols = ArrayUtils.removeElements(p.featureCols, p.categoricalCols);
+        String[] continuousCols = ArrayUtils.removeElements(p.featuresCols, p.categoricalCols);
         Tuple2<Table, DataStream<KBinsDiscretizerModelData>> continuousMappedDataAndModelData =
                 discretizeContinuousCols(dataTable, continuousCols, p.maxBins);
         dataTable = continuousMappedDataAndModelData.f0;
@@ -121,9 +121,9 @@ class Preprocess {
      * information for all features.
      */
     static Tuple2<Table, DataStream<FeatureMeta>> preprocessVecCol(Table dataTable, GbtParams p) {
-        dataTable = dataTable.select($(p.vectorCol), $(p.labelCol));
+        dataTable = dataTable.select($(p.featuresCols[0]), $(p.labelCol));
         Tuple2<Table, DataStream<KBinsDiscretizerModelData>> mappedDataAndModelData =
-                discretizeVectorCol(dataTable, p.vectorCol, p.maxBins);
+                discretizeVectorCol(dataTable, p.featuresCols[0], p.maxBins);
         dataTable = mappedDataAndModelData.f0;
         DataStream<FeatureMeta> featureMeta =
                 buildContinuousFeatureMeta(mappedDataAndModelData.f1, null);
