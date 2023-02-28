@@ -86,8 +86,24 @@ class SharedStorage {
         }
 
         T get() {
-            //noinspection unchecked
-            return (T) m.get(t);
+            // It is possible that the `get` request of an item is triggered earlier than its
+            // initialization. In this case, we wait for a while.
+            long waitTime = 10;
+            do {
+                //noinspection unchecked
+                T value = (T) m.get(t);
+                if (null != value) {
+                    return value;
+                }
+                try {
+                    Thread.sleep(waitTime);
+                } catch (InterruptedException e) {
+                    break;
+                }
+                waitTime *= 2;
+            } while (waitTime < 10 * 1000);
+            throw new IllegalStateException(
+                    String.format("Failed to get value of %s after waiting %d ms.", t, waitTime));
         }
     }
 
