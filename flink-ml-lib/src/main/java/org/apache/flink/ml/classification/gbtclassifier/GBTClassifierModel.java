@@ -44,7 +44,7 @@ import java.util.Collections;
 
 /** A Model computed by {@link GBTClassifier}. */
 public class GBTClassifierModel extends BaseGBTModel<GBTClassifierModel>
-        implements GBTClassifierParams<GBTClassifierModel> {
+        implements GBTClassifierModelParams<GBTClassifierModel> {
 
     /**
      * Loads model data from path.

@@ -28,7 +28,7 @@ import org.apache.flink.ml.param.StringParam;
  *
  * @param <T> The class type of this instance.
  */
-public interface GBTRegressorParams<T> extends BaseGBTParams<T> {
+public interface GBTRegressorParams<T> extends BaseGBTParams<T>, GBTRegressorModelParams<T> {
     Param<String> LOSS_TYPE =
             new StringParam(
                     "lossType",

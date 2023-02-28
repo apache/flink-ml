@@ -44,7 +44,7 @@ import org.apache.flink.ml.param.ParamValidators;
  * @param <T> The class type of this instance.
  */
 public interface BaseGBTParams<T>
-        extends GBTModelParams<T>,
+        extends BaseGBTModelParams<T>,
                 HasLeafCol<T>,
                 HasWeightCol<T>,
                 HasMaxDepth<T>,

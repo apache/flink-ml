@@ -31,8 +31,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /** Base model computed by {@link GBTClassifier} or {@link GBTRegressor}. */
-public abstract class BaseGBTModel<T extends BaseGBTModel<T>>
-        implements Model<T>, GBTModelParams<T> {
+public abstract class BaseGBTModel<T extends BaseGBTModel<T>> implements Model<T> {
 
     protected final Map<Param<?>, Object> paramMap = new HashMap<>();
     protected Table modelDataTable;

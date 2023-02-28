@@ -16,29 +16,13 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.classification.gbtclassifier;
+package org.apache.flink.ml.regression.gbtregressor;
 
-import org.apache.flink.ml.common.gbt.BaseGBTParams;
-import org.apache.flink.ml.param.Param;
-import org.apache.flink.ml.param.ParamValidators;
-import org.apache.flink.ml.param.StringParam;
+import org.apache.flink.ml.common.gbt.BaseGBTModelParams;
 
 /**
- * Parameters for {@link GBTClassifier}.
+ * Parameters for {@link GBTRegressorModel}.
  *
  * @param <T> The class type of this instance.
  */
-public interface GBTClassifierParams<T> extends BaseGBTParams<T>, GBTClassifierModelParams<T> {
-
-    Param<String> LOSS_TYPE =
-            new StringParam(
-                    "lossType", "Loss type.", "logistic", ParamValidators.inArray("logistic"));
-
-    default String getLossType() {
-        return get(LOSS_TYPE);
-    }
-
-    default T setLossType(String value) {
-        return set(LOSS_TYPE, value);
-    }
-}
+public interface GBTRegressorModelParams<T> extends BaseGBTModelParams<T> {}

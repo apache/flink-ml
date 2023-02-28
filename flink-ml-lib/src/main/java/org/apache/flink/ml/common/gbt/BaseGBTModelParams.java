@@ -34,5 +34,5 @@ import org.apache.flink.ml.regression.gbtregressor.GBTRegressorModel;
  *
  * @param <T> The class type of this instance.
  */
-public interface GBTModelParams<T>
+public interface BaseGBTModelParams<T>
         extends HasFeaturesCols<T>, HasLabelCol<T>, HasCategoricalCols<T>, HasPredictionCol<T> {}

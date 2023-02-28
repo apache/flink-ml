@@ -18,27 +18,14 @@
 
 package org.apache.flink.ml.classification.gbtclassifier;
 
-import org.apache.flink.ml.common.gbt.BaseGBTParams;
-import org.apache.flink.ml.param.Param;
-import org.apache.flink.ml.param.ParamValidators;
-import org.apache.flink.ml.param.StringParam;
+import org.apache.flink.ml.common.gbt.BaseGBTModelParams;
+import org.apache.flink.ml.common.param.HasProbabilityCol;
+import org.apache.flink.ml.common.param.HasRawPredictionCol;
 
 /**
- * Parameters for {@link GBTClassifier}.
+ * Parameters for {@link GBTClassifierModel}.
  *
  * @param <T> The class type of this instance.
  */
-public interface GBTClassifierParams<T> extends BaseGBTParams<T>, GBTClassifierModelParams<T> {
-
-    Param<String> LOSS_TYPE =
-            new StringParam(
-                    "lossType", "Loss type.", "logistic", ParamValidators.inArray("logistic"));
-
-    default String getLossType() {
-        return get(LOSS_TYPE);
-    }
-
-    default T setLossType(String value) {
-        return set(LOSS_TYPE, value);
-    }
-}
+public interface GBTClassifierModelParams<T>
+        extends BaseGBTModelParams<T>, HasRawPredictionCol<T>, HasProbabilityCol<T> {}

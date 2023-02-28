@@ -40,7 +40,8 @@ import java.io.IOException;
 import java.util.Collections;
 
 /** A Model computed by {@link GBTRegressor}. */
-public class GBTRegressorModel extends BaseGBTModel<GBTRegressorModel> {
+public class GBTRegressorModel extends BaseGBTModel<GBTRegressorModel>
+        implements GBTRegressorModelParams<GBTRegressorModel> {
 
     /**
      * Loads model data from path.
