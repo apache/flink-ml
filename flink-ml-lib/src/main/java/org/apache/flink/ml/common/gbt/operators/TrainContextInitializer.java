@@ -23,10 +23,10 @@ import org.apache.flink.ml.common.gbt.defs.BinnedInstance;
 import org.apache.flink.ml.common.gbt.defs.GbtParams;
 import org.apache.flink.ml.common.gbt.defs.TaskType;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
-import org.apache.flink.ml.common.gbt.loss.AbsoluteError;
-import org.apache.flink.ml.common.gbt.loss.LogLoss;
-import org.apache.flink.ml.common.gbt.loss.Loss;
-import org.apache.flink.ml.common.gbt.loss.SquaredError;
+import org.apache.flink.ml.common.lossfunc.AbsoluteErrorLoss;
+import org.apache.flink.ml.common.lossfunc.LogLoss;
+import org.apache.flink.ml.common.lossfunc.LossFunc;
+import org.apache.flink.ml.common.lossfunc.SquaredErrorLoss;
 import org.apache.flink.util.Preconditions;
 
 import org.slf4j.Logger;
@@ -135,15 +135,15 @@ class TrainContextInitializer {
         }
     }
 
-    private Loss getLoss() {
+    private LossFunc getLoss() {
         String lossType = params.lossType;
         switch (lossType) {
             case "logistic":
                 return LogLoss.INSTANCE;
             case "squared":
-                return SquaredError.INSTANCE;
+                return SquaredErrorLoss.INSTANCE;
             case "absolute":
-                return AbsoluteError.INSTANCE;
+                return AbsoluteErrorLoss.INSTANCE;
             default:
                 throw new UnsupportedOperationException("Unsupported loss.");
         }

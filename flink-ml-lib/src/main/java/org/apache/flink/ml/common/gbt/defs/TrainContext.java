@@ -19,7 +19,7 @@
 package org.apache.flink.ml.common.gbt.defs;
 
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.ml.common.gbt.loss.Loss;
+import org.apache.flink.ml.common.lossfunc.LossFunc;
 
 import java.io.Serializable;
 import java.util.Random;
@@ -43,5 +43,5 @@ public class TrainContext implements Serializable {
 
     public Tuple2<Double, Long> labelSumCount;
     public double prior;
-    public Loss loss;
+    public LossFunc loss;
 }

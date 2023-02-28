@@ -48,4 +48,37 @@ public interface LossFunc extends Serializable {
      */
     void computeGradient(
             LabeledPointWithWeight dataPoint, DenseVector coefficient, DenseVector cumGradient);
+
+    /**
+     * Calculates loss given pred and label.
+     *
+     * @param pred prediction value.
+     * @param label label value.
+     * @return loss value.
+     */
+    default double loss(double pred, double label) {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Calculates value of gradient given prediction and label.
+     *
+     * @param pred prediction value.
+     * @param label label value.
+     * @return the value of gradient.
+     */
+    default double gradient(double pred, double label) {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Calculates value of second derivative, i.e. hessian, given prediction and label.
+     *
+     * @param pred prediction value.
+     * @param label label value.
+     * @return the value of second derivative, i.e. hessian.
+     */
+    default double hessian(double pred, double label) {
+        throw new UnsupportedOperationException();
+    }
 }

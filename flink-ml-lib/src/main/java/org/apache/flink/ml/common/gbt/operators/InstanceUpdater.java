@@ -24,7 +24,7 @@ import org.apache.flink.ml.common.gbt.defs.Node;
 import org.apache.flink.ml.common.gbt.defs.PredGradHess;
 import org.apache.flink.ml.common.gbt.defs.Split;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
-import org.apache.flink.ml.common.gbt.loss.Loss;
+import org.apache.flink.ml.common.lossfunc.LossFunc;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +36,7 @@ class InstanceUpdater {
     private static final Logger LOG = LoggerFactory.getLogger(InstanceUpdater.class);
 
     private final int subtaskId;
-    private final Loss loss;
+    private final LossFunc loss;
     private final double stepSize;
     private final double prior;
 

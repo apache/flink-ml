@@ -28,8 +28,8 @@ import org.apache.flink.ml.common.gbt.defs.Histogram;
 import org.apache.flink.ml.common.gbt.defs.LearningNode;
 import org.apache.flink.ml.common.gbt.defs.PredGradHess;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
-import org.apache.flink.ml.common.gbt.loss.Loss;
 import org.apache.flink.ml.common.gbt.typeinfo.BinnedInstanceSerializer;
+import org.apache.flink.ml.common.lossfunc.LossFunc;
 import org.apache.flink.ml.common.sharedstorage.SharedStorageContext;
 import org.apache.flink.ml.common.sharedstorage.SharedStorageStreamOperator;
 import org.apache.flink.ml.linalg.SparseVector;
@@ -197,7 +197,7 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
                     if (0 == pgh.length) {
                         pgh = new PredGradHess[instances.length];
                         double prior = trainContext.prior;
-                        Loss loss = trainContext.loss;
+                        LossFunc loss = trainContext.loss;
                         for (int i = 0; i < instances.length; i += 1) {
                             double label = instances[i].label;
                             pgh[i] =

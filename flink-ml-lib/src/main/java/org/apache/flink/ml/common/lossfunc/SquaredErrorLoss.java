@@ -16,31 +16,45 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.gbt.loss;
+package org.apache.flink.ml.common.lossfunc;
+
+import org.apache.flink.ml.common.feature.LabeledPointWithWeight;
+import org.apache.flink.ml.linalg.DenseVector;
 
 /**
  * Squared error loss function defined as (y - pred)^2 where y and pred are label and predictions
  * for the instance respectively.
  */
-public class SquaredError implements Loss {
+public class SquaredErrorLoss implements LossFunc {
 
-    public static final SquaredError INSTANCE = new SquaredError();
+    public static final SquaredErrorLoss INSTANCE = new SquaredErrorLoss();
 
-    private SquaredError() {}
+    private SquaredErrorLoss() {}
 
     @Override
-    public double loss(double pred, double y) {
-        double error = y - pred;
+    public double loss(double pred, double label) {
+        double error = label - pred;
         return error * error;
     }
 
     @Override
-    public double gradient(double pred, double y) {
-        return -2. * (y - pred);
+    public double gradient(double pred, double label) {
+        return -2. * (label - pred);
     }
 
     @Override
-    public double hessian(double pred, double y) {
+    public double hessian(double pred, double label) {
         return 2.;
+    }
+
+    @Override
+    public double computeLoss(LabeledPointWithWeight dataPoint, DenseVector coefficient) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void computeGradient(
+            LabeledPointWithWeight dataPoint, DenseVector coefficient, DenseVector cumGradient) {
+        throw new UnsupportedOperationException();
     }
 }
