@@ -110,6 +110,7 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
     @Override
     public void snapshotState(StateSnapshotContext context) throws Exception {
         super.snapshotState(context);
+        splitsState.update(Collections.singletonList(splits));
         splitsState.snapshotState(context);
         nodeSplitterState.snapshotState(context);
         instanceUpdaterState.snapshotState(context);
@@ -204,7 +205,6 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
     @Override
     public void processElement(StreamRecord<Splits> element) throws Exception {
         splits = element.getValue();
-        splitsState.update(Collections.singletonList(splits));
     }
 
     @Override

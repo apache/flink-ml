@@ -110,6 +110,7 @@ class SharedStorage {
     static class Writer<T> extends Reader<T> {
         private final String ownerId;
         private final ListStateWithCache<T> cache;
+        private boolean isDirty;
 
         Writer(
                 Tuple3<StorageID, Integer, String> t,
@@ -138,6 +139,7 @@ class SharedStorage {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
+            isDirty = false;
         }
 
         private void ensureOwner() {
@@ -149,11 +151,7 @@ class SharedStorage {
         void set(T value) {
             ensureOwner();
             m.put(t, value);
-            try {
-                cache.update(Collections.singletonList(value));
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
+            isDirty = true;
         }
 
         void remove() {
@@ -164,6 +162,10 @@ class SharedStorage {
         }
 
         void snapshotState(StateSnapshotContext context) throws Exception {
+            if (isDirty) {
+                cache.update(Collections.singletonList(get()));
+                isDirty = false;
+            }
             cache.snapshotState(context);
         }
     }
