@@ -43,7 +43,7 @@ class InstanceUpdater {
     public InstanceUpdater(TrainContext trainContext) {
         subtaskId = trainContext.subtaskId;
         loss = trainContext.loss;
-        stepSize = trainContext.params.stepSize;
+        stepSize = trainContext.strategy.stepSize;
         prior = trainContext.prior;
     }
 

@@ -24,24 +24,50 @@ import org.apache.flink.ml.common.lossfunc.LossFunc;
 import java.io.Serializable;
 import java.util.Random;
 
-/** Stores the training context. */
+/**
+ * Stores necessary static context information for training. Subtasks of co-located operators
+ * scheduled in a same TaskManager share a same context.
+ */
 public class TrainContext implements Serializable {
+    /** Subtask ID of co-located operators. */
     public int subtaskId;
-    public int numSubtasks;
-    public GbtParams params;
 
+    /** Number of subtasks of co-located operators. */
+    public int numSubtasks;
+
+    /** Configurations for the boosting. */
+    public BoostingStrategy strategy;
+
+    /** Number of instances. */
     public int numInstances;
+
+    /** Number of bagging instances used for training one tree. */
     public int numBaggingInstances;
+
+    /** Randomizer for sampling instances. */
     public Random instanceRandomizer;
 
+    /** Number of features. */
     public int numFeatures;
+
+    /** Number of bagging features tested for splitting one node. */
     public int numBaggingFeatures;
+
+    /** Randomizer for sampling features. */
     public Random featureRandomizer;
 
+    /** Meta information of every feature. */
     public FeatureMeta[] featureMetas;
+
+    /** Number of bins for every feature. */
     public int[] numFeatureBins;
 
+    /** Sum and count of labels of all samples. */
     public Tuple2<Double, Long> labelSumCount;
+
+    /** The prior value for prediction. */
     public double prior;
+
+    /** The loss function. */
     public LossFunc loss;
 }

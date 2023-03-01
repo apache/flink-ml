@@ -20,12 +20,12 @@ package org.apache.flink.ml.common.gbt.operators;
 
 import org.apache.flink.ml.common.gbt.DataUtils;
 import org.apache.flink.ml.common.gbt.defs.BinnedInstance;
-import org.apache.flink.ml.common.gbt.defs.Distributor;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
 import org.apache.flink.ml.common.gbt.defs.Histogram;
 import org.apache.flink.ml.common.gbt.defs.LearningNode;
 import org.apache.flink.ml.common.gbt.defs.PredGradHess;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
+import org.apache.flink.ml.util.Distributor;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,7 +68,7 @@ class HistBuilder {
         featureRandomizer = trainContext.featureRandomizer;
         featureIndicesPool = IntStream.range(0, trainContext.numFeatures).toArray();
 
-        isInputVector = trainContext.params.isInputVector;
+        isInputVector = trainContext.strategy.isInputVector;
 
         maxFeatureBins = Arrays.stream(numFeatureBins).max().orElse(0);
         totalNumFeatureBins = Arrays.stream(numFeatureBins).sum();

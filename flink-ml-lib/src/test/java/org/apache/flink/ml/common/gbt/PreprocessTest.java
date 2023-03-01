@@ -22,8 +22,8 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
+import org.apache.flink.ml.common.gbt.defs.BoostingStrategy;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
-import org.apache.flink.ml.common.gbt.defs.GbtParams;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.util.TestUtils;
@@ -127,13 +127,14 @@ public class PreprocessTest extends AbstractTestBase {
 
     @Test
     public void testPreprocessCols() throws Exception {
-        GbtParams p = new GbtParams();
-        p.isInputVector = false;
-        p.featuresCols = new String[] {"f0", "f1", "f2"};
-        p.categoricalCols = new String[] {"f2"};
-        p.labelCol = "label";
-        p.maxBins = 3;
-        Tuple2<Table, DataStream<FeatureMeta>> results = Preprocess.preprocessCols(inputTable, p);
+        BoostingStrategy strategy = new BoostingStrategy();
+        strategy.isInputVector = false;
+        strategy.featuresCols = new String[] {"f0", "f1", "f2"};
+        strategy.categoricalCols = new String[] {"f2"};
+        strategy.labelCol = "label";
+        strategy.maxBins = 3;
+        Tuple2<Table, DataStream<FeatureMeta>> results =
+                Preprocess.preprocessCols(inputTable, strategy);
 
         actualMeta.get().clear();
         results.f1.addSink(new CollectSink<>(actualMeta));
@@ -174,12 +175,13 @@ public class PreprocessTest extends AbstractTestBase {
 
     @Test
     public void testPreprocessVectorCol() throws Exception {
-        GbtParams p = new GbtParams();
-        p.isInputVector = true;
-        p.featuresCols = new String[] {"vec"};
-        p.labelCol = "label";
-        p.maxBins = 3;
-        Tuple2<Table, DataStream<FeatureMeta>> results = Preprocess.preprocessVecCol(inputTable, p);
+        BoostingStrategy strategy = new BoostingStrategy();
+        strategy.isInputVector = true;
+        strategy.featuresCols = new String[] {"vec"};
+        strategy.labelCol = "label";
+        strategy.maxBins = 3;
+        Tuple2<Table, DataStream<FeatureMeta>> results =
+                Preprocess.preprocessVecCol(inputTable, strategy);
 
         actualMeta.get().clear();
         results.f1.addSink(new CollectSink<>(actualMeta));

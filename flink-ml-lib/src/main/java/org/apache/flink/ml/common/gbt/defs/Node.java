@@ -23,7 +23,13 @@ import org.apache.flink.ml.common.gbt.typeinfo.NodeTypeInfoFactory;
 
 import java.io.Serializable;
 
-/** Tree node in the decision tree that will be serialized to json and deserialized from json. */
+/**
+ * Represents a tree node in a decision tree.
+ *
+ * <p>NOTE: This class should be used together with a linear indexable structure, e.g., a list or an
+ * array, which stores all tree nodes, because {@link #left} and {@link #right} are indices of nodes
+ * in the linear structure.
+ */
 @TypeInfo(NodeTypeInfoFactory.class)
 public class Node implements Serializable {
 

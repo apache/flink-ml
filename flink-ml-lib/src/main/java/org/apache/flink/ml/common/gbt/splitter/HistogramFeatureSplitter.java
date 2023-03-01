@@ -20,8 +20,8 @@ package org.apache.flink.ml.common.gbt.splitter;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.ml.common.gbt.defs.BoostingStrategy;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
-import org.apache.flink.ml.common.gbt.defs.GbtParams;
 import org.apache.flink.ml.common.gbt.defs.HessianImpurity;
 import org.apache.flink.ml.common.gbt.defs.Impurity;
 import org.apache.flink.ml.common.gbt.defs.Slice;
@@ -35,9 +35,10 @@ public abstract class HistogramFeatureSplitter extends FeatureSplitter {
     protected double[] hists;
     protected Slice slice;
 
-    public HistogramFeatureSplitter(int featureId, FeatureMeta featureMeta, GbtParams params) {
-        super(featureId, featureMeta, params);
-        this.useMissing = params.useMissing;
+    public HistogramFeatureSplitter(
+            int featureId, FeatureMeta featureMeta, BoostingStrategy strategy) {
+        super(featureId, featureMeta, strategy);
+        this.useMissing = strategy.useMissing;
     }
 
     protected boolean isSplitIllegal(Impurity total, Impurity left, Impurity right) {
@@ -184,6 +185,6 @@ public abstract class HistogramFeatureSplitter extends FeatureSplitter {
     }
 
     protected HessianImpurity emptyImpurity() {
-        return new HessianImpurity(params.lambda, params.gamma, 0, 0, 0, 0);
+        return new HessianImpurity(strategy.regLambda, strategy.regGamma, 0, 0, 0, 0);
     }
 }

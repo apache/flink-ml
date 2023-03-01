@@ -31,10 +31,7 @@ import org.apache.flink.ml.param.StringParam;
 public interface GBTRegressorParams<T> extends BaseGBTParams<T>, GBTRegressorModelParams<T> {
     Param<String> LOSS_TYPE =
             new StringParam(
-                    "lossType",
-                    "Loss type.",
-                    "squared",
-                    ParamValidators.inArray("squared", "absolute"));
+                    "lossType", "Loss type.", "squared", ParamValidators.inArray("squared"));
 
     default String getLossType() {
         return get(LOSS_TYPE);

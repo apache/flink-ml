@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.gbt.defs;
+package org.apache.flink.ml.util;
 
 import java.io.Serializable;
 

@@ -18,8 +18,8 @@
 
 package org.apache.flink.ml.common.gbt.splitter;
 
+import org.apache.flink.ml.common.gbt.defs.BoostingStrategy;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
-import org.apache.flink.ml.common.gbt.defs.GbtParams;
 import org.apache.flink.ml.common.gbt.defs.Split;
 
 /**
@@ -32,20 +32,21 @@ import org.apache.flink.ml.common.gbt.defs.Split;
 public abstract class FeatureSplitter {
     protected final int featureId;
     protected final FeatureMeta featureMeta;
-    protected final GbtParams params;
+    protected final BoostingStrategy strategy;
 
     protected final int minSamplesPerLeaf;
     protected final double minSampleRatioPerChild;
     protected final double minInfoGain;
 
-    public FeatureSplitter(int featureId, FeatureMeta featureMeta, GbtParams params) {
-        this.params = params;
+    public FeatureSplitter(int featureId, FeatureMeta featureMeta, BoostingStrategy strategy) {
+        this.strategy = strategy;
         this.featureId = featureId;
         this.featureMeta = featureMeta;
 
-        this.minSamplesPerLeaf = params.minInstancesPerNode;
-        this.minSampleRatioPerChild = params.minWeightFractionPerNode; // TODO: not exactly the same
-        this.minInfoGain = params.minInfoGain;
+        this.minSamplesPerLeaf = strategy.minInstancesPerNode;
+        this.minSampleRatioPerChild =
+                strategy.minWeightFractionPerNode; // TODO: not exactly the same
+        this.minInfoGain = strategy.minInfoGain;
     }
 
     public abstract Split bestSplit();

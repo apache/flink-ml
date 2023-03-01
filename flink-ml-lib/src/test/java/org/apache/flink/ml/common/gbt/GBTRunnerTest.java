@@ -23,7 +23,8 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.ml.common.gbt.defs.GbtParams;
+import org.apache.flink.ml.common.gbt.defs.BoostingStrategy;
+import org.apache.flink.ml.common.gbt.defs.LossType;
 import org.apache.flink.ml.common.gbt.defs.TaskType;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
@@ -91,23 +92,23 @@ public class GBTRunnerTest extends AbstractTestBase {
                                         })));
     }
 
-    private GbtParams getCommonGbtParams() {
-        GbtParams p = new GbtParams();
-        p.featuresCols = new String[] {"f0", "f1", "f2"};
-        p.categoricalCols = new String[] {"f2"};
-        p.isInputVector = false;
-        p.gamma = 0.;
-        p.maxBins = 3;
-        p.seed = 123;
-        p.featureSubsetStrategy = "all";
-        p.maxDepth = 3;
-        p.maxNumLeaves = 1 << (p.maxDepth - 1);
-        p.maxIter = 20;
-        p.stepSize = 0.1;
-        return p;
+    private BoostingStrategy getCommonStrategy() {
+        BoostingStrategy strategy = new BoostingStrategy();
+        strategy.featuresCols = new String[] {"f0", "f1", "f2"};
+        strategy.categoricalCols = new String[] {"f2"};
+        strategy.isInputVector = false;
+        strategy.regGamma = 0.;
+        strategy.maxBins = 3;
+        strategy.seed = 123;
+        strategy.featureSubsetStrategy = "all";
+        strategy.maxDepth = 3;
+        strategy.maxNumLeaves = 1 << (strategy.maxDepth - 1);
+        strategy.maxIter = 20;
+        strategy.stepSize = 0.1;
+        return strategy;
     }
 
-    private void verifyModelData(GBTModelData modelData, GbtParams p) {
+    private void verifyModelData(GBTModelData modelData, BoostingStrategy p) {
         Assert.assertEquals(p.taskType, TaskType.valueOf(modelData.type));
         Assert.assertEquals(p.stepSize, modelData.stepSize, 1e-12);
         Assert.assertEquals(p.maxIter, modelData.allTrees.size());
@@ -115,25 +116,25 @@ public class GBTRunnerTest extends AbstractTestBase {
 
     @Test
     public void testTrainClassifier() throws Exception {
-        GbtParams p = getCommonGbtParams();
-        p.taskType = TaskType.CLASSIFICATION;
-        p.labelCol = "cls_label";
-        p.lossType = "logistic";
-        p.useMissing = true;
+        BoostingStrategy strategy = getCommonStrategy();
+        strategy.taskType = TaskType.CLASSIFICATION;
+        strategy.labelCol = "cls_label";
+        strategy.lossType = LossType.LOGISTIC;
+        strategy.useMissing = true;
 
-        GBTModelData modelData = GBTRunner.train(inputTable, p).executeAndCollect().next();
-        verifyModelData(modelData, p);
+        GBTModelData modelData = GBTRunner.train(inputTable, strategy).executeAndCollect().next();
+        verifyModelData(modelData, strategy);
     }
 
     @Test
     public void testTrainRegressor() throws Exception {
-        GbtParams p = getCommonGbtParams();
-        p.taskType = TaskType.REGRESSION;
-        p.labelCol = "label";
-        p.lossType = "squared";
-        p.useMissing = true;
+        BoostingStrategy strategy = getCommonStrategy();
+        strategy.taskType = TaskType.REGRESSION;
+        strategy.labelCol = "label";
+        strategy.lossType = LossType.SQUARED;
+        strategy.useMissing = true;
 
-        GBTModelData modelData = GBTRunner.train(inputTable, p).executeAndCollect().next();
-        verifyModelData(modelData, p);
+        GBTModelData modelData = GBTRunner.train(inputTable, strategy).executeAndCollect().next();
+        verifyModelData(modelData, strategy);
     }
 }

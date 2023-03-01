@@ -16,27 +16,10 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.param;
+package org.apache.flink.ml.common.gbt.defs;
 
-import org.apache.flink.ml.param.DoubleParam;
-import org.apache.flink.ml.param.Param;
-import org.apache.flink.ml.param.ParamValidators;
-import org.apache.flink.ml.param.WithParams;
-
-/** Interface for shared param subsampling rate. */
-public interface HasSubsamplingRate<T> extends WithParams<T> {
-    Param<Double> SUBSAMPLING_RATE =
-            new DoubleParam(
-                    "subsamplingRate",
-                    "Fraction of the training data used for learning one tree.",
-                    1.,
-                    ParamValidators.inRange(0., 1.));
-
-    default double getSubsamplingRate() {
-        return get(SUBSAMPLING_RATE);
-    }
-
-    default T setSubsamplingRate(Double value) {
-        return set(SUBSAMPLING_RATE, value);
-    }
+/** Indicates the type of loss. */
+public enum LossType {
+    SQUARED,
+    LOGISTIC,
 }

@@ -18,7 +18,6 @@
 
 package org.apache.flink.ml.common.gbt.operators;
 
-import org.apache.flink.ml.common.gbt.defs.Distributor;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
 import org.apache.flink.ml.common.gbt.defs.Histogram;
 import org.apache.flink.ml.common.gbt.defs.LearningNode;
@@ -29,6 +28,7 @@ import org.apache.flink.ml.common.gbt.defs.TrainContext;
 import org.apache.flink.ml.common.gbt.splitter.CategoricalFeatureSplitter;
 import org.apache.flink.ml.common.gbt.splitter.ContinuousFeatureSplitter;
 import org.apache.flink.ml.common.gbt.splitter.HistogramFeatureSplitter;
+import org.apache.flink.ml.util.Distributor;
 import org.apache.flink.util.Preconditions;
 
 import org.slf4j.Logger;
@@ -57,12 +57,12 @@ class SplitFinder {
             splitters[i] =
                     FeatureMeta.Type.CATEGORICAL == featureMetas[i].type
                             ? new CategoricalFeatureSplitter(
-                                    i, featureMetas[i], trainContext.params)
+                                    i, featureMetas[i], trainContext.strategy)
                             : new ContinuousFeatureSplitter(
-                                    i, featureMetas[i], trainContext.params);
+                                    i, featureMetas[i], trainContext.strategy);
         }
-        maxDepth = trainContext.params.maxDepth;
-        maxNumLeaves = trainContext.params.maxNumLeaves;
+        maxDepth = trainContext.strategy.maxDepth;
+        maxNumLeaves = trainContext.strategy.maxNumLeaves;
     }
 
     public Splits calc(

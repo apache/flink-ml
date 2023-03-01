@@ -44,8 +44,8 @@ class NodeSplitter {
     public NodeSplitter(TrainContext trainContext) {
         subtaskId = trainContext.subtaskId;
         featureMetas = trainContext.featureMetas;
-        maxLeaves = trainContext.params.maxNumLeaves;
-        maxDepth = trainContext.params.maxDepth;
+        maxLeaves = trainContext.strategy.maxNumLeaves;
+        maxDepth = trainContext.strategy.maxDepth;
     }
 
     private int partitionInstances(

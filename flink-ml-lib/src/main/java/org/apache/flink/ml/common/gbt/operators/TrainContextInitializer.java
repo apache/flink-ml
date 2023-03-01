@@ -20,10 +20,9 @@ package org.apache.flink.ml.common.gbt.operators;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.common.gbt.defs.BinnedInstance;
-import org.apache.flink.ml.common.gbt.defs.GbtParams;
+import org.apache.flink.ml.common.gbt.defs.BoostingStrategy;
 import org.apache.flink.ml.common.gbt.defs.TaskType;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
-import org.apache.flink.ml.common.lossfunc.AbsoluteErrorLoss;
 import org.apache.flink.ml.common.lossfunc.LogLoss;
 import org.apache.flink.ml.common.lossfunc.LossFunc;
 import org.apache.flink.ml.common.lossfunc.SquaredErrorLoss;
@@ -41,10 +40,10 @@ import static java.util.Arrays.stream;
 
 class TrainContextInitializer {
     private static final Logger LOG = LoggerFactory.getLogger(TrainContextInitializer.class);
-    private final GbtParams params;
+    private final BoostingStrategy strategy;
 
-    public TrainContextInitializer(GbtParams params) {
-        this.params = params;
+    public TrainContextInitializer(BoostingStrategy strategy) {
+        this.strategy = strategy;
     }
 
     /**
@@ -68,22 +67,22 @@ class TrainContextInitializer {
         LOG.info(
                 "subtaskId: {}, #samples: {}, #features: {}", subtaskId, numInstances, numFeatures);
 
-        trainContext.params = params;
+        trainContext.strategy = strategy;
         trainContext.numInstances = numInstances;
         trainContext.numFeatures = numFeatures;
 
         trainContext.numBaggingInstances = getNumBaggingSamples(numInstances);
         trainContext.numBaggingFeatures = getNumBaggingFeatures(numFeatures);
 
-        trainContext.instanceRandomizer = new Random(subtaskId + params.seed);
-        trainContext.featureRandomizer = new Random(params.seed);
+        trainContext.instanceRandomizer = new Random(subtaskId + strategy.seed);
+        trainContext.featureRandomizer = new Random(strategy.seed);
 
         trainContext.loss = getLoss();
         trainContext.prior = calcPrior(trainContext.labelSumCount);
 
         trainContext.numFeatureBins =
                 stream(trainContext.featureMetas)
-                        .mapToInt(d -> d.numBins(trainContext.params.useMissing))
+                        .mapToInt(d -> d.numBins(trainContext.strategy.useMissing))
                         .toArray();
 
         LOG.info("subtaskId: {}, {} end", subtaskId, TrainContextInitializer.class.getSimpleName());
@@ -91,7 +90,7 @@ class TrainContextInitializer {
     }
 
     private int getNumBaggingSamples(int numSamples) {
-        return (int) Math.min(numSamples, Math.ceil(numSamples * params.subsamplingRate));
+        return (int) Math.min(numSamples, Math.ceil(numSamples * strategy.subsamplingRate));
     }
 
     private int getNumBaggingFeatures(int numFeatures) {
@@ -102,24 +101,24 @@ class TrainContextInitializer {
                         String.join(", ", supported));
         final Function<Double, Integer> clamp =
                 d -> Math.max(1, Math.min(d.intValue(), numFeatures));
-        String strategy = params.featureSubsetStrategy;
+        String featureSubsetStrategy = strategy.featureSubsetStrategy;
         try {
-            int numBaggingFeatures = Integer.parseInt(strategy);
+            int numBaggingFeatures = Integer.parseInt(featureSubsetStrategy);
             Preconditions.checkArgument(
                     numBaggingFeatures >= 1 && numBaggingFeatures <= numFeatures, errorMsg);
         } catch (NumberFormatException ignored) {
         }
         try {
-            double baggingRatio = Double.parseDouble(strategy);
+            double baggingRatio = Double.parseDouble(featureSubsetStrategy);
             Preconditions.checkArgument(baggingRatio > 0. && baggingRatio <= 1., errorMsg);
             return clamp.apply(baggingRatio * numFeatures);
         } catch (NumberFormatException ignored) {
         }
 
-        Preconditions.checkArgument(supported.contains(strategy), errorMsg);
-        switch (strategy) {
+        Preconditions.checkArgument(supported.contains(featureSubsetStrategy), errorMsg);
+        switch (featureSubsetStrategy) {
             case "auto":
-                return TaskType.CLASSIFICATION.equals(params.taskType)
+                return TaskType.CLASSIFICATION.equals(strategy.taskType)
                         ? clamp.apply(Math.sqrt(numFeatures))
                         : clamp.apply(numFeatures / 3.);
             case "all":
@@ -136,28 +135,22 @@ class TrainContextInitializer {
     }
 
     private LossFunc getLoss() {
-        String lossType = params.lossType;
-        switch (lossType) {
-            case "logistic":
+        switch (strategy.lossType) {
+            case LOGISTIC:
                 return LogLoss.INSTANCE;
-            case "squared":
+            case SQUARED:
                 return SquaredErrorLoss.INSTANCE;
-            case "absolute":
-                return AbsoluteErrorLoss.INSTANCE;
             default:
                 throw new UnsupportedOperationException("Unsupported loss.");
         }
     }
 
     private double calcPrior(Tuple2<Double, Long> labelStat) {
-        String lossType = params.lossType;
-        switch (lossType) {
-            case "logistic":
+        switch (strategy.lossType) {
+            case LOGISTIC:
                 return Math.log(labelStat.f0 / (labelStat.f1 - labelStat.f0));
-            case "squared":
+            case SQUARED:
                 return labelStat.f0 / labelStat.f1;
-            case "absolute":
-                throw new UnsupportedOperationException("absolute error is not supported yet.");
             default:
                 throw new UnsupportedOperationException("Unsupported loss.");
         }

@@ -26,19 +26,20 @@ import org.apache.flink.iteration.DataStreamList;
 import org.apache.flink.iteration.IterationConfig;
 import org.apache.flink.iteration.Iterations;
 import org.apache.flink.iteration.ReplayableDataStreamList;
-import org.apache.flink.ml.classification.gbtclassifier.GBTClassifierParams;
+import org.apache.flink.ml.classification.gbtclassifier.GBTClassifier;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
+import org.apache.flink.ml.common.gbt.defs.BoostingStrategy;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
-import org.apache.flink.ml.common.gbt.defs.GbtParams;
+import org.apache.flink.ml.common.gbt.defs.LossType;
 import org.apache.flink.ml.common.gbt.defs.TaskType;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.linalg.typeinfo.SparseVectorTypeInfo;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
-import org.apache.flink.ml.regression.gbtregressor.GBTRegressorParams;
+import org.apache.flink.ml.regression.gbtregressor.GBTRegressor;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -61,22 +62,13 @@ import java.util.stream.Collectors;
 /** Runs a gradient boosting trees implementation. */
 public class GBTRunner {
 
-    public static DataStream<GBTModelData> trainClassifier(Table data, BaseGBTParams<?> estimator) {
-        return train(data, estimator, TaskType.CLASSIFICATION);
-    }
-
-    public static DataStream<GBTModelData> trainRegressor(Table data, BaseGBTParams<?> estimator) {
-        return train(data, estimator, TaskType.REGRESSION);
-    }
-
     private static boolean isVectorType(TypeInformation<?> typeInfo) {
         return typeInfo instanceof DenseVectorTypeInfo
                 || typeInfo instanceof SparseVectorTypeInfo
                 || typeInfo instanceof VectorTypeInfo;
     }
 
-    static DataStream<GBTModelData> train(
-            Table data, BaseGBTParams<?> estimator, TaskType taskType) {
+    public static DataStream<GBTModelData> train(Table data, BaseGBTParams<?> estimator) {
         String[] featuresCols = estimator.getFeaturesCols();
         TypeInformation<?>[] featuresTypes =
                 Arrays.stream(featuresCols)
@@ -90,29 +82,29 @@ public class GBTRunner {
         }
 
         boolean isInputVector = featuresCols.length == 1 && isVectorType(featuresTypes[0]);
-        return train(data, fromEstimator(estimator, isInputVector, taskType));
+        return train(data, getStrategy(estimator, isInputVector));
     }
 
     /** Trains a gradient boosting tree model with given data and parameters. */
-    static DataStream<GBTModelData> train(Table dataTable, GbtParams p) {
+    static DataStream<GBTModelData> train(Table dataTable, BoostingStrategy strategy) {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) dataTable).getTableEnvironment();
         Tuple2<Table, DataStream<FeatureMeta>> preprocessResult =
-                p.isInputVector
-                        ? Preprocess.preprocessVecCol(dataTable, p)
-                        : Preprocess.preprocessCols(dataTable, p);
+                strategy.isInputVector
+                        ? Preprocess.preprocessVecCol(dataTable, strategy)
+                        : Preprocess.preprocessCols(dataTable, strategy);
         dataTable = preprocessResult.f0;
         DataStream<FeatureMeta> featureMeta = preprocessResult.f1;
 
         DataStream<Row> data = tEnv.toDataStream(dataTable);
         DataStream<Tuple2<Double, Long>> labelSumCount =
-                DataStreamUtils.aggregate(data, new LabelSumCountFunction(p.labelCol));
-        return boost(dataTable, p, featureMeta, labelSumCount);
+                DataStreamUtils.aggregate(data, new LabelSumCountFunction(strategy.labelCol));
+        return boost(dataTable, strategy, featureMeta, labelSumCount);
     }
 
     private static DataStream<GBTModelData> boost(
             Table dataTable,
-            GbtParams p,
+            BoostingStrategy strategy,
             DataStream<FeatureMeta> featureMeta,
             DataStream<Tuple2<Double, Long>> labelSumCount) {
         StreamTableEnvironment tEnv =
@@ -134,7 +126,7 @@ public class GBTRunner {
                             DataStream<Integer> input = (DataStream<Integer>) (inputs.get(0));
                             return input.map(
                                     new InitTrainContextFunction(
-                                            featureMetaBcName, labelSumCountBcName, p));
+                                            featureMetaBcName, labelSumCountBcName, strategy));
                         });
 
         DataStream<Row> data = tEnv.toDataStream(dataTable);
@@ -145,12 +137,11 @@ public class GBTRunner {
                         IterationConfig.newBuilder()
                                 .setOperatorLifeCycle(IterationConfig.OperatorLifeCycle.ALL_ROUND)
                                 .build(),
-                        new BoostIterationBody(p));
+                        new BoostIterationBody(strategy));
         return dataStreamList.get(0);
     }
 
-    public static GbtParams fromEstimator(
-            BaseGBTParams<?> estimator, boolean isInputVector, TaskType taskType) {
+    public static BoostingStrategy getStrategy(BaseGBTParams<?> estimator, boolean isInputVector) {
         final Map<Param<?>, Object> paramMap = estimator.getParamMap();
         final Set<Param<?>> unsupported =
                 new HashSet<>(
@@ -171,62 +162,69 @@ public class GBTRunner {
                                     .collect(Collectors.joining(", "))));
         }
 
-        GbtParams p = new GbtParams();
-        p.taskType = taskType;
-        p.featuresCols = estimator.getFeaturesCols();
-        p.isInputVector = isInputVector;
-        p.labelCol = estimator.getLabelCol();
-        p.weightCol = estimator.getWeightCol();
-        p.categoricalCols = estimator.getCategoricalCols();
+        BoostingStrategy strategy = new BoostingStrategy();
+        strategy.featuresCols = estimator.getFeaturesCols();
+        strategy.isInputVector = isInputVector;
+        strategy.labelCol = estimator.getLabelCol();
+        strategy.categoricalCols = estimator.getCategoricalCols();
 
-        p.maxDepth = estimator.getMaxDepth();
-        p.maxBins = estimator.getMaxBins();
-        p.minInstancesPerNode = estimator.getMinInstancesPerNode();
-        p.minWeightFractionPerNode = estimator.getMinWeightFractionPerNode();
-        p.minInfoGain = estimator.getMinInfoGain();
-        p.maxIter = estimator.getMaxIter();
-        p.stepSize = estimator.getStepSize();
-        p.seed = estimator.getSeed();
-        p.subsamplingRate = estimator.getSubsamplingRate();
-        p.featureSubsetStrategy = estimator.getFeatureSubsetStrategy();
-        p.validationTol = estimator.getValidationTol();
-        p.gamma = estimator.getRegGamma();
-        p.lambda = estimator.getRegLambda();
+        strategy.maxDepth = estimator.getMaxDepth();
+        strategy.maxBins = estimator.getMaxBins();
+        strategy.minInstancesPerNode = estimator.getMinInstancesPerNode();
+        strategy.minWeightFractionPerNode = estimator.getMinWeightFractionPerNode();
+        strategy.minInfoGain = estimator.getMinInfoGain();
+        strategy.maxIter = estimator.getMaxIter();
+        strategy.stepSize = estimator.getStepSize();
+        strategy.seed = estimator.getSeed();
+        strategy.subsamplingRate = estimator.getSubsamplingRate();
+        strategy.featureSubsetStrategy = estimator.getFeatureSubsetStrategy();
+        strategy.regGamma = estimator.getRegGamma();
+        strategy.regLambda = estimator.getRegLambda();
 
-        if (TaskType.CLASSIFICATION.equals(p.taskType)) {
-            p.lossType = estimator.get(GBTClassifierParams.LOSS_TYPE);
+        String lossTypeStr;
+        if (estimator instanceof GBTClassifier) {
+            strategy.taskType = TaskType.CLASSIFICATION;
+            lossTypeStr = ((GBTClassifier) estimator).getLossType();
+        } else if (estimator instanceof GBTRegressor) {
+            strategy.taskType = TaskType.REGRESSION;
+            lossTypeStr = ((GBTRegressor) estimator).getLossType();
         } else {
-            p.lossType = estimator.get(GBTRegressorParams.LOSS_TYPE);
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Unexpected type of estimator: %s.",
+                            estimator.getClass().getSimpleName()));
         }
-        p.maxNumLeaves = 1 << p.maxDepth - 1;
-        p.useMissing = true;
-        return p;
+        strategy.lossType = LossType.valueOf(lossTypeStr.toUpperCase());
+        strategy.maxNumLeaves = 1 << strategy.maxDepth - 1;
+        strategy.useMissing = true;
+        return strategy;
     }
 
     private static class InitTrainContextFunction extends RichMapFunction<Integer, TrainContext> {
         private final String featureMetaBcName;
         private final String labelSumCountBcName;
-        private final GbtParams p;
+        private final BoostingStrategy strategy;
 
         private InitTrainContextFunction(
-                String featureMetaBcName, String labelSumCountBcName, GbtParams p) {
+                String featureMetaBcName, String labelSumCountBcName, BoostingStrategy strategy) {
             this.featureMetaBcName = featureMetaBcName;
             this.labelSumCountBcName = labelSumCountBcName;
-            this.p = p;
+            this.strategy = strategy;
         }
 
         @Override
         public TrainContext map(Integer value) {
             TrainContext trainContext = new TrainContext();
-            trainContext.params = p;
+            trainContext.strategy = strategy;
             trainContext.featureMetas =
                     getRuntimeContext()
                             .<FeatureMeta>getBroadcastVariable(featureMetaBcName)
                             .toArray(new FeatureMeta[0]);
-            if (!trainContext.params.isInputVector) {
+            if (!trainContext.strategy.isInputVector) {
                 Arrays.sort(
                         trainContext.featureMetas,
-                        Comparator.comparing(d -> ArrayUtils.indexOf(p.featuresCols, d.name)));
+                        Comparator.comparing(
+                                d -> ArrayUtils.indexOf(strategy.featuresCols, d.name)));
             }
             trainContext.numFeatures = trainContext.featureMetas.length;
             trainContext.labelSumCount =

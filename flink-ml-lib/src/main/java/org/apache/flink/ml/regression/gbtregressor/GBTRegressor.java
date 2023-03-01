@@ -60,7 +60,7 @@ public class GBTRegressor
         Preconditions.checkArgument(inputs.length == 1);
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
-        DataStream<GBTModelData> modelData = GBTRunner.trainRegressor(inputs[0], this);
+        DataStream<GBTModelData> modelData = GBTRunner.train(inputs[0], this);
         GBTRegressorModel model = new GBTRegressorModel();
         model.setModelData(tEnv.fromDataStream(modelData).renameColumns($("f0").as("modelData")));
         ReadWriteUtils.updateExistingParams(model, getParamMap());

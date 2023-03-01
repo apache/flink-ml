@@ -64,7 +64,7 @@ public class TerminationOperator extends AbstractStreamOperator<Integer>
                     boolean terminated =
                             getter.get(SharedStorageConstants.ALL_TREES).size()
                                     == getter.get(SharedStorageConstants.TRAIN_CONTEXT)
-                                            .params
+                                            .strategy
                                             .maxIter;
                     // TODO: add validation error rate
                     if (!terminated) {

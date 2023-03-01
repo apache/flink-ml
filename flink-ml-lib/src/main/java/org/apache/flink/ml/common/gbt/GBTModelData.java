@@ -116,10 +116,10 @@ public class GBTModelData {
             }
         }
         return new GBTModelData(
-                trainContext.params.taskType.name(),
-                trainContext.params.isInputVector,
+                trainContext.strategy.taskType.name(),
+                trainContext.strategy.isInputVector,
                 trainContext.prior,
-                trainContext.params.stepSize,
+                trainContext.strategy.stepSize,
                 allTrees,
                 categoryToIdMaps,
                 featureIdToBinEdges,

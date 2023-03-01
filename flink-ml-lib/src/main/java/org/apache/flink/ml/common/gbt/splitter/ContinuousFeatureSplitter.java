@@ -19,16 +19,17 @@
 package org.apache.flink.ml.common.gbt.splitter;
 
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.ml.common.gbt.defs.BoostingStrategy;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
-import org.apache.flink.ml.common.gbt.defs.GbtParams;
 import org.apache.flink.ml.common.gbt.defs.HessianImpurity;
 import org.apache.flink.ml.common.gbt.defs.Split;
 
 /** Splitter for a continuous feature. */
 public final class ContinuousFeatureSplitter extends HistogramFeatureSplitter {
 
-    public ContinuousFeatureSplitter(int featureId, FeatureMeta featureMeta, GbtParams params) {
-        super(featureId, featureMeta, params);
+    public ContinuousFeatureSplitter(
+            int featureId, FeatureMeta featureMeta, BoostingStrategy strategy) {
+        super(featureId, featureMeta, strategy);
     }
 
     @Override
@@ -60,7 +61,7 @@ public final class ContinuousFeatureSplitter extends HistogramFeatureSplitter {
                 missingGoLeft,
                 total.prediction(),
                 splitPoint,
-                !params.isInputVector,
+                !strategy.isInputVector,
                 ((FeatureMeta.ContinuousFeatureMeta) featureMeta).zeroBin);
     }
 }

@@ -23,8 +23,8 @@ import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.common.datastream.TableUtils;
+import org.apache.flink.ml.common.gbt.defs.BoostingStrategy;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
-import org.apache.flink.ml.common.gbt.defs.GbtParams;
 import org.apache.flink.ml.feature.kbinsdiscretizer.KBinsDiscretizer;
 import org.apache.flink.ml.feature.kbinsdiscretizer.KBinsDiscretizerModel;
 import org.apache.flink.ml.feature.kbinsdiscretizer.KBinsDiscretizerModelData;
@@ -62,9 +62,10 @@ class Preprocess {
      * Maps continuous and categorical columns to integers inplace using quantile discretizer and
      * string indexer respectively, and obtains meta information for all columns.
      */
-    static Tuple2<Table, DataStream<FeatureMeta>> preprocessCols(Table dataTable, GbtParams p) {
+    static Tuple2<Table, DataStream<FeatureMeta>> preprocessCols(
+            Table dataTable, BoostingStrategy strategy) {
 
-        final String[] relatedCols = ArrayUtils.add(p.featuresCols, p.labelCol);
+        final String[] relatedCols = ArrayUtils.add(strategy.featuresCols, strategy.labelCol);
         dataTable =
                 dataTable.select(
                         Arrays.stream(relatedCols)
@@ -72,21 +73,24 @@ class Preprocess {
                                 .toArray(ApiExpression[]::new));
 
         // Maps continuous columns to integers, and obtain corresponding discretizer model.
-        String[] continuousCols = ArrayUtils.removeElements(p.featuresCols, p.categoricalCols);
+        String[] continuousCols =
+                ArrayUtils.removeElements(strategy.featuresCols, strategy.categoricalCols);
         Tuple2<Table, DataStream<KBinsDiscretizerModelData>> continuousMappedDataAndModelData =
-                discretizeContinuousCols(dataTable, continuousCols, p.maxBins);
+                discretizeContinuousCols(dataTable, continuousCols, strategy.maxBins);
         dataTable = continuousMappedDataAndModelData.f0;
         DataStream<FeatureMeta> continuousFeatureMeta =
                 buildContinuousFeatureMeta(continuousMappedDataAndModelData.f1, continuousCols);
 
         // Maps categorical columns to integers, and obtain string indexer model.
         DataStream<FeatureMeta> categoricalFeatureMeta;
-        if (p.categoricalCols.length > 0) {
+        if (strategy.categoricalCols.length > 0) {
             String[] mappedCategoricalCols =
-                    Arrays.stream(p.categoricalCols).map(d -> d + "_output").toArray(String[]::new);
+                    Arrays.stream(strategy.categoricalCols)
+                            .map(d -> d + "_output")
+                            .toArray(String[]::new);
             StringIndexer stringIndexer =
                     new StringIndexer()
-                            .setInputCols(p.categoricalCols)
+                            .setInputCols(strategy.categoricalCols)
                             .setOutputCols(mappedCategoricalCols)
                             .setHandleInvalid("keep");
             StringIndexerModel stringIndexerModel = stringIndexer.fit(dataTable);
@@ -96,7 +100,7 @@ class Preprocess {
                     buildCategoricalFeatureMeta(
                             StringIndexerModelData.getModelDataStream(
                                     stringIndexerModel.getModelData()[0]),
-                            p.categoricalCols);
+                            strategy.categoricalCols);
         } else {
             categoricalFeatureMeta =
                     continuousFeatureMeta
@@ -106,9 +110,11 @@ class Preprocess {
 
         // Rename results columns.
         ApiExpression[] dropColumnExprs =
-                Arrays.stream(p.categoricalCols).map(Expressions::$).toArray(ApiExpression[]::new);
+                Arrays.stream(strategy.categoricalCols)
+                        .map(Expressions::$)
+                        .toArray(ApiExpression[]::new);
         ApiExpression[] renameColumnExprs =
-                Arrays.stream(p.categoricalCols)
+                Arrays.stream(strategy.categoricalCols)
                         .map(d -> $(d + "_output").as(d))
                         .toArray(ApiExpression[]::new);
         dataTable = dataTable.dropColumns(dropColumnExprs).renameColumns(renameColumnExprs);
@@ -120,10 +126,11 @@ class Preprocess {
      * Maps features values in vectors to integers using quantile discretizer, and obtains meta
      * information for all features.
      */
-    static Tuple2<Table, DataStream<FeatureMeta>> preprocessVecCol(Table dataTable, GbtParams p) {
-        dataTable = dataTable.select($(p.featuresCols[0]), $(p.labelCol));
+    static Tuple2<Table, DataStream<FeatureMeta>> preprocessVecCol(
+            Table dataTable, BoostingStrategy strategy) {
+        dataTable = dataTable.select($(strategy.featuresCols[0]), $(strategy.labelCol));
         Tuple2<Table, DataStream<KBinsDiscretizerModelData>> mappedDataAndModelData =
-                discretizeVectorCol(dataTable, p.featuresCols[0], p.maxBins);
+                discretizeVectorCol(dataTable, strategy.featuresCols[0], strategy.maxBins);
         dataTable = mappedDataAndModelData.f0;
         DataStream<FeatureMeta> featureMeta =
                 buildContinuousFeatureMeta(mappedDataAndModelData.f1, null);

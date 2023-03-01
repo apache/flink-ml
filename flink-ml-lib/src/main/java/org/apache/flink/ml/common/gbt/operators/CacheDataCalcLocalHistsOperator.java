@@ -23,7 +23,7 @@ import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.datacache.nonkeyed.ListStateWithCache;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.common.gbt.defs.BinnedInstance;
-import org.apache.flink.ml.common.gbt.defs.GbtParams;
+import org.apache.flink.ml.common.gbt.defs.BoostingStrategy;
 import org.apache.flink.ml.common.gbt.defs.Histogram;
 import org.apache.flink.ml.common.gbt.defs.LearningNode;
 import org.apache.flink.ml.common.gbt.defs.PredGradHess;
@@ -62,7 +62,7 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
     private static final String TREE_INITIALIZER_STATE_NAME = "tree_initializer";
     private static final String HIST_BUILDER_STATE_NAME = "hist_builder";
 
-    private final GbtParams gbtParams;
+    private final BoostingStrategy strategy;
     private final String sharedStorageAccessorID;
 
     // States of local data.
@@ -73,9 +73,9 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
     private transient HistBuilder histBuilder;
     private transient SharedStorageContext sharedStorageContext;
 
-    public CacheDataCalcLocalHistsOperator(GbtParams gbtParams) {
+    public CacheDataCalcLocalHistsOperator(BoostingStrategy strategy) {
         super();
-        this.gbtParams = gbtParams;
+        this.strategy = strategy;
         sharedStorageAccessorID = getClass().getSimpleName() + "-" + UUID.randomUUID();
     }
 
@@ -129,16 +129,16 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
         Row row = streamRecord.getValue();
         BinnedInstance instance = new BinnedInstance();
         instance.weight = 1.;
-        instance.label = row.getFieldAs(gbtParams.labelCol);
+        instance.label = row.getFieldAs(strategy.labelCol);
 
-        if (gbtParams.isInputVector) {
-            Vector vec = row.getFieldAs(gbtParams.featuresCols[0]);
+        if (strategy.isInputVector) {
+            Vector vec = row.getFieldAs(strategy.featuresCols[0]);
             SparseVector sv = vec.toSparse();
             instance.featureIds = sv.indices.length == sv.size() ? null : sv.indices;
             instance.featureValues = Arrays.stream(sv.values).mapToInt(d -> (int) d).toArray();
         } else {
             instance.featureValues =
-                    Arrays.stream(gbtParams.featuresCols)
+                    Arrays.stream(strategy.featuresCols)
                             .mapToInt(col -> ((Number) row.getFieldAs(col)).intValue())
                             .toArray();
         }
@@ -171,7 +171,7 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
                         TrainContext rawTrainContext =
                                 getter.get(SharedStorageConstants.TRAIN_CONTEXT);
                         TrainContext trainContext =
-                                new TrainContextInitializer(gbtParams)
+                                new TrainContextInitializer(strategy)
                                         .init(
                                                 rawTrainContext,
                                                 getRuntimeContext().getIndexOfThisSubtask(),

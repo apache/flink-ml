@@ -28,7 +28,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.iteration.DataStreamList;
 import org.apache.flink.iteration.IterationBody;
 import org.apache.flink.iteration.IterationBodyResult;
-import org.apache.flink.ml.common.gbt.defs.GbtParams;
+import org.apache.flink.ml.common.gbt.defs.BoostingStrategy;
 import org.apache.flink.ml.common.gbt.defs.Histogram;
 import org.apache.flink.ml.common.gbt.defs.Splits;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
@@ -59,10 +59,10 @@ import java.util.Map;
  * of data and row-store storage of instances.
  */
 class BoostIterationBody implements IterationBody {
-    private final GbtParams gbtParams;
+    private final BoostingStrategy strategy;
 
-    public BoostIterationBody(GbtParams gbtParams) {
-        this.gbtParams = gbtParams;
+    public BoostIterationBody(BoostingStrategy strategy) {
+        this.strategy = strategy;
     }
 
     private SharedStorageBody.SharedStorageBodyResult sharedStorageBody(
@@ -77,7 +77,7 @@ class BoostIterationBody implements IterationBody {
         // In 1st round, cache all data. For all rounds calculate local histogram based on
         // current tree layer.
         CacheDataCalcLocalHistsOperator cacheDataCalcLocalHistsOp =
-                new CacheDataCalcLocalHistsOperator(gbtParams);
+                new CacheDataCalcLocalHistsOperator(strategy);
         SingleOutputStreamOperator<Histogram> localHists =
                 data.connect(trainContext)
                         .transform(

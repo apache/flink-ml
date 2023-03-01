@@ -19,8 +19,8 @@
 package org.apache.flink.ml.common.gbt.splitter;
 
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.ml.common.gbt.defs.BoostingStrategy;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
-import org.apache.flink.ml.common.gbt.defs.GbtParams;
 import org.apache.flink.ml.common.gbt.defs.HessianImpurity;
 import org.apache.flink.ml.common.gbt.defs.Split;
 
@@ -35,8 +35,9 @@ import static org.apache.flink.ml.common.gbt.DataUtils.BIN_SIZE;
 /** Splitter for a categorical feature using LightGBM many-vs-many split. */
 public class CategoricalFeatureSplitter extends HistogramFeatureSplitter {
 
-    public CategoricalFeatureSplitter(int featureId, FeatureMeta featureMeta, GbtParams params) {
-        super(featureId, featureMeta, params);
+    public CategoricalFeatureSplitter(
+            int featureId, FeatureMeta featureMeta, BoostingStrategy strategy) {
+        super(featureId, featureMeta, strategy);
     }
 
     @Override
