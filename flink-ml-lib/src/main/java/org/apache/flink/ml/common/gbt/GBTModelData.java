@@ -74,7 +74,6 @@ public class GBTModelData {
 
     public GBTModelData() {}
 
-    // TODO: !!!
     public GBTModelData(
             String type,
             boolean isInputVector,

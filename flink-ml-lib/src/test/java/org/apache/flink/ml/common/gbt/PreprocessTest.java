@@ -142,7 +142,7 @@ public class PreprocessTest extends AbstractTestBase {
         List<Row> preprocessedRows =
                 IteratorUtils.toList(tEnv.toDataStream(results.f0).executeAndCollect());
 
-        // TODO: correct `binEdges` of feature `f0` after FLINK-30734 resolved.
+        // TODO: Correct `binEdges` of feature `f0` after FLINK-30734 resolved.
         List<FeatureMeta> expectedMeta =
                 Arrays.asList(
                         FeatureMeta.continuous("f0", 3, new double[] {1.2, 4.5, 13.9, 15.3}),
@@ -189,7 +189,7 @@ public class PreprocessTest extends AbstractTestBase {
         List<Row> preprocessedRows =
                 IteratorUtils.toList(tEnv.toDataStream(results.f0).executeAndCollect());
 
-        // TODO: correct `binEdges` of feature `_vec_f0` and `_vec_f2` after FLINK-30734 resolved.
+        // TODO: Correct `binEdges` of feature `_vec_f0` and `_vec_f2` after FLINK-30734 resolved.
         List<FeatureMeta> expectedMeta =
                 Arrays.asList(
                         FeatureMeta.continuous("_vec_f0", 3, new double[] {1.2, 4.5, 13.9, 15.3}),

@@ -44,8 +44,8 @@ public abstract class FeatureSplitter {
         this.featureMeta = featureMeta;
 
         this.minSamplesPerLeaf = strategy.minInstancesPerNode;
-        this.minSampleRatioPerChild =
-                strategy.minWeightFractionPerNode; // TODO: not exactly the same
+        // TODO: not exactly the same since weights are not supported right now.
+        this.minSampleRatioPerChild = strategy.minWeightFractionPerNode;
         this.minInfoGain = strategy.minInfoGain;
     }
 

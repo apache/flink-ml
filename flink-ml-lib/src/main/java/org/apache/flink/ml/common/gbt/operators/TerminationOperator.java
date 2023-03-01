@@ -66,7 +66,7 @@ public class TerminationOperator extends AbstractStreamOperator<Integer>
                                     == getter.get(SharedStorageConstants.TRAIN_CONTEXT)
                                             .strategy
                                             .maxIter;
-                    // TODO: add validation error rate
+                    // TODO: Add validation error rate
                     if (!terminated) {
                         output.collect(new StreamRecord<>(0));
                     }
