@@ -224,8 +224,10 @@ public class VectorIndexer
         @Override
         public void snapshotState(StateSnapshotContext context) throws Exception {
             super.snapshotState(context);
-            doublesByColumnState.update(
-                    Collections.singletonList(convertToListArray(doublesByColumn)));
+            if (doublesByColumn != null) {
+                doublesByColumnState.update(
+                        Collections.singletonList(convertToListArray(doublesByColumn)));
+            }
         }
 
         private List<Double>[] convertToListArray(HashSet<Double>[] array) {
