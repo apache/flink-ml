@@ -106,7 +106,7 @@ public class LinearRegression
                 rawModelData.map(LinearRegressionModelData::new);
         LinearRegressionModel model =
                 new LinearRegressionModel().setModelData(tEnv.fromDataStream(modelData));
-        ReadWriteUtils.updateExistingParams(model, paramMap);
+        ParamUtils.updateExistingParams(model, paramMap);
         return model;
     }
 

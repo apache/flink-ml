@@ -34,7 +34,7 @@ from pyflink.ml.wrapper import JavaWithParams
 
 
 def update_existing_params(target: JavaWithParams, source: JavaWithParams):
-    get_gateway().jvm.org.apache.flink.ml.util.ReadWriteUtils \
+    get_gateway().jvm.org.apache.flink.ml.util.ParamUtils \
         .updateExistingParams(target._java_obj, source._java_obj.getParamMap())
 
 

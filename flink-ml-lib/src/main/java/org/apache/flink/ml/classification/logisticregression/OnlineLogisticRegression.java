@@ -133,7 +133,7 @@ public class OnlineLogisticRegression
         Table onlineModelDataTable = tEnv.fromDataStream(onlineModelData);
         OnlineLogisticRegressionModel model =
                 new OnlineLogisticRegressionModel().setModelData(onlineModelDataTable);
-        ReadWriteUtils.updateExistingParams(model, paramMap);
+        ParamUtils.updateExistingParams(model, paramMap);
         return model;
     }
 

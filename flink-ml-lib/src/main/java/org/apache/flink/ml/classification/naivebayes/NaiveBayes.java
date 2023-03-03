@@ -135,7 +135,7 @@ public class NaiveBayes
 
         NaiveBayesModel model =
                 new NaiveBayesModel().setModelData(tEnv.fromDataStream(modelData, schema));
-        ReadWriteUtils.updateExistingParams(model, paramMap);
+        ParamUtils.updateExistingParams(model, paramMap);
         return model;
     }
 

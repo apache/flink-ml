@@ -28,6 +28,7 @@ import org.apache.flink.ml.api.Stage;
 import org.apache.flink.ml.benchmark.datagenerator.DataGenerator;
 import org.apache.flink.ml.benchmark.datagenerator.InputDataGenerator;
 import org.apache.flink.ml.common.datastream.TableUtils;
+import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
@@ -77,12 +78,12 @@ public class BenchmarkUtils {
             Map<String, Map<String, ?>> params,
             boolean dryRun)
             throws Exception {
-        Stage stage = ReadWriteUtils.instantiateWithParams(params.get("stage"));
+        Stage stage = ParamUtils.instantiateWithParams(params.get("stage"));
         InputDataGenerator inputDataGenerator =
-                ReadWriteUtils.instantiateWithParams(params.get("inputData"));
+                ParamUtils.instantiateWithParams(params.get("inputData"));
         DataGenerator modelDataGenerator = null;
         if (params.containsKey("modelData")) {
-            modelDataGenerator = ReadWriteUtils.instantiateWithParams(params.get("modelData"));
+            modelDataGenerator = ParamUtils.instantiateWithParams(params.get("modelData"));
         }
 
         return runBenchmark(tEnv, name, stage, inputDataGenerator, modelDataGenerator, dryRun);

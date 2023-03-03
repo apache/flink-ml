@@ -23,7 +23,7 @@ import org.apache.flink.ml.feature.vectorindexer.VectorIndexer;
 import org.apache.flink.ml.feature.vectorindexer.VectorIndexerModel;
 import org.apache.flink.ml.feature.vectorindexer.VectorIndexerModelData;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Expressions;
@@ -250,7 +250,7 @@ public class VectorIndexerTest extends AbstractTestBase {
         VectorIndexerModel model = vectorIndexer.fit(trainInputTable);
 
         VectorIndexerModel newModel = new VectorIndexerModel();
-        ReadWriteUtils.updateExistingParams(newModel, model.getParamMap());
+        ParamUtils.updateExistingParams(newModel, model.getParamMap());
         newModel.setModelData(model.getModelData());
         Table output = newModel.transform(testInputTable)[0];
 

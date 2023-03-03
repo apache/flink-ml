@@ -149,7 +149,7 @@ public class UnivariateFeatureSelector
                         .setParallelism(1);
         UnivariateFeatureSelectorModel model =
                 new UnivariateFeatureSelectorModel().setModelData(tEnv.fromDataStream(modelData));
-        ReadWriteUtils.updateExistingParams(model, getParamMap());
+        ParamUtils.updateExistingParams(model, getParamMap());
         return model;
     }
 

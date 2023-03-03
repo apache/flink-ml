@@ -88,7 +88,7 @@ public class CountVectorizer
 
         CountVectorizerModel model =
                 new CountVectorizerModel().setModelData(tEnv.fromDataStream(modelData));
-        ReadWriteUtils.updateExistingParams(model, getParamMap());
+        ParamUtils.updateExistingParams(model, getParamMap());
         return model;
     }
 

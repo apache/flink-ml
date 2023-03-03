@@ -229,7 +229,7 @@ public class StageTest {
             throws IOException {
         for (Map.Entry<String, Object> entry : paramOverrides.entrySet()) {
             Param<?> param = stage.getParam(entry.getKey());
-            ReadWriteUtils.setParam(stage, param, entry.getValue());
+            ParamUtils.setParam(stage, param, entry.getValue());
         }
 
         String path = Files.createTempDirectory("").toString();

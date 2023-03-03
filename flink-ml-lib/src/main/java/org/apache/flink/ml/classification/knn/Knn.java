@@ -67,7 +67,7 @@ public class Knn implements Estimator<Knn, KnnModel>, KnnParams<Knn> {
                 computeNormSquare(tEnv.toDataStream(inputs[0]));
         DataStream<KnnModelData> modelData = genModelData(inputDataWithNorm);
         KnnModel model = new KnnModel().setModelData(tEnv.fromDataStream(modelData));
-        ReadWriteUtils.updateExistingParams(model, getParamMap());
+        ParamUtils.updateExistingParams(model, getParamMap());
         return model;
     }
 

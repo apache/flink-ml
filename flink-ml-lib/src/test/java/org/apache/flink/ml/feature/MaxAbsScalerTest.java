@@ -25,7 +25,7 @@ import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
-import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -240,7 +240,7 @@ public class MaxAbsScalerTest {
         Table modelData = modelA.getModelData()[0];
 
         MaxAbsScalerModel modelB = new MaxAbsScalerModel().setModelData(modelData);
-        ReadWriteUtils.updateExistingParams(modelB, modelA.getParamMap());
+        ParamUtils.updateExistingParams(modelB, modelA.getParamMap());
         Table output = modelB.transform(predictDataTable)[0];
         verifyPredictionResult(output, maxAbsScaler.getOutputCol(), EXPECTED_DATA);
     }

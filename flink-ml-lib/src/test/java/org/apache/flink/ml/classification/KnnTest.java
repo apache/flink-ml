@@ -27,7 +27,7 @@ import org.apache.flink.ml.linalg.DenseMatrix;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -243,7 +243,7 @@ public class KnnTest extends AbstractTestBase {
         KnnModel modelA = knn.fit(trainData);
         Table modelData = modelA.getModelData()[0];
         KnnModel modelB = new KnnModel().setModelData(modelData);
-        ReadWriteUtils.updateExistingParams(modelB, modelA.getParamMap());
+        ParamUtils.updateExistingParams(modelB, modelA.getParamMap());
         Table output = modelB.transform(predictData)[0];
         verifyPredictionResult(output, knn.getLabelCol(), knn.getPredictionCol());
     }

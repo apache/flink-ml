@@ -104,7 +104,7 @@ public class OnlineStandardScaler
 
         OnlineStandardScalerModel model =
                 new OnlineStandardScalerModel().setModelData(tEnv.fromDataStream(modelData));
-        ReadWriteUtils.updateExistingParams(model, paramMap);
+        ParamUtils.updateExistingParams(model, paramMap);
         return model;
     }
 

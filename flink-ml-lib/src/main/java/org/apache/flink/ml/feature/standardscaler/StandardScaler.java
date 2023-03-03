@@ -96,7 +96,7 @@ public class StandardScaler
 
         StandardScalerModel model =
                 new StandardScalerModel().setModelData(tEnv.fromDataStream(modelData));
-        ReadWriteUtils.updateExistingParams(model, paramMap);
+        ParamUtils.updateExistingParams(model, paramMap);
         return model;
     }
 

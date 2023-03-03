@@ -108,7 +108,7 @@ public class LinearSVC implements Estimator<LinearSVC, LinearSVCModel>, LinearSV
 
         DataStream<LinearSVCModelData> modelData = rawModelData.map(LinearSVCModelData::new);
         LinearSVCModel model = new LinearSVCModel().setModelData(tEnv.fromDataStream(modelData));
-        ReadWriteUtils.updateExistingParams(model, paramMap);
+        ParamUtils.updateExistingParams(model, paramMap);
         return model;
     }
 

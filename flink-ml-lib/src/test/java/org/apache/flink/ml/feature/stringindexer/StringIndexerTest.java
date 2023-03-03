@@ -19,7 +19,7 @@
 package org.apache.flink.ml.feature.stringindexer;
 
 import org.apache.flink.ml.common.param.HasHandleInvalid;
-import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
@@ -339,7 +339,7 @@ public class StringIndexerTest extends AbstractTestBase {
                         .fit(trainTable);
 
         StringIndexerModel newModel = new StringIndexerModel();
-        ReadWriteUtils.updateExistingParams(newModel, model.getParamMap());
+        ParamUtils.updateExistingParams(newModel, model.getParamMap());
         newModel.setModelData(model.getModelData());
         Table output = newModel.transform(predictTable)[0];
 
