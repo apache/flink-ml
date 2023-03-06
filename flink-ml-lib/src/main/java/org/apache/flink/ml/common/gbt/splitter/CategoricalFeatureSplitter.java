@@ -24,11 +24,10 @@ import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
 import org.apache.flink.ml.common.gbt.defs.HessianImpurity;
 import org.apache.flink.ml.common.gbt.defs.Split;
 
-import org.apache.commons.lang3.ArrayUtils;
+import org.eclipse.collections.api.list.primitive.MutableIntList;
+import org.eclipse.collections.impl.list.mutable.primitive.IntArrayList;
 
-import java.util.Arrays;
 import java.util.BitSet;
-import java.util.Comparator;
 
 import static org.apache.flink.ml.common.gbt.DataUtils.BIN_SIZE;
 
@@ -51,22 +50,35 @@ public class CategoricalFeatureSplitter extends HistogramFeatureSplitter {
         }
 
         int numBins = slice.size();
-        // Sorts categories based on grads / hessians, i.e., LightGBM many-vs-many approach.
-        Integer[] sortedCategories = new Integer[numBins];
+        // Sorts categories (bins） based on grads / hessians, i.e., LightGBM many-vs-many approach.
+        MutableIntList sortedIndices = new IntArrayList(numBins);
+        // A category (bin) is treated as missing values if its occurrences is smaller than a
+        // threshold. Currently, the threshold is 0.
+        BitSet ignoredIndices = new BitSet(numBins);
         {
             double[] scores = new double[numBins];
             for (int i = 0; i < numBins; ++i) {
-                sortedCategories[i] = i;
-                int startIndex = (slice.start + i) * BIN_SIZE;
-                scores[i] = hists[startIndex] / hists[startIndex + 1];
+                int index = (slice.start + i) * BIN_SIZE;
+                if (hists[index + 3] > 0) {
+                    sortedIndices.add(i);
+                    scores[i] = hists[index] / hists[index + 1];
+                } else {
+                    ignoredIndices.set(i);
+                    missing.add(
+                            (int) hists[index + 3],
+                            hists[index + 2],
+                            hists[index],
+                            hists[index + 1]);
+                }
             }
-            Arrays.sort(sortedCategories, Comparator.comparing(d -> scores[d]));
+            sortedIndices.sortThis(
+                    (value1, value2) -> Double.compare(scores[value1], scores[value2]));
         }
 
         Tuple3<Double, Integer, Boolean> bestSplit =
-                findBestSplit(ArrayUtils.toPrimitive(sortedCategories), total, missing);
+                findBestSplit(sortedIndices.toArray(), total, missing);
         double bestGain = bestSplit.f0;
-        int bestSplitBinId = bestSplit.f1;
+        int bestSplitIndex = bestSplit.f1;
         boolean missingGoLeft = bestSplit.f2;
 
         if (bestGain <= Split.INVALID_GAIN || bestGain <= minInfoGain) {
@@ -76,9 +88,9 @@ public class CategoricalFeatureSplitter extends HistogramFeatureSplitter {
         // Indicates which bins should go left.
         BitSet binsGoLeft = new BitSet(numBins);
         if (useMissing) {
-            for (int i = 0; i < numBins; ++i) {
-                int binId = sortedCategories[i];
-                if (i <= bestSplitBinId) {
+            for (int i = 0; i < sortedIndices.size(); ++i) {
+                int binId = sortedIndices.get(i);
+                if (i <= bestSplitIndex) {
                     if (binId < featureMeta.missingBin) {
                         binsGoLeft.set(binId);
                     } else if (binId > featureMeta.missingBin) {
@@ -87,14 +99,15 @@ public class CategoricalFeatureSplitter extends HistogramFeatureSplitter {
                 }
             }
         } else {
-            int numCategories =
-                    ((FeatureMeta.CategoricalFeatureMeta) featureMeta).categories.length;
-            for (int i = 0; i < numCategories; i += 1) {
-                int binId = sortedCategories[i];
-                if (i <= bestSplitBinId) {
+            for (int i = 0; i < sortedIndices.size(); i += 1) {
+                int binId = sortedIndices.get(i);
+                if (i <= bestSplitIndex) {
                     binsGoLeft.set(binId);
                 }
             }
+        }
+        if (missingGoLeft) {
+            binsGoLeft.or(ignoredIndices);
         }
         return new Split.CategoricalSplit(
                 featureId,
