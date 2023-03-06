@@ -97,12 +97,12 @@ public final class PipelineModel implements Model<PipelineModel> {
      * @return true if all stages have corresponding TransformerServable, false if not.
      */
     public boolean supportServable() {
-        for (Stage stage : stages) {
+        for (Stage<?> stage : stages) {
             if (!(stage instanceof Transformer)) {
                 return false;
             }
-            Transformer transformer = (Transformer) stage;
-            Class<? extends Transformer> clazz = transformer.getClass();
+            Transformer<?> transformer = (Transformer<?>) stage;
+            Class<?> clazz = transformer.getClass();
             try {
                 clazz.getMethod("loadServable", String.class);
             } catch (NoSuchMethodException e) {

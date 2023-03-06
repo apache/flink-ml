@@ -18,11 +18,8 @@
 
 package org.apache.flink.ml.util;
 
-import org.apache.flink.core.fs.FSDataInputStream;
-import org.apache.flink.core.fs.FileStatus;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
-import org.apache.flink.util.Preconditions;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -116,23 +113,5 @@ public class FileUtils {
     /** Returns a subdirectory of the given path for saving/loading model data. */
     public static Path getDataPath(String path) {
         return new Path(path, "data");
-    }
-
-    /**
-     * Opens an FSDataInputStream to read the model data file in the directory. Only one model data
-     * file is expected to be in the directory.
-     *
-     * @param path The parent directory of the model data file.
-     * @return A FSDataInputStream to read the model data.
-     */
-    public static FSDataInputStream getModelDataInputStream(Path path) throws IOException {
-        FileSystem fileSystem = path.getFileSystem();
-
-        FileStatus[] files = fileSystem.listStatus(path);
-        Preconditions.checkState(
-                files.length == 1,
-                "Only one model data file is expected in the directory %s.",
-                path);
-        return fileSystem.open(files[0].getPath());
     }
 }

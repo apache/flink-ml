@@ -19,19 +19,17 @@
 package org.apache.flink.ml.servable.builder;
 
 import org.apache.flink.api.common.typeutils.base.IntSerializer;
-import org.apache.flink.core.fs.FSDataInputStream;
-import org.apache.flink.core.fs.Path;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.servable.api.DataFrame;
 import org.apache.flink.ml.servable.api.Row;
 import org.apache.flink.ml.servable.api.TransformerServable;
 import org.apache.flink.ml.servable.types.DataTypes;
-import org.apache.flink.ml.util.FileUtils;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ServableReadWriteUtils;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -80,11 +78,9 @@ public class ExampleServables {
             SumModelServable servable =
                     ServableReadWriteUtils.loadServableParam(path, SumModelServable.class);
 
-            Path modelDataPath = FileUtils.getDataPath(path);
-            try (FSDataInputStream fsDataInputStream =
-                    FileUtils.getModelDataInputStream(modelDataPath)) {
+            try (InputStream inputStream = ServableReadWriteUtils.loadModelData(path)) {
                 DataInputViewStreamWrapper dataInputViewStreamWrapper =
-                        new DataInputViewStreamWrapper(fsDataInputStream);
+                        new DataInputViewStreamWrapper(inputStream);
                 int delta = IntSerializer.INSTANCE.deserialize(dataInputViewStreamWrapper);
                 servable.setDelta(delta);
             }

@@ -18,12 +18,17 @@
 
 package org.apache.flink.ml.util;
 
+import org.apache.flink.core.fs.FileStatus;
+import org.apache.flink.core.fs.FileSystem;
+import org.apache.flink.core.fs.Path;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.servable.api.TransformerServable;
 import org.apache.flink.ml.servable.builder.PipelineModelServable;
 import org.apache.flink.util.InstantiationUtil;
+import org.apache.flink.util.Preconditions;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -124,5 +129,26 @@ public class ServableReadWriteUtils {
         }
 
         return instance;
+    }
+
+    /**
+     * Opens an FSDataInputStream to read the model data file in the directory. Only one model data
+     * file is expected to be in the directory.
+     *
+     * @param path The parent directory of the model data file.
+     * @return A FSDataInputStream to read the model data.
+     */
+    public static InputStream loadModelData(String path) throws IOException {
+
+        Path modelDataPath = FileUtils.getDataPath(path);
+
+        FileSystem fileSystem = modelDataPath.getFileSystem();
+
+        FileStatus[] files = fileSystem.listStatus(modelDataPath);
+        Preconditions.checkState(
+                files.length == 1,
+                "Only one model data file is expected in the directory %s.",
+                path);
+        return fileSystem.open(files[0].getPath());
     }
 }
