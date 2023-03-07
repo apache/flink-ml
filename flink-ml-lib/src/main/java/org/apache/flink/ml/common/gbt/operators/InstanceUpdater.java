@@ -21,7 +21,6 @@ package org.apache.flink.ml.common.gbt.operators;
 import org.apache.flink.ml.common.gbt.defs.BinnedInstance;
 import org.apache.flink.ml.common.gbt.defs.LearningNode;
 import org.apache.flink.ml.common.gbt.defs.Node;
-import org.apache.flink.ml.common.gbt.defs.PredGradHess;
 import org.apache.flink.ml.common.gbt.defs.Split;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
 import org.apache.flink.ml.common.lossfunc.LossFunc;
@@ -48,20 +47,20 @@ class InstanceUpdater {
     }
 
     public void update(
-            PredGradHess[] pgh,
+            double[] pgh,
             List<LearningNode> leaves,
             int[] indices,
             BinnedInstance[] instances,
-            Consumer<PredGradHess[]> pghSetter,
+            Consumer<double[]> pghSetter,
             List<Node> treeNodes) {
         LOG.info("subtaskId: {}, {} start", subtaskId, InstanceUpdater.class.getSimpleName());
         if (pgh.length == 0) {
-            pgh = new PredGradHess[instances.length];
+            pgh = new double[instances.length * 3];
             for (int i = 0; i < instances.length; i += 1) {
                 double label = instances[i].label;
-                pgh[i] =
-                        new PredGradHess(
-                                prior, loss.gradient(prior, label), loss.hessian(prior, label));
+                pgh[3 * i] = prior;
+                pgh[3 * i + 1] = loss.gradient(prior, label);
+                pgh[3 * i + 2] = loss.hessian(prior, label);
             }
         }
 
@@ -70,20 +69,20 @@ class InstanceUpdater {
             double pred = split.prediction * stepSize;
             for (int i = nodeInfo.slice.start; i < nodeInfo.slice.end; ++i) {
                 int instanceId = indices[i];
-                updatePgh(pred, instances[instanceId].label, pgh[instanceId]);
+                updatePgh(instanceId, pred, instances[instanceId].label, pgh);
             }
             for (int i = nodeInfo.oob.start; i < nodeInfo.oob.end; ++i) {
                 int instanceId = indices[i];
-                updatePgh(pred, instances[instanceId].label, pgh[instanceId]);
+                updatePgh(instanceId, pred, instances[instanceId].label, pgh);
             }
         }
         pghSetter.accept(pgh);
         LOG.info("subtaskId: {}, {} end", subtaskId, InstanceUpdater.class.getSimpleName());
     }
 
-    private void updatePgh(double pred, double label, PredGradHess pgh) {
-        pgh.pred += pred;
-        pgh.gradient = loss.gradient(pgh.pred, label);
-        pgh.hessian = loss.hessian(pgh.pred, label);
+    private void updatePgh(int instanceId, double pred, double label, double[] pgh) {
+        pgh[instanceId * 3] += pred;
+        pgh[instanceId * 3 + 1] = loss.gradient(pgh[instanceId * 3], label);
+        pgh[instanceId * 3 + 2] = loss.hessian(pgh[instanceId * 3], label);
     }
 }

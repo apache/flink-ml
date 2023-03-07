@@ -84,7 +84,7 @@ class TrainContextInitializer {
                 stream(trainContext.featureMetas)
                         .mapToInt(d -> d.numBins(trainContext.strategy.useMissing))
                         .toArray();
-
+        LOG.info("Number of bins for each feature: {}", trainContext.numFeatureBins);
         LOG.info("subtaskId: {}, {} end", subtaskId, TrainContextInitializer.class.getSimpleName());
         return trainContext;
     }

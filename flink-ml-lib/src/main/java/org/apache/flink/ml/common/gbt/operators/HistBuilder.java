@@ -23,7 +23,6 @@ import org.apache.flink.ml.common.gbt.defs.BinnedInstance;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
 import org.apache.flink.ml.common.gbt.defs.Histogram;
 import org.apache.flink.ml.common.gbt.defs.LearningNode;
-import org.apache.flink.ml.common.gbt.defs.PredGradHess;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
 import org.apache.flink.ml.util.Distributor;
 
@@ -86,7 +85,7 @@ class HistBuilder {
             boolean isInputVector,
             int[] indices,
             BinnedInstance[] instances,
-            PredGradHess[] pgh,
+            double[] pgh,
             double[] hists) {
         int numNodes = layer.size();
         int numFeatures = featureMetas.length;
@@ -138,8 +137,8 @@ class HistBuilder {
                 int instanceId = indices[i];
                 BinnedInstance binnedInstance = instances[instanceId];
                 double weight = binnedInstance.weight;
-                double gradient = pgh[instanceId].gradient;
-                double hessian = pgh[instanceId].hessian;
+                double gradient = pgh[3 * instanceId + 1];
+                double hessian = pgh[3 * instanceId + 2];
 
                 totalHists[0] += gradient;
                 totalHists[1] += hessian;
@@ -151,8 +150,8 @@ class HistBuilder {
                 int instanceId = indices[i];
                 BinnedInstance binnedInstance = instances[instanceId];
                 double weight = binnedInstance.weight;
-                double gradient = pgh[instanceId].gradient;
-                double hessian = pgh[instanceId].hessian;
+                double gradient = pgh[3 * instanceId + 1];
+                double hessian = pgh[3 * instanceId + 2];
 
                 if (null == binnedInstance.featureIds) {
                     for (int j = 0; j < binnedInstance.featureValues.length; j += 1) {
@@ -244,7 +243,7 @@ class HistBuilder {
             List<LearningNode> layer,
             int[] indices,
             BinnedInstance[] instances,
-            PredGradHess[] pgh,
+            double[] pgh,
             Consumer<int[]> nodeFeaturePairsSetter) {
         LOG.info("subtaskId: {}, {} start", subtaskId, HistBuilder.class.getSimpleName());
         int numNodes = layer.size();

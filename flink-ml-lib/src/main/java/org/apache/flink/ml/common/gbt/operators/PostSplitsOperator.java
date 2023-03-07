@@ -25,7 +25,6 @@ import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.common.gbt.defs.BinnedInstance;
 import org.apache.flink.ml.common.gbt.defs.LearningNode;
 import org.apache.flink.ml.common.gbt.defs.Node;
-import org.apache.flink.ml.common.gbt.defs.PredGradHess;
 import org.apache.flink.ml.common.gbt.defs.Splits;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
 import org.apache.flink.ml.common.sharedstorage.SharedStorageContext;
@@ -194,7 +193,7 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
             throws Exception {
         sharedStorageContext.invoke(
                 (getter, setter) -> {
-                    setter.set(SharedStorageConstants.PREDS_GRADS_HESSIANS, new PredGradHess[0]);
+                    setter.set(SharedStorageConstants.PREDS_GRADS_HESSIANS, new double[0]);
                     setter.set(SharedStorageConstants.SWAPPED_INDICES, new int[0]);
                     setter.set(SharedStorageConstants.LEAVES, Collections.emptyList());
                     setter.set(SharedStorageConstants.LAYER, Collections.emptyList());

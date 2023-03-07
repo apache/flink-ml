@@ -29,14 +29,13 @@ import org.apache.flink.ml.common.gbt.GBTRunner;
 import org.apache.flink.ml.common.gbt.defs.BinnedInstance;
 import org.apache.flink.ml.common.gbt.defs.LearningNode;
 import org.apache.flink.ml.common.gbt.defs.Node;
-import org.apache.flink.ml.common.gbt.defs.PredGradHess;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
 import org.apache.flink.ml.common.gbt.typeinfo.BinnedInstanceSerializer;
 import org.apache.flink.ml.common.gbt.typeinfo.LearningNodeSerializer;
 import org.apache.flink.ml.common.gbt.typeinfo.NodeSerializer;
-import org.apache.flink.ml.common.gbt.typeinfo.PredGradHessSerializer;
 import org.apache.flink.ml.common.sharedstorage.ItemDescriptor;
 import org.apache.flink.ml.common.sharedstorage.SharedStorageUtils;
+import org.apache.flink.ml.linalg.typeinfo.OptimizedDoublePrimitiveArraySerializer;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -67,15 +66,14 @@ public class SharedStorageConstants {
                     new BinnedInstance[0]);
 
     /**
-     * Predictions, gradients, and hessians of instances, sharing same instances with {@link
+     * (prediction, gradient, and hessian) of instances, sharing same indexing with {@link
      * #INSTANCES}.
      */
-    static final ItemDescriptor<PredGradHess[]> PREDS_GRADS_HESSIANS =
+    static final ItemDescriptor<double[]> PREDS_GRADS_HESSIANS =
             ItemDescriptor.of(
                     "preds_grads_hessians",
-                    new GenericArraySerializer<>(
-                            PredGradHess.class, PredGradHessSerializer.INSTANCE),
-                    new PredGradHess[0]);
+                    new OptimizedDoublePrimitiveArraySerializer(),
+                    new double[0]);
 
     /** Shuffle indices of instances used after every new tree just initialized. */
     static final ItemDescriptor<int[]> SHUFFLED_INDICES =

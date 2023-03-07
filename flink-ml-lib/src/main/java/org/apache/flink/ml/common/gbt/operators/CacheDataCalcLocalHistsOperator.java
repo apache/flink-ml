@@ -26,7 +26,6 @@ import org.apache.flink.ml.common.gbt.defs.BinnedInstance;
 import org.apache.flink.ml.common.gbt.defs.BoostingStrategy;
 import org.apache.flink.ml.common.gbt.defs.Histogram;
 import org.apache.flink.ml.common.gbt.defs.LearningNode;
-import org.apache.flink.ml.common.gbt.defs.PredGradHess;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
 import org.apache.flink.ml.common.gbt.typeinfo.BinnedInstanceSerializer;
 import org.apache.flink.ml.common.lossfunc.LossFunc;
@@ -192,19 +191,17 @@ public class CacheDataCalcLocalHistsOperator extends AbstractStreamOperator<Hist
                     Preconditions.checkArgument(
                             getRuntimeContext().getIndexOfThisSubtask() == trainContext.subtaskId);
                     BinnedInstance[] instances = getter.get(SharedStorageConstants.INSTANCES);
-                    PredGradHess[] pgh = getter.get(SharedStorageConstants.PREDS_GRADS_HESSIANS);
+                    double[] pgh = getter.get(SharedStorageConstants.PREDS_GRADS_HESSIANS);
                     // In the first round, use prior as the predictions.
                     if (0 == pgh.length) {
-                        pgh = new PredGradHess[instances.length];
+                        pgh = new double[instances.length * 3];
                         double prior = trainContext.prior;
                         LossFunc loss = trainContext.loss;
                         for (int i = 0; i < instances.length; i += 1) {
                             double label = instances[i].label;
-                            pgh[i] =
-                                    new PredGradHess(
-                                            prior,
-                                            loss.gradient(prior, label),
-                                            loss.hessian(prior, label));
+                            pgh[3 * i] = prior;
+                            pgh[3 * i + 1] = loss.gradient(prior, label);
+                            pgh[3 * i + 2] = loss.hessian(prior, label);
                         }
                     }
 
