@@ -144,23 +144,23 @@ public class PipelineTest extends AbstractTestBase {
 
         DataFrame input =
                 new DataFrame(
-                        Arrays.asList("input"),
-                        Arrays.asList(DataTypes.INT),
+                        Collections.singletonList("input"),
+                        Collections.singletonList(DataTypes.INT),
                         Arrays.asList(
-                                new Row(Arrays.asList(1)),
-                                new Row(Arrays.asList(2)),
-                                new Row(Arrays.asList(3))));
+                                new Row(Collections.singletonList(1)),
+                                new Row(Collections.singletonList(2)),
+                                new Row(Collections.singletonList(3))));
 
         DataFrame output = servable.transform(input);
 
         DataFrame expectedOutput =
                 new DataFrame(
-                        Arrays.asList("input"),
-                        Arrays.asList(DataTypes.INT),
+                        Collections.singletonList("input"),
+                        Collections.singletonList(DataTypes.INT),
                         Arrays.asList(
-                                new Row(Arrays.asList(61)),
-                                new Row(Arrays.asList(62)),
-                                new Row(Arrays.asList(63))));
+                                new Row(Collections.singletonList(61)),
+                                new Row(Collections.singletonList(62)),
+                                new Row(Collections.singletonList(63))));
 
         compareDataFrame(expectedOutput, output);
     }

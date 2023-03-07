@@ -22,10 +22,12 @@ import org.apache.flink.api.common.typeutils.base.IntSerializer;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.servable.api.DataFrame;
+import org.apache.flink.ml.servable.api.ModelServable;
 import org.apache.flink.ml.servable.api.Row;
 import org.apache.flink.ml.servable.api.TransformerServable;
 import org.apache.flink.ml.servable.types.DataTypes;
 import org.apache.flink.ml.util.ParamUtils;
+import org.apache.flink.ml.util.Serializer;
 import org.apache.flink.ml.util.ServableReadWriteUtils;
 
 import java.io.IOException;
@@ -43,7 +45,7 @@ public class ExampleServables {
      * A {@link TransformerServable} subclass that increments every value in the input dataframe by
      * `delta` and outputs the resulting values.
      */
-    public static class SumModelServable implements TransformerServable<SumModelServable> {
+    public static class SumModelServable implements ModelServable<SumModelServable> {
 
         private static final String COL_NAME = "input";
 
@@ -82,13 +84,19 @@ public class ExampleServables {
                 DataInputViewStreamWrapper dataInputViewStreamWrapper =
                         new DataInputViewStreamWrapper(inputStream);
                 int delta = IntSerializer.INSTANCE.deserialize(dataInputViewStreamWrapper);
-                servable.setDelta(delta);
+                return servable.setDelta(delta);
             }
-            return servable;
         }
 
         public SumModelServable setDelta(int delta) {
             this.delta = delta;
+            return this;
+        }
+
+        public SumModelServable setModelData(InputStream... modelDataInputs) throws IOException {
+            assert modelDataInputs.length == 1;
+
+            delta = Serializer.deserialize(modelDataInputs[0], getClass().getClassLoader());
             return this;
         }
     }

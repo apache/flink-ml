@@ -24,9 +24,12 @@ import org.apache.flink.ml.servable.api.Row;
 import org.apache.flink.ml.servable.api.TransformerServable;
 import org.apache.flink.ml.servable.builder.ExampleServables.SumModelServable;
 import org.apache.flink.ml.servable.types.DataTypes;
+import org.apache.flink.ml.util.Serializer;
 
 import org.junit.Test;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -35,10 +38,16 @@ import java.util.List;
 public class PipelineModelServableTest {
 
     @Test
-    public void testTransform() {
-        SumModelServable servableA = new SumModelServable().setDelta(10);
-        SumModelServable servableB = new SumModelServable().setDelta(20);
-        SumModelServable servableC = new SumModelServable().setDelta(30);
+    public void testTransform() throws IOException {
+        SumModelServable servableA =
+                new SumModelServable()
+                        .setModelData(new ByteArrayInputStream(Serializer.serialize(10)));
+        SumModelServable servableB =
+                new SumModelServable()
+                        .setModelData(new ByteArrayInputStream(Serializer.serialize(20)));
+        SumModelServable servableC =
+                new SumModelServable()
+                        .setModelData(new ByteArrayInputStream(Serializer.serialize(30)));
 
         List<TransformerServable<?>> servables = Arrays.asList(servableA, servableB, servableC);
 
