@@ -18,17 +18,20 @@
 
 package org.apache.flink.ml.common.gbt.operators;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.common.gbt.DataUtils;
 import org.apache.flink.ml.common.gbt.defs.BinnedInstance;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
 import org.apache.flink.ml.common.gbt.defs.Histogram;
 import org.apache.flink.ml.common.gbt.defs.LearningNode;
+import org.apache.flink.ml.common.gbt.defs.Slice;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
 import org.apache.flink.ml.util.Distributor;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
@@ -114,6 +117,7 @@ class HistBuilder {
         BitSet featureValid = null;
         boolean allFeatureValid;
         for (int k = 0; k < numNodes; k += 1) {
+            long start = System.currentTimeMillis();
             int[] features = nodeToFeatures[k];
             int[] binOffsets = nodeToBinOffsets[k];
             LearningNode node = layer.get(k);
@@ -204,6 +208,12 @@ class HistBuilder {
                     }
                 }
             }
+            LOG.info(
+                    "STEP 3: node {}, {} #instances, {} #features, {} ms",
+                    k,
+                    node.slice.size(),
+                    features.length,
+                    System.currentTimeMillis() - start);
         }
     }
 
@@ -239,7 +249,7 @@ class HistBuilder {
     }
 
     /** Calculate local histograms for nodes in current layer of tree. */
-    Histogram build(
+    List<Tuple2<Integer, Histogram>> build(
             List<LearningNode> layer,
             int[] indices,
             BinnedInstance[] instances,
@@ -267,6 +277,7 @@ class HistBuilder {
                 numNodes * Math.min(maxFeatureBins * numBaggingFeatures, totalNumFeatureBins);
         double[] hists = new double[maxNumBins * BIN_SIZE];
         // Calculates histograms for (nodeId, featureId) pairs.
+        long start = System.currentTimeMillis();
         calcNodeFeaturePairHists(
                 layer,
                 nodeToFeatures,
@@ -277,11 +288,27 @@ class HistBuilder {
                 instances,
                 pgh,
                 hists);
+        long elapsed = System.currentTimeMillis() - start;
+        LOG.info("Elapsed time for calcNodeFeaturePairHists: {} ms", elapsed);
 
         // Calculates number of elements received by each downstream subtask.
         int[] recvcnts = calcRecvCounts(numSubtasks, nodeFeaturePairs, numFeatureBins);
 
+        List<Tuple2<Integer, Histogram>> histograms = new ArrayList<>();
+        int sliceStart = 0;
+        for (int i = 0; i < recvcnts.length; i += 1) {
+            int sliceSize = recvcnts[i];
+            histograms.add(
+                    Tuple2.of(
+                            i,
+                            new Histogram(
+                                    subtaskId,
+                                    hists,
+                                    new Slice(sliceStart, sliceStart + sliceSize))));
+            sliceStart += sliceSize;
+        }
+
         LOG.info("subtaskId: {}, {} end", this.subtaskId, HistBuilder.class.getSimpleName());
-        return new Histogram(this.subtaskId, hists, recvcnts);
+        return histograms;
     }
 }

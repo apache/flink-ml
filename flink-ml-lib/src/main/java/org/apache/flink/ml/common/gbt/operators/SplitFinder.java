@@ -82,6 +82,7 @@ class SplitFinder {
             LearningNode node = layer.get(nodeId);
 
             Preconditions.checkState(node.depth < maxDepth || numLeaves + 2 <= maxNumLeaves);
+            Preconditions.checkState(histogram.slice.start == 0);
             splitters[featureId].reset(
                     histogram.hists, new Slice(binOffset, binOffset + numFeatureBins[featureId]));
             Split bestSplit = splitters[featureId].bestSplit();

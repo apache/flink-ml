@@ -79,10 +79,14 @@ public final class OptimizedDoublePrimitiveArraySerializer extends TypeSerialize
         if (record == null) {
             throw new IllegalArgumentException("The record must not be null.");
         }
-        final int len = record.length;
+        serialize(record, 0, record.length, target);
+    }
+
+    public void serialize(double[] record, int start, int len, DataOutputView target)
+            throws IOException {
         target.writeInt(len);
-        for (int i = 0; i < len; i++) {
-            Bits.putDouble(buf, (i & 127) << 3, record[i]);
+        for (int i = 0; i < len; i += 1) {
+            Bits.putDouble(buf, (i & 127) << 3, record[start + i]);
             if ((i & 127) == 127) {
                 target.write(buf);
             }

@@ -22,11 +22,13 @@ import org.apache.flink.api.common.typeutils.SimpleTypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.base.IntSerializer;
 import org.apache.flink.api.common.typeutils.base.TypeSerializerSingleton;
-import org.apache.flink.api.common.typeutils.base.array.IntPrimitiveArraySerializer;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.ml.common.gbt.defs.Histogram;
+import org.apache.flink.ml.common.gbt.defs.Slice;
 import org.apache.flink.ml.linalg.typeinfo.OptimizedDoublePrimitiveArraySerializer;
+
+import org.apache.commons.lang3.ArrayUtils;
 
 import java.io.IOException;
 
@@ -53,18 +55,15 @@ public final class HistogramSerializer extends TypeSerializerSingleton<Histogram
     public Histogram copy(Histogram from) {
         Histogram histogram = new Histogram();
         histogram.subtaskId = from.subtaskId;
-        histogram.hists = from.hists.clone();
-        histogram.recvcnts = from.recvcnts.clone();
+        histogram.hists = ArrayUtils.subarray(from.hists, from.slice.start, from.slice.end);
+        histogram.slice.start = 0;
+        histogram.slice.end = from.slice.size();
         return histogram;
     }
 
     @Override
     public Histogram copy(Histogram from, Histogram reuse) {
-        assert from.getClass() == reuse.getClass();
-        reuse.subtaskId = from.subtaskId;
-        reuse.hists = from.hists.clone();
-        reuse.recvcnts = from.recvcnts.clone();
-        return reuse;
+        return copy(from);
     }
 
     @Override
@@ -74,9 +73,9 @@ public final class HistogramSerializer extends TypeSerializerSingleton<Histogram
 
     @Override
     public void serialize(Histogram record, DataOutputView target) throws IOException {
-        IntSerializer.INSTANCE.serialize(record.subtaskId, target);
-        histsSerializer.serialize(record.hists, target);
-        IntPrimitiveArraySerializer.INSTANCE.serialize(record.recvcnts, target);
+        target.writeInt(record.subtaskId);
+        // Only writes valid slice of `hists`.
+        histsSerializer.serialize(record.hists, record.slice.start, record.slice.size(), target);
     }
 
     @Override
@@ -84,15 +83,16 @@ public final class HistogramSerializer extends TypeSerializerSingleton<Histogram
         Histogram histogram = new Histogram();
         histogram.subtaskId = IntSerializer.INSTANCE.deserialize(source);
         histogram.hists = histsSerializer.deserialize(source);
-        histogram.recvcnts = IntPrimitiveArraySerializer.INSTANCE.deserialize(source);
+        histogram.slice = new Slice(0, histogram.hists.length);
         return histogram;
     }
 
     @Override
     public Histogram deserialize(Histogram reuse, DataInputView source) throws IOException {
         reuse.subtaskId = IntSerializer.INSTANCE.deserialize(source);
-        reuse.hists = histsSerializer.deserialize(source);
-        reuse.recvcnts = IntPrimitiveArraySerializer.INSTANCE.deserialize(source);
+        reuse.hists = histsSerializer.deserialize(reuse.hists, source);
+        reuse.slice.start = 0;
+        reuse.slice.end = reuse.hists.length;
         return reuse;
     }
 

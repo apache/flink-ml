@@ -18,12 +18,9 @@
 
 package org.apache.flink.ml.common.gbt;
 
-import org.apache.flink.api.common.functions.FlatMapFunction;
-import org.apache.flink.api.common.functions.Partitioner;
 import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
-import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.iteration.DataStreamList;
 import org.apache.flink.iteration.IterationBody;
@@ -46,8 +43,6 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.OutputTag;
-
-import org.apache.commons.lang3.ArrayUtils;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -78,17 +73,21 @@ class BoostIterationBody implements IterationBody {
         // current tree layer.
         CacheDataCalcLocalHistsOperator cacheDataCalcLocalHistsOp =
                 new CacheDataCalcLocalHistsOperator(strategy);
-        SingleOutputStreamOperator<Histogram> localHists =
+        SingleOutputStreamOperator<Tuple2<Integer, Histogram>> localHists =
                 data.connect(trainContext)
                         .transform(
                                 "CacheDataCalcLocalHists",
-                                TypeInformation.of(Histogram.class),
+                                new TypeHint<Tuple2<Integer, Histogram>>() {}.getTypeInfo(),
                                 cacheDataCalcLocalHistsOp);
         for (ItemDescriptor<?> s : SharedStorageConstants.OWNED_BY_CACHE_DATA_CALC_LOCAL_HISTS_OP) {
             ownerMap.put(s, cacheDataCalcLocalHistsOp.getSharedStorageAccessorID());
         }
 
-        DataStream<Histogram> globalHists = scatterReduceHistograms(localHists);
+        DataStream<Histogram> globalHists =
+                localHists
+                        .partitionCustom((key, numPartitions) -> key, value -> value.f0)
+                        .map(d -> d.f1)
+                        .flatMap(new HistogramAggregateFunction());
 
         SingleOutputStreamOperator<Splits> localSplits =
                 globalHists.transform(
@@ -141,43 +140,5 @@ class BoostIterationBody implements IterationBody {
                                 (d, out) -> {}, TypeInformation.of(TrainContext.class))),
                 DataStreamList.of(finalModelData),
                 termination);
-    }
-
-    public DataStream<Histogram> scatterReduceHistograms(DataStream<Histogram> localHists) {
-        return localHists
-                .flatMap(
-                        (FlatMapFunction<Histogram, Tuple2<Integer, Histogram>>)
-                                (value, out) -> {
-                                    double[] hists = value.hists;
-                                    int[] recvcnts = value.recvcnts;
-                                    int p = 0;
-                                    for (int i = 0; i < recvcnts.length; i += 1) {
-                                        out.collect(
-                                                Tuple2.of(
-                                                        i,
-                                                        new Histogram(
-                                                                value.subtaskId,
-                                                                ArrayUtils.subarray(
-                                                                        hists, p, p + recvcnts[i]),
-                                                                recvcnts)));
-                                        p += recvcnts[i];
-                                    }
-                                })
-                .returns(new TypeHint<Tuple2<Integer, Histogram>>() {})
-                .partitionCustom(
-                        new Partitioner<Integer>() {
-                            @Override
-                            public int partition(Integer key, int numPartitions) {
-                                return key;
-                            }
-                        },
-                        new KeySelector<Tuple2<Integer, Histogram>, Integer>() {
-                            @Override
-                            public Integer getKey(Tuple2<Integer, Histogram> value) {
-                                return value.f0;
-                            }
-                        })
-                .map(d -> d.f1)
-                .flatMap(new HistogramAggregateFunction());
     }
 }

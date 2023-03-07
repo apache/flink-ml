@@ -30,26 +30,25 @@ import java.io.Serializable;
  */
 @TypeInfo(HistogramTypeInfoFactory.class)
 public class Histogram implements Serializable {
-
-    // Stores source subtask ID when reducing or target subtask ID when scattering.
+    // Stores source subtask ID.
     public int subtaskId;
     // Stores values of histogram bins.
     public double[] hists;
-    // Stores the number of elements received by subtasks in scattering.
-    public int[] recvcnts;
+    // Stores the valid slice of `hists`.
+    public Slice slice = new Slice();
 
     public Histogram() {}
 
-    public Histogram(int subtaskId, double[] hists, int[] recvcnts) {
+    public Histogram(int subtaskId, double[] hists, Slice slice) {
         this.subtaskId = subtaskId;
         this.hists = hists;
-        this.recvcnts = recvcnts;
+        this.slice = slice;
     }
 
     private Histogram accumulate(Histogram other) {
-        Preconditions.checkArgument(hists.length == other.hists.length);
-        for (int i = 0; i < hists.length; i += 1) {
-            hists[i] += other.hists[i];
+        Preconditions.checkArgument(slice.size() == other.slice.size());
+        for (int i = 0; i < slice.size(); i += 1) {
+            hists[slice.start + i] += other.hists[other.slice.start + i];
         }
         return this;
     }
