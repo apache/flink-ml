@@ -51,8 +51,7 @@ public class ServableReadWriteUtils {
      *     servables.
      * @return A list of servables.
      */
-    public static List<TransformerServable<?>> loadPipelineOfServables(String path)
-            throws IOException {
+    public static List<TransformerServable<?>> loadPipeline(String path) throws IOException {
         Map<String, ?> metadata = loadMetadata(path, "");
         int numStages = (Integer) metadata.get("numStages");
         List<TransformerServable<?>> servables = new ArrayList<>(numStages);

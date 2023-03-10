@@ -23,7 +23,6 @@ import org.apache.flink.ml.servable.api.DataFrame;
 import org.apache.flink.ml.servable.api.Row;
 import org.apache.flink.ml.servable.builder.ExampleServables.SumModelServable;
 import org.apache.flink.ml.servable.types.DataTypes;
-import org.apache.flink.ml.util.Serializer;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
@@ -39,12 +38,12 @@ import java.io.ByteArrayInputStream;
 import java.util.Arrays;
 import java.util.Collections;
 
-import static org.apache.flink.ml.servable.TestUtils.compareDataFrame;
-import static org.apache.flink.ml.util.TestUtils.saveAndLoadServable;
+import static org.apache.flink.ml.servable.TestUtils.assertDataFrameEquals;
 
-/** Tests the behavior of integration with Servables. */
-public class IntegrateWithServableTest extends AbstractTestBase {
+/** Tests the behavior of integration between Transformer and Servable. */
+public class ServableTest extends AbstractTestBase {
 
+    private StreamExecutionEnvironment env;
     private StreamTableEnvironment tEnv;
 
     private static final DataFrame INPUT =
@@ -69,38 +68,41 @@ public class IntegrateWithServableTest extends AbstractTestBase {
 
     @Before
     public void before() {
-        StreamExecutionEnvironment env = TestUtils.getExecutionEnvironment();
+        env = TestUtils.getExecutionEnvironment();
         tEnv = StreamTableEnvironment.create(env);
     }
 
     @Test
-    public void testSaveModelAndLoadAsServable() throws Exception {
-        SumModel model = new SumModel().setModelData(tEnv.fromValues(10));
+    public void testSaveModelLoadServable() throws Exception {
+        String modelPath = tempFolder.newFolder().getAbsolutePath();
 
-        SumModelServable servable =
-                saveAndLoadServable(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+        SumModel model = new SumModel().setModelData(tEnv.fromValues(10));
+        model.save(modelPath);
+        env.execute();
+
+        SumModelServable servable = SumModel.loadServable(modelPath);
 
         DataFrame output = servable.transform(INPUT);
 
-        compareDataFrame(EXPECTED_OUTPUT, output);
+        assertDataFrameEquals(EXPECTED_OUTPUT, output);
     }
 
     @Test
-    public void testGetModelDataAndSetToServable() throws Exception {
+    public void testSetModelData() throws Exception {
         SumModel model = new SumModel().setModelData(tEnv.fromValues(10));
         Table modelDataTable = model.getModelData()[0];
-        Integer modelData =
+
+        byte[] serializedModelData =
                 tEnv.toDataStream(modelDataTable)
-                        .map(x -> (int) x.getField(0))
+                        .map(x -> SumModelServable.serialize(x.getField(0)))
                         .executeAndCollect()
                         .next();
 
-        byte[] serializedModelData = Serializer.serialize(modelData);
         SumModelServable servable =
                 new SumModelServable().setModelData(new ByteArrayInputStream(serializedModelData));
 
         DataFrame output = servable.transform(INPUT);
 
-        compareDataFrame(EXPECTED_OUTPUT, output);
+        assertDataFrameEquals(EXPECTED_OUTPUT, output);
     }
 }

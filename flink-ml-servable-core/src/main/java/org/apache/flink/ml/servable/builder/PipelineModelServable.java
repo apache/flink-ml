@@ -57,7 +57,7 @@ public final class PipelineModelServable implements ModelServable<PipelineModelS
     }
 
     public static PipelineModelServable load(String path) throws IOException {
-        return new PipelineModelServable(ServableReadWriteUtils.loadPipelineOfServables(path));
+        return new PipelineModelServable(ServableReadWriteUtils.loadPipeline(path));
     }
 
     @Override

@@ -20,6 +20,7 @@ package org.apache.flink.ml.servable.builder;
 
 import org.apache.flink.api.common.typeutils.base.IntSerializer;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
+import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.servable.api.DataFrame;
 import org.apache.flink.ml.servable.api.ModelServable;
@@ -27,9 +28,10 @@ import org.apache.flink.ml.servable.api.Row;
 import org.apache.flink.ml.servable.api.TransformerServable;
 import org.apache.flink.ml.servable.types.DataTypes;
 import org.apache.flink.ml.util.ParamUtils;
-import org.apache.flink.ml.util.Serializer;
 import org.apache.flink.ml.util.ServableReadWriteUtils;
+import org.apache.flink.util.Preconditions;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -61,7 +63,7 @@ public class ExampleServables {
         public DataFrame transform(DataFrame input) {
             List<Row> outputRows = new ArrayList<>();
             for (Row row : input.collect()) {
-                assert row.size() == 1;
+                Preconditions.checkState(row.size() == 1);
                 int originValue = (Integer) row.get(0);
                 outputRows.add(new Row(Collections.singletonList(originValue + delta)));
             }
@@ -83,21 +85,31 @@ public class ExampleServables {
             try (InputStream inputStream = ServableReadWriteUtils.loadModelData(path)) {
                 DataInputViewStreamWrapper dataInputViewStreamWrapper =
                         new DataInputViewStreamWrapper(inputStream);
-                int delta = IntSerializer.INSTANCE.deserialize(dataInputViewStreamWrapper);
-                return servable.setDelta(delta);
+                servable.delta = IntSerializer.INSTANCE.deserialize(dataInputViewStreamWrapper);
+                return servable;
             }
         }
 
-        public SumModelServable setDelta(int delta) {
-            this.delta = delta;
+        public SumModelServable setModelData(InputStream... modelDataInputs) throws IOException {
+            Preconditions.checkArgument(modelDataInputs.length == 1);
+
+            DataInputViewStreamWrapper inputViewStreamWrapper =
+                    new DataInputViewStreamWrapper(modelDataInputs[0]);
+
+            delta = IntSerializer.INSTANCE.deserialize(inputViewStreamWrapper);
+
             return this;
         }
 
-        public SumModelServable setModelData(InputStream... modelDataInputs) throws IOException {
-            assert modelDataInputs.length == 1;
+        public static byte[] serialize(Object modelData) throws IOException {
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 
-            delta = Serializer.deserialize(modelDataInputs[0], getClass().getClassLoader());
-            return this;
+            DataOutputViewStreamWrapper outputViewStreamWrapper =
+                    new DataOutputViewStreamWrapper(outputStream);
+
+            IntSerializer.INSTANCE.serialize((Integer) modelData, outputViewStreamWrapper);
+
+            return outputStream.toByteArray();
         }
     }
 }

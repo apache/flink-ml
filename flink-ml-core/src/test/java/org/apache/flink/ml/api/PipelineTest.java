@@ -42,7 +42,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import static org.apache.flink.ml.servable.TestUtils.compareDataFrame;
+import static org.apache.flink.ml.servable.TestUtils.assertDataFrameEquals;
 import static org.apache.flink.ml.util.TestUtils.saveAndLoadServable;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -162,6 +162,6 @@ public class PipelineTest extends AbstractTestBase {
                                 new Row(Collections.singletonList(62)),
                                 new Row(Collections.singletonList(63))));
 
-        compareDataFrame(expectedOutput, output);
+        assertDataFrameEquals(expectedOutput, output);
     }
 }
