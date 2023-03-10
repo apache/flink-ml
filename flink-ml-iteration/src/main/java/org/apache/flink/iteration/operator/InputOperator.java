@@ -22,6 +22,7 @@ import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
+import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 /** Input operator that wraps the user record into {@link IterationRecord}. */
@@ -45,5 +46,10 @@ public class InputOperator<T> extends AbstractStreamOperator<IterationRecord<T>>
         reusable.setTimestamp(streamRecord.getTimestamp());
         reusable.getValue().setValue(streamRecord.getValue());
         output.collect(reusable);
+    }
+
+    @Override
+    public void processWatermark(Watermark mark) {
+        // TODO: FLINK-31373 Support processing watermarks in iterations.
     }
 }
