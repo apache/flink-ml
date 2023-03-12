@@ -138,7 +138,6 @@ public class ServableReadWriteUtils {
      * @return A FSDataInputStream to read the model data.
      */
     public static InputStream loadModelData(String path) throws IOException {
-
         Path modelDataPath = FileUtils.getDataPath(path);
 
         FileSystem fileSystem = modelDataPath.getFileSystem();
