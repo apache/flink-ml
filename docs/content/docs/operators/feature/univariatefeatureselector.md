@@ -220,3 +220,7 @@ for result in t_env.to_data_stream(output).execute_and_collect():
           '\tOutput Value: ' + str(result[output_index]))
 
 ```
+
+{{< /tab>}}
+
+{{< /tabs>}}
