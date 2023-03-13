@@ -43,7 +43,6 @@ import static org.apache.flink.ml.servable.TestUtils.assertDataFrameEquals;
 /** Tests the behavior of integration between Transformer and Servable. */
 public class ServableTest extends AbstractTestBase {
 
-    private StreamExecutionEnvironment env;
     private StreamTableEnvironment tEnv;
 
     private static final DataFrame INPUT =
@@ -68,7 +67,7 @@ public class ServableTest extends AbstractTestBase {
 
     @Before
     public void before() {
-        env = TestUtils.getExecutionEnvironment();
+        StreamExecutionEnvironment env = TestUtils.getExecutionEnvironment();
         tEnv = StreamTableEnvironment.create(env);
     }
 
@@ -77,10 +76,9 @@ public class ServableTest extends AbstractTestBase {
         String modelPath = tempFolder.newFolder().getAbsolutePath();
 
         SumModel model = new SumModel().setModelData(tEnv.fromValues(10));
-        model.save(modelPath);
-        env.execute();
 
-        SumModelServable servable = SumModel.loadServable(modelPath);
+        SumModelServable servable =
+                TestUtils.saveAndLoadServable(tEnv, model, modelPath, SumModel::loadServable);
 
         DataFrame output = servable.transform(INPUT);
 

@@ -45,6 +45,7 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.test.util.TestBaseUtils;
 import org.apache.flink.types.Row;
+import org.apache.flink.util.function.FunctionWithException;
 
 import org.apache.commons.collections.IteratorUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -212,11 +213,15 @@ public class TestUtils {
     }
 
     /**
-     * Saves a transformer to filesystem and reloads the matadata as a servable by invoking the
-     * static loadServable() method.
+     * Saves a transformer to filesystem and reloads the matadata as a servable with the given
+     * loadServable function.
      */
     public static <T extends TransformerServable<T>> T saveAndLoadServable(
-            StreamTableEnvironment tEnv, Transformer transformer, String path) throws Exception {
+            StreamTableEnvironment tEnv,
+            Transformer<?> transformer,
+            String path,
+            FunctionWithException<String, T, IOException> loadServableFunc)
+            throws Exception {
         StreamExecutionEnvironment env = TableUtils.getExecutionEnvironment(tEnv);
 
         transformer.save(path);
@@ -229,8 +234,7 @@ public class TestUtils {
             }
         }
 
-        Method method = transformer.getClass().getMethod("loadServable", String.class);
-        return (T) method.invoke(null, path);
+        return loadServableFunc.apply(path);
     }
 
     /**

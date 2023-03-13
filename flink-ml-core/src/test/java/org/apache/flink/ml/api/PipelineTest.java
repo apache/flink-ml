@@ -43,7 +43,6 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.apache.flink.ml.servable.TestUtils.assertDataFrameEquals;
-import static org.apache.flink.ml.util.TestUtils.saveAndLoadServable;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -131,7 +130,7 @@ public class PipelineTest extends AbstractTestBase {
     }
 
     @Test
-    public void testLoadServable() throws Exception {
+    public void testPipelineModelServable() throws Exception {
         SumModel modelA = new SumModel().setModelData(tEnv.fromValues(10));
         SumModel modelB = new SumModel().setModelData(tEnv.fromValues(20));
         SumModel modelC = new SumModel().setModelData(tEnv.fromValues(30));
@@ -140,7 +139,11 @@ public class PipelineTest extends AbstractTestBase {
         Model<?> model = new PipelineModel(stages);
 
         PipelineModelServable servable =
-                saveAndLoadServable(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndLoadServable(
+                        tEnv,
+                        model,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        PipelineModel::loadServable);
 
         DataFrame input =
                 new DataFrame(
