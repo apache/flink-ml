@@ -114,7 +114,7 @@ public class KMeans implements Estimator<KMeans, KMeansModel>, KMeansParams<KMea
 
         Table finalModelDataTable = tEnv.fromDataStream(finalModelData);
         KMeansModel model = new KMeansModel().setModelData(finalModelDataTable);
-        ReadWriteUtils.updateExistingParams(model, paramMap);
+        ParamUtils.updateExistingParams(model, paramMap);
         return model;
     }
 

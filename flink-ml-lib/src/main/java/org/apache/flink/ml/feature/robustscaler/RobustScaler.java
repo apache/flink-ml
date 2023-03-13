@@ -84,7 +84,7 @@ public class RobustScaler
                         new QuantileAggregator(getRelativeError(), getLower(), getUpper()));
         RobustScalerModel model =
                 new RobustScalerModel().setModelData(tEnv.fromDataStream(modelData));
-        ReadWriteUtils.updateExistingParams(model, getParamMap());
+        ParamUtils.updateExistingParams(model, getParamMap());
         return model;
     }
 

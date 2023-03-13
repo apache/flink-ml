@@ -20,25 +20,38 @@ package org.apache.flink.ml.api;
 
 import org.apache.flink.ml.api.ExampleStages.SumEstimator;
 import org.apache.flink.ml.api.ExampleStages.SumModel;
+import org.apache.flink.ml.api.ExampleStages.UnionAlgoOperator;
 import org.apache.flink.ml.builder.Pipeline;
 import org.apache.flink.ml.builder.PipelineModel;
+import org.apache.flink.ml.servable.api.DataFrame;
+import org.apache.flink.ml.servable.api.Row;
+import org.apache.flink.ml.servable.builder.PipelineModelServable;
+import org.apache.flink.ml.servable.types.DataTypes;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.test.util.AbstractTestBase;
 
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import static org.apache.flink.ml.servable.TestUtils.assertDataFrameEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
 /** Tests the behavior of Pipeline and PipelineModel. */
 public class PipelineTest extends AbstractTestBase {
     private StreamExecutionEnvironment env;
     private StreamTableEnvironment tEnv;
+
+    @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
 
     @Before
     public void before() {
@@ -94,5 +107,64 @@ public class PipelineTest extends AbstractTestBase {
         Estimator<?, ?> loadedEstimator = Pipeline.load(tEnv, path);
         // Executes the loaded Pipeline and verifies that it produces the expected output.
         TestUtils.executeAndCheckOutput(env, loadedEstimator, inputs, output, null, null);
+    }
+
+    @Test
+    public void testSupportServable() {
+        SumEstimator estimatorA = new SumEstimator();
+        UnionAlgoOperator algoOperatorA = new UnionAlgoOperator();
+        SumModel modelA = new SumModel();
+        SumModel modelB = new SumModel();
+
+        List<Stage<?>> stages = Arrays.asList(modelA, modelB);
+        PipelineModel pipelineModel = new PipelineModel(stages);
+        assertTrue(pipelineModel.supportServable());
+
+        stages = Arrays.asList(estimatorA, modelA);
+        pipelineModel = new PipelineModel(stages);
+        assertFalse(pipelineModel.supportServable());
+
+        stages = Arrays.asList(algoOperatorA, modelA);
+        pipelineModel = new PipelineModel(stages);
+        assertFalse(pipelineModel.supportServable());
+    }
+
+    @Test
+    public void testPipelineModelServable() throws Exception {
+        SumModel modelA = new SumModel().setModelData(tEnv.fromValues(10));
+        SumModel modelB = new SumModel().setModelData(tEnv.fromValues(20));
+        SumModel modelC = new SumModel().setModelData(tEnv.fromValues(30));
+
+        List<Stage<?>> stages = Arrays.asList(modelA, modelB, modelC);
+        Model<?> model = new PipelineModel(stages);
+
+        PipelineModelServable servable =
+                TestUtils.saveAndLoadServable(
+                        tEnv,
+                        model,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        PipelineModel::loadServable);
+
+        DataFrame input =
+                new DataFrame(
+                        Collections.singletonList("input"),
+                        Collections.singletonList(DataTypes.INT),
+                        Arrays.asList(
+                                new Row(Collections.singletonList(1)),
+                                new Row(Collections.singletonList(2)),
+                                new Row(Collections.singletonList(3))));
+
+        DataFrame output = servable.transform(input);
+
+        DataFrame expectedOutput =
+                new DataFrame(
+                        Collections.singletonList("input"),
+                        Collections.singletonList(DataTypes.INT),
+                        Arrays.asList(
+                                new Row(Collections.singletonList(61)),
+                                new Row(Collections.singletonList(62)),
+                                new Row(Collections.singletonList(63))));
+
+        assertDataFrameEquals(expectedOutput, output);
     }
 }

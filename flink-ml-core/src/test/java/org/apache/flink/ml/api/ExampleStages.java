@@ -24,6 +24,7 @@ import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.state.MapStateDescriptor;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.ml.param.Param;
+import org.apache.flink.ml.servable.builder.ExampleServables.SumModelServable;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.ml.util.TestUtils;
@@ -109,6 +110,10 @@ public class ExampleStages {
 
             SumModel model = ReadWriteUtils.loadStageParam(path);
             return model.setModelData(modelDataTable);
+        }
+
+        public static SumModelServable loadServable(String path) throws IOException {
+            return SumModelServable.load(path);
         }
     }
 

@@ -23,7 +23,10 @@ import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.ml.api.AlgoOperator;
 import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.api.Stage;
+import org.apache.flink.ml.api.Transformer;
 import org.apache.flink.ml.param.Param;
+import org.apache.flink.ml.servable.api.TransformerServable;
+import org.apache.flink.ml.servable.builder.PipelineModelServable;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.table.api.Table;
@@ -80,6 +83,33 @@ public final class PipelineModel implements Model<PipelineModel> {
     public static PipelineModel load(StreamTableEnvironment tEnv, String path) throws IOException {
         return new PipelineModel(
                 ReadWriteUtils.loadPipeline(tEnv, path, PipelineModel.class.getName()));
+    }
+
+    public static PipelineModelServable loadServable(String path) throws IOException {
+        return PipelineModelServable.load(path);
+    }
+
+    /**
+     * Whether all stages in the pipeline have corresponding {@link TransformerServable} so that the
+     * PipelineModel can be turned into a TransformerServable and used in an online inference
+     * program.
+     *
+     * @return true if all stages have corresponding TransformerServable, false if not.
+     */
+    public boolean supportServable() {
+        for (Stage<?> stage : stages) {
+            if (!(stage instanceof Transformer)) {
+                return false;
+            }
+            Transformer<?> transformer = (Transformer<?>) stage;
+            Class<?> clazz = transformer.getClass();
+            try {
+                clazz.getMethod("loadServable", String.class);
+            } catch (NoSuchMethodException e) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

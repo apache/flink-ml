@@ -239,7 +239,7 @@ following ways.
   the number of clusters, of a K-means algorithm, users can directly invoke
   `setK()` method on that `KMeans` instance.
 - Pass a parameter map containing new values to the stage through
-  `ReadWriteUtils.updateExistingParams()` method.
+  `ParamUtils.updateExistingParams()` method.
 
 If a `Model` is generated through an `Estimator`'s `fit()` method, the `Model`
 would inherit the `Estimator` object's parameters. Thus there is no need to set

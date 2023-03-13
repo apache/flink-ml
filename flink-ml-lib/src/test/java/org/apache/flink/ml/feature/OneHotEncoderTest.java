@@ -25,7 +25,7 @@ import org.apache.flink.ml.feature.onehotencoder.OneHotEncoderModel;
 import org.apache.flink.ml.feature.onehotencoder.OneHotEncoderModelData;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
@@ -289,7 +289,7 @@ public class OneHotEncoderTest extends AbstractTestBase {
 
         Table modelData = modelA.getModelData()[0];
         OneHotEncoderModel modelB = new OneHotEncoderModel().setModelData(modelData);
-        ReadWriteUtils.updateExistingParams(modelB, modelA.getParamMap());
+        ParamUtils.updateExistingParams(modelB, modelA.getParamMap());
 
         Table outputTable = modelB.transform(predictTable)[0];
         Map<Double, Vector>[] actualOutput =

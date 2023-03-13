@@ -78,7 +78,7 @@ public class IDF implements Estimator<IDF, IDFModel>, IDFParams<IDF> {
                 DataStreamUtils.aggregate(inputData, new IDFAggregator(getMinDocFreq()));
 
         IDFModel model = new IDFModel().setModelData(tEnv.fromDataStream(modelData));
-        ReadWriteUtils.updateExistingParams(model, getParamMap());
+        ParamUtils.updateExistingParams(model, getParamMap());
         return model;
     }
 

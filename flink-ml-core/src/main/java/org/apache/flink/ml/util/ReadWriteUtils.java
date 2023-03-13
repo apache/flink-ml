@@ -24,7 +24,6 @@ import org.apache.flink.api.connector.source.Source;
 import org.apache.flink.connector.file.sink.FileSink;
 import org.apache.flink.connector.file.src.FileSource;
 import org.apache.flink.connector.file.src.reader.SimpleStreamFormat;
-import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.ml.api.Stage;
 import org.apache.flink.ml.builder.Graph;
@@ -33,25 +32,18 @@ import org.apache.flink.ml.builder.GraphModel;
 import org.apache.flink.ml.builder.GraphNode;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.param.Param;
-import org.apache.flink.ml.param.WithParams;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.filesystem.bucketassigners.BasePathBucketAssigner;
 import org.apache.flink.streaming.api.functions.sink.filesystem.rollingpolicies.OnCheckpointRollingPolicy;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
-import org.apache.flink.util.InstantiationUtil;
 import org.apache.flink.util.Preconditions;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonParser;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -59,7 +51,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /** Utility methods for reading and writing stages. */
 public class ReadWriteUtils {
@@ -104,28 +95,7 @@ public class ReadWriteUtils {
         // TODO: add version in the metadata.
         String metadataStr = OBJECT_MAPPER.writeValueAsString(metadata);
 
-        saveToFile(new Path(path, "metadata").toUri().toString(), metadataStr, false);
-    }
-
-    /** Saves a given string to the specified file. */
-    public static void saveToFile(String pathStr, String content, boolean isOverwrite)
-            throws IOException {
-        Path path = new Path(pathStr);
-
-        // Creates parent directories if not already created.
-        FileSystem fs = mkdirs(path.getParent());
-
-        FileSystem.WriteMode writeMode = FileSystem.WriteMode.OVERWRITE;
-        if (!isOverwrite) {
-            writeMode = FileSystem.WriteMode.NO_OVERWRITE;
-            if (fs.exists(path)) {
-                throw new IOException("File " + path + " already exists.");
-            }
-        }
-        try (BufferedWriter writer =
-                new BufferedWriter(new OutputStreamWriter(fs.create(path, writeMode)))) {
-            writer.write(content);
-        }
+        FileUtils.saveToFile(new Path(path, "metadata").toUri().toString(), metadataStr, false);
     }
 
     /**
@@ -141,62 +111,6 @@ public class ReadWriteUtils {
         saveMetadata(stage, path, new HashMap<>());
     }
 
-    /** Returns a subdirectory of the given path for saving/loading model data. */
-    private static String getDataPath(String path) {
-        return new Path(path, "data").toString();
-    }
-
-    /**
-     * Loads the metadata from the metadata file under the given path.
-     *
-     * <p>The method throws RuntimeException if the expectedClassName is not empty AND it does not
-     * match the className of the previously saved stage.
-     *
-     * @param path The parent directory of the metadata file to read from.
-     * @param expectedClassName The expected class name of the stage.
-     * @return A map from metadata name to metadata value.
-     */
-    public static Map<String, ?> loadMetadata(String path, String expectedClassName)
-            throws IOException {
-        Path metadataPath = new Path(path, "metadata");
-        FileSystem fs = metadataPath.getFileSystem();
-
-        StringBuilder buffer = new StringBuilder();
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(metadataPath)))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                if (!line.startsWith("#")) {
-                    buffer.append(line);
-                }
-            }
-        }
-
-        @SuppressWarnings("unchecked")
-        Map<String, ?> result = OBJECT_MAPPER.readValue(buffer.toString(), Map.class);
-
-        String className = (String) result.get("className");
-        if (!expectedClassName.isEmpty() && !expectedClassName.equals(className)) {
-            throw new RuntimeException(
-                    "Class name "
-                            + className
-                            + " does not match the expected class name "
-                            + expectedClassName
-                            + ".");
-        }
-
-        return result;
-    }
-
-    // Returns a string with value {parentPath}/stages/{stageIdx}, where the stageIdx is prefixed
-    // with zero or more `0` to have the same length as numStages. The resulting string can be
-    // used as the directory to save a stage of the Pipeline or PipelineModel.
-    private static String getPathForPipelineStage(int stageIdx, int numStages, String parentPath) {
-        String format =
-                String.format("stages%s%%0%dd", File.separator, String.valueOf(numStages).length());
-        String fileName = String.format(format, stageIdx);
-        return new Path(parentPath, fileName).toString();
-    }
-
     /**
      * Saves a Pipeline or PipelineModel with the given list of stages to the given path.
      *
@@ -207,7 +121,7 @@ public class ReadWriteUtils {
     public static void savePipeline(Stage<?> pipeline, List<Stage<?>> stages, String path)
             throws IOException {
         // Creates parent directories if not already created.
-        mkdirs(new Path(path));
+        FileUtils.mkdirs(new Path(path));
 
         Map<String, Object> extraMetadata = new HashMap<>();
         extraMetadata.put("numStages", stages.size());
@@ -215,7 +129,7 @@ public class ReadWriteUtils {
 
         int numStages = stages.size();
         for (int i = 0; i < numStages; i++) {
-            String stagePath = getPathForPipelineStage(i, numStages, path);
+            String stagePath = FileUtils.getPathForPipelineStage(i, numStages, path);
             stages.get(i).save(stagePath);
         }
     }
@@ -233,21 +147,15 @@ public class ReadWriteUtils {
      */
     public static List<Stage<?>> loadPipeline(
             StreamTableEnvironment tEnv, String path, String expectedClassName) throws IOException {
-        Map<String, ?> metadata = loadMetadata(path, expectedClassName);
+        Map<String, ?> metadata = FileUtils.loadMetadata(path, expectedClassName);
         int numStages = (Integer) metadata.get("numStages");
         List<Stage<?>> stages = new ArrayList<>(numStages);
 
         for (int i = 0; i < numStages; i++) {
-            String stagePath = getPathForPipelineStage(i, numStages, path);
+            String stagePath = FileUtils.getPathForPipelineStage(i, numStages, path);
             stages.add(loadStage(tEnv, stagePath));
         }
         return stages;
-    }
-
-    private static FileSystem mkdirs(Path path) throws IOException {
-        FileSystem fs = path.getFileSystem();
-        fs.mkdirs(path);
-        return fs;
     }
 
     /**
@@ -260,7 +168,7 @@ public class ReadWriteUtils {
     public static void saveGraph(Stage<?> graph, GraphData graphData, String path)
             throws IOException {
         // Creates parent directories if not already created.
-        mkdirs(new Path(path));
+        FileUtils.mkdirs(new Path(path));
 
         Map<String, Object> extraMetadata = new HashMap<>();
         extraMetadata.put("graphData", graphData.toMap());
@@ -272,7 +180,7 @@ public class ReadWriteUtils {
                         .orElse(-1);
 
         for (GraphNode node : graphData.nodes) {
-            String stagePath = getPathForPipelineStage(node.nodeId, maxNodeId + 1, path);
+            String stagePath = FileUtils.getPathForPipelineStage(node.nodeId, maxNodeId + 1, path);
             node.stage.save(stagePath);
         }
     }
@@ -291,7 +199,7 @@ public class ReadWriteUtils {
     @SuppressWarnings("unchecked")
     public static Stage<?> loadGraph(
             StreamTableEnvironment tEnv, String path, String expectedClassName) throws IOException {
-        Map<String, ?> metadata = loadMetadata(path, expectedClassName);
+        Map<String, ?> metadata = FileUtils.loadMetadata(path, expectedClassName);
         GraphData graphData = GraphData.fromMap((Map<String, Object>) metadata.get("graphData"));
 
         int maxNodeId =
@@ -301,7 +209,7 @@ public class ReadWriteUtils {
                         .orElse(-1);
 
         for (GraphNode node : graphData.nodes) {
-            String stagePath = getPathForPipelineStage(node.nodeId, maxNodeId + 1, path);
+            String stagePath = FileUtils.getPathForPipelineStage(node.nodeId, maxNodeId + 1, path);
             node.stage = loadStage(tEnv, stagePath);
         }
 
@@ -323,27 +231,6 @@ public class ReadWriteUtils {
                 graphData.outputModelDataIds);
     }
 
-    // A helper method that sets WithParams object's parameter value. We can not call
-    // WithParams.set(param, value)
-    // directly because WithParams::set(...) needs the actual type of the value.
-    @SuppressWarnings("unchecked")
-    public static <T> void setParam(WithParams<?> instance, Param<T> param, Object value) {
-        instance.set(param, (T) value);
-    }
-
-    // A helper method that updates WithParams instance's param map using values from the
-    // paramOverrides. This method only updates values for parameters already defined in the
-    // instance's param map.
-    public static void updateExistingParams(
-            WithParams<?> instance, Map<Param<?>, Object> paramOverrides) {
-        Set<Param<?>> existingParams = instance.getParamMap().keySet();
-        for (Map.Entry<Param<?>, Object> entry : paramOverrides.entrySet()) {
-            if (existingParams.contains(entry.getKey())) {
-                setParam(instance, entry.getKey(), entry.getValue());
-            }
-        }
-    }
-
     /**
      * Loads the stage with the saved parameters from the given path. This method reads the metadata
      * file under the given path, instantiates the stage using its no-argument constructor, and
@@ -360,39 +247,10 @@ public class ReadWriteUtils {
      */
     public static <T extends Stage<T>> T loadStageParam(String path) throws IOException {
         try {
-            return instantiateWithParams(loadMetadata(path, ""));
+            return ParamUtils.instantiateWithParams(FileUtils.loadMetadata(path, ""));
         } catch (ClassNotFoundException e) {
             throw new RuntimeException("Failed to load stage.", e);
         }
-    }
-
-    /**
-     * Instantiates a WithParams subclass from the provided json map.
-     *
-     * @param jsonMap a map containing className and paramMap.
-     * @return the instantiated WithParams subclass instance.
-     */
-    @SuppressWarnings("unchecked")
-    public static <T extends WithParams<T>> T instantiateWithParams(Map<String, ?> jsonMap)
-            throws ClassNotFoundException, IOException {
-        String className = (String) jsonMap.get("className");
-        Class<T> clazz = (Class<T>) Class.forName(className);
-        T instance = InstantiationUtil.instantiate(clazz);
-
-        Map<String, Param<?>> nameToParam = new HashMap<>();
-        for (Param<?> param : ParamUtils.getPublicFinalParamFields(instance)) {
-            nameToParam.put(param.name, param);
-        }
-
-        if (jsonMap.containsKey("paramMap")) {
-            Map<String, Object> paramMap = (Map<String, Object>) jsonMap.get("paramMap");
-            for (Map.Entry<String, Object> entry : paramMap.entrySet()) {
-                Param<?> param = nameToParam.get(entry.getKey());
-                setParam(instance, param, param.jsonDecode(entry.getValue()));
-            }
-        }
-
-        return instance;
     }
 
     /**
@@ -408,7 +266,7 @@ public class ReadWriteUtils {
      * @return An instance of Stage.
      */
     public static Stage<?> loadStage(StreamTableEnvironment tEnv, String path) throws IOException {
-        Map<String, ?> metadata = loadMetadata(path, "");
+        Map<String, ?> metadata = FileUtils.loadMetadata(path, "");
         String className = (String) metadata.get("className");
 
         try {
@@ -440,8 +298,7 @@ public class ReadWriteUtils {
     public static <T> void saveModelData(
             DataStream<T> model, String path, Encoder<T> modelEncoder) {
         FileSink<T> sink =
-                FileSink.forRowFormat(
-                                new org.apache.flink.core.fs.Path(getDataPath(path)), modelEncoder)
+                FileSink.forRowFormat(FileUtils.getDataPath(path), modelEncoder)
                         .withRollingPolicy(OnCheckpointRollingPolicy.build())
                         .withBucketAssigner(new BasePathBucketAssigner<>())
                         .build();
@@ -461,7 +318,7 @@ public class ReadWriteUtils {
             StreamTableEnvironment tEnv, String path, SimpleStreamFormat<T> modelDecoder) {
         StreamExecutionEnvironment env = TableUtils.getExecutionEnvironment(tEnv);
         Source<T, ?, ?> source =
-                FileSource.forRecordStreamFormat(modelDecoder, new Path(getDataPath(path))).build();
+                FileSource.forRecordStreamFormat(modelDecoder, FileUtils.getDataPath(path)).build();
         DataStream<T> modelDataStream =
                 env.fromSource(source, WatermarkStrategy.noWatermarks(), "modelData");
         return tEnv.fromDataStream(modelDataStream);

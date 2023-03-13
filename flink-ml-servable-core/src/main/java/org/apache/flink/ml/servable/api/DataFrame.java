@@ -97,7 +97,7 @@ public class DataFrame {
      * @throws IllegalArgumentException if the number of values is different from the number of
      *     rows.
      */
-    public DataFrame addColumn(String columnName, DataType dataType, List<Object> values) {
+    public DataFrame addColumn(String columnName, DataType dataType, List<?> values) {
         if (values.size() != rows.size()) {
             throw new RuntimeException(
                     String.format(
@@ -107,7 +107,7 @@ public class DataFrame {
         columnNames.add(columnName);
         dataTypes.add(dataType);
 
-        Iterator<Object> iter = values.iterator();
+        Iterator<?> iter = values.iterator();
         for (Row row : rows) {
             Object value = iter.next();
             row.add(value);

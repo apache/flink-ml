@@ -110,7 +110,7 @@ public class OnlineKMeans
 
         Table onlineModelDataTable = tEnv.fromDataStream(onlineModelData);
         OnlineKMeansModel model = new OnlineKMeansModel().setModelData(onlineModelDataTable);
-        ReadWriteUtils.updateExistingParams(model, paramMap);
+        ParamUtils.updateExistingParams(model, paramMap);
         return model;
     }
 

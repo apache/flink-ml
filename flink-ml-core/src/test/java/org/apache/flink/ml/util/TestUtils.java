@@ -32,10 +32,12 @@ import org.apache.flink.ml.api.AlgoOperator;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.api.Stage;
+import org.apache.flink.ml.api.Transformer;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.typeinfo.SparseVectorTypeInfo;
+import org.apache.flink.ml.servable.api.TransformerServable;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
@@ -43,6 +45,7 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.test.util.TestBaseUtils;
 import org.apache.flink.types.Row;
+import org.apache.flink.util.function.FunctionWithException;
 
 import org.apache.commons.collections.IteratorUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -207,6 +210,31 @@ public class TestUtils {
         Method method =
                 stage.getClass().getMethod("load", StreamTableEnvironment.class, String.class);
         return (T) method.invoke(null, tEnv, path);
+    }
+
+    /**
+     * Saves a transformer to filesystem and reloads the matadata as a servable with the given
+     * loadServable function.
+     */
+    public static <T extends TransformerServable<T>> T saveAndLoadServable(
+            StreamTableEnvironment tEnv,
+            Transformer<?> transformer,
+            String path,
+            FunctionWithException<String, T, IOException> loadServableFunc)
+            throws Exception {
+        StreamExecutionEnvironment env = TableUtils.getExecutionEnvironment(tEnv);
+
+        transformer.save(path);
+        try {
+            env.execute();
+        } catch (RuntimeException e) {
+            if (!e.getMessage()
+                    .equals("No operators defined in streaming topology. Cannot execute.")) {
+                throw e;
+            }
+        }
+
+        return loadServableFunc.apply(path);
     }
 
     /**

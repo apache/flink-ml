@@ -132,7 +132,7 @@ public class StringIndexer
 
         StringIndexerModel model =
                 new StringIndexerModel().setModelData(tEnv.fromDataStream(modelData));
-        ReadWriteUtils.updateExistingParams(model, paramMap);
+        ParamUtils.updateExistingParams(model, paramMap);
         return model;
     }
 

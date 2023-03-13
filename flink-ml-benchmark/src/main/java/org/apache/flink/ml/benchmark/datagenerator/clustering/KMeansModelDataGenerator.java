@@ -27,7 +27,6 @@ import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
-import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -59,7 +58,7 @@ public class KMeansModelDataGenerator
     @Override
     public Table[] getData(StreamTableEnvironment tEnv) {
         InputDataGenerator<?> vectorArrayGenerator = new DenseVectorArrayGenerator();
-        ReadWriteUtils.updateExistingParams(vectorArrayGenerator, paramMap);
+        ParamUtils.updateExistingParams(vectorArrayGenerator, paramMap);
         vectorArrayGenerator.setNumValues(1);
         vectorArrayGenerator.setColNames(new String[] {"centroids"});
 

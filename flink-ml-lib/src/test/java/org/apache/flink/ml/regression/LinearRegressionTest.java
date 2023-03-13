@@ -27,7 +27,7 @@ import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.regression.linearregression.LinearRegression;
 import org.apache.flink.ml.regression.linearregression.LinearRegressionModel;
 import org.apache.flink.ml.regression.linearregression.LinearRegressionModelData;
-import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
@@ -218,7 +218,7 @@ public class LinearRegressionTest extends AbstractTestBase {
         LinearRegressionModel model = linearRegression.fit(trainDataTable);
 
         LinearRegressionModel newModel = new LinearRegressionModel();
-        ReadWriteUtils.updateExistingParams(newModel, model.getParamMap());
+        ParamUtils.updateExistingParams(newModel, model.getParamMap());
         newModel.setModelData(model.getModelData());
         Table output = newModel.transform(trainDataTable)[0];
         verifyPredictionResult(

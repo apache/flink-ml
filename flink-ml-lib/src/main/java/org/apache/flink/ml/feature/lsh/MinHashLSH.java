@@ -18,6 +18,7 @@
 
 package org.apache.flink.ml.feature.lsh;
 
+import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -48,7 +49,7 @@ public class MinHashLSH extends LSH<MinHashLSH, MinHashLSHModel>
                                         dim,
                                         getSeed()));
         MinHashLSHModel model = new MinHashLSHModel().setModelData(tEnv.fromDataStream(modelData));
-        ReadWriteUtils.updateExistingParams(model, getParamMap());
+        ParamUtils.updateExistingParams(model, getParamMap());
         return model;
     }
 

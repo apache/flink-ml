@@ -29,7 +29,7 @@ import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
-import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
@@ -272,7 +272,7 @@ public class LogisticRegressionTest extends AbstractTestBase {
         LogisticRegressionModel model = logisticRegression.fit(binomialDataTable);
 
         LogisticRegressionModel newModel = new LogisticRegressionModel();
-        ReadWriteUtils.updateExistingParams(newModel, model.getParamMap());
+        ParamUtils.updateExistingParams(newModel, model.getParamMap());
         newModel.setModelData(model.getModelData());
         Table output = newModel.transform(binomialDataTable)[0];
         verifyPredictionResult(

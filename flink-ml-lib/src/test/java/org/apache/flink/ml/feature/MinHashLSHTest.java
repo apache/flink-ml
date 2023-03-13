@@ -25,7 +25,7 @@ import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -353,7 +353,7 @@ public class MinHashLSHTest extends AbstractTestBase {
         MinHashLSHModel modelA = lsh.fit(inputTable);
         Table modelDataData = modelA.getModelData()[0];
         MinHashLSHModel modelB = new MinHashLSHModel().setModelData(modelDataData);
-        ReadWriteUtils.updateExistingParams(modelB, modelA.getParamMap());
+        ParamUtils.updateExistingParams(modelB, modelA.getParamMap());
         Table output = modelB.transform(inputTable)[0].select($(lsh.getOutputCol()));
         verifyPredictionResult(output, outputRows);
     }

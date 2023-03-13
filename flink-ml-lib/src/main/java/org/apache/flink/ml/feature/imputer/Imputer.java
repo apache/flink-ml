@@ -107,7 +107,7 @@ public class Imputer implements Estimator<Imputer, ImputerModel>, ImputerParams<
                         .build();
         ImputerModel model =
                 new ImputerModel().setModelData(tEnv.fromDataStream(modelData, schema));
-        ReadWriteUtils.updateExistingParams(model, getParamMap());
+        ParamUtils.updateExistingParams(model, getParamMap());
         return model;
     }
 

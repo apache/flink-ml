@@ -111,7 +111,7 @@ public class MinMaxScaler
 
         MinMaxScalerModel model =
                 new MinMaxScalerModel().setModelData(tEnv.fromDataStream(modelData));
-        ReadWriteUtils.updateExistingParams(model, getParamMap());
+        ParamUtils.updateExistingParams(model, getParamMap());
         return model;
     }
 
