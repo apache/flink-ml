@@ -49,7 +49,6 @@ public class TerminationOperator extends AbstractStreamOperator<Integer>
     @Override
     public void initializeState(StateInitializationContext context) throws Exception {
         super.initializeState(context);
-        sharedStorageContext.initializeState(this, getRuntimeContext(), context);
     }
 
     @Override

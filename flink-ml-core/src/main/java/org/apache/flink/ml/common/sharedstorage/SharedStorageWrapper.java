@@ -16,13 +16,11 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.sharedstorage.operator;
+package org.apache.flink.ml.common.sharedstorage;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.iteration.operator.OperatorWrapper;
-import org.apache.flink.ml.common.sharedstorage.SharedStorageContext;
-import org.apache.flink.ml.common.sharedstorage.SharedStorageStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
@@ -34,12 +32,12 @@ import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.util.OutputTag;
 
 /** The operator wrapper for {@link AbstractSharedStorageWrapperOperator}. */
-public class SharedStorageWrapper<T> implements OperatorWrapper<T, T> {
+class SharedStorageWrapper<T> implements OperatorWrapper<T, T> {
 
     /** Shared storage context. */
-    private final SharedStorageContext context;
+    private final SharedStorageContextImpl context;
 
-    public SharedStorageWrapper(SharedStorageContext context) {
+    public SharedStorageWrapper(SharedStorageContextImpl context) {
         this.context = context;
     }
 

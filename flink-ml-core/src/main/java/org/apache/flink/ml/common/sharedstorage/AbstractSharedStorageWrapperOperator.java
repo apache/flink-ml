@@ -16,15 +16,13 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.sharedstorage.operator;
+package org.apache.flink.ml.common.sharedstorage;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.core.memory.ManagedMemoryUseCase;
 import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.proxy.state.ProxyStreamOperatorStateContext;
 import org.apache.flink.metrics.groups.OperatorMetricGroup;
-import org.apache.flink.ml.common.sharedstorage.SharedStorageContext;
-import org.apache.flink.ml.common.sharedstorage.SharedStorageStreamOperator;
 import org.apache.flink.runtime.checkpoint.CheckpointOptions;
 import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -34,6 +32,7 @@ import org.apache.flink.runtime.state.CheckpointStreamFactory;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.graph.StreamConfig;
+import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.InternalTimeServiceManager;
 import org.apache.flink.streaming.api.operators.OperatorSnapshotFutures;
 import org.apache.flink.streaming.api.operators.Output;
@@ -73,6 +72,7 @@ abstract class AbstractSharedStorageWrapperOperator<T, S extends StreamOperator<
     protected final Output<StreamRecord<T>> output;
 
     protected final StreamOperatorFactory<T> operatorFactory;
+    private final SharedStorageContextImpl context;
     protected final OperatorMetricGroup metrics;
     protected final S wrappedOperator;
     protected transient StreamOperatorStateHandler stateHandler;
@@ -83,12 +83,13 @@ abstract class AbstractSharedStorageWrapperOperator<T, S extends StreamOperator<
     AbstractSharedStorageWrapperOperator(
             StreamOperatorParameters<T> parameters,
             StreamOperatorFactory<T> operatorFactory,
-            SharedStorageContext context) {
+            SharedStorageContextImpl context) {
         this.parameters = Objects.requireNonNull(parameters);
         this.streamConfig = Objects.requireNonNull(parameters.getStreamConfig());
         this.containingTask = Objects.requireNonNull(parameters.getContainingTask());
         this.output = Objects.requireNonNull(parameters.getOutput());
         this.operatorFactory = Objects.requireNonNull(operatorFactory);
+        this.context = context;
         this.metrics = createOperatorMetricGroup(containingTask.getEnvironment(), streamConfig);
         this.wrappedOperator =
                 (S)
@@ -134,6 +135,7 @@ abstract class AbstractSharedStorageWrapperOperator<T, S extends StreamOperator<
     @Override
     public void close() throws Exception {
         wrappedOperator.close();
+        context.clear();
     }
 
     @Override
@@ -148,10 +150,16 @@ abstract class AbstractSharedStorageWrapperOperator<T, S extends StreamOperator<
 
     @Override
     public void initializeState(StateInitializationContext stateInitializationContext)
-            throws Exception {}
+            throws Exception {
+        context.initializeState(
+                wrappedOperator,
+                ((AbstractStreamOperator<?>) wrappedOperator).getRuntimeContext(),
+                stateInitializationContext);
+    }
 
     @Override
     public void snapshotState(StateSnapshotContext stateSnapshotContext) throws Exception {
+        context.snapshotState(stateSnapshotContext);
         if (wrappedOperator instanceof StreamOperatorStateHandler.CheckpointedStreamOperator) {
             ((CheckpointedStreamOperator) wrappedOperator).snapshotState(stateSnapshotContext);
         }

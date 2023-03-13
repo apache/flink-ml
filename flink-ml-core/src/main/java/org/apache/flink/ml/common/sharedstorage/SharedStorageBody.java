@@ -66,12 +66,12 @@ public interface SharedStorageBody extends Serializable {
          * {@link SharedStorageStreamOperator#getSharedStorageAccessorID()}, which must be kept
          * unchanged for an instance of {@link SharedStorageStreamOperator}.
          */
-        private final Map<ItemDescriptor<?>, String> ownerMap;
+        private final Map<ItemDescriptor<?>, SharedStorageStreamOperator> ownerMap;
 
         public SharedStorageBodyResult(
                 List<DataStream<?>> outputs,
                 List<DataStream<?>> accessors,
-                Map<ItemDescriptor<?>, String> ownerMap) {
+                Map<ItemDescriptor<?>, SharedStorageStreamOperator> ownerMap) {
             this.outputs = outputs;
             this.accessors = accessors;
             this.ownerMap = ownerMap;
@@ -85,7 +85,7 @@ public interface SharedStorageBody extends Serializable {
             return accessors;
         }
 
-        public Map<ItemDescriptor<?>, String> getOwnerMap() {
+        public Map<ItemDescriptor<?>, SharedStorageStreamOperator> getOwnerMap() {
             return ownerMap;
         }
     }

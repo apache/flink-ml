@@ -19,12 +19,6 @@
 package org.apache.flink.ml.common.sharedstorage;
 
 import org.apache.flink.annotation.Experimental;
-import org.apache.flink.runtime.state.StateInitializationContext;
-import org.apache.flink.runtime.state.StateSnapshotContext;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
-import org.apache.flink.streaming.api.operators.StreamOperator;
-import org.apache.flink.streaming.api.operators.StreamOperatorStateHandler;
-import org.apache.flink.streaming.api.operators.StreamingRuntimeContext;
 import org.apache.flink.util.function.BiConsumerWithException;
 
 /**
@@ -32,17 +26,6 @@ import org.apache.flink.util.function.BiConsumerWithException;
  * have an instance of this context set by {@link
  * SharedStorageStreamOperator#onSharedStorageContextSet} in runtime. User defined logic can be
  * invoked through {@link #invoke} with the access to shared items.
- *
- * <p>NOTE: The corresponding operator must explicitly invoke
- *
- * <ul>
- *   <li>{@link #initializeState} to initialize this context and possibly restore data items owned
- *       by itself in {@link StreamOperatorStateHandler.CheckpointedStreamOperator#initializeState};
- *   <li>{@link #snapshotState} in order to save data items owned by itself in {@link
- *       StreamOperatorStateHandler.CheckpointedStreamOperator#snapshotState};
- *   <li>{@link #clear()} in order to clear all data items owned by itself in {@link
- *       StreamOperator#close}.
- * </ul>
  */
 @Experimental
 public interface SharedStorageContext {
@@ -55,16 +38,6 @@ public interface SharedStorageContext {
      */
     void invoke(BiConsumerWithException<SharedItemGetter, SharedItemSetter, Exception> func)
             throws Exception;
-
-    /** Initializes shared storage context and restores of shared items owned by this operator. */
-    <T extends AbstractStreamOperator<?> & SharedStorageStreamOperator> void initializeState(
-            T operator, StreamingRuntimeContext runtimeContext, StateInitializationContext context);
-
-    /** Save shared items owned by this operator. */
-    void snapshotState(StateSnapshotContext context) throws Exception;
-
-    /** Clear all internal states. */
-    void clear();
 
     /** Interface of shared item getter. */
     @FunctionalInterface

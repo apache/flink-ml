@@ -20,13 +20,14 @@ package org.apache.flink.ml.common.sharedstorage;
 
 import org.apache.flink.annotation.Experimental;
 import org.apache.flink.iteration.compile.DraftExecutionEnvironment;
-import org.apache.flink.ml.common.sharedstorage.operator.SharedStorageWrapper;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.util.Preconditions;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -65,7 +66,12 @@ public class SharedStorageUtils {
         SharedStorageBody.SharedStorageBodyResult result = body.process(draftSources);
 
         List<DataStream<?>> draftOutputs = result.getOutputs();
-        context.setOwnerMap(result.getOwnerMap());
+        Map<ItemDescriptor<?>, SharedStorageStreamOperator> rawOwnerMap = result.getOwnerMap();
+        Map<ItemDescriptor<?>, String> ownerMap = new HashMap<>();
+        for (ItemDescriptor<?> item : rawOwnerMap.keySet()) {
+            ownerMap.put(item, rawOwnerMap.get(item).getSharedStorageAccessorID());
+        }
+        context.setOwnerMap(ownerMap);
 
         for (DataStream<?> draftOutput : draftOutputs) {
             draftEnv.addOperator(draftOutput.getTransformation());

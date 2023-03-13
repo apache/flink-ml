@@ -115,8 +115,6 @@ public class CacheDataCalcLocalHistsOperator
         histBuilder =
                 OperatorStateUtils.getUniqueElement(histBuilderState, HIST_BUILDER_STATE_NAME)
                         .orElse(null);
-
-        sharedStorageContext.initializeState(this, getRuntimeContext(), context);
     }
 
     @Override
@@ -125,7 +123,6 @@ public class CacheDataCalcLocalHistsOperator
         instancesCollecting.snapshotState(context);
         treeInitializerState.snapshotState(context);
         histBuilderState.snapshotState(context);
-        sharedStorageContext.snapshotState(context);
     }
 
     @Override
@@ -263,7 +260,6 @@ public class CacheDataCalcLocalHistsOperator
         instancesCollecting.clear();
         treeInitializerState.clear();
         histBuilderState.clear();
-        sharedStorageContext.clear();
         super.close();
     }
 

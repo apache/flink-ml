@@ -38,6 +38,7 @@ import org.apache.flink.ml.common.gbt.operators.SharedStorageConstants;
 import org.apache.flink.ml.common.gbt.operators.TerminationOperator;
 import org.apache.flink.ml.common.sharedstorage.ItemDescriptor;
 import org.apache.flink.ml.common.sharedstorage.SharedStorageBody;
+import org.apache.flink.ml.common.sharedstorage.SharedStorageStreamOperator;
 import org.apache.flink.ml.common.sharedstorage.SharedStorageUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
@@ -67,7 +68,7 @@ class BoostIterationBody implements IterationBody {
         //noinspection unchecked
         DataStream<TrainContext> trainContext = (DataStream<TrainContext>) inputs.get(1);
 
-        Map<ItemDescriptor<?>, String> ownerMap = new HashMap<>();
+        Map<ItemDescriptor<?>, SharedStorageStreamOperator> ownerMap = new HashMap<>();
 
         CacheDataCalcLocalHistsOperator cacheDataCalcLocalHistsOp =
                 new CacheDataCalcLocalHistsOperator(strategy);
@@ -79,7 +80,7 @@ class BoostIterationBody implements IterationBody {
                                         Types.INT, Types.INT, TypeInformation.of(Histogram.class)),
                                 cacheDataCalcLocalHistsOp);
         for (ItemDescriptor<?> s : SharedStorageConstants.OWNED_BY_CACHE_DATA_CALC_LOCAL_HISTS_OP) {
-            ownerMap.put(s, cacheDataCalcLocalHistsOp.getSharedStorageAccessorID());
+            ownerMap.put(s, cacheDataCalcLocalHistsOp);
         }
 
         DataStream<Tuple2<Integer, Histogram>> globalHists =
@@ -105,7 +106,7 @@ class BoostIterationBody implements IterationBody {
                         .broadcast()
                         .transform("PostSplits", TypeInformation.of(Integer.class), postSplitsOp);
         for (ItemDescriptor<?> descriptor : SharedStorageConstants.OWNED_BY_POST_SPLITS_OP) {
-            ownerMap.put(descriptor, postSplitsOp.getSharedStorageAccessorID());
+            ownerMap.put(descriptor, postSplitsOp);
         }
 
         final OutputTag<GBTModelData> finalModelDataOutputTag =

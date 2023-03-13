@@ -41,10 +41,30 @@ class SharedStorage {
     private static final Map<Tuple3<StorageID, Integer, String>, String> owners =
             new ConcurrentHashMap<>();
 
+    private static final ConcurrentHashMap<Tuple3<StorageID, Integer, String>, Integer>
+            numItemRefs = new ConcurrentHashMap<>();
+
+    static int incRef(Tuple3<StorageID, Integer, String> t) {
+        return numItemRefs.compute(t, (k, oldV) -> null == oldV ? 1 : oldV + 1);
+    }
+
+    static int decRef(Tuple3<StorageID, Integer, String> t) {
+        int numRefs = numItemRefs.compute(t, (k, oldV) -> oldV - 1);
+        if (numRefs == 0) {
+            m.remove(t);
+            owners.remove(t);
+            numItemRefs.remove(t);
+        }
+        return numRefs;
+    }
+
     /** Gets a {@link Reader} of shared item identified by (storageID, subtaskId, descriptor). */
     static <T> Reader<T> getReader(
             StorageID storageID, int subtaskId, ItemDescriptor<T> descriptor) {
-        return new Reader<>(Tuple3.of(storageID, subtaskId, descriptor.key));
+        Tuple3<StorageID, Integer, String> t = Tuple3.of(storageID, subtaskId, descriptor.key);
+        Reader<T> reader = new Reader<>(t);
+        incRef(t);
+        return reader;
     }
 
     /** Gets a {@link Writer} of shared item identified by (storageID, subtaskId, key). */
@@ -75,6 +95,7 @@ class SharedStorage {
                         stateInitializationContext,
                         operatorID);
         writer.set(descriptor.initVal);
+        incRef(t);
         return writer;
     }
 
@@ -104,6 +125,10 @@ class SharedStorage {
             } while (waitTime < 10 * 1000);
             throw new IllegalStateException(
                     String.format("Failed to get value of %s after waiting %d ms.", t, waitTime));
+        }
+
+        void remove() {
+            decRef(t);
         }
     }
 
@@ -154,10 +179,10 @@ class SharedStorage {
             isDirty = true;
         }
 
+        @Override
         void remove() {
             ensureOwner();
-            m.remove(t);
-            owners.remove(t);
+            super.remove();
             cache.clear();
         }
 

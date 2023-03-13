@@ -98,8 +98,6 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
                 OperatorStateUtils.getUniqueElement(
                                 instanceUpdaterState, INSTANCE_UPDATER_STATE_NAME)
                         .orElse(null);
-
-        sharedStorageContext.initializeState(this, getRuntimeContext(), context);
     }
 
     @Override
@@ -107,7 +105,6 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
         super.snapshotState(context);
         nodeSplitterState.snapshotState(context);
         instanceUpdaterState.snapshotState(context);
-        sharedStorageContext.snapshotState(context);
     }
 
     @Override
@@ -218,7 +215,6 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
     public void close() throws Exception {
         nodeSplitterState.clear();
         instanceUpdaterState.clear();
-        sharedStorageContext.clear();
         super.close();
     }
 

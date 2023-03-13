@@ -77,8 +77,6 @@ public class CalcLocalSplitsOperator extends AbstractStreamOperator<Tuple3<Integ
         splitFinder =
                 OperatorStateUtils.getUniqueElement(splitFinderState, SPLIT_FINDER_STATE_NAME)
                         .orElse(null);
-
-        sharedStorageContext.initializeState(this, getRuntimeContext(), context);
     }
 
     @Override

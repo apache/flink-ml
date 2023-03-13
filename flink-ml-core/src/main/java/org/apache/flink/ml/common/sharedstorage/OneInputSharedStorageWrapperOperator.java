@@ -16,10 +16,9 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.sharedstorage.operator;
+package org.apache.flink.ml.common.sharedstorage;
 
 import org.apache.flink.iteration.operator.OperatorUtils;
-import org.apache.flink.ml.common.sharedstorage.SharedStorageContext;
 import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
@@ -37,7 +36,7 @@ class OneInputSharedStorageWrapperOperator<IN, OUT>
     OneInputSharedStorageWrapperOperator(
             StreamOperatorParameters<OUT> parameters,
             StreamOperatorFactory<OUT> operatorFactory,
-            SharedStorageContext context) {
+            SharedStorageContextImpl context) {
         super(parameters, operatorFactory, context);
     }
 

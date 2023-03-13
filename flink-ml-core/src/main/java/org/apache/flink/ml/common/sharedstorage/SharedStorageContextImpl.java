@@ -21,6 +21,7 @@ package org.apache.flink.ml.common.sharedstorage;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
+import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamingRuntimeContext;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.function.BiConsumerWithException;
@@ -41,7 +42,7 @@ class SharedStorageContextImpl implements SharedStorageContext, Serializable {
         this.storageID = new StorageID();
     }
 
-    public void setOwnerMap(Map<ItemDescriptor<?>, String> ownerMap) {
+    void setOwnerMap(Map<ItemDescriptor<?>, String> ownerMap) {
         this.ownerMap = ownerMap;
     }
 
@@ -73,12 +74,14 @@ class SharedStorageContextImpl implements SharedStorageContext, Serializable {
         writer.set(value);
     }
 
-    @Override
-    public <T extends AbstractStreamOperator<?> & SharedStorageStreamOperator> void initializeState(
-            T operator,
+    void initializeState(
+            StreamOperator<?> operator,
             StreamingRuntimeContext runtimeContext,
             StateInitializationContext context) {
-        String ownerId = operator.getSharedStorageAccessorID();
+        Preconditions.checkArgument(
+                operator instanceof SharedStorageStreamOperator
+                        && operator instanceof AbstractStreamOperator);
+        String ownerId = ((SharedStorageStreamOperator) operator).getSharedStorageAccessorID();
         int subtaskId = runtimeContext.getIndexOfThisSubtask();
         for (Map.Entry<ItemDescriptor<?>, String> entry : ownerMap.entrySet()) {
             ItemDescriptor descriptor = entry.getKey();
@@ -91,7 +94,7 @@ class SharedStorageContextImpl implements SharedStorageContext, Serializable {
                                 descriptor,
                                 ownerId,
                                 operator.getOperatorID(),
-                                operator.getContainingTask(),
+                                ((AbstractStreamOperator<?>) operator).getContainingTask(),
                                 runtimeContext,
                                 context));
             }
@@ -99,17 +102,18 @@ class SharedStorageContextImpl implements SharedStorageContext, Serializable {
         }
     }
 
-    @Override
-    public void snapshotState(StateSnapshotContext context) throws Exception {
+    void snapshotState(StateSnapshotContext context) throws Exception {
         for (SharedStorage.Writer<?> writer : writers.values()) {
             writer.snapshotState(context);
         }
     }
 
-    @Override
-    public void clear() {
+    void clear() {
         for (SharedStorage.Writer writer : writers.values()) {
             writer.remove();
+        }
+        for (SharedStorage.Reader reader : readers.values()) {
+            reader.remove();
         }
         writers.clear();
         readers.clear();

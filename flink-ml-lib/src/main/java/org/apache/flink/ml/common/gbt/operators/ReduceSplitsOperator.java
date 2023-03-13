@@ -24,7 +24,6 @@ import org.apache.flink.ml.common.gbt.defs.Split;
 import org.apache.flink.ml.common.sharedstorage.SharedStorageContext;
 import org.apache.flink.ml.common.sharedstorage.SharedStorageStreamOperator;
 import org.apache.flink.runtime.state.StateInitializationContext;
-import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -74,15 +73,9 @@ public class ReduceSplitsOperator extends AbstractStreamOperator<Tuple2<Integer,
 
     @Override
     public void initializeState(StateInitializationContext context) throws Exception {
-        sharedStorageContext.initializeState(this, getRuntimeContext(), context);
         nodeFeatureMap = new HashMap<>();
         nodeBestSplit = new HashMap<>();
         nodeFeatureCounter = new HashMap<>();
-    }
-
-    @Override
-    public void snapshotState(StateSnapshotContext context) throws Exception {
-        sharedStorageContext.snapshotState(context);
     }
 
     @Override
@@ -132,7 +125,6 @@ public class ReduceSplitsOperator extends AbstractStreamOperator<Tuple2<Integer,
 
     @Override
     public void close() throws Exception {
-        sharedStorageContext.clear();
         super.close();
     }
 }
