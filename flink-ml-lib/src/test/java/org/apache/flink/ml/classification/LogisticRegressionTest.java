@@ -24,6 +24,7 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegression;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModel;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelData;
+import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelServable;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vector;
@@ -49,6 +50,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import static org.apache.flink.ml.util.TestUtils.saveAndLoadServable;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -259,6 +261,25 @@ public class LogisticRegressionTest extends AbstractTestBase {
                 logisticRegression.getFeaturesCol(),
                 logisticRegression.getPredictionCol(),
                 logisticRegression.getRawPredictionCol());
+    }
+
+    @Test
+    public void testSaveLoadServable() throws Exception {
+        LogisticRegression logisticRegression = new LogisticRegression().setWeightCol("weight");
+        LogisticRegressionModel model = logisticRegression.fit(binomialDataTable);
+
+        LogisticRegressionModelServable servable =
+                saveAndLoadServable(
+                        tEnv,
+                        model,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        LogisticRegressionModel::loadServable);
+
+        assertEquals("features", servable.getFeaturesCol());
+        assertEquals("prediction", servable.getPredictionCol());
+        assertEquals("rawPrediction", servable.getRawPredictionCol());
+
+        assertArrayEquals(expectedCoefficient, servable.getCoefficient().values, 0.1);
     }
 
     @Test

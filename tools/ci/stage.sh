@@ -23,11 +23,13 @@ STAGE_TESTS="tests"
 STAGE_MISC="misc"
 
 MODULES_CORE="\
+flink-ml-servable-core,\
 flink-ml-core,\
 flink-ml-iteration,\
 "
 
 MODULES_LIB="\
+flink-ml-servable-lib,\
 flink-ml-lib,\
 "
 

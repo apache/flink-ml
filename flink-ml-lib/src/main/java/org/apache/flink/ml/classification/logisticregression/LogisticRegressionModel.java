@@ -21,14 +21,13 @@ package org.apache.flink.ml.classification.logisticregression;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
-import org.apache.flink.ml.linalg.BLAS;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vector;
-import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -122,6 +121,10 @@ public class LogisticRegressionModel
         return model.setModelData(modelDataTable);
     }
 
+    public static LogisticRegressionModelServable loadServable(String path) throws IOException {
+        return LogisticRegressionModelServable.load(path);
+    }
+
     @Override
     public Map<Param<?>, Object> getParamMap() {
         return paramMap;
@@ -150,21 +153,9 @@ public class LogisticRegressionModel
                 coefficient = modelData.coefficient;
             }
             DenseVector features = ((Vector) dataPoint.getField(featuresCol)).toDense();
-            Row predictionResult = predictOneDataPoint(features, coefficient);
-            return Row.join(dataPoint, predictionResult);
+            Tuple2<Double, DenseVector> predictionResult =
+                    LogisticRegressionModelServable.predictOneDataPoint(features, coefficient);
+            return Row.join(dataPoint, Row.of(predictionResult.f0, predictionResult.f1));
         }
-    }
-
-    /**
-     * The main logic that predicts one input data point.
-     *
-     * @param feature The input feature.
-     * @param coefficient The model parameters.
-     * @return The prediction label and the raw probabilities.
-     */
-    protected static Row predictOneDataPoint(Vector feature, DenseVector coefficient) {
-        double dotValue = BLAS.dot(feature, coefficient);
-        double prob = 1 - 1.0 / (1.0 + Math.exp(dotValue));
-        return Row.of(dotValue >= 0 ? 1. : 0., Vectors.dense(1 - prob, prob));
     }
 }

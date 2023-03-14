@@ -22,6 +22,7 @@ import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.ml.api.Model;
@@ -47,8 +48,6 @@ import org.apache.commons.lang3.ArrayUtils;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-
-import static org.apache.flink.ml.classification.logisticregression.LogisticRegressionModel.predictOneDataPoint;
 
 /**
  * A Model which classifies data using the model data computed by {@link OnlineLogisticRegression}.
@@ -157,14 +156,16 @@ public class OnlineLogisticRegressionModel
                 return;
             }
             Vector features = (Vector) dataPoint.getField(featuresCol);
-            Row predictionResult = predictOneDataPoint(features, coefficient);
+
+            Tuple2<Double, DenseVector> predictionResult =
+                    LogisticRegressionModelServable.predictOneDataPoint(features, coefficient);
             output.collect(
                     new StreamRecord<>(
                             Row.join(
                                     dataPoint,
                                     Row.of(
-                                            predictionResult.getField(0),
-                                            predictionResult.getField(1),
+                                            predictionResult.f0,
+                                            predictionResult.f1,
                                             modelDataVersion))));
         }
     }

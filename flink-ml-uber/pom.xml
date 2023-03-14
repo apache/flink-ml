@@ -55,6 +55,12 @@ under the License.
 
     <dependency>
       <groupId>org.apache.flink</groupId>
+      <artifactId>flink-ml-servable-lib</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.flink</groupId>
       <artifactId>flink-ml-lib</artifactId>
       <version>${project.version}</version>
     </dependency>
@@ -84,6 +90,7 @@ under the License.
                   <include>org.apache.flink:flink-ml-servable-core</include>
                   <include>org.apache.flink:flink-ml-core</include>
                   <include>org.apache.flink:flink-ml-iteration</include>
+                  <include>org.apache.flink:flink-ml-servable-lib</include>
                   <include>org.apache.flink:flink-ml-lib</include>
                   <include>org.apache.flink:flink-ml-benchmark</include>
                   <include>dev.ludovic.netlib:blas</include>
