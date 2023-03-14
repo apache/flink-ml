@@ -37,6 +37,7 @@ import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.typeinfo.SparseVectorTypeInfo;
+import org.apache.flink.ml.servable.api.DataFrame;
 import org.apache.flink.ml.servable.api.TransformerServable;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -56,6 +57,7 @@ import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
@@ -304,5 +306,22 @@ public class TestUtils {
             }
         }
         return 0;
+    }
+
+    /** Construct DataFrame from a list of Flink {@link Row}s. */
+    public static DataFrame constructDataFrame(
+            List<String> columnNames,
+            List<org.apache.flink.ml.servable.types.DataType> dataTypes,
+            List<Row> rows) {
+        List<org.apache.flink.ml.servable.api.Row> rowList = new ArrayList<>();
+        for (Row row : rows) {
+            List<Object> values = new ArrayList<>();
+            for (int i = 0; i < row.getArity(); i++) {
+                Object value = row.getField(i);
+                values.add(value);
+            }
+            rowList.add(new org.apache.flink.ml.servable.api.Row(values));
+        }
+        return new DataFrame(columnNames, dataTypes, rowList);
     }
 }

@@ -55,6 +55,7 @@ under the License.
     <module>flink-ml-servable-core</module>
     <module>flink-ml-core</module>
     <module>flink-ml-iteration</module>
+    <module>flink-ml-servable-lib</module>
     <module>flink-ml-lib</module>
     <module>flink-ml-tests</module>
     <module>flink-ml-uber</module>

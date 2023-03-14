@@ -21,14 +21,13 @@ package org.apache.flink.ml.classification.logisticregression;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
-import org.apache.flink.ml.linalg.BLAS;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vector;
-import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -68,7 +67,7 @@ public class LogisticRegressionModel
         DataStream<Row> inputStream = tEnv.toDataStream(inputs[0]);
         final String broadcastModelKey = "broadcastModelKey";
         DataStream<LogisticRegressionModelData> modelDataStream =
-                LogisticRegressionModelData.getModelDataStream(modelDataTable);
+                LogisticRegressionModelDataUtil.getModelDataStream(modelDataTable);
         RowTypeInfo inputTypeInfo = TableUtils.getRowTypeInfo(inputs[0].getResolvedSchema());
         RowTypeInfo outputTypeInfo =
                 new RowTypeInfo(
@@ -87,7 +86,7 @@ public class LogisticRegressionModel
                         inputList -> {
                             DataStream inputData = inputList.get(0);
                             return inputData.map(
-                                    new PredictLabelFunction(broadcastModelKey, getFeaturesCol()),
+                                    new PredictLabelFunction(broadcastModelKey, paramMap),
                                     outputTypeInfo);
                         });
         return new Table[] {tEnv.fromDataStream(predictionResult)};
@@ -108,9 +107,9 @@ public class LogisticRegressionModel
     public void save(String path) throws IOException {
         ReadWriteUtils.saveMetadata(this, path);
         ReadWriteUtils.saveModelData(
-                LogisticRegressionModelData.getModelDataStream(modelDataTable),
+                LogisticRegressionModelDataUtil.getModelDataStream(modelDataTable),
                 path,
-                new LogisticRegressionModelData.ModelDataEncoder());
+                new LogisticRegressionModelDataUtil.ModelDataEncoder());
     }
 
     public static LogisticRegressionModel load(StreamTableEnvironment tEnv, String path)
@@ -118,8 +117,12 @@ public class LogisticRegressionModel
         LogisticRegressionModel model = ReadWriteUtils.loadStageParam(path);
         Table modelDataTable =
                 ReadWriteUtils.loadModelData(
-                        tEnv, path, new LogisticRegressionModelData.ModelDataDecoder());
+                        tEnv, path, new LogisticRegressionModelDataUtil.ModelDataDecoder());
         return model.setModelData(modelDataTable);
+    }
+
+    public static LogisticRegressionModelServable loadServable(String path) throws IOException {
+        return LogisticRegressionModelServable.load(path);
     }
 
     @Override
@@ -132,39 +135,29 @@ public class LogisticRegressionModel
 
         private final String broadcastModelKey;
 
-        private final String featuresCol;
+        private final Map<Param<?>, Object> params;
 
-        private DenseVector coefficient;
+        private LogisticRegressionModelServable servable;
 
-        public PredictLabelFunction(String broadcastModelKey, String featuresCol) {
+        public PredictLabelFunction(String broadcastModelKey, Map<Param<?>, Object> params) {
             this.broadcastModelKey = broadcastModelKey;
-            this.featuresCol = featuresCol;
+            this.params = params;
         }
 
         @Override
         public Row map(Row dataPoint) {
-            if (coefficient == null) {
+            if (servable == null) {
                 LogisticRegressionModelData modelData =
                         (LogisticRegressionModelData)
                                 getRuntimeContext().getBroadcastVariable(broadcastModelKey).get(0);
-                coefficient = modelData.coefficient;
+                servable = new LogisticRegressionModelServable(modelData);
+                ParamUtils.updateExistingParams(servable, params);
             }
-            DenseVector features = ((Vector) dataPoint.getField(featuresCol)).toDense();
-            Row predictionResult = predictOneDataPoint(features, coefficient);
-            return Row.join(dataPoint, predictionResult);
-        }
-    }
+            Vector features = (Vector) dataPoint.getField(servable.getFeaturesCol());
 
-    /**
-     * The main logic that predicts one input data point.
-     *
-     * @param feature The input feature.
-     * @param coefficient The model parameters.
-     * @return The prediction label and the raw probabilities.
-     */
-    protected static Row predictOneDataPoint(Vector feature, DenseVector coefficient) {
-        double dotValue = BLAS.dot(feature, coefficient);
-        double prob = 1 - 1.0 / (1.0 + Math.exp(dotValue));
-        return Row.of(dotValue >= 0 ? 1. : 0., Vectors.dense(1 - prob, prob));
+            Tuple2<Double, DenseVector> predictionResult = servable.transform(features);
+
+            return Row.join(dataPoint, Row.of(predictionResult.f0, predictionResult.f1));
+        }
     }
 }

@@ -89,7 +89,7 @@ public class OnlineLogisticRegression
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
         DataStream<LogisticRegressionModelData> modelDataStream =
-                LogisticRegressionModelData.getModelDataStream(initModelDataTable);
+                LogisticRegressionModelDataUtil.getModelDataStream(initModelDataTable);
 
         RowTypeInfo inputTypeInfo = TableUtils.getRowTypeInfo(inputs[0].getResolvedSchema());
         TypeInformation pointTypeInfo;
@@ -413,9 +413,9 @@ public class OnlineLogisticRegression
     public void save(String path) throws IOException {
         ReadWriteUtils.saveMetadata(this, path);
         ReadWriteUtils.saveModelData(
-                LogisticRegressionModelData.getModelDataStream(initModelDataTable),
+                LogisticRegressionModelDataUtil.getModelDataStream(initModelDataTable),
                 path,
-                new LogisticRegressionModelData.ModelDataEncoder());
+                new LogisticRegressionModelDataUtil.ModelDataEncoder());
     }
 
     public static OnlineLogisticRegression load(StreamTableEnvironment tEnv, String path)
@@ -423,7 +423,7 @@ public class OnlineLogisticRegression
         OnlineLogisticRegression onlineLogisticRegression = ReadWriteUtils.loadStageParam(path);
         Table modelDataTable =
                 ReadWriteUtils.loadModelData(
-                        tEnv, path, new LogisticRegressionModelData.ModelDataDecoder());
+                        tEnv, path, new LogisticRegressionModelDataUtil.ModelDataDecoder());
         onlineLogisticRegression.setInitialModelData(modelDataTable);
         return onlineLogisticRegression;
     }

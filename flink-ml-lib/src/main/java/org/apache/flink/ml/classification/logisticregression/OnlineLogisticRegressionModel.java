@@ -22,6 +22,7 @@ import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.ml.api.Model;
@@ -47,8 +48,6 @@ import org.apache.commons.lang3.ArrayUtils;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-
-import static org.apache.flink.ml.classification.logisticregression.LogisticRegressionModel.predictOneDataPoint;
 
 /**
  * A Model which classifies data using the model data computed by {@link OnlineLogisticRegression}.
@@ -88,12 +87,12 @@ public class OnlineLogisticRegressionModel
         DataStream<Row> predictionResult =
                 tEnv.toDataStream(inputs[0])
                         .connect(
-                                LogisticRegressionModelData.getModelDataStream(modelDataTable)
+                                LogisticRegressionModelDataUtil.getModelDataStream(modelDataTable)
                                         .broadcast())
                         .transform(
                                 "PredictLabelOperator",
                                 outputTypeInfo,
-                                new PredictLabelOperator(inputTypeInfo, getFeaturesCol()));
+                                new PredictLabelOperator(inputTypeInfo, paramMap));
 
         return new Table[] {tEnv.fromDataStream(predictionResult)};
     }
@@ -103,14 +102,15 @@ public class OnlineLogisticRegressionModel
             implements TwoInputStreamOperator<Row, LogisticRegressionModelData, Row> {
         private final RowTypeInfo inputTypeInfo;
 
-        private final String featuresCol;
+        private final Map<Param<?>, Object> params;
         private ListState<Row> bufferedPointsState;
         private DenseVector coefficient;
         private long modelDataVersion = 0L;
+        private LogisticRegressionModelServable servable;
 
-        public PredictLabelOperator(RowTypeInfo inputTypeInfo, String featuresCol) {
+        public PredictLabelOperator(RowTypeInfo inputTypeInfo, Map<Param<?>, Object> params) {
             this.inputTypeInfo = inputTypeInfo;
-            this.featuresCol = featuresCol;
+            this.params = params;
         }
 
         @Override
@@ -156,15 +156,22 @@ public class OnlineLogisticRegressionModel
                 bufferedPointsState.add(dataPoint);
                 return;
             }
-            Vector features = (Vector) dataPoint.getField(featuresCol);
-            Row predictionResult = predictOneDataPoint(features, coefficient);
+            if (servable == null) {
+                servable =
+                        new LogisticRegressionModelServable(
+                                new LogisticRegressionModelData(coefficient, 0L));
+                ParamUtils.updateExistingParams(servable, params);
+            }
+            Vector features = (Vector) dataPoint.getField(servable.getFeaturesCol());
+            Tuple2<Double, DenseVector> predictionResult = servable.transform(features);
+
             output.collect(
                     new StreamRecord<>(
                             Row.join(
                                     dataPoint,
                                     Row.of(
-                                            predictionResult.getField(0),
-                                            predictionResult.getField(1),
+                                            predictionResult.f0,
+                                            predictionResult.f1,
                                             modelDataVersion))));
         }
     }
