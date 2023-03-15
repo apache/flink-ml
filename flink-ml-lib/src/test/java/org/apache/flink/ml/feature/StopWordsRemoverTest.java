@@ -342,7 +342,10 @@ public class StopWordsRemoverTest extends AbstractTestBase {
 
         StopWordsRemover loadedRemover =
                 TestUtils.saveAndReload(
-                        tEnv, remover, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+                        tEnv,
+                        remover,
+                        TEMPORARY_FOLDER.newFolder().getAbsolutePath(),
+                        StopWordsRemover::load);
 
         verifyOutputResult(loadedRemover, inputTable);
     }

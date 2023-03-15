@@ -168,10 +168,17 @@ public class VarianceThresholdSelectorTest extends AbstractTestBase {
                 new VarianceThresholdSelector().setVarianceThreshold(8.0);
         VarianceThresholdSelector loadedVarianceThresholdSelector =
                 TestUtils.saveAndReload(
-                        tEnv, varianceThresholdSelector, tempFolder.newFolder().getAbsolutePath());
+                        tEnv,
+                        varianceThresholdSelector,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        VarianceThresholdSelector::load);
         VarianceThresholdSelectorModel model = loadedVarianceThresholdSelector.fit(trainDataTable);
         VarianceThresholdSelectorModel loadedModel =
-                TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv,
+                        model,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        VarianceThresholdSelectorModel::load);
         assertEquals(
                 Arrays.asList("numOfFeatures", "indices"),
                 model.getModelData()[0].getResolvedSchema().getColumnNames());

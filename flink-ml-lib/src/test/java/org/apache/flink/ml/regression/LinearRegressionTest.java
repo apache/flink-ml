@@ -187,9 +187,17 @@ public class LinearRegressionTest extends AbstractTestBase {
         LinearRegression linearRegression = new LinearRegression().setWeightCol("weight");
         linearRegression =
                 TestUtils.saveAndReload(
-                        tEnv, linearRegression, tempFolder.newFolder().getAbsolutePath());
+                        tEnv,
+                        linearRegression,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        LinearRegression::load);
         LinearRegressionModel model = linearRegression.fit(trainDataTable);
-        model = TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+        model =
+                TestUtils.saveAndReload(
+                        tEnv,
+                        model,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        LinearRegressionModel::load);
         assertEquals(
                 Collections.singletonList("coefficient"),
                 model.getModelData()[0].getResolvedSchema().getColumnNames());

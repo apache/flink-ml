@@ -141,7 +141,10 @@ public class PolynomialExpansionTest extends AbstractTestBase {
 
         PolynomialExpansion loadedPolynomialExpansion =
                 TestUtils.saveAndReload(
-                        tEnv, polynomialExpansion, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+                        tEnv,
+                        polynomialExpansion,
+                        TEMPORARY_FOLDER.newFolder().getAbsolutePath(),
+                        PolynomialExpansion::load);
 
         Table output = loadedPolynomialExpansion.transform(inputDataTable)[0];
         verifyOutputResult(output, loadedPolynomialExpansion.getOutputCol(), EXPECTED_DENSE_OUTPUT);

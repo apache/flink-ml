@@ -148,7 +148,10 @@ public class RegexTokenizerTest extends AbstractTestBase {
                         Row.of((Object) new String[] {"te,st.", "punct"}));
         RegexTokenizer loadedRegexTokenizer =
                 TestUtils.saveAndReload(
-                        tEnv, regexTokenizer, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+                        tEnv,
+                        regexTokenizer,
+                        TEMPORARY_FOLDER.newFolder().getAbsolutePath(),
+                        RegexTokenizer::load);
         Table output = loadedRegexTokenizer.transform(inputDataTable)[0];
         verifyOutputResult(output, loadedRegexTokenizer.getOutputCol(), expectedRows);
     }

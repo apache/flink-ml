@@ -192,7 +192,10 @@ public class SQLTransformerTest extends AbstractTestBase {
 
         SQLTransformer loadedSQLTransformer =
                 TestUtils.saveAndReload(
-                        tEnv, sqlTransformer, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+                        tEnv,
+                        sqlTransformer,
+                        TEMPORARY_FOLDER.newFolder().getAbsolutePath(),
+                        SQLTransformer::load);
 
         Table outputTable = loadedSQLTransformer.transform(inputTable)[0];
 

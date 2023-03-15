@@ -212,9 +212,15 @@ public class LinearSVCTest extends AbstractTestBase {
     public void testSaveLoadAndPredict() throws Exception {
         LinearSVC linearSVC = new LinearSVC().setWeightCol("weight");
         linearSVC =
-                TestUtils.saveAndReload(tEnv, linearSVC, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv, linearSVC, tempFolder.newFolder().getAbsolutePath(), LinearSVC::load);
         LinearSVCModel model = linearSVC.fit(trainDataTable);
-        model = TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+        model =
+                TestUtils.saveAndReload(
+                        tEnv,
+                        model,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        LinearSVCModel::load);
         assertEquals(
                 Collections.singletonList("coefficient"),
                 model.getModelData()[0].getResolvedSchema().getColumnNames());

@@ -208,10 +208,17 @@ public class CountVectorizerTest extends AbstractTestBase {
         CountVectorizer countVectorizer = new CountVectorizer();
         CountVectorizer loadedCountVectorizer =
                 TestUtils.saveAndReload(
-                        tEnv, countVectorizer, tempFolder.newFolder().getAbsolutePath());
+                        tEnv,
+                        countVectorizer,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        CountVectorizer::load);
         CountVectorizerModel model = loadedCountVectorizer.fit(inputTable);
         CountVectorizerModel loadedModel =
-                TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv,
+                        model,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        CountVectorizerModel::load);
         assertEquals(
                 Arrays.asList("vocabulary"),
                 loadedModel.getModelData()[0].getResolvedSchema().getColumnNames());

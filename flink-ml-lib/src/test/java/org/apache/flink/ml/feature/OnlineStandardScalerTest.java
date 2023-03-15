@@ -374,13 +374,19 @@ public class OnlineStandardScalerTest extends AbstractTestBase {
 
         standardScaler =
                 TestUtils.saveAndReload(
-                        tEnv, standardScaler, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+                        tEnv,
+                        standardScaler,
+                        TEMPORARY_FOLDER.newFolder().getAbsolutePath(),
+                        OnlineStandardScaler::load);
         OnlineStandardScalerModel model = standardScaler.fit(inputTableWithEventTime);
         Table[] modelData = model.getModelData();
 
         model =
                 TestUtils.saveAndReload(
-                        tEnv, model, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+                        tEnv,
+                        model,
+                        TEMPORARY_FOLDER.newFolder().getAbsolutePath(),
+                        OnlineStandardScalerModel::load);
         model.setModelData(modelData);
 
         Table output = model.transform(inputTableWithEventTime)[0];

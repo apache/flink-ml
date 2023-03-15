@@ -188,7 +188,8 @@ public class ChiSqTestTest extends AbstractTestBase {
         ChiSqTest chiSqTest = new ChiSqTest().setFeaturesCol("features").setLabelCol("label");
 
         ChiSqTest loadedChiSqTest =
-                TestUtils.saveAndReload(tEnv, chiSqTest, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv, chiSqTest, tempFolder.newFolder().getAbsolutePath(), ChiSqTest::load);
         Table output1 = loadedChiSqTest.transform(inputTableWithDoubleLabel)[0];
         verifyPredictionResult(output1, expectedChiSqTestResultWithDoubleLabel);
     }

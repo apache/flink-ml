@@ -131,7 +131,10 @@ public class RandomSplitterTest extends AbstractTestBase {
 
         RandomSplitter splitterLoad =
                 TestUtils.saveAndReload(
-                        tEnv, randomSplitter, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+                        tEnv,
+                        randomSplitter,
+                        TEMPORARY_FOLDER.newFolder().getAbsolutePath(),
+                        RandomSplitter::load);
 
         Table[] output = splitterLoad.transform(data);
         List<Row> result0 = IteratorUtils.toList(tEnv.toDataStream(output[0]).executeAndCollect());

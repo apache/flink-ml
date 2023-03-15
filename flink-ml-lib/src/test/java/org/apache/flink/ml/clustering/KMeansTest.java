@@ -211,10 +211,12 @@ public class KMeansTest extends AbstractTestBase {
     public void testSaveLoadAndPredict() throws Exception {
         KMeans kmeans = new KMeans().setMaxIter(2).setK(2);
         KMeans loadedKmeans =
-                TestUtils.saveAndReload(tEnv, kmeans, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv, kmeans, tempFolder.newFolder().getAbsolutePath(), KMeans::load);
         KMeansModel model = loadedKmeans.fit(dataTable);
         KMeansModel loadedModel =
-                TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv, model, tempFolder.newFolder().getAbsolutePath(), KMeansModel::load);
         Table output = loadedModel.transform(dataTable)[0];
         assertEquals(
                 Arrays.asList("centroids", "weights"),

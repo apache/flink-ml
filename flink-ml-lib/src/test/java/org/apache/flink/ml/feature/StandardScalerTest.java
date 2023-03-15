@@ -191,10 +191,18 @@ public class StandardScalerTest extends AbstractTestBase {
         StandardScaler standardScaler = new StandardScaler();
         standardScaler =
                 TestUtils.saveAndReload(
-                        tEnv, standardScaler, tempFolder.newFolder().getAbsolutePath());
+                        tEnv,
+                        standardScaler,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        StandardScaler::load);
 
         StandardScalerModel model = standardScaler.fit(denseTable);
-        model = TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+        model =
+                TestUtils.saveAndReload(
+                        tEnv,
+                        model,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        StandardScalerModel::load);
 
         assertEquals(
                 Arrays.asList("mean", "std"),

@@ -413,7 +413,10 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
 
         agglomerativeClustering =
                 TestUtils.saveAndReload(
-                        tEnv, agglomerativeClustering, tempFolder.newFolder().getAbsolutePath());
+                        tEnv,
+                        agglomerativeClustering,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        AgglomerativeClustering::load);
 
         Table[] outputs = agglomerativeClustering.transform(inputDataTable);
         verifyClusteringResult(

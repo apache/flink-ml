@@ -213,10 +213,12 @@ public class ImputerTest extends AbstractTestBase {
                         .setInputCols("f1", "f2", "f3", "f4")
                         .setOutputCols("o1", "o2", "o3", "o4");
         Imputer loadedImputer =
-                TestUtils.saveAndReload(tEnv, imputer, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv, imputer, tempFolder.newFolder().getAbsolutePath(), Imputer::load);
         ImputerModel model = loadedImputer.fit(trainDataTable);
         ImputerModel loadedModel =
-                TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv, model, tempFolder.newFolder().getAbsolutePath(), ImputerModel::load);
         assertEquals(
                 Collections.singletonList("surrogates"),
                 model.getModelData()[0].getResolvedSchema().getColumnNames());

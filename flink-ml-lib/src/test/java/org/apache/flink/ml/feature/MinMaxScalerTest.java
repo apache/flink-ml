@@ -174,10 +174,17 @@ public class MinMaxScalerTest extends AbstractTestBase {
         MinMaxScaler minMaxScaler = new MinMaxScaler();
         MinMaxScaler loadedMinMaxScaler =
                 TestUtils.saveAndReload(
-                        tEnv, minMaxScaler, tempFolder.newFolder().getAbsolutePath());
+                        tEnv,
+                        minMaxScaler,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        MinMaxScaler::load);
         MinMaxScalerModel model = loadedMinMaxScaler.fit(trainDataTable);
         MinMaxScalerModel loadedModel =
-                TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv,
+                        model,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        MinMaxScalerModel::load);
         assertEquals(
                 Arrays.asList("minVector", "maxVector"),
                 model.getModelData()[0].getResolvedSchema().getColumnNames());

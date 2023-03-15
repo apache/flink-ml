@@ -271,7 +271,8 @@ public class MinHashLSHTest extends AbstractTestBase {
                         .setNumHashFunctionsPerTable(3);
 
         MinHashLSH loadedLsh =
-                TestUtils.saveAndReload(tEnv, lsh, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv, lsh, tempFolder.newFolder().getAbsolutePath(), MinHashLSH::load);
         MinHashLSHModel lshModel = loadedLsh.fit(inputTable);
         Assert.assertEquals(
                 Arrays.asList(
@@ -295,7 +296,11 @@ public class MinHashLSHTest extends AbstractTestBase {
                         .setNumHashFunctionsPerTable(3);
         MinHashLSHModel lshModel = lsh.fit(inputTable);
         MinHashLSHModel loadedModel =
-                TestUtils.saveAndReload(tEnv, lshModel, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv,
+                        lshModel,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        MinHashLSHModel::load);
         Table output = loadedModel.transform(inputTable)[0].select($(lsh.getOutputCol()));
         verifyPredictionResult(output, outputRows);
     }

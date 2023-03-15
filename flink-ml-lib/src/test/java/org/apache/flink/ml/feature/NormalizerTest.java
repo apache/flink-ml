@@ -144,7 +144,10 @@ public class NormalizerTest extends AbstractTestBase {
 
         Normalizer loadedNormalizer =
                 TestUtils.saveAndReload(
-                        tEnv, normalizer, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+                        tEnv,
+                        normalizer,
+                        TEMPORARY_FOLDER.newFolder().getAbsolutePath(),
+                        Normalizer::load);
 
         Table output = loadedNormalizer.transform(inputDataTable)[0];
         verifyOutputResult(output, loadedNormalizer.getOutputCol(), EXPECTED_DENSE_OUTPUT);

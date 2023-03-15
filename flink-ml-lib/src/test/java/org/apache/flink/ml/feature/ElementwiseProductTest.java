@@ -159,7 +159,10 @@ public class ElementwiseProductTest extends AbstractTestBase {
                         .setScalingVec(Vectors.dense(1.1, 1.1));
         ElementwiseProduct loadedElementwiseProduct =
                 TestUtils.saveAndReload(
-                        tEnv, elementwiseProduct, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+                        tEnv,
+                        elementwiseProduct,
+                        TEMPORARY_FOLDER.newFolder().getAbsolutePath(),
+                        ElementwiseProduct::load);
         Table output = loadedElementwiseProduct.transform(inputDataTable)[0];
         verifyOutputResult(output, loadedElementwiseProduct.getOutputCol(), false);
     }
@@ -193,7 +196,10 @@ public class ElementwiseProductTest extends AbstractTestBase {
                                 Vectors.sparse(5, new int[] {0, 1}, new double[] {1.1, 1.1}));
         ElementwiseProduct loadedElementwiseProduct =
                 TestUtils.saveAndReload(
-                        tEnv, elementwiseProduct, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+                        tEnv,
+                        elementwiseProduct,
+                        TEMPORARY_FOLDER.newFolder().getAbsolutePath(),
+                        ElementwiseProduct::load);
         Table output = loadedElementwiseProduct.transform(inputDataTable)[0];
         verifyOutputResult(output, loadedElementwiseProduct.getOutputCol(), true);
     }

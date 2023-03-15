@@ -142,7 +142,10 @@ public class InteractionTest extends AbstractTestBase {
 
         Interaction loadedInteraction =
                 TestUtils.saveAndReload(
-                        tEnv, interaction, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+                        tEnv,
+                        interaction,
+                        TEMPORARY_FOLDER.newFolder().getAbsolutePath(),
+                        Interaction::load);
 
         Table output = loadedInteraction.transform(inputDataTable)[0];
         verifyOutputResult(output, loadedInteraction.getOutputCol(), EXPECTED_SPARSE_OUTPUT);
@@ -155,7 +158,10 @@ public class InteractionTest extends AbstractTestBase {
 
         Interaction loadedInteraction =
                 TestUtils.saveAndReload(
-                        tEnv, interaction, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+                        tEnv,
+                        interaction,
+                        TEMPORARY_FOLDER.newFolder().getAbsolutePath(),
+                        Interaction::load);
 
         Table output = loadedInteraction.transform(inputDataTable)[0];
         verifyOutputResult(output, loadedInteraction.getOutputCol(), EXPECTED_DENSE_OUTPUT);

@@ -674,10 +674,18 @@ public class UnivariateFeatureSelectorTest extends AbstractTestBase {
                         .setSelectionThreshold(1);
 
         UnivariateFeatureSelector loadSelector =
-                TestUtils.saveAndReload(tEnv, selector, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv,
+                        selector,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        UnivariateFeatureSelector::load);
         UnivariateFeatureSelectorModel model = loadSelector.fit(inputANOVATable);
         UnivariateFeatureSelectorModel loadedModel =
-                TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv,
+                        model,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        UnivariateFeatureSelectorModel::load);
         assertEquals(
                 Collections.singletonList("indices"),
                 model.getModelData()[0].getResolvedSchema().getColumnNames());

@@ -103,7 +103,10 @@ public class FeatureHasherTest extends AbstractTestBase {
                         .setNumFeatures(1000);
         FeatureHasher loadedFeatureHasher =
                 TestUtils.saveAndReload(
-                        tEnv, featureHash, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+                        tEnv,
+                        featureHash,
+                        TEMPORARY_FOLDER.newFolder().getAbsolutePath(),
+                        FeatureHasher::load);
         Table output = loadedFeatureHasher.transform(inputDataTable)[0];
         verifyOutputResult(output, loadedFeatureHasher.getOutputCol());
     }
@@ -117,7 +120,10 @@ public class FeatureHasherTest extends AbstractTestBase {
                         .setNumFeatures(1000);
         FeatureHasher loadedFeatureHasher =
                 TestUtils.saveAndReload(
-                        tEnv, featureHash, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+                        tEnv,
+                        featureHash,
+                        TEMPORARY_FOLDER.newFolder().getAbsolutePath(),
+                        FeatureHasher::load);
         Table output = loadedFeatureHasher.transform(inputDataTable)[0];
         verifyOutputResult(output, loadedFeatureHasher.getOutputCol());
     }
@@ -137,7 +143,10 @@ public class FeatureHasherTest extends AbstractTestBase {
                         .setNumFeatures(1000);
         FeatureHasher loadedFeatureHasher =
                 TestUtils.saveAndReload(
-                        tEnv, featureHash, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+                        tEnv,
+                        featureHash,
+                        TEMPORARY_FOLDER.newFolder().getAbsolutePath(),
+                        FeatureHasher::load);
         Table output = loadedFeatureHasher.transform(inputDataTable)[0];
         verifyOutputResult(output, loadedFeatureHasher.getOutputCol());
     }

@@ -158,7 +158,10 @@ public class HashingTFTest extends AbstractTestBase {
         HashingTF hashingTF = new HashingTF();
         HashingTF loadedHashingTF =
                 TestUtils.saveAndReload(
-                        tEnv, hashingTF, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+                        tEnv,
+                        hashingTF,
+                        TEMPORARY_FOLDER.newFolder().getAbsolutePath(),
+                        HashingTF::load);
 
         Table output = loadedHashingTF.transform(inputDataTable)[0];
         verifyOutputResult(output, loadedHashingTF.getOutputCol(), EXPECTED_OUTPUT);

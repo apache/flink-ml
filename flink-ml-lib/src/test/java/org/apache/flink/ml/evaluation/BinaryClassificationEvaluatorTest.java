@@ -316,7 +316,11 @@ public class BinaryClassificationEvaluatorTest extends AbstractTestBase {
                                 BinaryClassificationEvaluatorParams.KS,
                                 BinaryClassificationEvaluatorParams.AREA_UNDER_ROC);
         BinaryClassificationEvaluator loadedEval =
-                TestUtils.saveAndReload(tEnv, eval, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv,
+                        eval,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        BinaryClassificationEvaluator::load);
         Table evalResult = loadedEval.transform(inputDataTable)[0];
         assertArrayEquals(
                 new String[] {

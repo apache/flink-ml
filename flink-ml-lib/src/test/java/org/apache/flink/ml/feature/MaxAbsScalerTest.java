@@ -207,11 +207,18 @@ public class MaxAbsScalerTest {
         MaxAbsScaler maxAbsScaler = new MaxAbsScaler();
         MaxAbsScaler loadedMaxAbsScaler =
                 TestUtils.saveAndReload(
-                        tEnv, maxAbsScaler, tempFolder.newFolder().getAbsolutePath());
+                        tEnv,
+                        maxAbsScaler,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        MaxAbsScaler::load);
 
         MaxAbsScalerModel model = loadedMaxAbsScaler.fit(trainDataTable);
         MaxAbsScalerModel loadedModel =
-                TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv,
+                        model,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        MaxAbsScalerModel::load);
 
         Table output = loadedModel.transform(predictDataTable)[0];
         verifyPredictionResult(output, maxAbsScaler.getOutputCol(), EXPECTED_DATA);

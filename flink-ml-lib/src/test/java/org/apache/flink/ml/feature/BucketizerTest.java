@@ -203,7 +203,11 @@ public class BucketizerTest extends AbstractTestBase {
                         .setHandleInvalid(HasHandleInvalid.KEEP_INVALID)
                         .setSplitsArray(splitsArray);
         Bucketizer loadedBucketizer =
-                TestUtils.saveAndReload(tEnv, bucketizer, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv,
+                        bucketizer,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        Bucketizer::load);
         Table output = loadedBucketizer.transform(inputTable)[0];
         verifyOutputResult(output, loadedBucketizer.getOutputCols(), expectedKeepResult);
     }
