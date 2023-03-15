@@ -16,8 +16,10 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.classification.logisticregression;
+package org.apache.flink.ml.classification;
 
+import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelData;
+import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelServable;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
@@ -39,7 +41,7 @@ import static org.junit.Assert.assertTrue;
 /** Tests the {@link LogisticRegressionModelServable}. */
 public class LogisticRegressionModelServableTest {
 
-    private static final DataFrame PREDICT_DATA =
+    protected static final DataFrame PREDICT_DATA =
             new DataFrame(
                     new ArrayList<>(Arrays.asList("features", "label", "weight")),
                     new ArrayList<>(
@@ -102,8 +104,8 @@ public class LogisticRegressionModelServableTest {
     public void testTransform() throws IOException {
         LogisticRegressionModelServable servable = new LogisticRegressionModelServable();
 
-        servable.setModelData(
-                new ByteArrayInputStream(LogisticRegressionModelServable.serialize(COEFFICIENT)));
+        LogisticRegressionModelData modelData = new LogisticRegressionModelData(COEFFICIENT);
+        servable.setModelData(new ByteArrayInputStream(modelData.serialize()));
 
         DataFrame output = servable.transform(PREDICT_DATA);
 
@@ -114,24 +116,7 @@ public class LogisticRegressionModelServableTest {
                 servable.getRawPredictionCol());
     }
 
-    @Test
-    public void testSetModelData() throws IOException {
-        byte[] serializedModelData = LogisticRegressionModelServable.serialize(COEFFICIENT);
-
-        LogisticRegressionModelServable servable = new LogisticRegressionModelServable();
-
-        servable.setModelData(new ByteArrayInputStream(serializedModelData));
-
-        DataFrame output = servable.transform(PREDICT_DATA);
-
-        verifyPredictionResult(
-                output,
-                servable.getFeaturesCol(),
-                servable.getPredictionCol(),
-                servable.getRawPredictionCol());
-    }
-
-    private void verifyPredictionResult(
+    protected static void verifyPredictionResult(
             DataFrame output, String featuresCol, String predictionCol, String rawPredictionCol) {
         int featuresColIndex = output.getIndex(featuresCol);
         int predictionColIndex = output.getIndex(predictionCol);

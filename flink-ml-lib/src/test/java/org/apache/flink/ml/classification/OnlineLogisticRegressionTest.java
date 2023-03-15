@@ -30,6 +30,7 @@ import org.apache.flink.metrics.Gauge;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegression;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModel;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelData;
+import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelDataUtil;
 import org.apache.flink.ml.classification.logisticregression.OnlineLogisticRegression;
 import org.apache.flink.ml.classification.logisticregression.OnlineLogisticRegressionModel;
 import org.apache.flink.ml.linalg.DenseVector;
@@ -293,7 +294,7 @@ public class OnlineLogisticRegressionTest extends TestLogger {
         tEnv.toDataStream(outputTable).addSink(outputSink);
 
         Table modelDataTable = onlineModel.getModelData()[0];
-        LogisticRegressionModelData.getModelDataStream(modelDataTable).addSink(modelDataSink);
+        LogisticRegressionModelDataUtil.getModelDataStream(modelDataTable).addSink(modelDataSink);
     }
 
     /** Blocks the thread until Model has set up init model data. */
@@ -512,7 +513,8 @@ public class OnlineLogisticRegressionTest extends TestLogger {
 
     @Test
     public void testGenerateRandomModelData() throws Exception {
-        Table modelDataTable = LogisticRegressionModelData.generateRandomModelData(tEnv, 2, 2022);
+        Table modelDataTable =
+                LogisticRegressionModelDataUtil.generateRandomModelData(tEnv, 2, 2022);
         DataStream<Row> modelData = tEnv.toDataStream(modelDataTable);
         Row modelRow = (Row) IteratorUtils.toList(modelData.executeAndCollect()).get(0);
         Assert.assertEquals(2, ((DenseVector) modelRow.getField(0)).size());

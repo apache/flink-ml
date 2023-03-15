@@ -41,22 +41,10 @@ import java.io.OutputStream;
 import java.util.Random;
 
 /**
- * Model data of {@link LogisticRegressionModel} and {@link OnlineLogisticRegressionModel}.
- *
- * <p>This class also provides methods to convert model data from Table to Datastream, and classes
- * to save/load model data.
+ * The utility class which provides methods to convert model data from Table to Datastream, and
+ * classes to save/load model data.
  */
-public class LogisticRegressionModelData {
-
-    public DenseVector coefficient;
-    public long modelVersion;
-
-    public LogisticRegressionModelData() {}
-
-    public LogisticRegressionModelData(DenseVector coefficient, long modelVersion) {
-        this.coefficient = coefficient;
-        this.modelVersion = modelVersion;
-    }
+public class LogisticRegressionModelDataUtil {
 
     /**
      * Generates a Table containing a {@link LogisticRegressionModelData} instance with randomly

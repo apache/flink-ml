@@ -87,7 +87,7 @@ public class OnlineLogisticRegressionModel
         DataStream<Row> predictionResult =
                 tEnv.toDataStream(inputs[0])
                         .connect(
-                                LogisticRegressionModelData.getModelDataStream(modelDataTable)
+                                LogisticRegressionModelDataUtil.getModelDataStream(modelDataTable)
                                         .broadcast())
                         .transform(
                                 "PredictLabelOperator",
@@ -157,8 +157,11 @@ public class OnlineLogisticRegressionModel
             }
             Vector features = (Vector) dataPoint.getField(featuresCol);
 
-            Tuple2<Double, DenseVector> predictionResult =
-                    LogisticRegressionModelServable.predictOneDataPoint(features, coefficient);
+            LogisticRegressionModelServable servable =
+                    new LogisticRegressionModelServable(
+                            new LogisticRegressionModelData(coefficient));
+            Tuple2<Double, DenseVector> predictionResult = servable.transform(features);
+
             output.collect(
                     new StreamRecord<>(
                             Row.join(

@@ -24,12 +24,14 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegression;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModel;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelData;
+import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelDataUtil;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelServable;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.servable.api.DataFrame;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -46,6 +48,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import java.io.ByteArrayInputStream;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -264,32 +267,13 @@ public class LogisticRegressionTest extends AbstractTestBase {
     }
 
     @Test
-    public void testSaveLoadServable() throws Exception {
-        LogisticRegression logisticRegression = new LogisticRegression().setWeightCol("weight");
-        LogisticRegressionModel model = logisticRegression.fit(binomialDataTable);
-
-        LogisticRegressionModelServable servable =
-                saveAndLoadServable(
-                        tEnv,
-                        model,
-                        tempFolder.newFolder().getAbsolutePath(),
-                        LogisticRegressionModel::loadServable);
-
-        assertEquals("features", servable.getFeaturesCol());
-        assertEquals("prediction", servable.getPredictionCol());
-        assertEquals("rawPrediction", servable.getRawPredictionCol());
-
-        assertArrayEquals(expectedCoefficient, servable.getCoefficient().values, 0.1);
-    }
-
-    @Test
     @SuppressWarnings("unchecked")
     public void testGetModelData() throws Exception {
         LogisticRegression logisticRegression = new LogisticRegression().setWeightCol("weight");
         LogisticRegressionModel model = logisticRegression.fit(binomialDataTable);
         List<LogisticRegressionModelData> modelData =
                 IteratorUtils.toList(
-                        LogisticRegressionModelData.getModelDataStream(model.getModelData()[0])
+                        LogisticRegressionModelDataUtil.getModelDataStream(model.getModelData()[0])
                                 .executeAndCollect());
         assertEquals(1, modelData.size());
         assertArrayEquals(expectedCoefficient, modelData.get(0).coefficient.values, 0.1);
@@ -309,6 +293,50 @@ public class LogisticRegressionTest extends AbstractTestBase {
                 logisticRegression.getFeaturesCol(),
                 logisticRegression.getPredictionCol(),
                 logisticRegression.getRawPredictionCol());
+    }
+
+    @Test
+    public void testSaveLoadServableAndPredict() throws Exception {
+        LogisticRegression logisticRegression = new LogisticRegression().setWeightCol("weight");
+        LogisticRegressionModel model = logisticRegression.fit(binomialDataTable);
+
+        LogisticRegressionModelServable servable =
+                saveAndLoadServable(
+                        tEnv,
+                        model,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        LogisticRegressionModel::loadServable);
+
+        assertEquals("features", servable.getFeaturesCol());
+        assertEquals("prediction", servable.getPredictionCol());
+        assertEquals("rawPrediction", servable.getRawPredictionCol());
+
+        DataFrame output = servable.transform(LogisticRegressionModelServableTest.PREDICT_DATA);
+        LogisticRegressionModelServableTest.verifyPredictionResult(
+                output,
+                servable.getFeaturesCol(),
+                servable.getPredictionCol(),
+                servable.getRawPredictionCol());
+    }
+
+    @Test
+    public void testSetModelDataToServable() throws Exception {
+        LogisticRegression logisticRegression = new LogisticRegression().setWeightCol("weight");
+        LogisticRegressionModel model = logisticRegression.fit(binomialDataTable);
+        List<LogisticRegressionModelData> modelData =
+                IteratorUtils.toList(
+                        LogisticRegressionModelDataUtil.getModelDataStream(model.getModelData()[0])
+                                .executeAndCollect());
+
+        LogisticRegressionModelServable servable = new LogisticRegressionModelServable();
+        servable.setModelData(new ByteArrayInputStream(modelData.get(0).serialize()));
+
+        DataFrame output = servable.transform(LogisticRegressionModelServableTest.PREDICT_DATA);
+        LogisticRegressionModelServableTest.verifyPredictionResult(
+                output,
+                servable.getFeaturesCol(),
+                servable.getPredictionCol(),
+                servable.getRawPredictionCol());
     }
 
     @Test
@@ -370,7 +398,7 @@ public class LogisticRegressionTest extends AbstractTestBase {
                         .fit(binomialDataTable);
         List<LogisticRegressionModelData> modelData =
                 IteratorUtils.toList(
-                        LogisticRegressionModelData.getModelDataStream(model.getModelData()[0])
+                        LogisticRegressionModelDataUtil.getModelDataStream(model.getModelData()[0])
                                 .executeAndCollect());
         final double errorTol = 1e-3;
         assertArrayEquals(expectedCoefficient, modelData.get(0).coefficient.values, errorTol);
