@@ -566,7 +566,7 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
 
         private MailboxExecutorWithYieldTimeout(MailboxExecutor mailboxExecutor) {
             this.mailboxExecutor = mailboxExecutor;
-            this.timer = new Timer();
+            this.timer = new Timer(true);
         }
 
         @Override
