@@ -263,9 +263,18 @@ public class OneHotEncoderTest extends AbstractTestBase {
     @Test
     public void testSaveLoad() throws Exception {
         estimator =
-                TestUtils.saveAndReload(tEnv, estimator, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv,
+                        estimator,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        OneHotEncoder::load);
         OneHotEncoderModel model = estimator.fit(trainTable);
-        model = TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+        model =
+                TestUtils.saveAndReload(
+                        tEnv,
+                        model,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        OneHotEncoderModel::load);
         Table outputTable = model.transform(predictTable)[0];
         Map<Double, Vector>[] actualOutput =
                 executeAndCollect(outputTable, model.getInputCols(), model.getOutputCols());

@@ -359,7 +359,10 @@ public class VectorAssemblerTest extends AbstractTestBase {
 
         VectorAssembler loadedVectorAssembler =
                 TestUtils.saveAndReload(
-                        tEnv, vectorAssembler, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+                        tEnv,
+                        vectorAssembler,
+                        TEMPORARY_FOLDER.newFolder().getAbsolutePath(),
+                        VectorAssembler::load);
 
         Table output = loadedVectorAssembler.transform(inputDataTable)[0];
         verifyOutputResult(output, loadedVectorAssembler.getOutputCol(), 3);
@@ -383,7 +386,10 @@ public class VectorAssemblerTest extends AbstractTestBase {
 
         VectorAssembler loadedVectorAssembler =
                 TestUtils.saveAndReload(
-                        tEnv, vectorAssembler, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+                        tEnv,
+                        vectorAssembler,
+                        TEMPORARY_FOLDER.newFolder().getAbsolutePath(),
+                        VectorAssembler::load);
 
         Table output = loadedVectorAssembler.transform(inputDataTable)[0];
         verifyOutputResult(output, loadedVectorAssembler.getOutputCol(), 3);

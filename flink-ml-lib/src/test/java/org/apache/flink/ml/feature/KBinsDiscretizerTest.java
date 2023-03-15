@@ -206,10 +206,18 @@ public class KBinsDiscretizerTest extends AbstractTestBase {
                 new KBinsDiscretizer().setNumBins(3).setStrategy(KBinsDiscretizerParams.UNIFORM);
         kBinsDiscretizer =
                 TestUtils.saveAndReload(
-                        tEnv, kBinsDiscretizer, tempFolder.newFolder().getAbsolutePath());
+                        tEnv,
+                        kBinsDiscretizer,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        KBinsDiscretizer::load);
 
         KBinsDiscretizerModel model = kBinsDiscretizer.fit(trainTable);
-        model = TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+        model =
+                TestUtils.saveAndReload(
+                        tEnv,
+                        model,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        KBinsDiscretizerModel::load);
 
         assertEquals(
                 Collections.singletonList("binEdges"),

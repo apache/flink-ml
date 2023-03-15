@@ -140,7 +140,8 @@ public class DCTTest extends AbstractTestBase {
         DCT dct = new DCT().setInverse(true);
 
         DCT loadedDCT =
-                TestUtils.saveAndReload(tEnv, dct, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv, dct, TEMPORARY_FOLDER.newFolder().getAbsolutePath(), DCT::load);
 
         Table outputTable = loadedDCT.transform(inputTable)[0];
 

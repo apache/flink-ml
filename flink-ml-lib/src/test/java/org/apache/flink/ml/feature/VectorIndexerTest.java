@@ -198,10 +198,18 @@ public class VectorIndexerTest extends AbstractTestBase {
                 new VectorIndexer().setHandleInvalid(HasHandleInvalid.KEEP_INVALID);
         vectorIndexer =
                 TestUtils.saveAndReload(
-                        tEnv, vectorIndexer, tempFolder.newFolder().getAbsolutePath());
+                        tEnv,
+                        vectorIndexer,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        VectorIndexer::load);
 
         VectorIndexerModel model = vectorIndexer.fit(trainInputTable);
-        model = TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+        model =
+                TestUtils.saveAndReload(
+                        tEnv,
+                        model,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        VectorIndexerModel::load);
 
         assertEquals(
                 Collections.singletonList("categoryMaps"),

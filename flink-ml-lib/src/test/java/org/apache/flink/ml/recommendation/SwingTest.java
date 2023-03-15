@@ -222,7 +222,8 @@ public class SwingTest {
     public void testSaveLoadAndTransform() throws Exception {
         Swing swing = new Swing().setMinUserBehavior(1);
         Swing loadedSwing =
-                TestUtils.saveAndReload(tEnv, swing, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv, swing, tempFolder.newFolder().getAbsolutePath(), Swing::load);
         Table outputTable = loadedSwing.transform(inputTable)[0];
         List<Row> results = IteratorUtils.toList(outputTable.execute().collect());
         compareResultAndExpected(results);

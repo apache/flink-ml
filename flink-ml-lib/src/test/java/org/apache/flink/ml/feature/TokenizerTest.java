@@ -95,7 +95,10 @@ public class TokenizerTest extends AbstractTestBase {
         Tokenizer tokenizer = new Tokenizer();
         Tokenizer loadedTokenizer =
                 TestUtils.saveAndReload(
-                        tEnv, tokenizer, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+                        tEnv,
+                        tokenizer,
+                        TEMPORARY_FOLDER.newFolder().getAbsolutePath(),
+                        Tokenizer::load);
         Table output = loadedTokenizer.transform(inputDataTable)[0];
         verifyOutputResult(output, loadedTokenizer.getOutputCol(), EXPECTED_OUTPUT);
     }

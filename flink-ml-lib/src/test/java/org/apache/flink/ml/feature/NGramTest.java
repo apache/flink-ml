@@ -100,7 +100,7 @@ public class NGramTest extends AbstractTestBase {
         NGram nGram = new NGram();
         NGram loadedNGram =
                 TestUtils.saveAndReload(
-                        tEnv, nGram, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+                        tEnv, nGram, TEMPORARY_FOLDER.newFolder().getAbsolutePath(), NGram::load);
         Table output = loadedNGram.transform(inputDataTable)[0];
         verifyOutputResult(output, loadedNGram.getOutputCol());
     }

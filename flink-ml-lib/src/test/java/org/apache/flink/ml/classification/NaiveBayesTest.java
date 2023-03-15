@@ -265,11 +265,20 @@ public class NaiveBayesTest extends AbstractTestBase {
     @Test
     public void testSaveLoad() throws Exception {
         estimator =
-                TestUtils.saveAndReload(tEnv, estimator, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv,
+                        estimator,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        NaiveBayes::load);
 
         NaiveBayesModel model = estimator.fit(trainTable);
 
-        model = TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+        model =
+                TestUtils.saveAndReload(
+                        tEnv,
+                        model,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        NaiveBayesModel::load);
 
         Table outputTable = model.transform(predictTable)[0];
 

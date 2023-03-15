@@ -141,7 +141,10 @@ public class BinarizerTest extends AbstractTestBase {
 
         Binarizer loadedBinarizer =
                 TestUtils.saveAndReload(
-                        tEnv, binarizer, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+                        tEnv,
+                        binarizer,
+                        TEMPORARY_FOLDER.newFolder().getAbsolutePath(),
+                        Binarizer::load);
 
         Table output = loadedBinarizer.transform(inputDataTable)[0];
         verifyOutputResult(output, loadedBinarizer.getOutputCols());

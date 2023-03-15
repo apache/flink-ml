@@ -178,10 +178,17 @@ public class RobustScalerTest extends AbstractTestBase {
         RobustScaler robustScaler = new RobustScaler();
         RobustScaler loadedRobustScaler =
                 TestUtils.saveAndReload(
-                        tEnv, robustScaler, tempFolder.newFolder().getAbsolutePath());
+                        tEnv,
+                        robustScaler,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        RobustScaler::load);
         RobustScalerModel model = loadedRobustScaler.fit(trainDataTable);
         RobustScalerModel loadedModel =
-                TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv,
+                        model,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        RobustScalerModel::load);
         assertEquals(
                 Arrays.asList("medians", "ranges"),
                 model.getModelData()[0].getResolvedSchema().getColumnNames());

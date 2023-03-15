@@ -239,9 +239,17 @@ public class LogisticRegressionTest extends AbstractTestBase {
         LogisticRegression logisticRegression = new LogisticRegression().setWeightCol("weight");
         logisticRegression =
                 TestUtils.saveAndReload(
-                        tEnv, logisticRegression, tempFolder.newFolder().getAbsolutePath());
+                        tEnv,
+                        logisticRegression,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        LogisticRegression::load);
         LogisticRegressionModel model = logisticRegression.fit(binomialDataTable);
-        model = TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+        model =
+                TestUtils.saveAndReload(
+                        tEnv,
+                        model,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        LogisticRegressionModel::load);
         assertEquals(
                 Arrays.asList("coefficient", "modelVersion"),
                 model.getModelData()[0].getResolvedSchema().getColumnNames());

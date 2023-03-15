@@ -141,10 +141,14 @@ public class IDFTest extends AbstractTestBase {
     @Test
     public void testSaveLoadAndPredict() throws Exception {
         IDF idf = new IDF();
-        idf = TestUtils.saveAndReload(tEnv, idf, tempFolder.newFolder().getAbsolutePath());
+        idf =
+                TestUtils.saveAndReload(
+                        tEnv, idf, tempFolder.newFolder().getAbsolutePath(), IDF::load);
 
         IDFModel model = idf.fit(inputTable);
-        model = TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+        model =
+                TestUtils.saveAndReload(
+                        tEnv, model, tempFolder.newFolder().getAbsolutePath(), IDFModel::load);
 
         assertEquals(
                 Arrays.asList("idf", "docFreq", "numDocs"),

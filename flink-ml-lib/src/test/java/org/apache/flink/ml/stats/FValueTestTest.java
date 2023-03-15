@@ -412,7 +412,11 @@ public class FValueTestTest extends AbstractTestBase {
     public void testSaveLoadAndTransform() throws Exception {
         FValueTest fValueTest = new FValueTest();
         FValueTest loadedFValueTest =
-                TestUtils.saveAndReload(tEnv, fValueTest, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv,
+                        fValueTest,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        FValueTest::load);
         Table output = loadedFValueTest.transform(denseInputTable)[0];
         verifyTransformationResult(output, EXPECTED_OUTPUT_DENSE);
     }

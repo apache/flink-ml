@@ -116,7 +116,10 @@ public class VectorSlicerTest extends AbstractTestBase {
                 new VectorSlicer().setInputCol("vec").setOutputCol("sliceVec").setIndices(0, 1, 2);
         VectorSlicer loadedVectorSlicer =
                 TestUtils.saveAndReload(
-                        tEnv, vectorSlicer, TEMPORARY_FOLDER.newFolder().getAbsolutePath());
+                        tEnv,
+                        vectorSlicer,
+                        TEMPORARY_FOLDER.newFolder().getAbsolutePath(),
+                        VectorSlicer::load);
         Table output = loadedVectorSlicer.transform(inputDataTable)[0];
         verifyOutputResult(output, loadedVectorSlicer.getOutputCol(), false);
     }

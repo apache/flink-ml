@@ -394,7 +394,8 @@ public class ANOVATestTest extends AbstractTestBase {
     public void testSaveLoadAndTransform() throws Exception {
         ANOVATest anovaTest = new ANOVATest();
         ANOVATest loadedANOVATest =
-                TestUtils.saveAndReload(tEnv, anovaTest, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv, anovaTest, tempFolder.newFolder().getAbsolutePath(), ANOVATest::load);
         Table output = loadedANOVATest.transform(denseInputTable)[0];
         verifyTransformationResult(output, EXPECTED_OUTPUT_DENSE);
     }
