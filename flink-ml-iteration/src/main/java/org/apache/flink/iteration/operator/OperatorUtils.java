@@ -89,11 +89,11 @@ public class OperatorUtils {
         }
     }
 
-    public static StreamConfig createWrappedOperatorConfig(StreamConfig wrapperConfig) {
+    public static StreamConfig createWrappedOperatorConfig(
+            StreamConfig wrapperConfig, ClassLoader cl) {
         StreamConfig wrappedConfig = new StreamConfig(wrapperConfig.getConfiguration().clone());
         for (int i = 0; i < wrappedConfig.getNumberOfNetworkInputs(); ++i) {
-            KeySelector keySelector =
-                    wrapperConfig.getStatePartitioner(i, OperatorUtils.class.getClassLoader());
+            KeySelector keySelector = wrapperConfig.getStatePartitioner(i, cl);
             if (keySelector != null) {
                 checkState(
                         keySelector instanceof ProxyKeySelector,
