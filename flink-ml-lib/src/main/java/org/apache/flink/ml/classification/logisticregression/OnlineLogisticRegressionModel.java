@@ -92,7 +92,7 @@ public class OnlineLogisticRegressionModel
                         .transform(
                                 "PredictLabelOperator",
                                 outputTypeInfo,
-                                new PredictLabelOperator(inputTypeInfo, getFeaturesCol()));
+                                new PredictLabelOperator(inputTypeInfo, paramMap));
 
         return new Table[] {tEnv.fromDataStream(predictionResult)};
     }
@@ -102,14 +102,15 @@ public class OnlineLogisticRegressionModel
             implements TwoInputStreamOperator<Row, LogisticRegressionModelData, Row> {
         private final RowTypeInfo inputTypeInfo;
 
-        private final String featuresCol;
+        private final Map<Param<?>, Object> params;
         private ListState<Row> bufferedPointsState;
         private DenseVector coefficient;
         private long modelDataVersion = 0L;
+        private LogisticRegressionModelServable servable;
 
-        public PredictLabelOperator(RowTypeInfo inputTypeInfo, String featuresCol) {
+        public PredictLabelOperator(RowTypeInfo inputTypeInfo, Map<Param<?>, Object> params) {
             this.inputTypeInfo = inputTypeInfo;
-            this.featuresCol = featuresCol;
+            this.params = params;
         }
 
         @Override
@@ -155,11 +156,13 @@ public class OnlineLogisticRegressionModel
                 bufferedPointsState.add(dataPoint);
                 return;
             }
-            Vector features = (Vector) dataPoint.getField(featuresCol);
-
-            LogisticRegressionModelServable servable =
-                    new LogisticRegressionModelServable(
-                            new LogisticRegressionModelData(coefficient));
+            if (servable == null) {
+                servable =
+                        new LogisticRegressionModelServable(
+                                new LogisticRegressionModelData(coefficient));
+                ParamUtils.updateExistingParams(servable, params);
+            }
+            Vector features = (Vector) dataPoint.getField(servable.getFeaturesCol());
             Tuple2<Double, DenseVector> predictionResult = servable.transform(features);
 
             output.collect(

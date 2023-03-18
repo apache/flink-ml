@@ -19,12 +19,10 @@
 package org.apache.flink.ml.classification.logisticregression;
 
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.ml.linalg.BLAS;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.servable.api.DataFrame;
 import org.apache.flink.ml.servable.api.ModelServable;
@@ -55,7 +53,7 @@ public class LogisticRegressionModelServable
         ParamUtils.initializeMapWithDefaultValues(paramMap, this);
     }
 
-    public LogisticRegressionModelServable(LogisticRegressionModelData modelData) {
+    LogisticRegressionModelServable(LogisticRegressionModelData modelData) {
         this();
         this.modelData = modelData;
     }
@@ -84,15 +82,7 @@ public class LogisticRegressionModelServable
             throws IOException {
         Preconditions.checkArgument(modelDataInputs.length == 1);
 
-        DataInputViewStreamWrapper inputViewStreamWrapper =
-                new DataInputViewStreamWrapper(modelDataInputs[0]);
-
-        DenseVectorSerializer serializer = new DenseVectorSerializer();
-
-        DenseVector coefficient = serializer.deserialize(inputViewStreamWrapper);
-        long modelVersion = inputViewStreamWrapper.readLong();
-        modelData = new LogisticRegressionModelData(coefficient, modelVersion);
-
+        modelData = LogisticRegressionModelData.decode(modelDataInputs[0]);
         return this;
     }
 
@@ -102,13 +92,7 @@ public class LogisticRegressionModelServable
                         path, LogisticRegressionModelServable.class);
 
         try (InputStream fsDataInputStream = ServableReadWriteUtils.loadModelData(path)) {
-            DataInputViewStreamWrapper dataInputViewStreamWrapper =
-                    new DataInputViewStreamWrapper(fsDataInputStream);
-            DenseVectorSerializer serializer = new DenseVectorSerializer();
-            DenseVector coefficient = serializer.deserialize(dataInputViewStreamWrapper);
-            long modelVersion = dataInputViewStreamWrapper.readLong();
-
-            servable.modelData = new LogisticRegressionModelData(coefficient, modelVersion);
+            servable.setModelData(fsDataInputStream);
             return servable;
         }
     }

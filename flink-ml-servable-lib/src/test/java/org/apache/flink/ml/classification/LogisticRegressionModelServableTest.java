@@ -31,6 +31,7 @@ import org.apache.flink.ml.servable.types.DataTypes;
 import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -102,10 +103,13 @@ public class LogisticRegressionModelServableTest {
 
     @Test
     public void testTransform() throws IOException {
-        LogisticRegressionModelServable servable = new LogisticRegressionModelServable();
-
         LogisticRegressionModelData modelData = new LogisticRegressionModelData(COEFFICIENT);
-        servable.setModelData(new ByteArrayInputStream(modelData.serialize()));
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        modelData.encode(outputStream);
+
+        LogisticRegressionModelServable servable = new LogisticRegressionModelServable();
+        servable.setModelData(new ByteArrayInputStream(outputStream.toByteArray()));
 
         DataFrame output = servable.transform(PREDICT_DATA);
 

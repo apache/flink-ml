@@ -323,13 +323,13 @@ public class LogisticRegressionTest extends AbstractTestBase {
     public void testSetModelDataToServable() throws Exception {
         LogisticRegression logisticRegression = new LogisticRegression().setWeightCol("weight");
         LogisticRegressionModel model = logisticRegression.fit(binomialDataTable);
-        List<LogisticRegressionModelData> modelData =
-                IteratorUtils.toList(
-                        LogisticRegressionModelDataUtil.getModelDataStream(model.getModelData()[0])
-                                .executeAndCollect());
+        byte[] serializedModelData =
+                LogisticRegressionModelDataUtil.getModelDataByteStream(model.getModelData()[0])
+                        .executeAndCollect()
+                        .next();
 
         LogisticRegressionModelServable servable = new LogisticRegressionModelServable();
-        servable.setModelData(new ByteArrayInputStream(modelData.get(0).serialize()));
+        servable.setModelData(new ByteArrayInputStream(serializedModelData));
 
         DataFrame output = servable.transform(LogisticRegressionModelServableTest.PREDICT_DATA);
         LogisticRegressionModelServableTest.verifyPredictionResult(

@@ -24,17 +24,15 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.file.src.reader.SimpleStreamFormat;
 import org.apache.flink.core.fs.FSDataInputStream;
-import org.apache.flink.core.memory.DataInputViewStreamWrapper;
-import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
 
+import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -94,17 +92,36 @@ public class LogisticRegressionModelDataUtil {
                 .map(x -> new LogisticRegressionModelData(x.getFieldAs(0), x.getFieldAs(1)));
     }
 
+    /**
+     * Converts the table model to a data stream of bytes.
+     *
+     * @param modelDataTable The table of model data.
+     * @return The data stream of serialized model data.
+     */
+    public static DataStream<byte[]> getModelDataByteStream(Table modelDataTable) {
+        StreamTableEnvironment tEnv =
+                (StreamTableEnvironment) ((TableImpl) modelDataTable).getTableEnvironment();
+
+        return tEnv.toDataStream(modelDataTable)
+                .map(
+                        x -> {
+                            LogisticRegressionModelData modelData =
+                                    new LogisticRegressionModelData(
+                                            x.getFieldAs(0), x.getFieldAs(1));
+
+                            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                            modelData.encode(outputStream);
+                            return outputStream.toByteArray();
+                        });
+    }
+
     /** Data encoder for {@link LogisticRegression} and {@link OnlineLogisticRegression}. */
     public static class ModelDataEncoder implements Encoder<LogisticRegressionModelData> {
-        private final DenseVectorSerializer serializer = new DenseVectorSerializer();
 
         @Override
         public void encode(LogisticRegressionModelData modelData, OutputStream outputStream)
                 throws IOException {
-            DataOutputViewStreamWrapper dataOutputViewStreamWrapper =
-                    new DataOutputViewStreamWrapper(outputStream);
-            serializer.serialize(modelData.coefficient, dataOutputViewStreamWrapper);
-            dataOutputViewStreamWrapper.writeLong(modelData.modelVersion);
+            modelData.encode(outputStream);
         }
     }
 
@@ -115,17 +132,10 @@ public class LogisticRegressionModelDataUtil {
         public Reader<LogisticRegressionModelData> createReader(
                 Configuration configuration, FSDataInputStream inputStream) {
             return new Reader<LogisticRegressionModelData>() {
-                private final DenseVectorSerializer serializer = new DenseVectorSerializer();
-
                 @Override
                 public LogisticRegressionModelData read() throws IOException {
                     try {
-                        DataInputViewStreamWrapper dataInputViewStreamWrapper =
-                                new DataInputViewStreamWrapper(inputStream);
-                        DenseVector coefficient =
-                                serializer.deserialize(dataInputViewStreamWrapper);
-                        long modelVersion = dataInputViewStreamWrapper.readLong();
-                        return new LogisticRegressionModelData(coefficient, modelVersion);
+                        return LogisticRegressionModelData.decode(inputStream);
                     } catch (EOFException e) {
                         return null;
                     }

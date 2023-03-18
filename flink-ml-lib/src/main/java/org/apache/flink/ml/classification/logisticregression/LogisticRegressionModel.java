@@ -86,7 +86,7 @@ public class LogisticRegressionModel
                         inputList -> {
                             DataStream inputData = inputList.get(0);
                             return inputData.map(
-                                    new PredictLabelFunction(broadcastModelKey, getFeaturesCol()),
+                                    new PredictLabelFunction(broadcastModelKey, paramMap),
                                     outputTypeInfo);
                         });
         return new Table[] {tEnv.fromDataStream(predictionResult)};
@@ -135,28 +135,26 @@ public class LogisticRegressionModel
 
         private final String broadcastModelKey;
 
-        private final String featuresCol;
+        private final Map<Param<?>, Object> params;
 
-        private DenseVector coefficient;
+        private LogisticRegressionModelServable servable;
 
-        public PredictLabelFunction(String broadcastModelKey, String featuresCol) {
+        public PredictLabelFunction(String broadcastModelKey, Map<Param<?>, Object> params) {
             this.broadcastModelKey = broadcastModelKey;
-            this.featuresCol = featuresCol;
+            this.params = params;
         }
 
         @Override
         public Row map(Row dataPoint) {
-            if (coefficient == null) {
+            if (servable == null) {
                 LogisticRegressionModelData modelData =
                         (LogisticRegressionModelData)
                                 getRuntimeContext().getBroadcastVariable(broadcastModelKey).get(0);
-                coefficient = modelData.coefficient;
+                servable = new LogisticRegressionModelServable(modelData);
+                ParamUtils.updateExistingParams(servable, params);
             }
-            Vector features = (Vector) dataPoint.getField(featuresCol);
+            Vector features = (Vector) dataPoint.getField(servable.getFeaturesCol());
 
-            LogisticRegressionModelServable servable =
-                    new LogisticRegressionModelServable(
-                            new LogisticRegressionModelData(coefficient));
             Tuple2<Double, DenseVector> predictionResult = servable.transform(features);
 
             return Row.join(dataPoint, Row.of(predictionResult.f0, predictionResult.f1));

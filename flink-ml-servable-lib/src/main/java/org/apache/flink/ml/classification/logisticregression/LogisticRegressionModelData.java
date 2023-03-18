@@ -18,12 +18,15 @@
 
 package org.apache.flink.ml.classification.logisticregression;
 
+import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 /** Model data of {@link LogisticRegressionModelServable}. */
 public class LogisticRegressionModelData {
@@ -44,21 +47,34 @@ public class LogisticRegressionModelData {
     }
 
     /**
-     * Serializes the model data into byte array which can be saved to external storage and then be
-     * used to update the servable by `TransformerServable::setModelData` method.
+     * Serializes the instance and writes to the output stream.
      *
-     * @return The serialized model data in byte array.
+     * @param outputStream The stream to write to.
      */
-    public byte[] serialize() throws IOException {
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-
-        DataOutputViewStreamWrapper outputViewStreamWrapper =
+    @VisibleForTesting
+    public void encode(OutputStream outputStream) throws IOException {
+        DataOutputViewStreamWrapper dataOutputViewStreamWrapper =
                 new DataOutputViewStreamWrapper(outputStream);
 
         DenseVectorSerializer serializer = new DenseVectorSerializer();
-        serializer.serialize(coefficient, outputViewStreamWrapper);
-        outputViewStreamWrapper.writeLong(modelVersion);
+        serializer.serialize(coefficient, dataOutputViewStreamWrapper);
+        dataOutputViewStreamWrapper.writeLong(modelVersion);
+    }
 
-        return outputStream.toByteArray();
+    /**
+     * Reads and deserializes the model data from the input stream.
+     *
+     * @param inputStream The stream to read from.
+     * @return The model data instance.
+     */
+    static LogisticRegressionModelData decode(InputStream inputStream) throws IOException {
+        DataInputViewStreamWrapper dataInputViewStreamWrapper =
+                new DataInputViewStreamWrapper(inputStream);
+
+        DenseVectorSerializer serializer = new DenseVectorSerializer();
+        DenseVector coefficient = serializer.deserialize(dataInputViewStreamWrapper);
+        long modelVersion = dataInputViewStreamWrapper.readLong();
+
+        return new LogisticRegressionModelData(coefficient, modelVersion);
     }
 }
