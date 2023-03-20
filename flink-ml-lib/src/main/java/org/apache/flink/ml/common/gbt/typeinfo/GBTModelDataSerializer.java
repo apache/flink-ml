@@ -71,6 +71,7 @@ public final class GBTModelDataSerializer extends TypeSerializerSingleton<GBTMod
         for (int i = 0; i < from.allTrees.size(); i += 1) {
             record.allTrees.add(new ArrayList<>(from.allTrees.get(i)));
         }
+        record.featureNames = new ArrayList<>(from.featureNames);
         record.categoryToIdMaps = new IntObjectHashMap<>(from.categoryToIdMaps);
         record.featureIdToBinEdges = new IntObjectHashMap<>(from.featureIdToBinEdges);
         record.isCategorical = BitSet.valueOf(from.isCategorical.toByteArray());
@@ -101,6 +102,11 @@ public final class GBTModelDataSerializer extends TypeSerializerSingleton<GBTMod
             for (Node treeNode : treeNodes) {
                 NodeSerializer.INSTANCE.serialize(treeNode, target);
             }
+        }
+
+        IntSerializer.INSTANCE.serialize(record.featureNames.size(), target);
+        for (int i = 0; i < record.featureNames.size(); i += 1) {
+            StringSerializer.INSTANCE.serialize(record.featureNames.get(i), target);
         }
 
         IntSerializer.INSTANCE.serialize(record.categoryToIdMaps.size(), target);
@@ -143,6 +149,13 @@ public final class GBTModelDataSerializer extends TypeSerializerSingleton<GBTMod
                 treeNodes.add(NODE_SERIALIZER.deserialize(source));
             }
             record.allTrees.add(treeNodes);
+        }
+
+        int numFeatures = IntSerializer.INSTANCE.deserialize(source);
+        record.featureNames = new ArrayList<>(numFeatures);
+        for (int k = 0; k < numFeatures; k += 1) {
+            String featureName = StringSerializer.INSTANCE.deserialize(source);
+            record.featureNames.add(featureName);
         }
 
         int numCategoricalFeatures = IntSerializer.INSTANCE.deserialize(source);

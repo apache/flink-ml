@@ -78,8 +78,12 @@ public class GBTClassifier
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
         DataStream<GBTModelData> modelData = GBTRunner.train(inputs[0], this);
+        DataStream<Map<String, Double>> featureImportance =
+                GBTRunner.getFeatureImportance(modelData);
         GBTClassifierModel model = new GBTClassifierModel();
-        model.setModelData(tEnv.fromDataStream(modelData).renameColumns($("f0").as("modelData")));
+        model.setModelData(
+                tEnv.fromDataStream(modelData).renameColumns($("f0").as("modelData")),
+                tEnv.fromDataStream(featureImportance));
         ReadWriteUtils.updateExistingParams(model, getParamMap());
         return model;
     }

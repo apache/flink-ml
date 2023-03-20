@@ -37,6 +37,7 @@ import org.apache.flink.ml.common.gbt.typeinfo.GBTModelDataTypeInfoFactory;
 import org.apache.flink.ml.feature.stringindexer.StringIndexerModel;
 import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.regression.gbtregressor.GBTRegressorModel;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -49,6 +50,7 @@ import org.eclipse.collections.impl.map.mutable.primitive.ObjectIntHashMap;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
 
@@ -68,6 +70,7 @@ public class GBTModelData {
     public double stepSize;
 
     public List<List<Node>> allTrees;
+    public List<String> featureNames;
     public IntObjectHashMap<ObjectIntHashMap<String>> categoryToIdMaps;
     public IntObjectHashMap<double[]> featureIdToBinEdges;
     public BitSet isCategorical;
@@ -80,6 +83,7 @@ public class GBTModelData {
             double prior,
             double stepSize,
             List<List<Node>> allTrees,
+            List<String> featureNames,
             IntObjectHashMap<ObjectIntHashMap<String>> categoryToIdMaps,
             IntObjectHashMap<double[]> featureIdToBinEdges,
             BitSet isCategorical) {
@@ -88,12 +92,14 @@ public class GBTModelData {
         this.prior = prior;
         this.stepSize = stepSize;
         this.allTrees = allTrees;
+        this.featureNames = featureNames;
         this.categoryToIdMaps = categoryToIdMaps;
         this.featureIdToBinEdges = featureIdToBinEdges;
         this.isCategorical = isCategorical;
     }
 
     public static GBTModelData from(TrainContext trainContext, List<List<Node>> allTrees) {
+        List<String> featureNames = new ArrayList<>();
         IntObjectHashMap<ObjectIntHashMap<String>> categoryToIdMaps = new IntObjectHashMap<>();
         IntObjectHashMap<double[]> featureIdToBinEdges = new IntObjectHashMap<>();
         BitSet isCategorical = new BitSet();
@@ -101,6 +107,7 @@ public class GBTModelData {
         FeatureMeta[] featureMetas = trainContext.featureMetas;
         for (int k = 0; k < featureMetas.length; k += 1) {
             FeatureMeta featureMeta = featureMetas[k];
+            featureNames.add(featureMeta.name);
             if (featureMeta instanceof FeatureMeta.CategoricalFeatureMeta) {
                 String[] categories = ((FeatureMeta.CategoricalFeatureMeta) featureMeta).categories;
                 ObjectIntHashMap<String> categoryToId = new ObjectIntHashMap<>();
@@ -120,6 +127,7 @@ public class GBTModelData {
                 trainContext.prior,
                 trainContext.strategy.stepSize,
                 allTrees,
+                featureNames,
                 categoryToIdMaps,
                 featureIdToBinEdges,
                 isCategorical);

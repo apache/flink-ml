@@ -21,6 +21,7 @@ package org.apache.flink.ml.common.gbt;
 import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.iteration.DataStreamList;
 import org.apache.flink.iteration.IterationConfig;
@@ -33,6 +34,7 @@ import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.common.gbt.defs.BoostingStrategy;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
 import org.apache.flink.ml.common.gbt.defs.LossType;
+import org.apache.flink.ml.common.gbt.defs.Node;
 import org.apache.flink.ml.common.gbt.defs.TaskType;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
@@ -100,6 +102,40 @@ public class GBTRunner {
         DataStream<Tuple2<Double, Long>> labelSumCount =
                 DataStreamUtils.aggregate(data, new LabelSumCountFunction(strategy.labelCol));
         return boost(dataTable, strategy, featureMeta, labelSumCount);
+    }
+
+    public static DataStream<Map<String, Double>> getFeatureImportance(
+            DataStream<GBTModelData> modelData) {
+        return modelData
+                .map(
+                        value -> {
+                            Map<Integer, Double> featureImportanceMap = new HashMap<>();
+                            double sum = 0.;
+                            for (List<Node> tree : value.allTrees) {
+                                for (Node node : tree) {
+                                    if (node.isLeaf) {
+                                        continue;
+                                    }
+                                    featureImportanceMap.merge(
+                                            node.split.featureId, node.split.gain, Double::sum);
+                                    sum += node.split.gain;
+                                }
+                            }
+                            if (sum > 0.) {
+                                for (Map.Entry<Integer, Double> entry :
+                                        featureImportanceMap.entrySet()) {
+                                    entry.setValue(entry.getValue() / sum);
+                                }
+                            }
+
+                            List<String> featureNames = value.featureNames;
+                            return featureImportanceMap.entrySet().stream()
+                                    .collect(
+                                            Collectors.toMap(
+                                                    d -> featureNames.get(d.getKey()),
+                                                    Map.Entry::getValue));
+                        })
+                .returns(Types.MAP(Types.STRING, Types.DOUBLE));
     }
 
     private static DataStream<GBTModelData> boost(
