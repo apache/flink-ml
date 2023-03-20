@@ -159,7 +159,7 @@ public class OnlineLogisticRegressionModel
             if (servable == null) {
                 servable =
                         new LogisticRegressionModelServable(
-                                new LogisticRegressionModelData(coefficient));
+                                new LogisticRegressionModelData(coefficient, 0L));
                 ParamUtils.updateExistingParams(servable, params);
             }
             Vector features = (Vector) dataPoint.getField(servable.getFeaturesCol());

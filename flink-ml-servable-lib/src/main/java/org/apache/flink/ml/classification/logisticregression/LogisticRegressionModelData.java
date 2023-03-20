@@ -37,12 +37,8 @@ public class LogisticRegressionModelData {
 
     public LogisticRegressionModelData() {}
 
-    public LogisticRegressionModelData(DenseVector coefficient) {
-        this.coefficient = coefficient;
-    }
-
     public LogisticRegressionModelData(DenseVector coefficient, long modelVersion) {
-        this(coefficient);
+        this.coefficient = coefficient;
         this.modelVersion = modelVersion;
     }
 
