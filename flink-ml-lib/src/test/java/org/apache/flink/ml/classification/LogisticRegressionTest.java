@@ -32,6 +32,8 @@ import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.servable.api.DataFrame;
+import org.apache.flink.ml.servable.types.BasicType;
+import org.apache.flink.ml.servable.types.DataTypes;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -49,6 +51,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.ByteArrayInputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -104,6 +107,8 @@ public class LogisticRegressionTest extends AbstractTestBase {
 
     private Table multinomialDataTable;
 
+    private DataFrame binomialDataDataFrame;
+
     @Before
     public void before() {
         env = TestUtils.getExecutionEnvironment();
@@ -127,6 +132,15 @@ public class LogisticRegressionTest extends AbstractTestBase {
                                             DenseVectorTypeInfo.INSTANCE, Types.DOUBLE, Types.DOUBLE
                                         },
                                         new String[] {"features", "label", "weight"})));
+        binomialDataDataFrame =
+                TestUtils.constructDataFrame(
+                        new ArrayList<>(Arrays.asList("features", "label", "weight")),
+                        new ArrayList<>(
+                                Arrays.asList(
+                                        DataTypes.VECTOR(BasicType.DOUBLE),
+                                        DataTypes.DOUBLE,
+                                        DataTypes.DOUBLE)),
+                        binomialTrainData);
     }
 
     @SuppressWarnings("ConstantConditions, unchecked")
@@ -138,6 +152,26 @@ public class LogisticRegressionTest extends AbstractTestBase {
             DenseVector feature = ((Vector) predictionRow.getField(featuresCol)).toDense();
             double prediction = (double) predictionRow.getField(predictionCol);
             DenseVector rawPrediction = (DenseVector) predictionRow.getField(rawPredictionCol);
+            if (feature.get(0) <= 5) {
+                assertEquals(0, prediction, TOLERANCE);
+                assertTrue(rawPrediction.get(0) > 0.5);
+            } else {
+                assertEquals(1, prediction, TOLERANCE);
+                assertTrue(rawPrediction.get(0) < 0.5);
+            }
+        }
+    }
+
+    private void verifyPredictionResult(
+            DataFrame output, String featuresCol, String predictionCol, String rawPredictionCol) {
+        int featuresColIndex = output.getIndex(featuresCol);
+        int predictionColIndex = output.getIndex(predictionCol);
+        int rawPredictionColIndex = output.getIndex(rawPredictionCol);
+
+        for (org.apache.flink.ml.servable.api.Row predictionRow : output.collect()) {
+            DenseVector feature = ((Vector) predictionRow.get(featuresColIndex)).toDense();
+            double prediction = (double) predictionRow.get(predictionColIndex);
+            DenseVector rawPrediction = (DenseVector) predictionRow.get(rawPredictionColIndex);
             if (feature.get(0) <= 5) {
                 assertEquals(0, prediction, TOLERANCE);
                 assertTrue(rawPrediction.get(0) > 0.5);
@@ -307,12 +341,8 @@ public class LogisticRegressionTest extends AbstractTestBase {
                         tempFolder.newFolder().getAbsolutePath(),
                         LogisticRegressionModel::loadServable);
 
-        assertEquals("features", servable.getFeaturesCol());
-        assertEquals("prediction", servable.getPredictionCol());
-        assertEquals("rawPrediction", servable.getRawPredictionCol());
-
-        DataFrame output = servable.transform(LogisticRegressionModelServableTest.PREDICT_DATA);
-        LogisticRegressionModelServableTest.verifyPredictionResult(
+        DataFrame output = servable.transform(binomialDataDataFrame);
+        verifyPredictionResult(
                 output,
                 servable.getFeaturesCol(),
                 servable.getPredictionCol(),
@@ -329,10 +359,11 @@ public class LogisticRegressionTest extends AbstractTestBase {
                         .next();
 
         LogisticRegressionModelServable servable = new LogisticRegressionModelServable();
+        ParamUtils.updateExistingParams(servable, model.getParamMap());
         servable.setModelData(new ByteArrayInputStream(serializedModelData));
 
-        DataFrame output = servable.transform(LogisticRegressionModelServableTest.PREDICT_DATA);
-        LogisticRegressionModelServableTest.verifyPredictionResult(
+        DataFrame output = servable.transform(binomialDataDataFrame);
+        verifyPredictionResult(
                 output,
                 servable.getFeaturesCol(),
                 servable.getPredictionCol(),

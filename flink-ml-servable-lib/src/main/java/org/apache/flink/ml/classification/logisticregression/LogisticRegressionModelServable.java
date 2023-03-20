@@ -91,8 +91,8 @@ public class LogisticRegressionModelServable
                 ServableReadWriteUtils.loadServableParam(
                         path, LogisticRegressionModelServable.class);
 
-        try (InputStream fsDataInputStream = ServableReadWriteUtils.loadModelData(path)) {
-            servable.setModelData(fsDataInputStream);
+        try (InputStream modelData = ServableReadWriteUtils.loadModelData(path)) {
+            servable.setModelData(modelData);
             return servable;
         }
     }
