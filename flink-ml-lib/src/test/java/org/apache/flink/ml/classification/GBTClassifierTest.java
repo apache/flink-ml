@@ -484,8 +484,7 @@ public class GBTClassifierTest extends AbstractTestBase {
                         .setMaxBins(3)
                         .setSeed(123);
         GBTClassifierModel modelA = gbtc.fit(inputTable);
-        Table modelDataTable = modelA.getModelData()[0];
-        GBTClassifierModel modelB = new GBTClassifierModel().setModelData(modelDataTable);
+        GBTClassifierModel modelB = new GBTClassifierModel().setModelData(modelA.getModelData());
         ReadWriteUtils.updateExistingParams(modelB, modelA.getParamMap());
         Table output =
                 modelA.transform(inputTable)[0].select(

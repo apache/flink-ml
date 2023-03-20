@@ -25,6 +25,7 @@ import org.apache.flink.ml.regression.gbtregressor.GBTRegressor;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.table.api.Table;
+import org.apache.flink.util.Preconditions;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -35,6 +36,7 @@ public abstract class BaseGBTModel<T extends BaseGBTModel<T>> implements Model<T
 
     protected final Map<Param<?>, Object> paramMap = new HashMap<>();
     protected Table modelDataTable;
+    protected Table featureImportanceTable;
 
     public BaseGBTModel() {
         ParamUtils.initializeMapWithDefaultValues(paramMap, this);
@@ -42,12 +44,14 @@ public abstract class BaseGBTModel<T extends BaseGBTModel<T>> implements Model<T
 
     @Override
     public Table[] getModelData() {
-        return new Table[] {modelDataTable};
+        return new Table[] {modelDataTable, featureImportanceTable};
     }
 
     @Override
     public T setModelData(Table... inputs) {
+        Preconditions.checkArgument(inputs.length == 2);
         modelDataTable = inputs[0];
+        featureImportanceTable = inputs[1];
         //noinspection unchecked
         return (T) this;
     }

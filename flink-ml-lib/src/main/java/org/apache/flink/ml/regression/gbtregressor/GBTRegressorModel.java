@@ -25,6 +25,7 @@ import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.common.gbt.BaseGBTModel;
 import org.apache.flink.ml.common.gbt.GBTModelData;
+import org.apache.flink.ml.common.gbt.GBTRunner;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
@@ -38,6 +39,7 @@ import org.eclipse.collections.impl.map.mutable.primitive.IntDoubleHashMap;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Map;
 
 /** A Model computed by {@link GBTRegressor}. */
 public class GBTRegressorModel extends BaseGBTModel<GBTRegressorModel>
@@ -55,7 +57,9 @@ public class GBTRegressorModel extends BaseGBTModel<GBTRegressorModel>
         GBTRegressorModel model = ReadWriteUtils.loadStageParam(path);
         Table modelDataTable =
                 ReadWriteUtils.loadModelData(tEnv, path, new GBTModelData.ModelDataDecoder());
-        return model.setModelData(modelDataTable);
+        DataStream<Map<String, Double>> featureImportance =
+                GBTRunner.getFeatureImportance(GBTModelData.getModelDataStream(modelDataTable));
+        return model.setModelData(modelDataTable, tEnv.fromDataStream(featureImportance));
     }
 
     @Override
