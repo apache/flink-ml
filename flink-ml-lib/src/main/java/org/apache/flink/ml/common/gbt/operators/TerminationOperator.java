@@ -76,13 +76,15 @@ public class TerminationOperator extends AbstractStreamOperator<Integer>
     @Override
     public void onIterationTerminated(Context context, Collector<GBTModelData> collector)
             throws Exception {
-        sharedStorageContext.invoke(
-                (getter, setter) ->
-                        context.output(
-                                modelDataOutputTag,
-                                GBTModelData.from(
-                                        getter.get(SharedStorageConstants.TRAIN_CONTEXT),
-                                        getter.get(SharedStorageConstants.ALL_TREES))));
+        if (0 == getRuntimeContext().getIndexOfThisSubtask()) {
+            sharedStorageContext.invoke(
+                    (getter, setter) ->
+                            context.output(
+                                    modelDataOutputTag,
+                                    GBTModelData.from(
+                                            getter.get(SharedStorageConstants.TRAIN_CONTEXT),
+                                            getter.get(SharedStorageConstants.ALL_TREES))));
+        }
     }
 
     @Override

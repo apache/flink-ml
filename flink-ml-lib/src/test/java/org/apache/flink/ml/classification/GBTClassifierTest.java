@@ -457,7 +457,10 @@ public class GBTClassifierTest extends AbstractTestBase {
         Assert.assertArrayEquals(
                 new String[] {"modelData"}, modelDataColumnNames.toArray(new String[0]));
 
-        Row modelDataRow = (Row) IteratorUtils.toList(output.executeAndCollect()).get(0);
+        //noinspection unchecked
+        List<Row> modelDataRows = IteratorUtils.toList(output.executeAndCollect());
+        Assert.assertEquals(1, modelDataRows.size());
+        Row modelDataRow = modelDataRows.get(0);
         GBTModelData modelData = modelDataRow.getFieldAs(0);
         Assert.assertNotNull(modelData);
 
