@@ -31,7 +31,6 @@ import org.apache.flink.ml.regression.gbtregressor.GBTRegressor;
 import org.apache.flink.ml.regression.gbtregressor.GBTRegressorModel;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.ml.util.TestUtils;
-import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
@@ -53,6 +52,7 @@ import java.util.BitSet;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 import static org.apache.flink.table.api.Expressions.$;
 
@@ -297,6 +297,9 @@ public class GBTRegressorTest extends AbstractTestBase {
         Assert.assertEquals(
                 Collections.singletonList("modelData"),
                 model.getModelData()[0].getResolvedSchema().getColumnNames());
+        Assert.assertEquals(
+                Collections.singletonList("featureImportance"),
+                model.getModelData()[1].getResolvedSchema().getColumnNames());
         Table output = model.transform(inputTable)[0].select($(gbtr.getPredictionCol()));
         verifyPredictionResult(output, outputRows);
     }
@@ -331,12 +334,14 @@ public class GBTRegressorTest extends AbstractTestBase {
         GBTRegressorModel model = gbtr.fit(inputTable);
         Table modelDataTable = model.getModelData()[0];
         List<String> modelDataColumnNames = modelDataTable.getResolvedSchema().getColumnNames();
-        DataStream<Row> output = tEnv.toDataStream(modelDataTable);
         Assert.assertArrayEquals(
                 new String[] {"modelData"}, modelDataColumnNames.toArray(new String[0]));
 
-        Row modelDataRow = (Row) IteratorUtils.toList(output.executeAndCollect()).get(0);
-        GBTModelData modelData = modelDataRow.getFieldAs(0);
+        //noinspection unchecked
+        List<Row> modelDataRows =
+                IteratorUtils.toList(tEnv.toDataStream(modelDataTable).executeAndCollect());
+        Assert.assertEquals(1, modelDataRows.size());
+        GBTModelData modelData = modelDataRows.get(0).getFieldAs(0);
         Assert.assertNotNull(modelData);
 
         Assert.assertEquals(TaskType.REGRESSION, TaskType.valueOf(modelData.type));
@@ -349,6 +354,19 @@ public class GBTRegressorTest extends AbstractTestBase {
                 gbtr.getFeaturesCols().length - gbtr.getCategoricalCols().length,
                 modelData.featureIdToBinEdges.size());
         Assert.assertEquals(BitSet.valueOf(new byte[] {4}), modelData.isCategorical);
+
+        Table featureImportanceTable = model.getModelData()[1];
+        Assert.assertEquals(
+                Collections.singletonList("featureImportance"),
+                featureImportanceTable.getResolvedSchema().getColumnNames());
+        //noinspection unchecked
+        List<Row> featureImportanceRows =
+                IteratorUtils.toList(tEnv.toDataStream(featureImportanceTable).executeAndCollect());
+        Assert.assertEquals(1, featureImportanceRows.size());
+        Map<String, Double> featureImportanceMap =
+                featureImportanceRows.get(0).getFieldAs("featureImportance");
+        Assert.assertArrayEquals(
+                gbtr.getFeaturesCols(), featureImportanceMap.keySet().toArray(new String[0]));
     }
 
     @Test
@@ -362,8 +380,7 @@ public class GBTRegressorTest extends AbstractTestBase {
                         .setMaxBins(3)
                         .setSeed(123);
         GBTRegressorModel modelA = gbtr.fit(inputTable);
-        Table modelDataTable = modelA.getModelData()[0];
-        GBTRegressorModel modelB = new GBTRegressorModel().setModelData(modelDataTable);
+        GBTRegressorModel modelB = new GBTRegressorModel().setModelData(modelA.getModelData());
         ReadWriteUtils.updateExistingParams(modelB, modelA.getParamMap());
         Table output = modelA.transform(inputTable)[0].select($(gbtr.getPredictionCol()));
         verifyPredictionResult(output, outputRows);

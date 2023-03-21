@@ -32,7 +32,6 @@ import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.util.ReadWriteUtils;
 import org.apache.flink.ml.util.TestUtils;
-import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
@@ -54,6 +53,7 @@ import java.util.BitSet;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 import static org.apache.flink.table.api.Expressions.$;
 
@@ -411,6 +411,9 @@ public class GBTClassifierTest extends AbstractTestBase {
         Assert.assertEquals(
                 Collections.singletonList("modelData"),
                 model.getModelData()[0].getResolvedSchema().getColumnNames());
+        Assert.assertEquals(
+                Collections.singletonList("featureImportance"),
+                model.getModelData()[1].getResolvedSchema().getColumnNames());
         Table output =
                 model.transform(inputTable)[0].select(
                         $(gbtc.getPredictionCol()),
@@ -453,15 +456,14 @@ public class GBTClassifierTest extends AbstractTestBase {
         GBTClassifierModel model = gbtc.fit(inputTable);
         Table modelDataTable = model.getModelData()[0];
         List<String> modelDataColumnNames = modelDataTable.getResolvedSchema().getColumnNames();
-        DataStream<Row> output = tEnv.toDataStream(modelDataTable);
         Assert.assertArrayEquals(
                 new String[] {"modelData"}, modelDataColumnNames.toArray(new String[0]));
 
         //noinspection unchecked
-        List<Row> modelDataRows = IteratorUtils.toList(output.executeAndCollect());
+        List<Row> modelDataRows =
+                IteratorUtils.toList(tEnv.toDataStream(modelDataTable).executeAndCollect());
         Assert.assertEquals(1, modelDataRows.size());
-        Row modelDataRow = modelDataRows.get(0);
-        GBTModelData modelData = modelDataRow.getFieldAs(0);
+        GBTModelData modelData = modelDataRows.get(0).getFieldAs(0);
         Assert.assertNotNull(modelData);
 
         Assert.assertEquals(TaskType.CLASSIFICATION, TaskType.valueOf(modelData.type));
@@ -474,6 +476,19 @@ public class GBTClassifierTest extends AbstractTestBase {
                 gbtc.getFeaturesCols().length - gbtc.getCategoricalCols().length,
                 modelData.featureIdToBinEdges.size());
         Assert.assertEquals(BitSet.valueOf(new byte[] {4}), modelData.isCategorical);
+
+        Table featureImportanceTable = model.getModelData()[1];
+        Assert.assertEquals(
+                Collections.singletonList("featureImportance"),
+                featureImportanceTable.getResolvedSchema().getColumnNames());
+        //noinspection unchecked
+        List<Row> featureImportanceRows =
+                IteratorUtils.toList(tEnv.toDataStream(featureImportanceTable).executeAndCollect());
+        Assert.assertEquals(1, featureImportanceRows.size());
+        Map<String, Double> featureImportanceMap =
+                featureImportanceRows.get(0).getFieldAs("featureImportance");
+        Assert.assertArrayEquals(
+                gbtc.getFeaturesCols(), featureImportanceMap.keySet().toArray(new String[0]));
     }
 
     @Test

@@ -83,7 +83,8 @@ public class GBTClassifier
         GBTClassifierModel model = new GBTClassifierModel();
         model.setModelData(
                 tEnv.fromDataStream(modelData).renameColumns($("f0").as("modelData")),
-                tEnv.fromDataStream(featureImportance));
+                tEnv.fromDataStream(featureImportance)
+                        .renameColumns($("f0").as("featureImportance")));
         ReadWriteUtils.updateExistingParams(model, getParamMap());
         return model;
     }
