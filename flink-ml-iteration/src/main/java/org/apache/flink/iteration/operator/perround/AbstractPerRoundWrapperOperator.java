@@ -166,7 +166,8 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
                                             clonedOperatorFactory,
                                             (StreamTask) parameters.getContainingTask(),
                                             OperatorUtils.createWrappedOperatorConfig(
-                                                    parameters.getStreamConfig()),
+                                                    parameters.getStreamConfig(),
+                                                    containingTask.getUserCodeClassLoader()),
                                             proxyOutput,
                                             parameters.getOperatorEventDispatcher())
                                     .f0;

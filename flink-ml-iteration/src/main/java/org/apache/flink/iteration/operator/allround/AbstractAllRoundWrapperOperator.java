@@ -81,7 +81,8 @@ public abstract class AbstractAllRoundWrapperOperator<T, S extends StreamOperato
                                         operatorFactory,
                                         (StreamTask) parameters.getContainingTask(),
                                         OperatorUtils.createWrappedOperatorConfig(
-                                                parameters.getStreamConfig()),
+                                                parameters.getStreamConfig(),
+                                                containingTask.getUserCodeClassLoader()),
                                         proxyOutput,
                                         parameters.getOperatorEventDispatcher())
                                 .f0;
