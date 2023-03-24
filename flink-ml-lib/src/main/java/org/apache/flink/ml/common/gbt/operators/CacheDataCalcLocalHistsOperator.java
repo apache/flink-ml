@@ -130,7 +130,7 @@ public class CacheDataCalcLocalHistsOperator
         Row row = streamRecord.getValue();
         BinnedInstance instance = new BinnedInstance();
         instance.weight = 1.;
-        instance.label = row.getFieldAs(strategy.labelCol);
+        instance.label = row.<Number>getFieldAs(strategy.labelCol).doubleValue();
 
         if (strategy.isInputVector) {
             Vector vec = row.getFieldAs(strategy.featuresCols[0]);
