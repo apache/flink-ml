@@ -280,6 +280,15 @@ public class DataStreamUtils {
      * <p>This method takes samples without replacement. If the number of elements in the stream is
      * smaller than expected number of samples, all elements will be included in the sample.
      *
+     * <p>Technical details about this method: Firstly, the input elements are rebalanced. Then, in
+     * the first-round sampling, `firstRoundNumSamples` samples are selected from each data
+     * partitions. In the second-round sampling, `numSamples` elements are sampled from the results
+     * of the first round.
+     *
+     * <p>If the input elements are evenly distributed after rebalancing each element is selected
+     * with an equal probability during both rounds of sampling. Otherwise, elements are picks based
+     * on probabilities with tolerable differences.
+     *
      * @param input The input data stream.
      * @param numSamples The number of elements to be sampled.
      * @param randomSeed The seed to randomly pick elements as sample.
@@ -288,13 +297,20 @@ public class DataStreamUtils {
     public static <T> DataStream<T> sample(DataStream<T> input, int numSamples, long randomSeed) {
         int inputParallelism = input.getParallelism();
 
-        return input.transform(
-                        "samplingOperator",
-                        input.getType(),
-                        new SamplingOperator<>(numSamples, randomSeed))
-                .setParallelism(inputParallelism)
+        // In a worst-case scenario, the data partition with the greatest number of elements has
+        // `inputParallelism` additional elements compared to the one with the fewest elements.
+        // Therefore, additional elements are sampled from each partition in case some partitions
+        // has insufficient elements.
+        int firstRoundNumSamples =
+                Math.min((numSamples / inputParallelism) + inputParallelism, numSamples);
+        return input.rebalance()
                 .transform(
                         "samplingOperator",
+                        input.getType(),
+                        new SamplingOperator<>(firstRoundNumSamples, randomSeed))
+                .setParallelism(inputParallelism)
+                .transform(
+                        "samplingOperator-2nd-round",
                         input.getType(),
                         new SamplingOperator<>(numSamples, randomSeed))
                 .setParallelism(1)
