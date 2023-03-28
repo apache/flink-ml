@@ -28,6 +28,7 @@ import org.apache.flink.ml.common.lossfunc.LossFunc;
 import org.apache.flink.ml.common.lossfunc.SquaredErrorLoss;
 import org.apache.flink.util.Preconditions;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,8 +36,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.function.Function;
-
-import static java.util.Arrays.stream;
 
 class TrainContextInitializer {
     private static final Logger LOG = LoggerFactory.getLogger(TrainContextInitializer.class);
@@ -80,10 +79,13 @@ class TrainContextInitializer {
         trainContext.loss = getLoss();
         trainContext.prior = calcPrior(trainContext.labelSumCount);
 
+        // A special `feature` is appended with #bins = 1 to simplify codes.
         trainContext.numFeatureBins =
-                stream(trainContext.featureMetas)
-                        .mapToInt(d -> d.numBins(trainContext.strategy.useMissing))
-                        .toArray();
+                ArrayUtils.add(
+                        Arrays.stream(trainContext.featureMetas)
+                                .mapToInt(d -> d.numBins(trainContext.strategy.useMissing))
+                                .toArray(),
+                        1);
         LOG.info("Number of bins for each feature: {}", trainContext.numFeatureBins);
         LOG.info("subtaskId: {}, {} end", subtaskId, TrainContextInitializer.class.getSimpleName());
         return trainContext;

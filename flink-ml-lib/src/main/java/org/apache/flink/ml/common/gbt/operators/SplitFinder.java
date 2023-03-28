@@ -52,8 +52,9 @@ class SplitFinder {
 
         numFeatureBins = trainContext.numFeatureBins;
         FeatureMeta[] featureMetas = trainContext.featureMetas;
-        splitters = new HistogramFeatureSplitter[trainContext.numFeatures];
-        for (int i = 0; i < trainContext.numFeatures; ++i) {
+        int numFeatures = trainContext.numFeatures;
+        splitters = new HistogramFeatureSplitter[numFeatures + 1];
+        for (int i = 0; i < numFeatures; ++i) {
             splitters[i] =
                     FeatureMeta.Type.CATEGORICAL == featureMetas[i].type
                             ? new CategoricalFeatureSplitter(
@@ -61,6 +62,12 @@ class SplitFinder {
                             : new ContinuousFeatureSplitter(
                                     i, featureMetas[i], trainContext.strategy);
         }
+        // Adds an addition splitter to obtain the prediction of the node.
+        splitters[numFeatures] =
+                new ContinuousFeatureSplitter(
+                        numFeatures,
+                        new FeatureMeta.ContinuousFeatureMeta("SPECIAL", 0, new double[0]),
+                        trainContext.strategy);
         maxDepth = trainContext.strategy.maxDepth;
         maxNumLeaves = trainContext.strategy.maxNumLeaves;
     }
