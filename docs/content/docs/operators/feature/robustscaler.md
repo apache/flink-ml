@@ -1,5 +1,5 @@
 ---
-title: "Robust Scaler"
+title: "RobustScaler"
 weight: 1
 type: docs
 aliases:
@@ -25,9 +25,9 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-## Robust Scaler
+## RobustScaler
 
-Robust Scaler is an algorithm that scales features using statistics that are
+RobustScaler is an algorithm that scales features using statistics that are
 robust to outliers.
 
 This Scaler removes the median and scales the data according to the quantile

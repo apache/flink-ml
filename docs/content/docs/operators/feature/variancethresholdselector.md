@@ -1,5 +1,5 @@
 ---
-title: "Variance Threshold Selector"
+title: "VarianceThresholdSelector"
 weight: 1
 type: docs
 aliases:
@@ -25,9 +25,9 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-## Variance Threshold Selector
+## VarianceThresholdSelector
 
-Variance Threshold Selector is a selector that removes low-variance features. 
+VarianceThresholdSelector is a selector that removes low-variance features. 
 Features with a variance not greater than the varianceThreshold will be removed. 
 If not set, varianceThreshold defaults to 0, which means only features with 
 variance 0 (i.e. features that have the same value in all samples) will be removed.

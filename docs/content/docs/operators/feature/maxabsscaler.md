@@ -1,5 +1,5 @@
 ---
-title: "Max Abs Scaler"
+title: "MaxAbsScaler"
 weight: 1
 type: docs
 aliases:
@@ -25,9 +25,9 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-## Max Abs Scaler
+## MaxAbsScaler
 
-Max Abs Scaler is an algorithm rescales feature values to the range [-1, 1] 
+MaxAbsScaler is an algorithm rescales feature values to the range [-1, 1] 
 by dividing through the largest maximum absolute value in each feature. 
 It does not shift/center the data and thus does not destroy any sparsity.
 

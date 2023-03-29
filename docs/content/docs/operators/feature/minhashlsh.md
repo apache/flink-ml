@@ -1,5 +1,5 @@
 ---
-title: "MinHash LSH"
+title: "MinHashLSH"
 weight: 1
 type: docs
 aliases:
@@ -25,13 +25,13 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-## MinHash LSH
+## MinHashLSH
 
-MinHash LSH is a Locality Sensitive Hashing (LSH) scheme for Jaccard distance metric.
+MinHashLSH is a Locality Sensitive Hashing (LSH) scheme for Jaccard distance metric.
 The input features are sets of natural numbers represented as non-zero indices of vectors,
 either dense vectors or sparse vectors. Typically, sparse vectors are more efficient.
 
-In addition to transforming input feature vectors to multiple hash values, the MinHash LSH 
+In addition to transforming input feature vectors to multiple hash values, the MinHashLSH 
 model also supports approximate nearest neighbors search within a dataset regarding a key 
 vector and approximate similarity join between two datasets.
 

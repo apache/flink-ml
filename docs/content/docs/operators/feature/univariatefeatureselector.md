@@ -1,5 +1,5 @@
 ---
-title: "Univariate Feature Selector"
+title: "UnivariateFeatureSelector"
 weight: 1
 type: docs
 aliases:
@@ -25,12 +25,12 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-## Univariate Feature Selector
-Univariate Feature Selector is an algorithm that selects features based on 
+## UnivariateFeatureSelector
+UnivariateFeatureSelector is an algorithm that selects features based on 
 univariate statistical tests against labels.
 
-Currently, Flink supports three Univariate Feature Selectors: chi-squared, 
-ANOVA F-test and F-value. User can choose Univariate Feature Selector by 
+Currently, Flink supports three UnivariateFeatureSelectors: chi-squared, 
+ANOVA F-test and F-value. User can choose UnivariateFeatureSelector by 
 setting `featureType` and `labelType`, and Flink will pick the score function
 based on the specified `featureType` and `labelType`.
 
@@ -45,7 +45,7 @@ The following combination of `featureType` and `labelType` are supported:
         F-value, i.e. f_regression in sklearn.
 </ul>
 
-Univariate Feature Selector supports different selection modes:
+UnivariateFeatureSelector supports different selection modes:
 
 <ul>
     <li>numTopFeatures: chooses a fixed number of top features according to a 

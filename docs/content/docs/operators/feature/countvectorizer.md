@@ -1,5 +1,5 @@
 ---
-title: "Count Vectorizer"
+title: "CountVectorizer"
 weight: 1
 type: docs
 aliases:
@@ -23,7 +23,7 @@ specific language governing permissions dand limitations
 under the License.
 -->
 
-## Count Vectorizer
+## CountVectorizer
 
 CountVectorizer is an algorithm that converts a collection of text
 documents to vectors of token counts. When an a-priori dictionary is not 
