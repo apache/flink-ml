@@ -1,5 +1,5 @@
 ---
-title: "Elementwise Product"
+title: "ElementwiseProduct"
 weight: 1
 type: docs
 aliases:
@@ -25,9 +25,9 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-## Elementwise Product
+## ElementwiseProduct
 
-Elementwise Product multiplies each input vector with a given scaling vector using 
+ElementwiseProduct multiplies each input vector with a given scaling vector using 
 Hadamard product. If the size of the input vector does not equal the size of the 
 scaling vector, the transformer will throw an IllegalArgumentException.
 

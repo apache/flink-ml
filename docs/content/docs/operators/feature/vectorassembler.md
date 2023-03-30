@@ -1,5 +1,5 @@
 ---
-title: "Vector Assembler"
+title: "VectorAssembler"
 weight: 1
 type: docs
 aliases:
@@ -25,7 +25,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-## Vector Assembler
+## VectorAssembler
 A Transformer which combines a given list of input columns into a vector column. Input columns
 would be numerical or vectors whose sizes are specified by the {@link #INPUT_SIZES} parameter.
 Invalid input data with null values or values with wrong sizes would be dealt with according to

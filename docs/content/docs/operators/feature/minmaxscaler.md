@@ -1,5 +1,5 @@
 ---
-title: "Min Max Scaler"
+title: "MinMaxScaler"
 weight: 1
 type: docs
 aliases:
@@ -25,9 +25,9 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-## Min Max Scaler
+## MinMaxScaler
 
-Min Max Scaler is an algorithm that rescales feature values to a common range
+MinMaxScaler is an algorithm that rescales feature values to a common range
 [min, max] which defined by user.
 ### Input Columns
 

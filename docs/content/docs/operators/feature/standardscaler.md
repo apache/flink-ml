@@ -1,5 +1,5 @@
 ---
-title: "Standard Scaler"
+title: "StandardScaler"
 weight: 1
 type: docs
 aliases:
@@ -25,9 +25,9 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-## Standard Scaler
+## StandardScaler
 
-Standard Scaler is an algorithm that standardizes the input features by removing
+StandardScaler is an algorithm that standardizes the input features by removing
 the mean and scaling each dimension to unit variance.
 ### Input Columns
 

@@ -1,5 +1,5 @@
 ---
-title: "Vector Slicer"
+title: "VectorSlicer"
 weight: 1
 type: docs
 aliases:
@@ -25,9 +25,9 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-## Vector Slicer
+## VectorSlicer
 
-Vector Slicer transforms a vector to a new feature, which is a sub-array of the original
+VectorSlicer transforms a vector to a new feature, which is a sub-array of the original
 feature. It is useful for extracting features from a given vector.
 
 Note that duplicate features are not allowed, so there can be no overlap between selected

@@ -1,5 +1,5 @@
 ---
-title: "Feature Hasher"
+title: "FeatureHasher"
 weight: 1
 type: docs
 aliases:
@@ -25,9 +25,9 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-## Feature Hasher
+## FeatureHasher
 
-Feature Hasher transforms a set of categorical or numerical features into a sparse vector of
+FeatureHasher transforms a set of categorical or numerical features into a sparse vector of
 a specified dimension. The rules of hashing categorical columns and numerical columns are as
 follows:
 

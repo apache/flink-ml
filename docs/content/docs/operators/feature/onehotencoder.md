@@ -1,5 +1,5 @@
 ---
-title: "One Hot Encoder"
+title: "OneHotEncoder"
 weight: 1
 type: docs
 aliases:
@@ -24,9 +24,9 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-## One Hot Encoder
+## OneHotEncoder
 
-One-hot encoding maps a categorical feature, represented as a label index, to a
+OneHotEncoder maps a categorical feature, represented as a label index, to a
 binary vector with at most a single one-value indicating the presence of a
 specific feature value from among the set of all feature values. This encoding
 allows algorithms that expect continuous features, such as Logistic Regression,
