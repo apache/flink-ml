@@ -70,15 +70,18 @@ class StringIndexerTest(PyFlinkMLTestCase):
 
         self.assertEqual('arbitrary', string_indexer.string_order_type)
         self.assertEqual('error', string_indexer.handle_invalid)
+        self.assertEqual(2 ** 31 - 1, string_indexer.max_index_num)
 
         string_indexer.set_input_cols('input_col1', 'input_col2') \
             .set_output_cols('output_col1', 'output_col2') \
             .set_string_order_type('alphabetAsc') \
+            .set_max_index_num(100) \
             .set_handle_invalid('skip')
 
         self.assertEqual(('input_col1', 'input_col2'), string_indexer.input_cols)
         self.assertEqual(('output_col1', 'output_col2'), string_indexer.output_cols)
         self.assertEqual('alphabetAsc', string_indexer.string_order_type)
+        self.assertEqual(100, string_indexer.max_index_num)
         self.assertEqual('skip', string_indexer.handle_invalid)
 
     def test_output_schema(self):
@@ -109,6 +112,31 @@ class StringIndexerTest(PyFlinkMLTestCase):
         predicted_results.sort(key=lambda x: (x[0] is None, x[0]))
 
         self.assertEqual(predicted_results, self.expected_alphabetic_asc_predict_data)
+
+    def test_max_index_num(self):
+        string_indexer = StringIndexer() \
+            .set_max_index_num(3) \
+            .set_input_cols('input_col1', 'input_col2') \
+            .set_output_cols('output_col1', 'output_col2') \
+            .set_handle_invalid('keep') \
+            .set_string_order_type("frequencyDesc")
+
+        expected_predict_data = [
+            Row('a', 2.0, 1, 0),
+            Row('b', 1.0, 0, 2),
+            Row('e', 2.0, 2, 0),
+            Row('f', None, 2, 2),
+            Row(None, None, 2, 2),
+        ]
+
+        output = string_indexer.fit(self.train_table).transform(self.predict_table)[0]
+
+        predicted_results = [result for result in
+                             self.t_env.to_data_stream(output).execute_and_collect()]
+
+        predicted_results.sort(key=lambda x: (x[0] is None, x[0]))
+
+        self.assertEqual(predicted_results, expected_predict_data)
 
     def test_fit_and_predict(self):
         string_indexer = StringIndexer() \

@@ -42,6 +42,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.flink.ml.feature.stringindexer.StringIndexerParams.MAX_INDEX_NUM;
+import static org.apache.flink.ml.feature.stringindexer.StringIndexerParams.STRING_ORDER_TYPE;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -125,16 +127,19 @@ public class StringIndexerTest extends AbstractTestBase {
         StringIndexer stringIndexer = new StringIndexer();
         assertEquals(stringIndexer.getStringOrderType(), StringIndexerParams.ARBITRARY_ORDER);
         assertEquals(stringIndexer.getHandleInvalid(), StringIndexerParams.ERROR_INVALID);
+        assertEquals(stringIndexer.getMaxIndexNum(), Integer.MAX_VALUE);
 
         stringIndexer
                 .setInputCols("inputCol1", "inputCol2")
                 .setOutputCols("outputCol1", "outputCol2")
                 .setStringOrderType(StringIndexerParams.ALPHABET_ASC_ORDER)
+                .setMaxIndexNum(100)
                 .setHandleInvalid(StringIndexerParams.SKIP_INVALID);
 
         assertArrayEquals(new String[] {"inputCol1", "inputCol2"}, stringIndexer.getInputCols());
         assertArrayEquals(new String[] {"outputCol1", "outputCol2"}, stringIndexer.getOutputCols());
         assertEquals(stringIndexer.getStringOrderType(), StringIndexerParams.ALPHABET_ASC_ORDER);
+        assertEquals(stringIndexer.getMaxIndexNum(), 100);
         assertEquals(stringIndexer.getHandleInvalid(), StringIndexerParams.SKIP_INVALID);
     }
 
@@ -207,6 +212,65 @@ public class StringIndexerTest extends AbstractTestBase {
 
         assertEquals(3, distinctStringsCol1.size());
         assertEquals(3, distinctStringsCol2.size());
+    }
+
+    @Test
+    public void testMaxIndexNum() throws Exception {
+        StringIndexer stringIndexer =
+                new StringIndexer()
+                        .setMaxIndexNum(3)
+                        .setInputCols("inputCol1", "inputCol2")
+                        .setOutputCols("outputCol1", "outputCol2")
+                        .setHandleInvalid(StringIndexerParams.KEEP_INVALID);
+        Table output;
+        List<Row> predictedResult;
+        final String expectedErrorMessage =
+                "Setting "
+                        + MAX_INDEX_NUM.name
+                        + " smaller than INT.MAX only works when "
+                        + STRING_ORDER_TYPE.name
+                        + " is set as "
+                        + StringIndexerParams.FREQUENCY_DESC_ORDER
+                        + ".";
+
+        // AlphabetAsc order.
+        stringIndexer.setStringOrderType(StringIndexerParams.ALPHABET_ASC_ORDER);
+        checkMaxIndexNumSettings(stringIndexer, expectedErrorMessage);
+
+        // AlphabetDesc order.
+        stringIndexer.setStringOrderType(StringIndexerParams.ALPHABET_DESC_ORDER);
+        checkMaxIndexNumSettings(stringIndexer, expectedErrorMessage);
+
+        // FrequencyAsc order.
+        stringIndexer.setStringOrderType(StringIndexerParams.FREQUENCY_ASC_ORDER);
+        checkMaxIndexNumSettings(stringIndexer, expectedErrorMessage);
+
+        // FrequencyDesc order.
+        final List<Row> expectedPredictData =
+                Arrays.asList(
+                        Row.of("a", 2.0, 1.0, 0.0),
+                        Row.of("b", 1.0, 0.0, 2.0),
+                        Row.of("e", 2.0, 2.0, 0.0),
+                        Row.of("f", null, 2.0, 2.0),
+                        Row.of(null, null, 2.0, 2.0));
+        stringIndexer.setStringOrderType(StringIndexerParams.FREQUENCY_DESC_ORDER);
+        output = stringIndexer.fit(trainTable).transform(predictTable)[0];
+        predictedResult = IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect());
+        verifyPredictionResult(expectedPredictData, predictedResult);
+
+        // Arbitrary order.
+        stringIndexer.setStringOrderType(StringIndexerParams.ARBITRARY_ORDER);
+        checkMaxIndexNumSettings(stringIndexer, expectedErrorMessage);
+    }
+
+    private void checkMaxIndexNumSettings(
+            StringIndexer stringIndexer, String expectedErrorMessage) {
+        try {
+            stringIndexer.fit(trainTable);
+            fail();
+        } catch (Exception e) {
+            assertEquals(expectedErrorMessage, e.getMessage());
+        }
     }
 
     @Test

@@ -38,7 +38,7 @@ StringIndexerModel.
 ### Input Columns
 
 | Param name | Type          | Default | Description                            |
-| :--------- | :------------ | :------ |:---------------------------------------|
+|:-----------|:--------------|:--------|:---------------------------------------|
 | inputCols  | Number/String | `null`  | String/Numerical values to be indexed. |
 
 ### Output Columns
@@ -59,9 +59,10 @@ Below are the parameters required by `StringIndexerModel`.
 
 `StringIndexer` needs parameters above and also below.
 
-| Key             | Default       | Type   | Required | Description                                                                                                                         |
-|-----------------|---------------|--------|----------|-------------------------------------------------------------------------------------------------------------------------------------|
-| stringOrderType | `"arbitrary"` | String | no       | How to order strings of each column. Supported values: 'arbitrary', 'frequencyDesc', 'frequencyAsc', 'alphabetDesc', 'alphabetAsc'. |
+| Key             | Default       | Type    | Required | Description                                                                                                                         |
+|-----------------|---------------|---------|----------|-------------------------------------------------------------------------------------------------------------------------------------|
+| stringOrderType | `"arbitrary"` | String  | no       | How to order strings of each column. Supported values: 'arbitrary', 'frequencyDesc', 'frequencyAsc', 'alphabetDesc', 'alphabetAsc'. |
+| MaxIndexNum     | `2147483647`  | Integer | no       | The max number of indices for each column. It only works when stringOrderType is set as frequencyDesc.                              |
 
 ### Examples
 
