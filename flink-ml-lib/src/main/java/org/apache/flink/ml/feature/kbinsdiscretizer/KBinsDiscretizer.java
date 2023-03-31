@@ -67,7 +67,10 @@ import java.util.Set;
  *       and the {@link KBinsDiscretizerParams#STRATEGY} is set as {@link
  *       KBinsDiscretizerParams#KMEANS}, we switch to {@link KBinsDiscretizerParams#UNIFORM}.
  *   <li>When the width of one output bin is zero, i.e., the left edge equals to the right edge of
- *       the bin, we remove it.
+ *       the bin, we replace the right edge as the average value of its two neighbors. One exception
+ *       is that the last two edges are the same --- in this case, the left edge is updated as the
+ *       average of its two neighbors. For example, the bin edges {0, 1, 1, 2, 2} are transformed
+ *       into {0, 1, 1.5, 1.75, 2}.
  * </ul>
  */
 public class KBinsDiscretizer
@@ -220,22 +223,49 @@ public class KBinsDiscretizer
                 binEdges[columnId] =
                         new double[] {Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY};
             } else {
-                double width = 1.0 * features.length / numBins;
-                double[] tempBinEdges = new double[numBins + 1];
+                double[] tempBinEdges;
+                if (features.length > numBins) {
+                    double width = 1.0 * features.length / numBins;
+                    tempBinEdges = new double[numBins + 1];
 
-                for (int binEdgeId = 0; binEdgeId < numBins; binEdgeId++) {
-                    tempBinEdges[binEdgeId] = features[(int) (binEdgeId * width)];
+                    for (int binEdgeId = 0; binEdgeId < numBins; binEdgeId++) {
+                        tempBinEdges[binEdgeId] = features[(int) (binEdgeId * width)];
+                    }
+                    tempBinEdges[numBins] = features[numData - 1];
+                } else {
+                    tempBinEdges = features;
                 }
-                tempBinEdges[numBins] = features[numData - 1];
 
-                // Removes bins that are empty, i.e., the left edge equals to the right edge.
-                Set<Double> edges = new HashSet<>(numBins);
+                // Bins with zero width should be converted to a non-empty bin.
+                Map<Double, Integer> edgesAndCnt = new HashMap<>(numBins);
                 for (double edge : tempBinEdges) {
-                    edges.add(edge);
+                    edgesAndCnt.put(edge, edgesAndCnt.getOrDefault(edge, 0) + 1);
                 }
-
-                binEdges[columnId] = edges.stream().mapToDouble(Double::doubleValue).toArray();
-                Arrays.sort(binEdges[columnId]);
+                List<Double> edges = new ArrayList<>();
+                for (Map.Entry<Double, Integer> edgeAndCnt : edgesAndCnt.entrySet()) {
+                    double edge = edgeAndCnt.getKey();
+                    int cnt = edgeAndCnt.getValue();
+                    edges.add(edge);
+                    if (cnt > 1) {
+                        edges.add(edge);
+                    }
+                }
+                tempBinEdges = edges.stream().mapToDouble(Double::doubleValue).toArray();
+                Arrays.sort(tempBinEdges);
+                int i = 1;
+                // If there are two consecutive bin edges with the same value, we update the right
+                // edge as the average of its two neighbors.
+                for (; i < tempBinEdges.length - 1; i++) {
+                    if (tempBinEdges[i] == tempBinEdges[i - 1]) {
+                        tempBinEdges[i] = (tempBinEdges[i + 1] + tempBinEdges[i - 1]) / 2;
+                    }
+                }
+                // If the last two bin edges are the same, we update the left bin edge as the
+                // average of its two neighbors.
+                if (tempBinEdges[i] == tempBinEdges[i - 1]) {
+                    tempBinEdges[i - 1] = (tempBinEdges[i] + tempBinEdges[i - 2]) / 2;
+                }
+                binEdges[columnId] = tempBinEdges;
             }
         }
         return binEdges;
