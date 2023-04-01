@@ -72,11 +72,11 @@ class KBinsDiscretizerTest(PyFlinkMLTestCase):
         self.quantile_output = [
             Vectors.dense(0, 0, 0),
             Vectors.dense(0, 0, 0),
-            Vectors.dense(0, 0, 0),
-            Vectors.dense(1, 0, 0),
-            Vectors.dense(2, 0, 0),
-            Vectors.dense(2, 0, 0),
-            Vectors.dense(2, 0, 0),
+            Vectors.dense(0, 0, 1),
+            Vectors.dense(1, 0, 1),
+            Vectors.dense(2, 0, 1),
+            Vectors.dense(2, 0, 1),
+            Vectors.dense(2, 0, 1),
         ]
 
         self.kmeans_output = [

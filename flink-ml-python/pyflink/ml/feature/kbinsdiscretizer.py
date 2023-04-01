@@ -147,8 +147,11 @@ class KBinsDiscretizer(JavaFeatureEstimator, _KBinsDiscretizerParams):
         <li>When the number of distinct values of one column is less than the specified
         number of bins and the {@link KBinsDiscretizerParams#STRATEGY} is set as {@link
         KBinsDiscretizerParams#KMEANS}, we switch to {@link KBinsDiscretizerParams#UNIFORM}.
-        <li>When the width of one output bin is zero, i.e., the left edge equals to the right
-        edge of the bin, we remove it.
+        <li>When the width of one output bin is zero, i.e., the left edge equals to the
+        right edge of the bin, we replace the right edge as the average value of its two
+        neighbors. One exception is that the last two edges are the same --- in this case,
+        the left edge is updated as the average of its two neighbors. For example,
+        the bin edges {0, 1, 1, 2, 2} are transformed into {0, 1, 1.5, 1.75, 2}.
     </ul>
     """
 

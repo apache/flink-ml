@@ -101,11 +101,11 @@ public class KBinsDiscretizerTest extends AbstractTestBase {
             Arrays.asList(
                     Row.of(Vectors.dense(0, 0, 0)),
                     Row.of(Vectors.dense(0, 0, 0)),
-                    Row.of(Vectors.dense(0, 0, 0)),
-                    Row.of(Vectors.dense(1, 0, 0)),
-                    Row.of(Vectors.dense(2, 0, 0)),
-                    Row.of(Vectors.dense(2, 0, 0)),
-                    Row.of(Vectors.dense(2, 0, 0)));
+                    Row.of(Vectors.dense(0, 0, 1)),
+                    Row.of(Vectors.dense(1, 0, 1)),
+                    Row.of(Vectors.dense(2, 0, 1)),
+                    Row.of(Vectors.dense(2, 0, 1)),
+                    Row.of(Vectors.dense(2, 0, 1)));
 
     private static final List<Row> KMEANS_OUTPUT =
             Arrays.asList(
@@ -281,5 +281,24 @@ public class KBinsDiscretizerTest extends AbstractTestBase {
         } catch (Throwable e) {
             assertEquals("The training set is empty.", ExceptionUtils.getRootCause(e).getMessage());
         }
+    }
+
+    @Test
+    public void testBinsWithWidthAsZero() throws Exception {
+        final List<Row> expectedOutput =
+                Arrays.asList(
+                        Row.of(Vectors.dense(0, 0, 0)),
+                        Row.of(Vectors.dense(0, 0, 0)),
+                        Row.of(Vectors.dense(0, 0, 1)),
+                        Row.of(Vectors.dense(3, 0, 1)),
+                        Row.of(Vectors.dense(5, 0, 1)),
+                        Row.of(Vectors.dense(6, 0, 1)),
+                        Row.of(Vectors.dense(6, 0, 1)));
+
+        KBinsDiscretizer kBinsDiscretizer =
+                new KBinsDiscretizer().setNumBins(10).setStrategy(KBinsDiscretizerParams.QUANTILE);
+
+        Table output = kBinsDiscretizer.fit(trainTable).transform(testTable)[0];
+        verifyPredictionResult(expectedOutput, output, kBinsDiscretizer.getOutputCol());
     }
 }
