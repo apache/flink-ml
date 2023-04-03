@@ -17,7 +17,7 @@
 ################################################################################
 import typing
 
-from pyflink.ml.param import Param, StringParam, ParamValidators
+from pyflink.ml.param import Param, IntParam, StringParam, ParamValidators
 from pyflink.ml.wrapper import JavaWithParams
 from pyflink.ml.feature.common import JavaFeatureModel, JavaFeatureEstimator
 from pyflink.ml.common.param import HasInputCols, HasOutputCols, HasHandleInvalid
@@ -62,6 +62,13 @@ class _StringIndexerParams(_StringIndexerModelParams):
         ParamValidators.in_array(
             ['arbitrary', 'frequencyDesc', 'frequencyAsc', 'alphabetDesc', 'alphabetAsc']))
 
+    MAX_INDEX_NUM: Param[int] = IntParam(
+        "max_index_num",
+        "The max number of indices for each column. It only works when "
+        + "'stringOrderType' is set as 'frequencyDesc'.",
+        2 ** 31 - 1,
+        ParamValidators.gt(1))
+
     def __init__(self, java_params):
         super(_StringIndexerParams, self).__init__(java_params)
 
@@ -71,9 +78,19 @@ class _StringIndexerParams(_StringIndexerModelParams):
     def get_string_order_type(self) -> str:
         return self.get(self.STRING_ORDER_TYPE)
 
+    def set_max_index_num(self, value: int):
+        return typing.cast(_StringIndexerParams, self.set(self.MAX_INDEX_NUM, value))
+
+    def get_max_index_num(self) -> int:
+        return self.get(self.MAX_INDEX_NUM)
+
     @property
     def string_order_type(self):
         return self.get_string_order_type()
+
+    @property
+    def max_index_num(self):
+        return self.get_max_index_num()
 
 
 class IndexToStringModel(JavaFeatureModel, _IndexToStringModelParams):
@@ -99,8 +116,8 @@ class StringIndexerModel(JavaFeatureModel, _StringIndexerModelParams):
     A Model which transforms input string/numeric column(s) to integer column(s) using the model
     data computed by :class:StringIndexer.
 
-    The `keep` option of {@link HasHandleInvalid} means that we put the invalid entries in a
-    special bucket, whose index is the number of distinct values in this column.
+    The `keep` option of {@link HasHandleInvalid} means that we transform the invalid input
+    into a special index, whose value is the number of distinct values in this column.
     """
 
     def __init__(self, java_model=None):
@@ -128,8 +145,12 @@ class StringIndexer(JavaFeatureEstimator, _StringIndexerParams):
     is arbitrarily ordered. Users can control this by setting {@link
     StringIndexerParams#STRING_ORDER_TYPE}.
 
-    The `keep` option of {@link HasHandleInvalid} means that we put the invalid entries in a
-    special bucket, whose index is the number of distinct values in this column.
+    User can also control the max number of output indices by setting {@link
+    StringIndexerParams#MAX_INDEX_NUM}. This parameter only works if {@link
+    StringIndexerParams#STRING_ORDER_TYPE} is set as 'frequencyDesc'.
+
+    The `keep` option of {@link HasHandleInvalid} means that we transform the invalid input
+    into a special index, whose value is the number of distinct values in this column.
     """
 
     def __init__(self):

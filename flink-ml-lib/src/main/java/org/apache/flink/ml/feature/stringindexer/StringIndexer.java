@@ -64,8 +64,12 @@ import java.util.Map.Entry;
  * is arbitrarily ordered. Users can control this by setting {@link
  * StringIndexerParams#STRING_ORDER_TYPE}.
  *
- * <p>The `keep` option of {@link HasHandleInvalid} means that we put the invalid entries in a
- * special bucket, whose index is the number of distinct values in this column.
+ * <p>User can also control the max number of output indices by setting {@link
+ * StringIndexerParams#MAX_INDEX_NUM}. This parameter only works if {@link
+ * StringIndexerParams#STRING_ORDER_TYPE} is set as 'frequencyDesc'.
+ *
+ * <p>The `keep` option of {@link HasHandleInvalid} means that we transform the invalid input into a
+ * special index, whose value is the number of distinct values in this column.
  */
 public class StringIndexer
         implements Estimator<StringIndexer, StringIndexerModel>,
@@ -96,6 +100,17 @@ public class StringIndexer
         String[] inputCols = getInputCols();
         String[] outputCols = getOutputCols();
         Preconditions.checkArgument(inputCols.length == outputCols.length);
+        if (getMaxIndexNum() < Integer.MAX_VALUE) {
+            Preconditions.checkArgument(
+                    getStringOrderType().equals(StringIndexerParams.FREQUENCY_DESC_ORDER),
+                    "Setting "
+                            + MAX_INDEX_NUM.name
+                            + " smaller than INT.MAX only works when "
+                            + STRING_ORDER_TYPE.name
+                            + " is set as "
+                            + StringIndexerParams.FREQUENCY_DESC_ORDER
+                            + ".");
+        }
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
 
@@ -127,7 +142,7 @@ public class StringIndexer
                         Types.OBJECT_ARRAY(Types.MAP(Types.STRING, Types.LONG)));
 
         DataStream<StringIndexerModelData> modelData =
-                countedString.map(new ModelGenerator(getStringOrderType()));
+                countedString.map(new ModelGenerator(getStringOrderType(), getMaxIndexNum()));
         modelData.getTransformation().setParallelism(1);
 
         StringIndexerModel model =
@@ -205,14 +220,19 @@ public class StringIndexer
 
     /**
      * Merges all the extracted strings and generates the {@link StringIndexerModelData} according
-     * to the specified string order type.
+     * to the specified string order type and maxIndexNum.
+     *
+     * <p>Note that the maxIndexNum works only when the strings are ordered by {@link
+     * StringIndexerParams#ALPHABET_DESC_ORDER}.
      */
     private static class ModelGenerator
             implements MapFunction<Map<String, Long>[], StringIndexerModelData> {
         private final String stringOrderType;
+        private final int maxIndexNum;
 
-        public ModelGenerator(String stringOrderType) {
+        public ModelGenerator(String stringOrderType, int maxIndexNum) {
             this.stringOrderType = stringOrderType;
+            this.maxIndexNum = maxIndexNum;
         }
 
         @Override
@@ -220,6 +240,7 @@ public class StringIndexer
             int numCols = value.length;
             String[][] stringArrays = new String[numCols][];
             ArrayList<Tuple2<String, Long>> stringsAndCnts = new ArrayList<>();
+
             for (int i = 0; i < numCols; i++) {
                 stringsAndCnts.clear();
                 stringsAndCnts.ensureCapacity(value[i].size());
@@ -242,6 +263,18 @@ public class StringIndexer
                         stringsAndCnts.sort(
                                 (valAndCnt1, valAndCnt2) ->
                                         -valAndCnt1.f1.compareTo(valAndCnt2.f1));
+
+                        if (stringsAndCnts.size() > maxIndexNum) {
+                            ArrayList<Tuple2<String, Long>> frequentStringsAndCnts =
+                                    new ArrayList<>();
+                            // Reserves the last index for infrequent element.
+                            frequentStringsAndCnts.ensureCapacity(maxIndexNum - 1);
+                            for (int indexId = 0; indexId < maxIndexNum - 1; indexId++) {
+                                frequentStringsAndCnts.add(stringsAndCnts.get(indexId));
+                            }
+                            stringsAndCnts = frequentStringsAndCnts;
+                        }
+
                         break;
                     case ARBITRARY_ORDER:
                         break;

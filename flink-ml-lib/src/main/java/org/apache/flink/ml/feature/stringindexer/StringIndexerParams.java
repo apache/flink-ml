@@ -18,6 +18,7 @@
 
 package org.apache.flink.ml.feature.stringindexer;
 
+import org.apache.flink.ml.param.IntParam;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.param.ParamValidators;
 import org.apache.flink.ml.param.StringParam;
@@ -58,11 +59,27 @@ public interface StringIndexerParams<T> extends StringIndexerModelParams<T> {
                             ALPHABET_DESC_ORDER,
                             ALPHABET_ASC_ORDER));
 
+    Param<Integer> MAX_INDEX_NUM =
+            new IntParam(
+                    "maxIndexNum",
+                    "The max number of indices for each column. It only works when "
+                            + "'stringOrderType' is set as 'frequencyDesc'.",
+                    Integer.MAX_VALUE,
+                    ParamValidators.gt(1));
+
     default String getStringOrderType() {
         return get(STRING_ORDER_TYPE);
     }
 
     default T setStringOrderType(String value) {
         return set(STRING_ORDER_TYPE, value);
+    }
+
+    default int getMaxIndexNum() {
+        return get(MAX_INDEX_NUM);
+    }
+
+    default T setMaxIndexNum(int value) {
+        return set(MAX_INDEX_NUM, value);
     }
 }
