@@ -275,19 +275,13 @@ public class DataStreamUtils {
     }
 
     /**
-     * Performs a uniform sampling over the elements in a bounded data stream.
+     * Performs an approximate uniform sampling over the elements in a bounded data stream. The
+     * difference of probabilities of two data points been sampled is bounded by O(numSamples * p *
+     * p / (M * M)), where p is the parallelism of the input stream, M is the total number of data
+     * points that the input stream contains.
      *
      * <p>This method takes samples without replacement. If the number of elements in the stream is
      * smaller than expected number of samples, all elements will be included in the sample.
-     *
-     * <p>Technical details about this method: Firstly, the input elements are rebalanced. Then, in
-     * the first-round sampling, `firstRoundNumSamples` samples are selected from each data
-     * partitions. In the second-round sampling, `numSamples` elements are sampled from the results
-     * of the first round.
-     *
-     * <p>If the input elements are evenly distributed after rebalancing each element is selected
-     * with an equal probability during both rounds of sampling. Otherwise, elements are picks based
-     * on probabilities with tolerable differences.
      *
      * @param input The input data stream.
      * @param numSamples The number of elements to be sampled.
@@ -298,9 +292,9 @@ public class DataStreamUtils {
         int inputParallelism = input.getParallelism();
 
         // In a worst-case scenario, the data partition with the greatest number of elements has
-        // `inputParallelism` additional elements compared to the one with the fewest elements.
-        // Therefore, additional elements are sampled from each partition in case some partitions
-        // has insufficient elements.
+        // `inputParallelism` additional elements compared to the one with the fewest elements even
+        // after `rebalance` performed. Therefore, additional elements are sampled from each
+        // partition in case some partitions has insufficient elements.
         int firstRoundNumSamples =
                 Math.min((numSamples / inputParallelism) + inputParallelism, numSamples);
         return input.rebalance()
