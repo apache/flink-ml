@@ -291,20 +291,19 @@ public class DataStreamUtils {
     public static <T> DataStream<T> sample(DataStream<T> input, int numSamples, long randomSeed) {
         int inputParallelism = input.getParallelism();
 
-        // In a worst-case scenario, the data partition with the greatest number of elements has
-        // `inputParallelism` additional elements compared to the one with the fewest elements even
-        // after `rebalance` performed. Therefore, additional elements are sampled from each
-        // partition in case some partitions has insufficient elements.
+        // The maximum difference of number of data points in each partition after calling
+        // `rebalance` is `inputParallelism`. As a result, extra `inputParallelism` data points are
+        // sampled for each partition in the first round.
         int firstRoundNumSamples =
                 Math.min((numSamples / inputParallelism) + inputParallelism, numSamples);
         return input.rebalance()
                 .transform(
-                        "samplingOperator",
+                        "firstRoundSampling",
                         input.getType(),
                         new SamplingOperator<>(firstRoundNumSamples, randomSeed))
                 .setParallelism(inputParallelism)
                 .transform(
-                        "samplingOperator-2nd-round",
+                        "secondRoundSampling",
                         input.getType(),
                         new SamplingOperator<>(numSamples, randomSeed))
                 .setParallelism(1)
