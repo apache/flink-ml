@@ -268,16 +268,16 @@ public class GBTRegressorTest extends AbstractTestBase {
         Table output = model.transform(inputTable)[0].select($(gbtr.getPredictionCol()));
         List<Row> outputRowsUsingNoCategoricalCols =
                 Arrays.asList(
-                        Row.of(40.07663214615239),
-                        Row.of(40.92462268161843),
-                        Row.of(40.941626445241624),
-                        Row.of(40.06608854749729),
-                        Row.of(40.12272436518743),
-                        Row.of(40.92737873124178),
-                        Row.of(40.08092204935494),
-                        Row.of(40.898529570430696),
-                        Row.of(40.08092204935494),
-                        Row.of(40.88296818645738));
+                        Row.of(40.060788327295285),
+                        Row.of(40.92126707025628),
+                        Row.of(40.08161253493682),
+                        Row.of(40.916655697518976),
+                        Row.of(40.95467692795112),
+                        Row.of(40.070253879056665),
+                        Row.of(40.06975535946203),
+                        Row.of(40.923228418693306),
+                        Row.of(40.093329043797524),
+                        Row.of(40.923115214426424));
         verifyPredictionResult(output, outputRowsUsingNoCategoricalCols);
     }
 
