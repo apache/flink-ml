@@ -28,6 +28,7 @@ import org.apache.flink.ml.common.gbt.defs.Slice;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
 import org.apache.flink.ml.util.Distributor;
 
+import org.eclipse.collections.impl.list.mutable.primitive.IntArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -268,9 +269,8 @@ class HistBuilder {
 
         // Generates (nodeId, featureId) pairs that are required to build histograms.
         int[][] nodeToFeatures = new int[numNodes][];
-        int[] nodeFeaturePairs = new int[numNodes * numBaggingFeatures * 2];
+        IntArrayList nodeFeaturePairs = new IntArrayList(numNodes * numBaggingFeatures * 2);
         boolean[] needSplit = new boolean[numNodes];
-        int p = 0;
         int numTotalBins = 0;
         for (int k = 0; k < numNodes; k += 1) {
             LearningNode node = layer.get(k);
@@ -288,12 +288,12 @@ class HistBuilder {
                 Arrays.sort(nodeToFeatures[k]);
             }
             for (int featureId : nodeToFeatures[k]) {
-                nodeFeaturePairs[p++] = k;
-                nodeFeaturePairs[p++] = featureId;
+                nodeFeaturePairs.add(k);
+                nodeFeaturePairs.add(featureId);
                 numTotalBins += numFeatureBins[featureId];
             }
         }
-        nodeFeaturePairsSetter.accept(nodeFeaturePairs);
+        nodeFeaturePairsSetter.accept(nodeFeaturePairs.toArray());
 
         double[] hists = new double[numTotalBins * BIN_SIZE];
         // Calculates histograms for (nodeId, featureId) pairs.
@@ -313,7 +313,7 @@ class HistBuilder {
         LOG.info("Elapsed time for calcNodeFeaturePairHists: {} ms", elapsed);
 
         // Calculates number of elements received by each downstream subtask.
-        int[] recvcnts = calcRecvCounts(numSubtasks, nodeFeaturePairs, numFeatureBins);
+        int[] recvcnts = calcRecvCounts(numSubtasks, nodeFeaturePairs.toArray(), numFeatureBins);
 
         List<Tuple2<Integer, Histogram>> histograms = new ArrayList<>();
         int sliceStart = 0;
