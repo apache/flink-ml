@@ -65,7 +65,7 @@ class _StringIndexerParams(_StringIndexerModelParams):
     MAX_INDEX_NUM: Param[int] = IntParam(
         "max_index_num",
         "The max number of indices for each column. It only works when "
-        + "stringOrderType is set as frequencyDesc.",
+        + "'stringOrderType' is set as 'frequencyDesc'.",
         2 ** 31 - 1,
         ParamValidators.gt(1))
 
@@ -147,7 +147,7 @@ class StringIndexer(JavaFeatureEstimator, _StringIndexerParams):
 
     User can also control the max number of output indices by setting {@link
     StringIndexerParams#MAX_INDEX_NUM}. This parameter only works if {@link
-    StringIndexerParams#STRING_ORDER_TYPE} is set as frequencyDesc.
+    StringIndexerParams#STRING_ORDER_TYPE} is set as 'frequencyDesc'.
 
     The `keep` option of {@link HasHandleInvalid} means that we transform the invalid input
     into a special index, whose value is the number of distinct values in this column.

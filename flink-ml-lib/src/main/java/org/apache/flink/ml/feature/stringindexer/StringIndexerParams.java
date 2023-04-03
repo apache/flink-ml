@@ -63,7 +63,7 @@ public interface StringIndexerParams<T> extends StringIndexerModelParams<T> {
             new IntParam(
                     "maxIndexNum",
                     "The max number of indices for each column. It only works when "
-                            + "stringOrderType is set as frequencyDesc.",
+                            + "'stringOrderType' is set as 'frequencyDesc'.",
                     Integer.MAX_VALUE,
                     ParamValidators.gt(1));
 

@@ -62,7 +62,7 @@ Below are the parameters required by `StringIndexerModel`.
 | Key             | Default       | Type    | Required | Description                                                                                                                         |
 |-----------------|---------------|---------|----------|-------------------------------------------------------------------------------------------------------------------------------------|
 | stringOrderType | `"arbitrary"` | String  | no       | How to order strings of each column. Supported values: 'arbitrary', 'frequencyDesc', 'frequencyAsc', 'alphabetDesc', 'alphabetAsc'. |
-| MaxIndexNum     | `2147483647`  | Integer | no       | The max number of indices for each column. It only works when stringOrderType is set as frequencyDesc.                              |
+| MaxIndexNum     | `2147483647`  | Integer | no       | The max number of indices for each column. It only works when 'stringOrderType' is set as 'frequencyDesc'.                          |
 
 ### Examples
 

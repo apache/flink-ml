@@ -66,7 +66,7 @@ import java.util.Map.Entry;
  *
  * <p>User can also control the max number of output indices by setting {@link
  * StringIndexerParams#MAX_INDEX_NUM}. This parameter only works if {@link
- * StringIndexerParams#STRING_ORDER_TYPE} is set as frequencyDesc.
+ * StringIndexerParams#STRING_ORDER_TYPE} is set as 'frequencyDesc'.
  *
  * <p>The `keep` option of {@link HasHandleInvalid} means that we transform the invalid input into a
  * special index, whose value is the number of distinct values in this column.
