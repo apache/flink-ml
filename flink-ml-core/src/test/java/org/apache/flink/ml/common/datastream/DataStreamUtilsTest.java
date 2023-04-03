@@ -101,6 +101,21 @@ public class DataStreamUtilsTest {
     }
 
     @Test
+    public void testSample() throws Exception {
+        int numSamples = 10;
+        int[] totalMinusOneChoices = new int[] {0, 5, 9, 10, 11, 20, 30, 40, 200};
+        for (int totalMinusOne : totalMinusOneChoices) {
+            DataStream<Long> dataStream =
+                    env.fromParallelCollection(
+                            new NumberSequenceIterator(0L, totalMinusOne), Types.LONG);
+            DataStream<Long> result = DataStreamUtils.sample(dataStream, numSamples, 0);
+            //noinspection unchecked
+            List<String> sampled = IteratorUtils.toList(result.executeAndCollect());
+            assertEquals(Math.min(numSamples, totalMinusOne + 1), sampled.size());
+        }
+    }
+
+    @Test
     public void testGenerateBatchData() throws Exception {
         DataStream<Long> dataStream =
                 env.fromParallelCollection(new NumberSequenceIterator(0L, 19L), Types.LONG);

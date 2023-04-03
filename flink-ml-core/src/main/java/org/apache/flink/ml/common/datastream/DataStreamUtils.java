@@ -275,7 +275,10 @@ public class DataStreamUtils {
     }
 
     /**
-     * Performs a uniform sampling over the elements in a bounded data stream.
+     * Performs an approximate uniform sampling over the elements in a bounded data stream. The
+     * difference of probabilities of two data points been sampled is bounded by O(numSamples * p *
+     * p / (M * M)), where p is the parallelism of the input stream, M is the total number of data
+     * points that the input stream contains.
      *
      * <p>This method takes samples without replacement. If the number of elements in the stream is
      * smaller than expected number of samples, all elements will be included in the sample.
@@ -288,13 +291,19 @@ public class DataStreamUtils {
     public static <T> DataStream<T> sample(DataStream<T> input, int numSamples, long randomSeed) {
         int inputParallelism = input.getParallelism();
 
-        return input.transform(
-                        "samplingOperator",
+        // The maximum difference of number of data points in each partition after calling
+        // `rebalance` is `inputParallelism`. As a result, extra `inputParallelism` data points are
+        // sampled for each partition in the first round.
+        int firstRoundNumSamples =
+                Math.min((numSamples / inputParallelism) + inputParallelism, numSamples);
+        return input.rebalance()
+                .transform(
+                        "firstRoundSampling",
                         input.getType(),
-                        new SamplingOperator<>(numSamples, randomSeed))
+                        new SamplingOperator<>(firstRoundNumSamples, randomSeed))
                 .setParallelism(inputParallelism)
                 .transform(
-                        "samplingOperator",
+                        "secondRoundSampling",
                         input.getType(),
                         new SamplingOperator<>(numSamples, randomSeed))
                 .setParallelism(1)
