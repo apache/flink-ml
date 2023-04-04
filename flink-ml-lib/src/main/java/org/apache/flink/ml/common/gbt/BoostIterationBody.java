@@ -18,23 +18,23 @@
 
 package org.apache.flink.ml.common.gbt;
 
-import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.iteration.DataStreamList;
 import org.apache.flink.iteration.IterationBody;
 import org.apache.flink.iteration.IterationBodyResult;
 import org.apache.flink.ml.common.gbt.defs.BoostingStrategy;
 import org.apache.flink.ml.common.gbt.defs.Histogram;
-import org.apache.flink.ml.common.gbt.defs.Splits;
+import org.apache.flink.ml.common.gbt.defs.Split;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
 import org.apache.flink.ml.common.gbt.operators.CacheDataCalcLocalHistsOperator;
 import org.apache.flink.ml.common.gbt.operators.CalcLocalSplitsOperator;
-import org.apache.flink.ml.common.gbt.operators.HistogramAggregateFunction;
 import org.apache.flink.ml.common.gbt.operators.PostSplitsOperator;
+import org.apache.flink.ml.common.gbt.operators.ReduceHistogramFunction;
+import org.apache.flink.ml.common.gbt.operators.ReduceSplitsOperator;
 import org.apache.flink.ml.common.gbt.operators.SharedStorageConstants;
-import org.apache.flink.ml.common.gbt.operators.SplitsAggregateFunction;
 import org.apache.flink.ml.common.gbt.operators.TerminationOperator;
 import org.apache.flink.ml.common.sharedstorage.ItemDescriptor;
 import org.apache.flink.ml.common.sharedstorage.SharedStorageBody;
@@ -69,33 +69,35 @@ class BoostIterationBody implements IterationBody {
 
         Map<ItemDescriptor<?>, String> ownerMap = new HashMap<>();
 
-        // In 1st round, cache all data. For all rounds calculate local histogram based on
-        // current tree layer.
         CacheDataCalcLocalHistsOperator cacheDataCalcLocalHistsOp =
                 new CacheDataCalcLocalHistsOperator(strategy);
-        SingleOutputStreamOperator<Tuple2<Integer, Histogram>> localHists =
+        SingleOutputStreamOperator<Tuple3<Integer, Integer, Histogram>> localHists =
                 data.connect(trainContext)
                         .transform(
                                 "CacheDataCalcLocalHists",
-                                new TypeHint<Tuple2<Integer, Histogram>>() {}.getTypeInfo(),
+                                Types.TUPLE(
+                                        Types.INT, Types.INT, TypeInformation.of(Histogram.class)),
                                 cacheDataCalcLocalHistsOp);
         for (ItemDescriptor<?> s : SharedStorageConstants.OWNED_BY_CACHE_DATA_CALC_LOCAL_HISTS_OP) {
             ownerMap.put(s, cacheDataCalcLocalHistsOp.getSharedStorageAccessorID());
         }
 
-        DataStream<Histogram> globalHists =
-                localHists
-                        .partitionCustom((key, numPartitions) -> key, value -> value.f0)
-                        .map(d -> d.f1)
-                        .flatMap(new HistogramAggregateFunction());
+        DataStream<Tuple2<Integer, Histogram>> globalHists =
+                localHists.keyBy(d -> d.f1).flatMap(new ReduceHistogramFunction());
 
-        SingleOutputStreamOperator<Splits> localSplits =
+        SingleOutputStreamOperator<Tuple3<Integer, Integer, Split>> localSplits =
                 globalHists.transform(
                         "CalcLocalSplits",
-                        TypeInformation.of(Splits.class),
+                        Types.TUPLE(Types.INT, Types.INT, TypeInformation.of(Split.class)),
                         new CalcLocalSplitsOperator());
-        DataStream<Splits> globalSplits =
-                localSplits.broadcast().flatMap(new SplitsAggregateFunction());
+
+        DataStream<Tuple2<Integer, Split>> globalSplits =
+                localSplits
+                        .keyBy(d -> d.f0)
+                        .transform(
+                                "ReduceGlobalSplits",
+                                Types.TUPLE(Types.INT, TypeInformation.of(Split.class)),
+                                new ReduceSplitsOperator());
 
         PostSplitsOperator postSplitsOp = new PostSplitsOperator();
         SingleOutputStreamOperator<Integer> updatedModelData =
@@ -118,7 +120,7 @@ class BoostIterationBody implements IterationBody {
 
         return new SharedStorageBody.SharedStorageBodyResult(
                 Arrays.asList(updatedModelData, finalModelData, termination),
-                Arrays.asList(localHists, localSplits, updatedModelData, termination),
+                Arrays.asList(localHists, localSplits, globalSplits, updatedModelData, termination),
                 ownerMap);
     }
 

@@ -53,6 +53,17 @@ public abstract class Split {
         this.prediction = prediction;
     }
 
+    public Split accumulate(Split other) {
+        if (gain < other.gain) {
+            return other;
+        } else if (gain == other.gain) {
+            if (featureId < other.featureId) {
+                return other;
+            }
+        }
+        return this;
+    }
+
     /**
      * Test the binned instance should go to the left child or the right child.
      *

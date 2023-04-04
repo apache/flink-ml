@@ -18,7 +18,7 @@
 
 package org.apache.flink.ml.common.gbt.operators;
 
-import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.ml.common.gbt.DataUtils;
 import org.apache.flink.ml.common.gbt.defs.BinnedInstance;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
@@ -26,13 +26,13 @@ import org.apache.flink.ml.common.gbt.defs.Histogram;
 import org.apache.flink.ml.common.gbt.defs.LearningNode;
 import org.apache.flink.ml.common.gbt.defs.Slice;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
-import org.apache.flink.ml.util.Distributor;
+import org.apache.flink.util.Collector;
+import org.apache.flink.util.Preconditions;
 
 import org.eclipse.collections.impl.list.mutable.primitive.IntArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
@@ -46,7 +46,6 @@ class HistBuilder {
     private static final Logger LOG = LoggerFactory.getLogger(HistBuilder.class);
 
     private final int subtaskId;
-    private final int numSubtasks;
 
     private final int numFeatures;
     private final int[] numFeatureBins;
@@ -61,7 +60,6 @@ class HistBuilder {
 
     public HistBuilder(TrainContext trainContext) {
         subtaskId = trainContext.subtaskId;
-        numSubtasks = trainContext.numSubtasks;
 
         numFeatures = trainContext.numFeatures;
         numFeatureBins = trainContext.numFeatureBins;
@@ -75,214 +73,29 @@ class HistBuilder {
         maxDepth = trainContext.strategy.maxDepth;
     }
 
-    /**
-     * Calculate histograms for all (nodeId, featureId) pairs. The results are written to `hists`,
-     * so `hists` must be large enough to store values.
-     */
-    private static void calcNodeFeaturePairHists(
-            List<LearningNode> layer,
-            int[][] nodeToFeatures,
-            boolean[] needSplit,
-            FeatureMeta[] featureMetas,
-            int[] numFeatureBins,
-            boolean isInputVector,
-            int[] indices,
-            BinnedInstance[] instances,
-            double[] pgh,
-            double[] hists) {
-        int numNodes = layer.size();
-        int numFeatures = featureMetas.length;
-
-        int[][] nodeToBinOffsets = new int[numNodes][];
-        int binOffset = 0;
-        for (int k = 0; k < numNodes; k += 1) {
-            int[] features = nodeToFeatures[k];
-            nodeToBinOffsets[k] = new int[features.length];
-            for (int i = 0; i < features.length; i += 1) {
-                nodeToBinOffsets[k][i] = binOffset;
-                binOffset += numFeatureBins[features[i]];
-            }
-        }
-
-        int[] featureDefaultVal = new int[numFeatures];
-        for (int i = 0; i < numFeatures; i += 1) {
-            FeatureMeta d = featureMetas[i];
-            featureDefaultVal[i] =
-                    isInputVector && d instanceof FeatureMeta.ContinuousFeatureMeta
-                            ? ((FeatureMeta.ContinuousFeatureMeta) d).zeroBin
-                            : d.missingBin;
-        }
-
-        int[] featureOffset = new int[numFeatures];
-        BitSet featureValid = null;
-        boolean allFeatureValid;
-        for (int k = 0; k < numNodes; k += 1) {
-            long start = System.currentTimeMillis();
-            int[] features = nodeToFeatures[k];
-            int[] binOffsets = nodeToBinOffsets[k];
-            LearningNode node = layer.get(k);
-
-            double[] totalHists = new double[4];
-            for (int i = node.slice.start; i < node.slice.end; i += 1) {
-                int instanceId = indices[i];
-                BinnedInstance binnedInstance = instances[instanceId];
-                double weight = binnedInstance.weight;
-                double gradient = pgh[3 * instanceId + 1];
-                double hessian = pgh[3 * instanceId + 2];
-
-                totalHists[0] += gradient;
-                totalHists[1] += hessian;
-                totalHists[2] += weight;
-                totalHists[3] += 1.;
-            }
-
-            if (needSplit[k]) {
-                if (numFeatures != features.length) {
-                    allFeatureValid = false;
-                    featureValid = new BitSet(numFeatures);
-                    for (int i = 0; i < features.length; i += 1) {
-                        featureValid.set(features[i]);
-                        featureOffset[features[i]] = binOffsets[i];
-                    }
-                } else {
-                    allFeatureValid = true;
-                    System.arraycopy(binOffsets, 0, featureOffset, 0, numFeatures);
-                }
-
-                for (int i = node.slice.start; i < node.slice.end; i += 1) {
-                    int instanceId = indices[i];
-                    BinnedInstance binnedInstance = instances[instanceId];
-                    double weight = binnedInstance.weight;
-                    double gradient = pgh[3 * instanceId + 1];
-                    double hessian = pgh[3 * instanceId + 2];
-
-                    if (null == binnedInstance.featureIds) {
-                        for (int j = 0; j < binnedInstance.featureValues.length; j += 1) {
-                            if (allFeatureValid || featureValid.get(j)) {
-                                add(
-                                        hists,
-                                        featureOffset[j],
-                                        binnedInstance.featureValues[j],
-                                        gradient,
-                                        hessian,
-                                        weight,
-                                        1.);
-                            }
-                        }
-                    } else {
-                        for (int j = 0; j < binnedInstance.featureIds.length; j += 1) {
-                            int featureId = binnedInstance.featureIds[j];
-                            if (allFeatureValid || featureValid.get(featureId)) {
-                                add(
-                                        hists,
-                                        featureOffset[featureId],
-                                        binnedInstance.featureValues[j],
-                                        gradient,
-                                        hessian,
-                                        weight,
-                                        1.);
-                            }
-                        }
-                    }
-                }
-
-                for (int featureId : features) {
-                    int defaultVal = featureDefaultVal[featureId];
-                    int defaultValIndex = (featureOffset[featureId] + defaultVal) * BIN_SIZE;
-                    hists[defaultValIndex] = totalHists[0];
-                    hists[defaultValIndex + 1] = totalHists[1];
-                    hists[defaultValIndex + 2] = totalHists[2];
-                    hists[defaultValIndex + 3] = totalHists[3];
-                    for (int i = 0; i < numFeatureBins[featureId]; i += 1) {
-                        if (i != defaultVal) {
-                            int index = (featureOffset[featureId] + i) * BIN_SIZE;
-                            add(
-                                    hists,
-                                    featureOffset[featureId],
-                                    defaultVal,
-                                    -hists[index],
-                                    -hists[index + 1],
-                                    -hists[index + 2],
-                                    -hists[index + 3]);
-                        }
-                    }
-                }
-            } else {
-                add(
-                        hists,
-                        binOffsets[0],
-                        0,
-                        totalHists[0],
-                        totalHists[1],
-                        totalHists[2],
-                        totalHists[3]);
-            }
-            LOG.info(
-                    "STEP 3: node {}, {} #instances, {} #features, {} ms",
-                    k,
-                    node.slice.size(),
-                    features.length,
-                    System.currentTimeMillis() - start);
-        }
-    }
-
-    private static void add(
-            double[] hists, int offset, int val, double d0, double d1, double d2, double d3) {
-        int index = (offset + val) * BIN_SIZE;
-        hists[index] += d0;
-        hists[index + 1] += d1;
-        hists[index + 2] += d2;
-        hists[index + 3] += d3;
-    }
-
-    /**
-     * Calculates elements counts of histogram distributed to each downstream subtask. The elements
-     * counts is bin counts multiplied by STEP. The minimum unit to be distributed is (nodeId,
-     * featureId), i.e., all bins belonging to the same (nodeId, featureId) pair must go to one
-     * subtask.
-     */
-    private static int[] calcRecvCounts(
-            int numSubtasks, int[] nodeFeaturePairs, int[] numFeatureBins) {
-        int[] recvcnts = new int[numSubtasks];
-        Distributor.EvenDistributor distributor =
-                new Distributor.EvenDistributor(numSubtasks, nodeFeaturePairs.length / 2);
-        for (int k = 0; k < numSubtasks; k += 1) {
-            int pairStart = (int) distributor.start(k);
-            int pairCnt = (int) distributor.count(k);
-            for (int i = pairStart; i < pairStart + pairCnt; i += 1) {
-                int featureId = nodeFeaturePairs[2 * i + 1];
-                recvcnts[k] += numFeatureBins[featureId] * BIN_SIZE;
-            }
-        }
-        return recvcnts;
-    }
-
     /** Calculate local histograms for nodes in current layer of tree. */
-    List<Tuple2<Integer, Histogram>> build(
+    void build(
             List<LearningNode> layer,
             int[] indices,
             BinnedInstance[] instances,
             double[] pgh,
-            Consumer<int[]> nodeFeaturePairsSetter) {
+            Consumer<int[]> nodeFeaturePairsSetter,
+            Collector<Tuple3<Integer, Integer, Histogram>> out) {
         LOG.info("subtaskId: {}, {} start", subtaskId, HistBuilder.class.getSimpleName());
         int numNodes = layer.size();
 
         // Generates (nodeId, featureId) pairs that are required to build histograms.
         int[][] nodeToFeatures = new int[numNodes][];
         IntArrayList nodeFeaturePairs = new IntArrayList(numNodes * numBaggingFeatures * 2);
-        boolean[] needSplit = new boolean[numNodes];
-        int numTotalBins = 0;
         for (int k = 0; k < numNodes; k += 1) {
             LearningNode node = layer.get(k);
             if (node.depth == maxDepth) {
-                needSplit[k] = false;
                 // Ignores the results, just to consume the randomizer.
                 DataUtils.sample(featureIndicesPool, numBaggingFeatures, featureRandomizer);
                 // No need to calculate histograms for features, only sum of gradients and hessians
                 // are needed. Uses `numFeatures` to indicate this special "feature".
                 nodeToFeatures[k] = new int[] {numFeatures};
             } else {
-                needSplit[k] = true;
                 nodeToFeatures[k] =
                         DataUtils.sample(featureIndicesPool, numBaggingFeatures, featureRandomizer);
                 Arrays.sort(nodeToFeatures[k]);
@@ -290,46 +103,252 @@ class HistBuilder {
             for (int featureId : nodeToFeatures[k]) {
                 nodeFeaturePairs.add(k);
                 nodeFeaturePairs.add(featureId);
-                numTotalBins += numFeatureBins[featureId];
             }
         }
         nodeFeaturePairsSetter.accept(nodeFeaturePairs.toArray());
 
-        double[] hists = new double[numTotalBins * BIN_SIZE];
         // Calculates histograms for (nodeId, featureId) pairs.
-        long start = System.currentTimeMillis();
-        calcNodeFeaturePairHists(
-                layer,
-                nodeToFeatures,
-                needSplit,
-                featureMetas,
-                numFeatureBins,
-                isInputVector,
-                indices,
-                instances,
-                pgh,
-                hists);
-        long elapsed = System.currentTimeMillis() - start;
-        LOG.info("Elapsed time for calcNodeFeaturePairHists: {} ms", elapsed);
+        HistBuilderImpl builderImpl =
+                new HistBuilderImpl(
+                        layer,
+                        maxDepth,
+                        numFeatures,
+                        numFeatureBins,
+                        nodeToFeatures,
+                        indices,
+                        instances,
+                        pgh);
+        builderImpl.init(isInputVector, featureMetas);
+        builderImpl.calcHistsForPairs(subtaskId, out);
 
-        // Calculates number of elements received by each downstream subtask.
-        int[] recvcnts = calcRecvCounts(numSubtasks, nodeFeaturePairs.toArray(), numFeatureBins);
+        LOG.info("subtaskId: {}, {} end", subtaskId, HistBuilder.class.getSimpleName());
+    }
 
-        List<Tuple2<Integer, Histogram>> histograms = new ArrayList<>();
-        int sliceStart = 0;
-        for (int i = 0; i < recvcnts.length; i += 1) {
-            int sliceSize = recvcnts[i];
-            histograms.add(
-                    Tuple2.of(
-                            i,
-                            new Histogram(
-                                    subtaskId,
-                                    hists,
-                                    new Slice(sliceStart, sliceStart + sliceSize))));
-            sliceStart += sliceSize;
+    static class HistBuilderImpl {
+        private final List<LearningNode> layer;
+        private final int maxDepth;
+        private final int numFeatures;
+        private final int[] numFeatureBins;
+        private final int[][] nodeToFeatures;
+        private final int[] indices;
+        private final BinnedInstance[] instances;
+        private final double[] pgh;
+
+        private int[] featureDefaultVal;
+
+        public HistBuilderImpl(
+                List<LearningNode> layer,
+                int maxDepth,
+                int numFeatures,
+                int[] numFeatureBins,
+                int[][] nodeToFeatures,
+                int[] indices,
+                BinnedInstance[] instances,
+                double[] pgh) {
+            this.layer = layer;
+            this.maxDepth = maxDepth;
+            this.numFeatures = numFeatures;
+            this.numFeatureBins = numFeatureBins;
+            this.nodeToFeatures = nodeToFeatures;
+            this.indices = indices;
+            this.instances = instances;
+            this.pgh = pgh;
+            Preconditions.checkArgument(numFeatureBins.length == numFeatures + 1);
         }
 
-        LOG.info("subtaskId: {}, {} end", this.subtaskId, HistBuilder.class.getSimpleName());
-        return histograms;
+        private static void calcHistsForDefaultBin(
+                int defaultVal,
+                int featureOffset,
+                int numBins,
+                double[] totalHists,
+                double[] hists,
+                int nodeOffset) {
+            int defaultValIndex = (nodeOffset + featureOffset + defaultVal) * BIN_SIZE;
+            hists[defaultValIndex] = totalHists[0];
+            hists[defaultValIndex + 1] = totalHists[1];
+            hists[defaultValIndex + 2] = totalHists[2];
+            hists[defaultValIndex + 3] = totalHists[3];
+            for (int i = 0; i < numBins; i += 1) {
+                if (i != defaultVal) {
+                    int index = (nodeOffset + featureOffset + i) * BIN_SIZE;
+                    add(
+                            hists,
+                            nodeOffset + featureOffset,
+                            defaultVal,
+                            -hists[index],
+                            -hists[index + 1],
+                            -hists[index + 2],
+                            -hists[index + 3]);
+                }
+            }
+        }
+
+        private static void add(
+                double[] hists, int offset, int val, double d0, double d1, double d2, double d3) {
+            int index = (offset + val) * BIN_SIZE;
+            hists[index] += d0;
+            hists[index + 1] += d1;
+            hists[index + 2] += d2;
+            hists[index + 3] += d3;
+        }
+
+        private void init(boolean isInputVector, FeatureMeta[] featureMetas) {
+            featureDefaultVal = new int[numFeatures];
+            for (int i = 0; i < numFeatures; i += 1) {
+                FeatureMeta d = featureMetas[i];
+                featureDefaultVal[i] =
+                        isInputVector && d instanceof FeatureMeta.ContinuousFeatureMeta
+                                ? ((FeatureMeta.ContinuousFeatureMeta) d).zeroBin
+                                : d.missingBin;
+            }
+        }
+
+        private void calcTotalHists(LearningNode node, double[] totalHists, int offset) {
+            for (int i = node.slice.start; i < node.slice.end; i += 1) {
+                int instanceId = indices[i];
+                BinnedInstance binnedInstance = instances[instanceId];
+                double weight = binnedInstance.weight;
+                double gradient = pgh[3 * instanceId + 1];
+                double hessian = pgh[3 * instanceId + 2];
+                add(totalHists, offset, 0, gradient, hessian, weight, 1.);
+            }
+        }
+
+        private void calcHistsForNonDefaultBins(
+                LearningNode node,
+                boolean allFeatureValid,
+                BitSet featureValid,
+                int[] featureOffset,
+                double[] hists,
+                int nodeOffset) {
+            for (int i = node.slice.start; i < node.slice.end; i += 1) {
+                int instanceId = indices[i];
+                BinnedInstance binnedInstance = instances[instanceId];
+                double weight = binnedInstance.weight;
+                double gradient = pgh[3 * instanceId + 1];
+                double hessian = pgh[3 * instanceId + 2];
+
+                if (null == binnedInstance.featureIds) {
+                    for (int j = 0; j < binnedInstance.featureValues.length; j += 1) {
+                        if (allFeatureValid || featureValid.get(j)) {
+                            add(
+                                    hists,
+                                    nodeOffset + featureOffset[j],
+                                    binnedInstance.featureValues[j],
+                                    gradient,
+                                    hessian,
+                                    weight,
+                                    1.);
+                        }
+                    }
+                } else {
+                    for (int j = 0; j < binnedInstance.featureIds.length; j += 1) {
+                        int featureId = binnedInstance.featureIds[j];
+                        if (allFeatureValid || featureValid.get(featureId)) {
+                            add(
+                                    hists,
+                                    nodeOffset + featureOffset[featureId],
+                                    binnedInstance.featureValues[j],
+                                    gradient,
+                                    hessian,
+                                    weight,
+                                    1.);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void calcHistsForSplitNode(
+                LearningNode node,
+                int[] features,
+                int[] binOffsets,
+                double[] hists,
+                int nodeOffset) {
+            double[] totalHists = new double[4];
+            calcTotalHists(node, totalHists, 0);
+
+            int[] featureOffsets = new int[numFeatures];
+            BitSet featureValid = null;
+            boolean allFeatureValid;
+            if (numFeatures != features.length) {
+                allFeatureValid = false;
+                featureValid = new BitSet(numFeatures);
+                for (int i = 0; i < features.length; i += 1) {
+                    featureValid.set(features[i]);
+                    featureOffsets[features[i]] = binOffsets[i];
+                }
+            } else {
+                allFeatureValid = true;
+                System.arraycopy(binOffsets, 0, featureOffsets, 0, numFeatures);
+            }
+
+            calcHistsForNonDefaultBins(
+                    node, allFeatureValid, featureValid, featureOffsets, hists, nodeOffset);
+
+            for (int featureId : features) {
+                calcHistsForDefaultBin(
+                        featureDefaultVal[featureId],
+                        featureOffsets[featureId],
+                        numFeatureBins[featureId],
+                        totalHists,
+                        hists,
+                        nodeOffset);
+            }
+        }
+
+        /** Calculate histograms for all (nodeId, featureId) pairs. */
+        private void calcHistsForPairs(
+                int subtaskId, Collector<Tuple3<Integer, Integer, Histogram>> out) {
+            long start = System.currentTimeMillis();
+            int numNodes = layer.size();
+            int offset = 0;
+            int pairBaseId = 0;
+            for (int k = 0; k < numNodes; k += 1) {
+                int[] features = nodeToFeatures[k];
+                final int nodeOffset = offset;
+                int[] binOffsets = new int[features.length];
+                for (int i = 0; i < features.length; i += 1) {
+                    binOffsets[i] = offset - nodeOffset;
+                    offset += numFeatureBins[features[i]];
+                }
+
+                double[] nodeHists = new double[(offset - nodeOffset) * BIN_SIZE];
+                long nodeStart = System.currentTimeMillis();
+                LearningNode node = layer.get(k);
+                if (node.depth != maxDepth) {
+                    calcHistsForSplitNode(node, features, binOffsets, nodeHists, 0);
+                } else {
+                    calcTotalHists(node, nodeHists, 0);
+                }
+                LOG.info(
+                        "subtaskId: {}, node {}, {} #instances, {} #features, {} ms",
+                        subtaskId,
+                        k,
+                        node.slice.size(),
+                        features.length,
+                        System.currentTimeMillis() - nodeStart);
+
+                int sliceStart = 0;
+                for (int i = 0; i < features.length; i += 1) {
+                    int sliceSize = numFeatureBins[features[i]] * BIN_SIZE;
+                    int pairId = pairBaseId + i;
+                    out.collect(
+                            Tuple3.of(
+                                    subtaskId,
+                                    pairId,
+                                    new Histogram(
+                                            nodeHists,
+                                            new Slice(sliceStart, sliceStart + sliceSize))));
+                    sliceStart += sliceSize;
+                }
+                pairBaseId += features.length;
+            }
+
+            LOG.info(
+                    "subtaskId: {}, elapsed time for calculating histograms: {} ms",
+                    subtaskId,
+                    System.currentTimeMillis() - start);
+        }
     }
 }

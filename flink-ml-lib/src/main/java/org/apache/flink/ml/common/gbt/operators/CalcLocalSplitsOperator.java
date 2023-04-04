@@ -18,13 +18,14 @@
 
 package org.apache.flink.ml.common.gbt.operators;
 
+import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.typeutils.runtime.kryo.KryoSerializer;
-import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.datacache.nonkeyed.ListStateWithCache;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.common.gbt.defs.Histogram;
 import org.apache.flink.ml.common.gbt.defs.LearningNode;
-import org.apache.flink.ml.common.gbt.defs.Splits;
+import org.apache.flink.ml.common.gbt.defs.Split;
 import org.apache.flink.ml.common.sharedstorage.SharedStorageContext;
 import org.apache.flink.ml.common.sharedstorage.SharedStorageStreamOperator;
 import org.apache.flink.runtime.state.StateInitializationContext;
@@ -32,18 +33,26 @@ import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
-import org.apache.flink.util.Collector;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-/** Calculates local splits for assigned (nodeId, featureId) pairs. */
-public class CalcLocalSplitsOperator extends AbstractStreamOperator<Splits>
-        implements OneInputStreamOperator<Histogram, Splits>,
-                IterationListener<Splits>,
+/**
+ * Calculates best splits from histograms for (nodeId, featureId) pairs.
+ *
+ * <p>The input elements are tuples of ((nodeId, featureId) pair index, Histogram). The output
+ * elements are tuples of (node index, (nodeId, featureId) pair index, Split).
+ */
+public class CalcLocalSplitsOperator extends AbstractStreamOperator<Tuple3<Integer, Integer, Split>>
+        implements OneInputStreamOperator<
+                        Tuple2<Integer, Histogram>, Tuple3<Integer, Integer, Split>>,
                 SharedStorageStreamOperator {
 
+    private static final Logger LOG = LoggerFactory.getLogger(CalcLocalSplitsOperator.class);
     private static final String SPLIT_FINDER_STATE_NAME = "split_finder";
     private final String sharedStorageAccessorID;
     // States of local data.
@@ -79,11 +88,7 @@ public class CalcLocalSplitsOperator extends AbstractStreamOperator<Splits>
     }
 
     @Override
-    public void onEpochWatermarkIncremented(
-            int epochWatermark, Context context, Collector<Splits> collector) {}
-
-    @Override
-    public void processElement(StreamRecord<Histogram> element) throws Exception {
+    public void processElement(StreamRecord<Tuple2<Integer, Histogram>> element) throws Exception {
         if (null == splitFinder) {
             sharedStorageContext.invoke(
                     (getter, setter) -> {
@@ -93,7 +98,10 @@ public class CalcLocalSplitsOperator extends AbstractStreamOperator<Splits>
                     });
         }
 
-        Histogram histogram = element.getValue();
+        Tuple2<Integer, Histogram> value = element.getValue();
+        int pairId = value.f0;
+        Histogram histogram = value.f1;
+        LOG.debug("Received histogram for pairId: {}", pairId);
         sharedStorageContext.invoke(
                 (getter, setter) -> {
                     List<LearningNode> layer = getter.get(SharedStorageConstants.LAYER);
@@ -102,18 +110,26 @@ public class CalcLocalSplitsOperator extends AbstractStreamOperator<Splits>
                                 Collections.singletonList(
                                         getter.get(SharedStorageConstants.ROOT_LEARNING_NODE));
                     }
-                    Splits splits =
+
+                    int[] nodeFeaturePairs = getter.get(SharedStorageConstants.NODE_FEATURE_PAIRS);
+                    int nodeId = nodeFeaturePairs[2 * pairId];
+                    int featureId = nodeFeaturePairs[2 * pairId + 1];
+                    LearningNode node = layer.get(nodeId);
+
+                    Split bestSplit =
                             splitFinder.calc(
-                                    layer,
-                                    getter.get(SharedStorageConstants.NODE_FEATURE_PAIRS),
+                                    node,
+                                    featureId,
                                     getter.get(SharedStorageConstants.LEAVES).size(),
                                     histogram);
-                    output.collect(new StreamRecord<>(splits));
+                    output.collect(new StreamRecord<>(Tuple3.of(nodeId, pairId, bestSplit)));
                 });
+        LOG.debug("Output split for pairId: {}", pairId);
     }
 
     @Override
-    public void onIterationTerminated(Context context, Collector<Splits> collector) {
+    public void close() throws Exception {
+        super.close();
         splitFinderState.clear();
     }
 

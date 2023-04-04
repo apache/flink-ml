@@ -18,6 +18,7 @@
 
 package org.apache.flink.ml.common.gbt.operators;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.runtime.kryo.KryoSerializer;
 import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.datacache.nonkeyed.ListStateWithCache;
@@ -25,7 +26,7 @@ import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.common.gbt.defs.BinnedInstance;
 import org.apache.flink.ml.common.gbt.defs.LearningNode;
 import org.apache.flink.ml.common.gbt.defs.Node;
-import org.apache.flink.ml.common.gbt.defs.Splits;
+import org.apache.flink.ml.common.gbt.defs.Split;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
 import org.apache.flink.ml.common.sharedstorage.SharedStorageContext;
 import org.apache.flink.ml.common.sharedstorage.SharedStorageStreamOperator;
@@ -35,6 +36,9 @@ import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.util.Collector;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -46,19 +50,19 @@ import java.util.UUID;
  * update instances scores after a tree is complete.
  */
 public class PostSplitsOperator extends AbstractStreamOperator<Integer>
-        implements OneInputStreamOperator<Splits, Integer>,
+        implements OneInputStreamOperator<Tuple2<Integer, Split>, Integer>,
                 IterationListener<Integer>,
                 SharedStorageStreamOperator {
 
-    private static final String SPLITS_STATE_NAME = "splits";
     private static final String NODE_SPLITTER_STATE_NAME = "node_splitter";
     private static final String INSTANCE_UPDATER_STATE_NAME = "instance_updater";
+
+    private static final Logger LOG = LoggerFactory.getLogger(PostSplitsOperator.class);
 
     private final String sharedStorageAccessorID;
 
     // States of local data.
-    private transient ListStateWithCache<Splits> splitsState;
-    private transient Splits splits;
+    private transient Split[] nodeSplits;
     private transient ListStateWithCache<NodeSplitter> nodeSplitterState;
     private transient NodeSplitter nodeSplitter;
     private transient ListStateWithCache<InstanceUpdater> instanceUpdaterState;
@@ -73,14 +77,6 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
     public void initializeState(StateInitializationContext context) throws Exception {
         super.initializeState(context);
 
-        splitsState =
-                new ListStateWithCache<>(
-                        new KryoSerializer<>(Splits.class, getExecutionConfig()),
-                        getContainingTask(),
-                        getRuntimeContext(),
-                        context,
-                        getOperatorID());
-        splits = OperatorStateUtils.getUniqueElement(splitsState, SPLITS_STATE_NAME).orElse(null);
         nodeSplitterState =
                 new ListStateWithCache<>(
                         new KryoSerializer<>(NodeSplitter.class, getExecutionConfig()),
@@ -109,8 +105,6 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
     @Override
     public void snapshotState(StateSnapshotContext context) throws Exception {
         super.snapshotState(context);
-        splitsState.update(Collections.singletonList(splits));
-        splitsState.snapshotState(context);
         nodeSplitterState.snapshotState(context);
         instanceUpdaterState.snapshotState(context);
         sharedStorageContext.snapshotState(context);
@@ -157,9 +151,10 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
                                     currentTreeNodes,
                                     layer,
                                     leaves,
-                                    splits.splits,
+                                    nodeSplits,
                                     indices,
                                     instances);
+                    nodeSplits = null;
                     setter.set(SharedStorageConstants.LEAVES, leaves);
                     setter.set(SharedStorageConstants.LAYER, nextLayer);
                     setter.set(SharedStorageConstants.CURRENT_TREE_NODES, currentTreeNodes);
@@ -181,6 +176,7 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
                         setter.set(SharedStorageConstants.LEAVES, new ArrayList<>());
                         setter.set(SharedStorageConstants.SWAPPED_INDICES, new int[0]);
                         setter.set(SharedStorageConstants.ALL_TREES, allTrees);
+                        LOG.info("finalize {}-th tree", allTrees.size());
                     } else {
                         setter.set(SharedStorageConstants.SWAPPED_INDICES, indices);
                         setter.set(SharedStorageConstants.NEED_INIT_TREE, false);
@@ -202,13 +198,24 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
     }
 
     @Override
-    public void processElement(StreamRecord<Splits> element) throws Exception {
-        splits = element.getValue();
+    public void processElement(StreamRecord<Tuple2<Integer, Split>> element) throws Exception {
+        if (null == nodeSplits) {
+            sharedStorageContext.invoke(
+                    (getter, setter) -> {
+                        List<LearningNode> layer = getter.get(SharedStorageConstants.LAYER);
+                        int numNodes = (layer.size() == 0) ? 1 : layer.size();
+                        nodeSplits = new Split[numNodes];
+                    });
+        }
+        Tuple2<Integer, Split> value = element.getValue();
+        int nodeId = value.f0;
+        Split split = value.f1;
+        LOG.debug("Received split for node {}", nodeId);
+        nodeSplits[nodeId] = split;
     }
 
     @Override
     public void close() throws Exception {
-        splitsState.clear();
         nodeSplitterState.clear();
         instanceUpdaterState.clear();
         sharedStorageContext.clear();

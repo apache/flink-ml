@@ -54,6 +54,7 @@ class InstanceUpdater {
             Consumer<double[]> pghSetter,
             List<Node> treeNodes) {
         LOG.info("subtaskId: {}, {} start", subtaskId, InstanceUpdater.class.getSimpleName());
+        long start = System.currentTimeMillis();
         if (pgh.length == 0) {
             pgh = new double[instances.length * 3];
             for (int i = 0; i < instances.length; i += 1) {
@@ -78,6 +79,10 @@ class InstanceUpdater {
         }
         pghSetter.accept(pgh);
         LOG.info("subtaskId: {}, {} end", subtaskId, InstanceUpdater.class.getSimpleName());
+        LOG.info(
+                "subtaskId: {}, elapsed time for updating instances: {} ms",
+                subtaskId,
+                System.currentTimeMillis() - start);
     }
 
     private void updatePgh(int instanceId, double pred, double label, double[] pgh) {

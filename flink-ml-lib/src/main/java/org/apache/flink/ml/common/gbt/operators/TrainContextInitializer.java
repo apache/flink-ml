@@ -86,7 +86,7 @@ class TrainContextInitializer {
                                 .mapToInt(d -> d.numBins(trainContext.strategy.useMissing))
                                 .toArray(),
                         1);
-        LOG.info("Number of bins for each feature: {}", trainContext.numFeatureBins);
+        LOG.debug("Number of bins for each feature: {}", trainContext.numFeatureBins);
         LOG.info("subtaskId: {}, {} end", subtaskId, TrainContextInitializer.class.getSimpleName());
         return trainContext;
     }

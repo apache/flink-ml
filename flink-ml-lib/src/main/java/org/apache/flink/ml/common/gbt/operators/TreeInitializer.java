@@ -48,11 +48,12 @@ class TreeInitializer {
     }
 
     /** Calculate local histograms for nodes in current layer of tree. */
-    public void init(Consumer<int[]> shuffledIndicesSetter) {
+    public void init(int numTrees, Consumer<int[]> shuffledIndicesSetter) {
         LOG.info("subtaskId: {}, {} start", subtaskId, TreeInitializer.class.getSimpleName());
         // Initializes the root node of a new tree when last tree is finalized.
         DataUtils.shuffle(shuffledIndices, instanceRandomizer);
         shuffledIndicesSetter.accept(shuffledIndices);
+        LOG.info("subtaskId: {}, initialize {}-th tree", subtaskId, numTrees + 1);
         LOG.info("subtaskId: {}, {} end", this.subtaskId, TreeInitializer.class.getSimpleName());
     }
 

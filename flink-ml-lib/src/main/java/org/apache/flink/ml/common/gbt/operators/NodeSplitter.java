@@ -105,6 +105,7 @@ class NodeSplitter {
             int[] indices,
             BinnedInstance[] instances) {
         LOG.info("subtaskId: {}, {} start", subtaskId, NodeSplitter.class.getSimpleName());
+        long start = System.currentTimeMillis();
         Preconditions.checkState(splits.length == layer.size());
 
         List<LearningNode> nextLayer = new ArrayList<>();
@@ -136,6 +137,10 @@ class NodeSplitter {
             }
         }
         LOG.info("subtaskId: {}, {} end", subtaskId, NodeSplitter.class.getSimpleName());
+        LOG.info(
+                "subtaskId: {}, elapsed time for splitting nodes: {} ms",
+                subtaskId,
+                System.currentTimeMillis() - start);
         return nextLayer;
     }
 }

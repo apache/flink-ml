@@ -18,39 +18,24 @@
 
 package org.apache.flink.ml.common.gbt.operators;
 
+import org.apache.flink.ml.common.gbt.DataUtils;
 import org.apache.flink.ml.common.gbt.defs.FeatureMeta;
 import org.apache.flink.ml.common.gbt.defs.Histogram;
 import org.apache.flink.ml.common.gbt.defs.LearningNode;
 import org.apache.flink.ml.common.gbt.defs.Slice;
 import org.apache.flink.ml.common.gbt.defs.Split;
-import org.apache.flink.ml.common.gbt.defs.Splits;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
 import org.apache.flink.ml.common.gbt.splitter.CategoricalFeatureSplitter;
 import org.apache.flink.ml.common.gbt.splitter.ContinuousFeatureSplitter;
 import org.apache.flink.ml.common.gbt.splitter.HistogramFeatureSplitter;
-import org.apache.flink.ml.util.Distributor;
 import org.apache.flink.util.Preconditions;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.List;
-
 class SplitFinder {
-    private static final Logger LOG = LoggerFactory.getLogger(SplitFinder.class);
-
-    private final int subtaskId;
-    private final int numSubtasks;
-    private final int[] numFeatureBins;
     private final HistogramFeatureSplitter[] splitters;
     private final int maxDepth;
     private final int maxNumLeaves;
 
     public SplitFinder(TrainContext trainContext) {
-        subtaskId = trainContext.subtaskId;
-        numSubtasks = trainContext.numSubtasks;
-
-        numFeatureBins = trainContext.numFeatureBins;
         FeatureMeta[] featureMetas = trainContext.featureMetas;
         int numFeatures = trainContext.numFeatures;
         splitters = new HistogramFeatureSplitter[numFeatures + 1];
@@ -72,35 +57,11 @@ class SplitFinder {
         maxNumLeaves = trainContext.strategy.maxNumLeaves;
     }
 
-    public Splits calc(
-            List<LearningNode> layer, int[] nodeFeaturePairs, int numLeaves, Histogram histogram) {
-        LOG.info("subtaskId: {}, {} start", subtaskId, SplitFinder.class.getSimpleName());
-
-        Distributor distributor =
-                new Distributor.EvenDistributor(numSubtasks, nodeFeaturePairs.length / 2);
-        int start = (int) distributor.start(subtaskId);
-        int cnt = (int) distributor.count(subtaskId);
-
-        Split[] nodesBestSplits = new Split[layer.size()];
-        int binOffset = 0;
-        for (int i = start; i < start + cnt; i += 1) {
-            int nodeId = nodeFeaturePairs[2 * i];
-            int featureId = nodeFeaturePairs[2 * i + 1];
-            LearningNode node = layer.get(nodeId);
-
-            Preconditions.checkState(node.depth < maxDepth || numLeaves + 2 <= maxNumLeaves);
-            Preconditions.checkState(histogram.slice.start == 0);
-            splitters[featureId].reset(
-                    histogram.hists, new Slice(binOffset, binOffset + numFeatureBins[featureId]));
-            Split bestSplit = splitters[featureId].bestSplit();
-            if (null == nodesBestSplits[nodeId]
-                    || (bestSplit.gain > nodesBestSplits[nodeId].gain)) {
-                nodesBestSplits[nodeId] = bestSplit;
-            }
-            binOffset += numFeatureBins[featureId];
-        }
-
-        LOG.info("subtaskId: {}, {} end", subtaskId, SplitFinder.class.getSimpleName());
-        return new Splits(subtaskId, nodesBestSplits);
+    public Split calc(LearningNode node, int featureId, int numLeaves, Histogram histogram) {
+        Preconditions.checkState(node.depth < maxDepth || numLeaves + 2 <= maxNumLeaves);
+        Preconditions.checkState(histogram.slice.start == 0);
+        splitters[featureId].reset(
+                histogram.hists, new Slice(0, histogram.hists.length / DataUtils.BIN_SIZE));
+        return splitters[featureId].bestSplit();
     }
 }

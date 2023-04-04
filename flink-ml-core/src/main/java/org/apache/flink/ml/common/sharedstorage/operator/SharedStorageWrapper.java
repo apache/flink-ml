@@ -20,7 +20,6 @@ package org.apache.flink.ml.common.sharedstorage.operator;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.functions.KeySelector;
-import org.apache.flink.iteration.operator.OperatorUtils;
 import org.apache.flink.iteration.operator.OperatorWrapper;
 import org.apache.flink.ml.common.sharedstorage.SharedStorageContext;
 import org.apache.flink.ml.common.sharedstorage.SharedStorageStreamOperator;
@@ -70,7 +69,7 @@ public class SharedStorageWrapper<T> implements OperatorWrapper<T, T> {
         return StreamOperatorFactoryUtil.createOperator(
                         operatorFactory,
                         (StreamTask<T, ?>) parameters.getContainingTask(),
-                        OperatorUtils.createWrappedOperatorConfig(parameters.getStreamConfig()),
+                        parameters.getStreamConfig(),
                         parameters.getOutput(),
                         parameters.getOperatorEventDispatcher())
                 .f0;

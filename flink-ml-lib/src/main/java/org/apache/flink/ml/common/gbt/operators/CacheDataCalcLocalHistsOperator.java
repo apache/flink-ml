@@ -18,7 +18,7 @@
 
 package org.apache.flink.ml.common.gbt.operators;
 
-import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.typeutils.runtime.kryo.KryoSerializer;
 import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.datacache.nonkeyed.ListStateWithCache;
@@ -51,13 +51,16 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Calculates local histograms for local data partition. Specifically in the first round, this
- * operator caches all data instances to JVM static region.
+ * Calculates local histograms for local data partition.
+ *
+ * <p>This operator only has input elements in the first round, including data instances and raw
+ * training context. There will be no input elements in other rounds. The output elements are tuples
+ * of (subtask index, (nodeId, featureId) pair index, Histogram).
  */
 public class CacheDataCalcLocalHistsOperator
-        extends AbstractStreamOperator<Tuple2<Integer, Histogram>>
-        implements TwoInputStreamOperator<Row, TrainContext, Tuple2<Integer, Histogram>>,
-                IterationListener<Tuple2<Integer, Histogram>>,
+        extends AbstractStreamOperator<Tuple3<Integer, Integer, Histogram>>
+        implements TwoInputStreamOperator<Row, TrainContext, Tuple3<Integer, Integer, Histogram>>,
+                IterationListener<Tuple3<Integer, Integer, Histogram>>,
                 SharedStorageStreamOperator {
 
     private static final String TREE_INITIALIZER_STATE_NAME = "tree_initializer";
@@ -154,9 +157,8 @@ public class CacheDataCalcLocalHistsOperator
                         setter.set(SharedStorageConstants.TRAIN_CONTEXT, rawTrainContext));
     }
 
-    @Override
     public void onEpochWatermarkIncremented(
-            int epochWatermark, Context context, Collector<Tuple2<Integer, Histogram>> out)
+            int epochWatermark, Context context, Collector<Tuple3<Integer, Integer, Histogram>> out)
             throws Exception {
         if (0 == epochWatermark) {
             // Initializes local state in first round.
@@ -215,6 +217,7 @@ public class CacheDataCalcLocalHistsOperator
                         // When last tree is finished, initializes a new tree, and shuffle instance
                         // indices.
                         treeInitializer.init(
+                                getter.get(SharedStorageConstants.ALL_TREES).size(),
                                 d -> setter.set(SharedStorageConstants.SHUFFLED_INDICES, d));
                         LearningNode rootLearningNode = treeInitializer.getRootLearningNode();
                         indices = getter.get(SharedStorageConstants.SHUFFLED_INDICES);
@@ -229,22 +232,20 @@ public class CacheDataCalcLocalHistsOperator
                         setter.set(SharedStorageConstants.HAS_INITED_TREE, false);
                     }
 
-                    List<Tuple2<Integer, Histogram>> histograms =
-                            histBuilder.build(
-                                    layer,
-                                    indices,
-                                    instances,
-                                    pgh,
-                                    d -> setter.set(SharedStorageConstants.NODE_FEATURE_PAIRS, d));
-                    for (Tuple2<Integer, Histogram> t : histograms) {
-                        out.collect(t);
-                    }
+                    histBuilder.build(
+                            layer,
+                            indices,
+                            instances,
+                            pgh,
+                            d -> setter.set(SharedStorageConstants.NODE_FEATURE_PAIRS, d),
+                            out);
                 });
     }
 
     @Override
     public void onIterationTerminated(
-            Context context, Collector<Tuple2<Integer, Histogram>> collector) throws Exception {
+            Context context, Collector<Tuple3<Integer, Integer, Histogram>> collector)
+            throws Exception {
         instancesCollecting.clear();
         treeInitializerState.clear();
         histBuilderState.clear();
