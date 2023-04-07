@@ -20,6 +20,7 @@ package org.apache.flink.ml.common.datastream;
 
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.functions.AggregateFunction;
+import org.apache.flink.api.common.functions.CoGroupFunction;
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.MapPartitionFunction;
@@ -32,12 +33,13 @@ import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.base.IntSerializer;
-import org.apache.flink.api.dag.Transformation;
+import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.TypeExtractor;
 import org.apache.flink.core.memory.ManagedMemoryUseCase;
 import org.apache.flink.iteration.datacache.nonkeyed.ListStateWithCache;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
+import org.apache.flink.ml.common.datastream.sort.CoGroupOperator;
 import org.apache.flink.ml.common.window.CountTumblingWindows;
 import org.apache.flink.ml.common.window.EventTimeSessionWindows;
 import org.apache.flink.ml.common.window.EventTimeTumblingWindows;
@@ -75,6 +77,7 @@ import org.apache.flink.util.Collector;
 
 import org.apache.commons.collections.IteratorUtils;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -133,6 +136,7 @@ public class DataStreamUtils {
             DataStream<IN> input,
             MapPartitionFunction<IN, OUT> func,
             TypeInformation<OUT> outType) {
+        func = input.getExecutionEnvironment().clean(func);
         return input.transform("mapPartition", outType, new MapPartitionOperator<>(func))
                 .setParallelism(input.getParallelism());
     }
@@ -162,6 +166,7 @@ public class DataStreamUtils {
      */
     public static <T> DataStream<T> reduce(
             DataStream<T> input, ReduceFunction<T> func, TypeInformation<T> outType) {
+        func = input.getExecutionEnvironment().clean(func);
         DataStream<T> partialReducedStream =
                 input.transform("reduce", outType, new ReduceOperator<>(func))
                         .setParallelism(input.getParallelism());
@@ -201,6 +206,7 @@ public class DataStreamUtils {
      */
     public static <T, K> DataStream<T> reduce(
             KeyedStream<T, K> input, ReduceFunction<T> func, TypeInformation<T> outType) {
+        func = input.getExecutionEnvironment().clean(func);
         return input.transform(
                         "Keyed Reduce",
                         outType,
@@ -263,6 +269,7 @@ public class DataStreamUtils {
             AggregateFunction<IN, ACC, OUT> func,
             TypeInformation<ACC> accType,
             TypeInformation<OUT> outType) {
+        func = input.getExecutionEnvironment().clean(func);
         DataStream<ACC> partialAggregatedStream =
                 input.transform(
                         "partialAggregate", accType, new PartialAggregateOperator<>(func, accType));
@@ -310,13 +317,14 @@ public class DataStreamUtils {
      * bytes should be in the same scale as existing usage in Flink, for example,
      * StreamExecWindowAggregate.WINDOW_AGG_MEMORY_RATIO.
      */
-    public static <T> void setManagedMemoryWeight(
-            Transformation<T> transformation, long memoryBytes) {
+    public static <T> void setManagedMemoryWeight(DataStream<T> dataStream, long memoryBytes) {
         if (memoryBytes > 0) {
             final int weightInMebibyte = Math.max(1, (int) (memoryBytes >> 20));
             final Optional<Integer> previousWeight =
-                    transformation.declareManagedMemoryUseCaseAtOperatorScope(
-                            ManagedMemoryUseCase.OPERATOR, weightInMebibyte);
+                    dataStream
+                            .getTransformation()
+                            .declareManagedMemoryUseCaseAtOperatorScope(
+                                    ManagedMemoryUseCase.OPERATOR, weightInMebibyte);
             if (previousWeight.isPresent()) {
                 throw new TableException(
                         "Managed memory weight has been set, this should not happen.");
@@ -336,6 +344,7 @@ public class DataStreamUtils {
      */
     public static <IN, OUT, W extends Window> SingleOutputStreamOperator<OUT> windowAllAndProcess(
             DataStream<IN> input, Windows windows, ProcessAllWindowFunction<IN, OUT, W> function) {
+        function = input.getExecutionEnvironment().clean(function);
         AllWindowedStream<IN, W> allWindowedStream = getAllWindowedStream(input, windows);
         return allWindowedStream.process(function);
     }
@@ -356,8 +365,54 @@ public class DataStreamUtils {
             Windows windows,
             ProcessAllWindowFunction<IN, OUT, W> function,
             TypeInformation<OUT> outType) {
+        function = input.getExecutionEnvironment().clean(function);
         AllWindowedStream<IN, W> allWindowedStream = getAllWindowedStream(input, windows);
         return allWindowedStream.process(function, outType);
+    }
+
+    /**
+     * A CoGroup transformation combines the elements of two {@link DataStream DataStreams} into one
+     * DataStream. It groups each DataStream individually on a key and gives groups of both
+     * DataStreams with equal keys together into a {@link
+     * org.apache.flink.api.common.functions.CoGroupFunction}. If a DataStream has a group with no
+     * matching key in the other DataStream, the CoGroupFunction is called with an empty group for
+     * the non-existing group.
+     *
+     * <p>The CoGroupFunction can iterate over the elements of both groups and return any number of
+     * elements including none.
+     *
+     * <p>NOTE: This method assumes both inputs are bounded.
+     *
+     * @param input1 The first data stream.
+     * @param input2 The second data stream.
+     * @param keySelector1 The KeySelector to be used for extracting the first input's key for
+     *     partitioning.
+     * @param keySelector2 The KeySelector to be used for extracting the second input's key for
+     *     partitioning.
+     * @param outTypeInformation The type information describing the output type.
+     * @param func The user-defined co-group function.
+     * @param <IN1> The class type of the first input.
+     * @param <IN2> The class type of the second input.
+     * @param <KEY> The class type of the key.
+     * @param <OUT> The class type of the output values.
+     * @return The result data stream.
+     */
+    public static <IN1, IN2, KEY extends Serializable, OUT> DataStream<OUT> coGroup(
+            DataStream<IN1> input1,
+            DataStream<IN2> input2,
+            KeySelector<IN1, KEY> keySelector1,
+            KeySelector<IN2, KEY> keySelector2,
+            TypeInformation<OUT> outTypeInformation,
+            CoGroupFunction<IN1, IN2, OUT> func) {
+        func = input1.getExecutionEnvironment().clean(func);
+        DataStream<OUT> result =
+                input1.connect(input2)
+                        .keyBy(keySelector1, keySelector2)
+                        .transform(
+                                "CoGroupOperator", outTypeInformation, new CoGroupOperator<>(func))
+                        .setParallelism(Math.max(input1.getParallelism(), input2.getParallelism()));
+        setManagedMemoryWeight(result, 100);
+        return result;
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
