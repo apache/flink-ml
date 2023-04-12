@@ -50,7 +50,7 @@ class MLLibTest(PyFlinkMLTestCase):
             this_directory, "../../../../flink-ml-lib"))
 
         ml_lib_jar = glob.glob(os.path.join(
-            FLINK_ML_LIB_SOURCE_PATH, "target", "flink-ml-lib-*SNAPSHOT.jar"))[0]
+            FLINK_ML_LIB_SOURCE_PATH, "target", "flink-ml-lib-*.jar"))[0]
 
         StageAnalyzer = get_gateway().jvm.org.apache.flink.ml.util.StageAnalyzer
         module_path = 'org.apache.flink.ml.{0}'.format(self.module_name())
