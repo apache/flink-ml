@@ -17,7 +17,7 @@
 ################################################################################
 import typing
 
-from pyflink.ml.common.param import HasOutputCol
+from pyflink.ml.common.param import HasOutputCol, HasSeed
 from pyflink.ml.param import Param, StringParam, IntParam, FloatParam, ParamValidators
 from pyflink.ml.recommendation.common import JavaRecommendationAlgoOperator
 from pyflink.ml.wrapper import JavaWithParams
@@ -25,7 +25,8 @@ from pyflink.ml.wrapper import JavaWithParams
 
 class _SwingParams(
     JavaWithParams,
-    HasOutputCol
+    HasOutputCol,
+    HasSeed
 ):
     """
     Params for :class:`Swing`.
