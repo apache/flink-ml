@@ -50,7 +50,7 @@ class MLLibTest(PyFlinkMLTestCase):
             this_directory, "../../../../flink-ml-lib"))
 
         paths = glob.glob(os.path.join(
-            FLINK_ML_LIB_SOURCE_PATH, "target", "flink-ml-lib-*.jar"))[0]
+            FLINK_ML_LIB_SOURCE_PATH, "target", "flink-ml-lib-*.jar"))
         paths = [path for path in paths if "test" not in path]
         if len(paths) != 1:
             raise Exception("The number of matched paths " + str(paths) + " is unexpected.")
