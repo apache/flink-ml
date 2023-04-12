@@ -49,8 +49,12 @@ class MLLibTest(PyFlinkMLTestCase):
         FLINK_ML_LIB_SOURCE_PATH = os.path.abspath(os.path.join(
             this_directory, "../../../../flink-ml-lib"))
 
-        ml_lib_jar = glob.glob(os.path.join(
-            FLINK_ML_LIB_SOURCE_PATH, "target", "flink-ml-lib-*SNAPSHOT.jar"))[0]
+        paths = glob.glob(os.path.join(
+            FLINK_ML_LIB_SOURCE_PATH, "target", "flink-ml-lib-*.jar"))
+        paths = [path for path in paths if "test" not in path]
+        if len(paths) != 1:
+            raise Exception("The number of matched paths " + str(paths) + " is unexpected.")
+        ml_lib_jar = paths[0]
 
         StageAnalyzer = get_gateway().jvm.org.apache.flink.ml.util.StageAnalyzer
         module_path = 'org.apache.flink.ml.{0}'.format(self.module_name())
