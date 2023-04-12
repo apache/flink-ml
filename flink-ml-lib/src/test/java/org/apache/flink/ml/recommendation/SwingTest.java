@@ -42,6 +42,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.fail;
 
 /** Tests {@link Swing}. */
@@ -120,6 +121,7 @@ public class SwingTest {
         assertEquals(15, swing.getAlpha1());
         assertEquals(0, swing.getAlpha2());
         assertEquals(0.3, swing.getBeta(), 1e-9);
+        assertEquals(swing.getClass().getName().hashCode(), swing.getSeed());
 
         swing.setItemCol("item_1")
                 .setUserCol("user_1")
@@ -129,7 +131,8 @@ public class SwingTest {
                 .setMaxUserBehavior(50)
                 .setAlpha1(5)
                 .setAlpha2(1)
-                .setBeta(0.35);
+                .setBeta(0.35)
+                .setSeed(1);
 
         assertEquals("item_1", swing.getItemCol());
         assertEquals("user_1", swing.getUserCol());
@@ -140,6 +143,7 @@ public class SwingTest {
         assertEquals(5, swing.getAlpha1());
         assertEquals(1, swing.getAlpha2());
         assertEquals(0.35, swing.getBeta(), 1e-9);
+        assertEquals(1, swing.getSeed());
     }
 
     @Test
@@ -220,12 +224,24 @@ public class SwingTest {
 
     @Test
     public void testSaveLoadAndTransform() throws Exception {
-        Swing swing = new Swing().setMinUserBehavior(1);
+        Swing swing = new Swing().setMinUserBehavior(2).setMaxUserBehavior(3);
         Swing loadedSwing =
                 TestUtils.saveAndReload(
                         tEnv, swing, tempFolder.newFolder().getAbsolutePath(), Swing::load);
         Table outputTable = loadedSwing.transform(inputTable)[0];
         List<Row> results = IteratorUtils.toList(outputTable.execute().collect());
         compareResultAndExpected(results);
+    }
+
+    @Test
+    public void testSamplingMethod() {
+        env.setParallelism(1);
+        Swing swing1 = new Swing().setMinUserBehavior(1).setMaxUserNumPerItem(2).setSeed(3);
+        Swing swing2 = new Swing().setMinUserBehavior(1).setMaxUserNumPerItem(2);
+        Table[] result1 = swing1.transform(inputTable);
+        Table[] result2 = swing2.transform(inputTable);
+        int result1Size = IteratorUtils.toList(result1[0].execute().collect()).size();
+        int result2Size = IteratorUtils.toList(result2[0].execute().collect()).size();
+        assertNotEquals(result1Size, result2Size);
     }
 }

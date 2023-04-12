@@ -19,6 +19,7 @@
 package org.apache.flink.ml.recommendation.swing;
 
 import org.apache.flink.ml.common.param.HasOutputCol;
+import org.apache.flink.ml.common.param.HasSeed;
 import org.apache.flink.ml.param.DoubleParam;
 import org.apache.flink.ml.param.IntParam;
 import org.apache.flink.ml.param.Param;
@@ -31,7 +32,7 @@ import org.apache.flink.ml.param.WithParams;
  *
  * @param <T> The class type of this instance.
  */
-public interface SwingParams<T> extends WithParams<T>, HasOutputCol<T> {
+public interface SwingParams<T> extends WithParams<T>, HasOutputCol<T>, HasSeed<T> {
     Param<String> USER_COL =
             new StringParam("userCol", "User column name.", "user", ParamValidators.notNull());
 

@@ -49,12 +49,13 @@ import org.apache.flink.util.Preconditions;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.stream.Collectors;
 
 /**
@@ -147,9 +148,11 @@ public class Swing implements AlgoOperator<Swing>, SwingParams<Swing> {
                                 new ComputingSimilarItems(
                                         getK(),
                                         getMaxUserNumPerItem(),
+                                        getMaxUserBehavior(),
                                         getAlpha1(),
                                         getAlpha2(),
-                                        getBeta()));
+                                        getBeta(),
+                                        getSeed()));
 
         return new Table[] {tEnv.fromDataStream(output)};
     }
@@ -182,8 +185,7 @@ public class Swing implements AlgoOperator<Swing>, SwingParams<Swing> {
         private final int maxUserItemInteraction;
 
         // Maps a user id to a set of items. Because ListState cannot keep values of type `Set`,
-        // we use `Map<Long, String>` with null values instead. So does `userAndPurchasedItems` and
-        // `itemAndPurchasers` in `ComputingSimilarItems`.
+        // we use `Map<Long, String>` with null values instead.
         private Map<Long, Map<Long, String>> userAndPurchasedItems = new HashMap<>();
 
         private ListState<Map<Long, Map<Long, String>>> userAndPurchasedItemsState;
@@ -259,13 +261,9 @@ public class Swing implements AlgoOperator<Swing>, SwingParams<Swing> {
     private static class ComputingSimilarItems extends AbstractStreamOperator<Row>
             implements OneInputStreamOperator<Tuple3<Long, Long, long[]>, Row>, BoundedOneInput {
 
-        private Map<Long, Map<Long, String>> userAndPurchasedItems = new HashMap<>();
-        private Map<Long, Map<Long, String>> itemAndPurchasers = new HashMap<>();
-        private ListState<Map<Long, Map<Long, String>>> userAndPurchasedItemsState;
-        private ListState<Map<Long, Map<Long, String>>> itemAndPurchasersState;
-
         private final int k;
         private final int maxUserNumPerItem;
+        private final int maxUserBehavior;
 
         private final int alpha1;
         private final int alpha2;
@@ -274,13 +272,29 @@ public class Swing implements AlgoOperator<Swing>, SwingParams<Swing> {
         private static final Character commaDelimiter = ',';
         private static final Character semicolonDelimiter = ';';
 
+        private final Random random;
+
+        private Map<Long, long[]> userAndPurchasedItems = new HashMap<>();
+        private Map<Long, List<Long>> itemAndPurchasers = new HashMap<>();
+
+        private ListState<Map<Long, long[]>> userAndPurchasedItemsState;
+        private ListState<Map<Long, List<Long>>> itemAndPurchasersState;
+
         private ComputingSimilarItems(
-                int k, int maxUserNumPerItem, int alpha1, int alpha2, double beta) {
+                int k,
+                int maxUserNumPerItem,
+                int maxUserBehavior,
+                int alpha1,
+                int alpha2,
+                double beta,
+                long seed) {
             this.k = k;
             this.maxUserNumPerItem = maxUserNumPerItem;
+            this.maxUserBehavior = maxUserBehavior;
             this.alpha1 = alpha1;
             this.alpha2 = alpha2;
             this.beta = beta;
+            this.random = new Random(seed);
         }
 
         @Override
@@ -289,36 +303,40 @@ public class Swing implements AlgoOperator<Swing>, SwingParams<Swing> {
             Map<Long, Double> userWeights = new HashMap<>(userAndPurchasedItems.size());
             userAndPurchasedItems.forEach(
                     (k, v) -> {
-                        int count = v.size();
+                        int count = v.length;
                         userWeights.put(k, calculateWeight(count));
                     });
 
+            long[] interaction = new long[maxUserBehavior];
             for (long mainItem : itemAndPurchasers.keySet()) {
-                List<Long> userList =
-                        sampleUserList(itemAndPurchasers.get(mainItem), maxUserNumPerItem);
+                List<Long> userList = itemAndPurchasers.get(mainItem);
                 HashMap<Long, Double> id2swing = new HashMap<>();
 
-                for (int i = 0; i < userList.size(); i++) {
+                for (int i = 1; i < userList.size(); i++) {
                     long u = userList.get(i);
+                    int interactionSize;
                     for (int j = i + 1; j < userList.size(); j++) {
                         long v = userList.get(j);
-                        HashSet<Long> interaction =
-                                new HashSet<>(userAndPurchasedItems.get(u).keySet());
-                        interaction.retainAll(userAndPurchasedItems.get(v).keySet());
-                        if (interaction.size() == 0) {
+                        interactionSize =
+                                calculateCommonItems(
+                                        userAndPurchasedItems.get(u),
+                                        userAndPurchasedItems.get(v),
+                                        interaction);
+                        if (interactionSize == 0) {
                             continue;
                         }
                         double similarity =
-                                (userWeights.get(u)
+                                userWeights.get(u)
                                         * userWeights.get(v)
-                                        / (alpha2 + interaction.size()));
-                        for (long simItem : interaction) {
+                                        / (alpha2 + interactionSize);
+                        for (int k = 0; k < interactionSize; k++) {
+                            long simItem = interaction[k];
                             if (simItem == mainItem) {
                                 continue;
                             }
                             double itemSimilarity =
                                     id2swing.getOrDefault(simItem, 0.0) + similarity;
-                            id2swing.putIfAbsent(simItem, itemSimilarity);
+                            id2swing.put(simItem, itemSimilarity);
                         }
                     }
                 }
@@ -350,16 +368,22 @@ public class Swing implements AlgoOperator<Swing>, SwingParams<Swing> {
             return (1.0 / Math.pow(alpha1 + size, beta));
         }
 
-        private static List<Long> sampleUserList(Map<Long, String> allUsers, int sampleSize) {
-            int totalSize = allUsers.size();
-            List<Long> userList = new ArrayList<>(allUsers.keySet());
-
-            if (totalSize < sampleSize) {
-                return userList;
+        private static int calculateCommonItems(long[] u, long[] v, long[] interaction) {
+            int pointerU = 0;
+            int pointerV = 0;
+            int interactionSize = 0;
+            while (pointerU < u.length && pointerV < v.length) {
+                if (u[pointerU] == v[pointerV]) {
+                    interaction[interactionSize++] = u[pointerU];
+                    pointerU++;
+                    pointerV++;
+                } else if (u[pointerU] < v[pointerV]) {
+                    pointerU++;
+                } else {
+                    pointerV++;
+                }
             }
-
-            Collections.shuffle(userList);
-            return userList.subList(0, sampleSize);
+            return interactionSize;
         }
 
         @Override
@@ -367,15 +391,33 @@ public class Swing implements AlgoOperator<Swing>, SwingParams<Swing> {
                 throws Exception {
             Tuple3<Long, Long, long[]> tuple3 = streamRecord.getValue();
             long user = tuple3.f0;
+            long[] userBehavior = tuple3.f2;
             long mainItem = tuple3.f1;
-            Map<Long, String> items = new HashMap<>();
-            for (long item : tuple3.f2) {
-                items.put(item, null);
+
+            if (!userAndPurchasedItems.containsKey(user)) {
+                Arrays.sort(userBehavior);
+                userAndPurchasedItems.put(user, userBehavior);
             }
 
-            userAndPurchasedItems.putIfAbsent(user, items);
-            itemAndPurchasers.putIfAbsent(mainItem, new HashMap<>());
-            itemAndPurchasers.get(mainItem).putIfAbsent(user, null);
+            itemAndPurchasers.putIfAbsent(mainItem, new ArrayList<>());
+            List<Long> purchasers = itemAndPurchasers.get(mainItem);
+            // Use the Reservoir Sampling method to randomly select k purchasers from
+            // the stream of records where 1<=k<=maxUserNumPerItem.
+            // See https://en.wikipedia.org/wiki/Reservoir_sampling for more information on
+            // Reservoir Sampling.
+            if (purchasers.size() == 0) {
+                purchasers.add(0L);
+            }
+            long total = purchasers.get(0);
+            if (purchasers.size() <= maxUserNumPerItem) {
+                purchasers.add(user);
+            } else {
+                int index = random.nextInt((int) total) + 1;
+                if (index <= maxUserNumPerItem) {
+                    purchasers.set(index, user);
+                }
+            }
+            purchasers.set(0, ++total);
         }
 
         @Override
@@ -388,7 +430,8 @@ public class Swing implements AlgoOperator<Swing>, SwingParams<Swing> {
                                             "userAndPurchasedItemsState",
                                             Types.MAP(
                                                     Types.LONG,
-                                                    Types.MAP(Types.LONG, Types.STRING))));
+                                                    PrimitiveArrayTypeInfo
+                                                            .LONG_PRIMITIVE_ARRAY_TYPE_INFO)));
 
             OperatorStateUtils.getUniqueElement(
                             userAndPurchasedItemsState, "userAndPurchasedItemsState")
@@ -399,9 +442,7 @@ public class Swing implements AlgoOperator<Swing>, SwingParams<Swing> {
                             .getListState(
                                     new ListStateDescriptor<>(
                                             "itemAndPurchasersState",
-                                            Types.MAP(
-                                                    Types.LONG,
-                                                    Types.MAP(Types.LONG, Types.STRING))));
+                                            Types.MAP(Types.LONG, Types.LIST(Types.LONG))));
 
             OperatorStateUtils.getUniqueElement(itemAndPurchasersState, "itemAndPurchasersState")
                     .ifPresent(stat -> itemAndPurchasers = stat);
