@@ -160,7 +160,7 @@ public class KMeans implements Estimator<KMeans, KMeansModel>, KMeansParams<KMea
                                                     DenseVectorTypeInfo.INSTANCE)),
                                     new CentroidsUpdateAccumulator(distanceMeasure));
 
-            DataStreamUtils.setManagedMemoryWeight(centroidIdAndPoints.getTransformation(), 100);
+            DataStreamUtils.setManagedMemoryWeight(centroidIdAndPoints, 100);
 
             int parallelism = centroidIdAndPoints.getParallelism();
             DataStream<KMeansModelData> newModelData =

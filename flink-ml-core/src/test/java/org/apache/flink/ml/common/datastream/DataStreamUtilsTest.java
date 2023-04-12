@@ -19,10 +19,14 @@
 package org.apache.flink.ml.common.datastream;
 
 import org.apache.flink.api.common.functions.AggregateFunction;
+import org.apache.flink.api.common.functions.CoGroupFunction;
 import org.apache.flink.api.common.functions.MapPartitionFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.functions.RichMapPartitionFunction;
+import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.Types;
+import org.apache.flink.api.java.functions.KeySelector;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -33,6 +37,7 @@ import org.apache.commons.collections.IteratorUtils;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.Assert.assertArrayEquals;
@@ -46,6 +51,95 @@ public class DataStreamUtilsTest {
     @Before
     public void before() {
         env = TestUtils.getExecutionEnvironment();
+    }
+
+    @Test
+    public void testCoGroupWithSingleParallelism() throws Exception {
+        DataStream<Tuple2<Integer, Integer>> data1 =
+                env.fromCollection(
+                        Arrays.asList(Tuple2.of(1, 1), Tuple2.of(2, 2), Tuple2.of(3, 3)));
+        DataStream<Tuple2<Integer, Double>> data2 =
+                env.fromCollection(
+                        Arrays.asList(
+                                Tuple2.of(1, 1.5),
+                                Tuple2.of(5, 5.5),
+                                Tuple2.of(3, 3.5),
+                                Tuple2.of(1, 2.5)));
+        DataStream<Double> result =
+                DataStreamUtils.coGroup(
+                        data1,
+                        data2,
+                        (KeySelector<Tuple2<Integer, Integer>, Integer>) tuple -> tuple.f0,
+                        (KeySelector<Tuple2<Integer, Double>, Integer>) tuple -> tuple.f0,
+                        BasicTypeInfo.DOUBLE_TYPE_INFO,
+                        new CoGroupFunction<
+                                Tuple2<Integer, Integer>, Tuple2<Integer, Double>, Double>() {
+                            @Override
+                            public void coGroup(
+                                    Iterable<Tuple2<Integer, Integer>> iterableA,
+                                    Iterable<Tuple2<Integer, Double>> iterableB,
+                                    Collector<Double> collector) {
+                                List<Tuple2<Integer, Integer>> valuesA =
+                                        IteratorUtils.toList(iterableA.iterator());
+                                List<Tuple2<Integer, Double>> valuesB =
+                                        IteratorUtils.toList(iterableB.iterator());
+
+                                double sum = 0;
+                                for (Tuple2<Integer, Integer> value : valuesA) {
+                                    sum += value.f1;
+                                }
+                                for (Tuple2<Integer, Double> value : valuesB) {
+                                    sum += value.f1;
+                                }
+                                collector.collect(sum);
+                            }
+                        });
+
+        List<Double> resultValues = IteratorUtils.toList(result.executeAndCollect());
+        double[] resultPrimitiveValues =
+                resultValues.stream().mapToDouble(Double::doubleValue).toArray();
+        double[] expectedResult = new double[] {5.0, 2.0, 6.5, 5.5};
+        assertArrayEquals(expectedResult, resultPrimitiveValues, 1e-5);
+    }
+
+    @Test
+    public void testCoGroupWithMultiParallelism() throws Exception {
+        DataStream<Long> data1 =
+                env.fromParallelCollection(new NumberSequenceIterator(0L, 10L), Types.LONG);
+        DataStream<Long> data2 =
+                env.fromParallelCollection(new NumberSequenceIterator(6L, 16L), Types.LONG);
+
+        DataStream<Long> result =
+                DataStreamUtils.coGroup(
+                        data1,
+                        data2,
+                        (KeySelector<Long, Long>) v -> v / 2,
+                        (KeySelector<Long, Long>) v -> v / 2,
+                        BasicTypeInfo.LONG_TYPE_INFO,
+                        new CoGroupFunction<Long, Long, Long>() {
+                            @Override
+                            public void coGroup(
+                                    Iterable<Long> iterableA,
+                                    Iterable<Long> iterableB,
+                                    Collector<Long> collector) {
+                                List<Long> valuesA = IteratorUtils.toList(iterableA.iterator());
+                                List<Long> valuesB = IteratorUtils.toList(iterableB.iterator());
+                                long sum = 0;
+                                for (Long value : valuesA) {
+                                    sum += value;
+                                }
+                                for (Long value : valuesB) {
+                                    sum += value;
+                                }
+                                collector.collect(sum);
+                            }
+                        });
+
+        List<Long> resultValues = IteratorUtils.toList(result.executeAndCollect());
+        long[] resultPrimitiveValues = resultValues.stream().mapToLong(Long::longValue).toArray();
+        Arrays.sort(resultPrimitiveValues);
+        long[] expectedResult = new long[] {1, 5, 9, 16, 25, 26, 29, 31, 34};
+        assertArrayEquals(expectedResult, resultPrimitiveValues);
     }
 
     @Test
