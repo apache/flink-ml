@@ -144,6 +144,7 @@ public class BoundedPerRoundStreamIterationITCase extends TestLogger {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.getConfig().enableObjectReuse();
         env.setParallelism(1);
+        env.setMaxParallelism(5);
 
         DataStream<Integer> variableSource = env.fromElements(0);
         DataStream<Integer> constSource =

@@ -24,6 +24,7 @@ import org.apache.flink.iteration.typeinfo.IterationRecordSerializer;
 import org.apache.flink.iteration.utils.ReflectionUtils;
 import org.apache.flink.runtime.io.network.api.writer.SubtaskStateMapper;
 import org.apache.flink.runtime.plugable.SerializationDelegate;
+import org.apache.flink.streaming.runtime.partitioner.ConfigurableStreamPartitioner;
 import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
 import org.apache.flink.streaming.runtime.streamrecord.StreamElementSerializer;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -31,7 +32,8 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import java.util.Objects;
 
 /** Proxy stream partitioner for the wrapped one. */
-public class ProxyStreamPartitioner<T> extends StreamPartitioner<IterationRecord<T>> {
+public class ProxyStreamPartitioner<T> extends StreamPartitioner<IterationRecord<T>>
+        implements ConfigurableStreamPartitioner {
 
     private final StreamPartitioner<T> wrappedStreamPartitioner;
 
@@ -97,5 +99,12 @@ public class ProxyStreamPartitioner<T> extends StreamPartitioner<IterationRecord
     @Override
     public String toString() {
         return wrappedStreamPartitioner.toString();
+    }
+
+    @Override
+    public void configure(int maxParallelism) {
+        if (wrappedStreamPartitioner instanceof ConfigurableStreamPartitioner) {
+            ((ConfigurableStreamPartitioner) wrappedStreamPartitioner).configure(maxParallelism);
+        }
     }
 }

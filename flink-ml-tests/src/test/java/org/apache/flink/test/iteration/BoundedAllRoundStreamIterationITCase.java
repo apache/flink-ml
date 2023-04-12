@@ -167,6 +167,7 @@ public class BoundedAllRoundStreamIterationITCase extends TestLogger {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.getConfig().enableObjectReuse();
         env.setParallelism(1);
+        env.setMaxParallelism(5);
         DataStream<EpochRecord> variableSource =
                 env.addSource(new DraftExecutionEnvironment.EmptySource<EpochRecord>() {})
                         .setParallelism(numSources)
@@ -231,6 +232,7 @@ public class BoundedAllRoundStreamIterationITCase extends TestLogger {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.getConfig().enableObjectReuse();
         env.setParallelism(1);
+        env.setMaxParallelism(5);
         DataStream<EpochRecord> variableSource =
                 env.addSource(new DraftExecutionEnvironment.EmptySource<EpochRecord>() {})
                         .setParallelism(numSources)
