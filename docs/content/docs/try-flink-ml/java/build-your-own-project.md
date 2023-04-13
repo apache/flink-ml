@@ -110,7 +110,7 @@ Change the dependencies provided in `pom.xml` as follows:
 <dependency>
   <groupId>org.apache.flink</groupId>
   <artifactId>flink-ml-uber</artifactId>
-  <version>2.2-SNAPSHOT</version>
+  <version>2.3-SNAPSHOT</version>
   <scope>provided</scope>
 </dependency>
 

@@ -62,6 +62,8 @@ mvn versions:set -DgenerateBackupPoms=false -DnewVersion=${NEW_VERSION}
 # change version of apache-flink-ml
 perl -pi -e "s#^__version__ = \".*\"#__version__ = \"${NEW_VERSION}\"#" flink-ml-python/pyflink/ml/version.py
 perl -pi -e "s#-SNAPSHOT#\\.dev0#" flink-ml-python/pyflink/ml/version.py
+sed -i "s/"${OLD_VERSION}"/"${NEW_VERSION}"/g" docs/config.toml
+sed -i "s/"${OLD_VERSION}"/"${NEW_VERSION}"/g" docs/content/docs/try-flink-ml/java/build-your-own-project.md
 
 git commit -am "[release] Update version to ${NEW_VERSION}"
 
