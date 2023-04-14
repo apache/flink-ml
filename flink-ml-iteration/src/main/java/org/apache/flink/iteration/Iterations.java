@@ -85,6 +85,9 @@ import static org.apache.flink.util.Preconditions.checkState;
  * <p>The limitation of constructing the subgraph inside the iteration body could be refer in {@link
  * IterationBody}.
  *
+ * <p>Note that the iteration framework cannot deal with watermarks correctly for now. It should be
+ * resolved by FLINK-31373.
+ *
  * <p>An example of the iteration is like:
  *
  * <pre>{@code
