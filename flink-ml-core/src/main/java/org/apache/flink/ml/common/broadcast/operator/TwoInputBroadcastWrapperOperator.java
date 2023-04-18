@@ -49,7 +49,8 @@ public class TwoInputBroadcastWrapperOperator<IN1, IN2, OUT>
                 streamRecord,
                 0,
                 wrappedOperator::processElement1,
-                wrappedOperator::processWatermark1);
+                wrappedOperator::processWatermark1,
+                wrappedOperator::setKeyContextElement1);
     }
 
     @Override
@@ -58,7 +59,8 @@ public class TwoInputBroadcastWrapperOperator<IN1, IN2, OUT>
                 streamRecord,
                 1,
                 wrappedOperator::processElement2,
-                wrappedOperator::processWatermark2);
+                wrappedOperator::processWatermark2,
+                wrappedOperator::setKeyContextElement2);
     }
 
     @Override
@@ -67,12 +69,14 @@ public class TwoInputBroadcastWrapperOperator<IN1, IN2, OUT>
             endInputX(
                     inputId - 1,
                     wrappedOperator::processElement1,
-                    wrappedOperator::processWatermark1);
+                    wrappedOperator::processWatermark1,
+                    wrappedOperator::setKeyContextElement1);
         } else {
             endInputX(
                     inputId - 1,
                     wrappedOperator::processElement2,
-                    wrappedOperator::processWatermark2);
+                    wrappedOperator::processWatermark2,
+                    wrappedOperator::setKeyContextElement2);
         }
         OperatorUtils.processOperatorOrUdfIfSatisfy(
                 wrappedOperator,
@@ -83,13 +87,21 @@ public class TwoInputBroadcastWrapperOperator<IN1, IN2, OUT>
     @Override
     public void processWatermark1(Watermark watermark) throws Exception {
         processWatermarkX(
-                watermark, 0, wrappedOperator::processElement1, wrappedOperator::processWatermark1);
+                watermark,
+                0,
+                wrappedOperator::processElement1,
+                wrappedOperator::processWatermark1,
+                wrappedOperator::setKeyContextElement1);
     }
 
     @Override
     public void processWatermark2(Watermark watermark) throws Exception {
         processWatermarkX(
-                watermark, 1, wrappedOperator::processElement2, wrappedOperator::processWatermark2);
+                watermark,
+                1,
+                wrappedOperator::processElement2,
+                wrappedOperator::processWatermark2,
+                wrappedOperator::setKeyContextElement2);
     }
 
     @Override

@@ -34,13 +34,13 @@ import org.apache.flink.util.Preconditions;
 /** The operator wrapper for {@link AbstractBroadcastWrapperOperator}. */
 public class BroadcastWrapper<T> implements OperatorWrapper<T, T> {
 
-    /** names of the broadcast data streams. */
+    /** Names of the broadcast data streams. */
     private final String[] broadcastStreamNames;
 
-    /** types of input data streams. */
+    /** Types of input data streams. */
     private final TypeInformation<?>[] inTypes;
 
-    /** whether each input is blocked or not. */
+    /** Whether each input is blocked or not. */
     private final boolean[] isBlocked;
 
     @VisibleForTesting

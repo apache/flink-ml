@@ -45,24 +45,24 @@ import java.util.List;
 public class BroadcastVariableReceiverOperator<OUT> extends AbstractStreamOperatorV2<OUT>
         implements MultipleInputStreamOperator<OUT>, BoundedMultiInput, Serializable {
 
-    /** names of the broadcast data streams. */
+    /** Names of the broadcast data streams. */
     private final String[] broadcastStreamNames;
 
-    /** output types of input data streams. */
+    /** Output types of input data streams. */
     private final TypeInformation<?>[] inTypes;
 
-    /** input list of the multi-input operator. */
+    /** Input list of the multi-input operator. */
     @SuppressWarnings("rawtypes")
     private final List<Input> inputList;
 
-    /** whether each broadcast input has finished. */
+    /** Whether each broadcast input has finished. */
     private boolean[] cachesReady;
 
-    /** state storage of the broadcast inputs. */
+    /** State storage of the broadcast inputs. */
     @SuppressWarnings("rawtypes")
     private ListState[] cacheStates;
 
-    /** cacheReady state storage of the broadcast inputs. */
+    /** CacheReady state storage of the broadcast inputs. */
     private ListState<Boolean>[] cacheReadyStates;
 
     @SuppressWarnings({"rawtypes", "unchecked"})

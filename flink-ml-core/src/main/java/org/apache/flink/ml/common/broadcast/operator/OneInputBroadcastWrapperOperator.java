@@ -49,12 +49,17 @@ public class OneInputBroadcastWrapperOperator<IN, OUT>
                 streamRecord,
                 0,
                 wrappedOperator::processElement,
-                wrappedOperator::processWatermark);
+                wrappedOperator::processWatermark,
+                wrappedOperator::setKeyContextElement);
     }
 
     @Override
     public void endInput() throws Exception {
-        endInputX(0, wrappedOperator::processElement, wrappedOperator::processWatermark);
+        endInputX(
+                0,
+                wrappedOperator::processElement,
+                wrappedOperator::processWatermark,
+                wrappedOperator::setKeyContextElement);
         OperatorUtils.processOperatorOrUdfIfSatisfy(
                 wrappedOperator, BoundedOneInput.class, BoundedOneInput::endInput);
     }
@@ -62,7 +67,11 @@ public class OneInputBroadcastWrapperOperator<IN, OUT>
     @Override
     public void processWatermark(Watermark watermark) throws Exception {
         processWatermarkX(
-                watermark, 0, wrappedOperator::processElement, wrappedOperator::processWatermark);
+                watermark,
+                0,
+                wrappedOperator::processElement,
+                wrappedOperator::processWatermark,
+                wrappedOperator::setKeyContextElement);
     }
 
     @Override
