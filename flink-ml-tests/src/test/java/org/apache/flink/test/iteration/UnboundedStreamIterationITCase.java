@@ -18,6 +18,8 @@
 
 package org.apache.flink.test.iteration;
 
+import org.apache.flink.api.common.typeinfo.Types;
+import org.apache.flink.api.common.typeutils.base.IntSerializer;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.RestOptions;
@@ -32,6 +34,10 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.graph.StreamConfig;
+import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
+import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
+import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.test.iteration.operators.CollectSink;
 import org.apache.flink.test.iteration.operators.EpochRecord;
 import org.apache.flink.test.iteration.operators.IncrementEpochMap;
@@ -45,11 +51,13 @@ import org.apache.flink.testutils.junit.SharedReference;
 import org.apache.flink.util.OutputTag;
 import org.apache.flink.util.TestLogger;
 
+import org.apache.commons.collections.IteratorUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
@@ -150,6 +158,39 @@ public class UnboundedStreamIterationITCase extends TestLogger {
                 computeRoundStat(result.get(), OutputRecord.Event.PROCESS_ELEMENT, 2 * 4 * 1000);
         verifyResult(roundsStat, 2, 4000, 4 * (0 + 999) * 1000 / 2);
         assertEquals(OutputRecord.Event.TERMINATED, result.get().take().getEvent());
+    }
+
+    @Test
+    public void testBoundedIterationWithSideOutput() throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(1);
+        env.getConfig().enableObjectReuse();
+
+        final OutputTag<Integer> outputTag = new OutputTag("0", Types.INT) {};
+        final Integer[] sourceData = new Integer[] {1, 2, 3};
+
+        DataStream<Integer> variableStream =
+                env.addSource(new DraftExecutionEnvironment.EmptySource<Integer>() {});
+        DataStream<Integer> dataStream = env.fromElements(sourceData);
+
+        DataStreamList result =
+                Iterations.iterateUnboundedStreams(
+                        DataStreamList.of(variableStream),
+                        DataStreamList.of(dataStream),
+                        (variableStreams, dataStreams) -> {
+                            SingleOutputStreamOperator transformed =
+                                    dataStreams
+                                            .<Integer>get(0)
+                                            .transform(
+                                                    "side-output",
+                                                    Types.INT,
+                                                    new SideOutputOperator(outputTag));
+                            return new IterationBodyResult(
+                                    DataStreamList.of(variableStreams.get(0)),
+                                    DataStreamList.of(transformed.getSideOutput(outputTag)));
+                        });
+        assertEquals(
+                Arrays.asList(sourceData), IteratorUtils.toList(result.get(0).executeAndCollect()));
     }
 
     public static MiniClusterConfiguration createMiniClusterConfiguration(int numTm, int numSlot) {
@@ -268,6 +309,32 @@ public class UnboundedStreamIterationITCase extends TestLogger {
         outputs.<OutputRecord<Integer>>get(0).addSink(new CollectSink(result));
 
         return env.getStreamGraph().getJobGraph();
+    }
+
+    private static class SideOutputOperator extends AbstractStreamOperator<Integer>
+            implements OneInputStreamOperator<Integer, Integer> {
+
+        private final OutputTag<Integer> outputTag;
+
+        public SideOutputOperator(OutputTag<Integer> outputTag) {
+            this.outputTag = outputTag;
+        }
+
+        @Override
+        public void open() throws Exception {
+            super.open();
+            StreamConfig config = getOperatorConfig();
+            ClassLoader cl = getClass().getClassLoader();
+
+            assertEquals(IntSerializer.INSTANCE, config.getTypeSerializerIn(0, cl));
+            assertEquals(IntSerializer.INSTANCE, config.getTypeSerializerOut(cl));
+            assertEquals(IntSerializer.INSTANCE, config.getTypeSerializerSideOut(outputTag, cl));
+        }
+
+        @Override
+        public void processElement(StreamRecord<Integer> element) {
+            output.collect(outputTag, element);
+        }
     }
 
     static Map<Integer, Tuple2<Integer, Integer>> computeRoundStat(

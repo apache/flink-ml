@@ -18,21 +18,26 @@
 
 package org.apache.flink.iteration.operator;
 
+import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.iteration.IterationID;
 import org.apache.flink.iteration.config.IterationOptions;
 import org.apache.flink.iteration.proxy.ProxyKeySelector;
+import org.apache.flink.iteration.typeinfo.IterationRecordSerializer;
+import org.apache.flink.iteration.typeinfo.IterationRecordTypeInfo;
 import org.apache.flink.iteration.utils.ReflectionUtils;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackChannel;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackConsumer;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackKey;
 import org.apache.flink.streaming.api.graph.StreamConfig;
+import org.apache.flink.streaming.api.graph.StreamConfig.NetworkInputConfig;
 import org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.util.ExceptionUtils;
+import org.apache.flink.util.OutputTag;
 import org.apache.flink.util.function.SupplierWithException;
 import org.apache.flink.util.function.ThrowingConsumer;
 
@@ -42,6 +47,7 @@ import java.util.Arrays;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.stream.Stream;
 
 import static org.apache.flink.util.Preconditions.checkState;
 
@@ -89,11 +95,10 @@ public class OperatorUtils {
         }
     }
 
-    public static StreamConfig createWrappedOperatorConfig(
-            StreamConfig wrapperConfig, ClassLoader cl) {
-        StreamConfig wrappedConfig = new StreamConfig(wrapperConfig.getConfiguration().clone());
+    public static StreamConfig createWrappedOperatorConfig(StreamConfig config, ClassLoader cl) {
+        StreamConfig wrappedConfig = new StreamConfig(config.getConfiguration().clone());
         for (int i = 0; i < wrappedConfig.getNumberOfNetworkInputs(); ++i) {
-            KeySelector keySelector = wrapperConfig.getStatePartitioner(i, cl);
+            KeySelector keySelector = config.getStatePartitioner(i, cl);
             if (keySelector != null) {
                 checkState(
                         keySelector instanceof ProxyKeySelector,
@@ -103,6 +108,58 @@ public class OperatorUtils {
                         i, ((ProxyKeySelector) keySelector).getWrappedKeySelector());
             }
         }
+
+        StreamConfig.InputConfig[] inputs = config.getInputs(cl);
+        for (int i = 0; i < inputs.length; ++i) {
+            if (inputs[i] instanceof NetworkInputConfig) {
+                TypeSerializer<?> typeSerializerIn =
+                        ((NetworkInputConfig) inputs[i]).getTypeSerializer();
+                checkState(
+                        typeSerializerIn instanceof IterationRecordSerializer,
+                        "The serializer of input[%s] should be IterationRecordSerializer but it is %s.",
+                        i,
+                        typeSerializerIn);
+                inputs[i] =
+                        new NetworkInputConfig(
+                                ((IterationRecordSerializer<?>) typeSerializerIn)
+                                        .getInnerSerializer(),
+                                i);
+            }
+        }
+        wrappedConfig.setInputs(inputs);
+
+        TypeSerializer<?> typeSerializerOut = config.getTypeSerializerOut(cl);
+        checkState(
+                typeSerializerOut instanceof IterationRecordSerializer,
+                "The serializer of output should be IterationRecordSerializer but it is %s.",
+                typeSerializerOut);
+        wrappedConfig.setTypeSerializerOut(
+                ((IterationRecordSerializer<?>) typeSerializerOut).getInnerSerializer());
+
+        Stream.concat(
+                        config.getChainedOutputs(cl).stream(),
+                        config.getNonChainedOutputs(cl).stream())
+                .forEach(
+                        edge -> {
+                            OutputTag<?> outputTag = edge.getOutputTag();
+                            if (outputTag != null) {
+                                TypeSerializer<?> typeSerializerSideOut =
+                                        config.getTypeSerializerSideOut(outputTag, cl);
+                                checkState(
+                                        typeSerializerSideOut instanceof IterationRecordSerializer,
+                                        "The serializer of side output with tag[%s] should be IterationRecordSerializer but it is %s.",
+                                        outputTag,
+                                        typeSerializerSideOut);
+                                wrappedConfig.setTypeSerializerSideOut(
+                                        new OutputTag<>(
+                                                outputTag.getId(),
+                                                ((IterationRecordTypeInfo<?>)
+                                                                outputTag.getTypeInfo())
+                                                        .getInnerTypeInfo()),
+                                        ((IterationRecordSerializer) typeSerializerSideOut)
+                                                .getInnerSerializer());
+                            }
+                        });
 
         return wrappedConfig;
     }
