@@ -21,6 +21,11 @@ import org.apache.flink.api.common.state.BroadcastState;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.state.MapStateDescriptor;
+import org.apache.flink.api.common.state.StateDescriptor;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.java.typeutils.ListTypeInfo;
+import org.apache.flink.api.java.typeutils.MapTypeInfo;
+import org.apache.flink.iteration.utils.ReflectionUtils;
 import org.apache.flink.runtime.checkpoint.CheckpointOptions;
 import org.apache.flink.runtime.state.CheckpointStreamFactory;
 import org.apache.flink.runtime.state.OperatorStateBackend;
@@ -50,20 +55,35 @@ public class ProxyOperatorStateBackend implements OperatorStateBackend {
     @Override
     public <K, V> BroadcastState<K, V> getBroadcastState(MapStateDescriptor<K, V> stateDescriptor)
             throws Exception {
-        MapStateDescriptor<K, V> newDescriptor =
-                new MapStateDescriptor<>(
-                        stateNamePrefix.prefix(stateDescriptor.getName()),
-                        stateDescriptor.getKeySerializer(),
-                        stateDescriptor.getValueSerializer());
+        MapStateDescriptor<K, V> newDescriptor;
+        if (stateDescriptor.isSerializerInitialized()) {
+            newDescriptor =
+                    new MapStateDescriptor<>(
+                            stateNamePrefix.prefix(stateDescriptor.getName()),
+                            stateDescriptor.getKeySerializer(),
+                            stateDescriptor.getValueSerializer());
+        } else {
+            MapTypeInfo<K, V> mapTypeInfo = getMapTypeInfo(stateDescriptor);
+            newDescriptor =
+                    new MapStateDescriptor<>(
+                            stateNamePrefix.prefix(stateDescriptor.getName()),
+                            mapTypeInfo.getKeyTypeInfo(),
+                            mapTypeInfo.getValueTypeInfo());
+        }
         return wrappedBackend.getBroadcastState(newDescriptor);
     }
 
     @Override
     public <S> ListState<S> getListState(ListStateDescriptor<S> stateDescriptor) throws Exception {
         ListStateDescriptor<S> newDescriptor =
-                new ListStateDescriptor<>(
-                        stateNamePrefix.prefix(stateDescriptor.getName()),
-                        stateDescriptor.getElementSerializer());
+                stateDescriptor.isSerializerInitialized()
+                        ? new ListStateDescriptor<>(
+                                stateNamePrefix.prefix(stateDescriptor.getName()),
+                                stateDescriptor.getElementSerializer())
+                        : new ListStateDescriptor<>(
+                                stateNamePrefix.prefix(stateDescriptor.getName()),
+                                getElementTypeInfo(stateDescriptor));
+
         return wrappedBackend.getListState(newDescriptor);
     }
 
@@ -71,9 +91,13 @@ public class ProxyOperatorStateBackend implements OperatorStateBackend {
     public <S> ListState<S> getUnionListState(ListStateDescriptor<S> stateDescriptor)
             throws Exception {
         ListStateDescriptor<S> newDescriptor =
-                new ListStateDescriptor<S>(
-                        stateNamePrefix.prefix(stateDescriptor.getName()),
-                        stateDescriptor.getElementSerializer());
+                stateDescriptor.isSerializerInitialized()
+                        ? new ListStateDescriptor<>(
+                                stateNamePrefix.prefix(stateDescriptor.getName()),
+                                stateDescriptor.getElementSerializer())
+                        : new ListStateDescriptor<>(
+                                stateNamePrefix.prefix(stateDescriptor.getName()),
+                                getElementTypeInfo(stateDescriptor));
         return wrappedBackend.getUnionListState(newDescriptor);
     }
 
@@ -124,5 +148,17 @@ public class ProxyOperatorStateBackend implements OperatorStateBackend {
             @Nonnull CheckpointOptions checkpointOptions)
             throws Exception {
         return wrappedBackend.snapshot(checkpointId, timestamp, streamFactory, checkpointOptions);
+    }
+
+    @SuppressWarnings("unchecked,rawtypes")
+    private <S> TypeInformation<S> getElementTypeInfo(ListStateDescriptor<S> stateDescriptor) {
+        return ((ListTypeInfo)
+                        ReflectionUtils.getFieldValue(
+                                stateDescriptor, StateDescriptor.class, "typeInfo"))
+                .getElementTypeInfo();
+    }
+
+    private <K, V> MapTypeInfo<K, V> getMapTypeInfo(MapStateDescriptor<K, V> stateDescriptor) {
+        return ReflectionUtils.getFieldValue(stateDescriptor, StateDescriptor.class, "typeInfo");
     }
 }
