@@ -161,7 +161,7 @@ public class UnboundedStreamIterationITCase extends TestLogger {
     }
 
     @Test
-    public void testUnwrapOperatorConfig() throws Exception {
+    public void testBoundedIterationWithSideOutput() throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
         env.getConfig().enableObjectReuse();
