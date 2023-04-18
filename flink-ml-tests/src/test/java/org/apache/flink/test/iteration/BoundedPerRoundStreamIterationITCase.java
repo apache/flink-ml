@@ -19,6 +19,10 @@
 package org.apache.flink.test.iteration;
 
 import org.apache.flink.api.common.functions.JoinFunction;
+import org.apache.flink.api.common.state.BroadcastState;
+import org.apache.flink.api.common.state.ListState;
+import org.apache.flink.api.common.state.ListStateDescriptor;
+import org.apache.flink.api.common.state.MapStateDescriptor;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
@@ -26,12 +30,14 @@ import org.apache.flink.iteration.DataStreamList;
 import org.apache.flink.iteration.IterationBody;
 import org.apache.flink.iteration.IterationBodyResult;
 import org.apache.flink.iteration.IterationConfig;
+import org.apache.flink.iteration.IterationConfig.OperatorLifeCycle;
 import org.apache.flink.iteration.Iterations;
 import org.apache.flink.iteration.ReplayableDataStreamList;
 import org.apache.flink.ml.common.datastream.EndOfStreamWindows;
 import org.apache.flink.ml.common.iteration.TerminateOnMaxIter;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.minicluster.MiniCluster;
+import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -55,6 +61,8 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -73,6 +81,7 @@ public class BoundedPerRoundStreamIterationITCase extends TestLogger {
 
     private SharedReference<BlockingQueue<OutputRecord<Integer>>> collectedOutputRecord;
     private SharedReference<BlockingQueue<Long>> collectedWatermarks;
+    private SharedReference<BlockingQueue<Long>> collectedOutputs;
 
     @Before
     public void setup() throws Exception {
@@ -81,6 +90,7 @@ public class BoundedPerRoundStreamIterationITCase extends TestLogger {
 
         collectedOutputRecord = sharedObjects.add(new LinkedBlockingQueue<>());
         collectedWatermarks = sharedObjects.add(new LinkedBlockingQueue<>());
+        collectedOutputs = sharedObjects.add(new LinkedBlockingQueue<>());
     }
 
     @After
@@ -134,6 +144,33 @@ public class BoundedPerRoundStreamIterationITCase extends TestLogger {
                 .get()
                 .iterator()
                 .forEachRemaining(x -> assertEquals(Long.MAX_VALUE, (long) x));
+    }
+
+    @Test
+    public void testPerRoundIterationWithState() throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(1);
+        DataStream<Long> broadcastStream = env.fromElements(1L);
+        DataStream<Long> inputStream = env.fromElements(1L);
+        DataStreamList outputStream =
+                Iterations.iterateBoundedStreamsUntilTermination(
+                        DataStreamList.of(inputStream),
+                        ReplayableDataStreamList.replay(broadcastStream),
+                        IterationConfig.newBuilder()
+                                .setOperatorLifeCycle(OperatorLifeCycle.PER_ROUND)
+                                .build(),
+                        new PerRoundIterationBodyWithState());
+
+        outputStream.<Long>get(0).addSink(new LongSink(collectedOutputs));
+        JobGraph jobGraph = env.getStreamGraph().getJobGraph();
+        miniCluster.executeJobBlocking(jobGraph);
+
+        List<Long> result = new ArrayList<>(3);
+        collectedOutputs.get().drainTo(result);
+        assertEquals(3, result.size());
+        for (long value : result) {
+            assertEquals(1L, value);
+        }
     }
 
     private static JobGraph createPerRoundJobGraph(
@@ -226,6 +263,56 @@ public class BoundedPerRoundStreamIterationITCase extends TestLogger {
 
             return new IterationBodyResult(
                     DataStreamList.of(input1), DataStreamList.of(res), terminationCriteria);
+        }
+    }
+
+    private static class PerRoundIterationBodyWithState implements IterationBody {
+
+        @Override
+        public IterationBodyResult process(
+                DataStreamList variableStreams, DataStreamList dataStreams) {
+            DataStream<Long> variableStream = variableStreams.get(0);
+
+            DataStream<Long> feedback =
+                    variableStream.transform("mapWithState", Types.LONG, new MapWithState());
+
+            DataStream<Integer> terminationCriteria =
+                    feedback.<Long>flatMap(new TerminateOnMaxIter(2)).returns(Types.INT);
+
+            return new IterationBodyResult(
+                    DataStreamList.of(feedback), DataStreamList.of(feedback), terminationCriteria);
+        }
+    }
+
+    private static class MapWithState extends AbstractStreamOperator<Long>
+            implements OneInputStreamOperator<Long, Long> {
+        private ListState<Long> listState;
+        private ListState<Long> unionState;
+        private BroadcastState<Long, Long> broadcastState;
+
+        @Override
+        public void processElement(StreamRecord<Long> element) throws Exception {
+            long val = element.getValue();
+            listState.add(val);
+            unionState.add(val);
+            broadcastState.put(val, val);
+            output.collect(element);
+        }
+
+        @Override
+        public void initializeState(StateInitializationContext context) throws Exception {
+            super.initializeState(context);
+            listState =
+                    context.getOperatorStateStore()
+                            .getListState(new ListStateDescriptor<>("longState", Types.LONG));
+            unionState =
+                    context.getOperatorStateStore()
+                            .getUnionListState(new ListStateDescriptor<>("unionState", Types.LONG));
+            broadcastState =
+                    context.getOperatorStateStore()
+                            .getBroadcastState(
+                                    new MapStateDescriptor<>(
+                                            "broadcastState", Types.LONG, Types.LONG));
         }
     }
 
