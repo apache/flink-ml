@@ -18,7 +18,6 @@
 
 package org.apache.flink.ml.common.broadcast.operator;
 
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.iteration.operator.OperatorUtils;
 import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
@@ -37,10 +36,8 @@ public class OneInputBroadcastWrapperOperator<IN, OUT>
     OneInputBroadcastWrapperOperator(
             StreamOperatorParameters<OUT> parameters,
             StreamOperatorFactory<OUT> operatorFactory,
-            String[] broadcastStreamNames,
-            TypeInformation<?>[] inTypes,
-            boolean[] isBlocking) {
-        super(parameters, operatorFactory, broadcastStreamNames, inTypes, isBlocking);
+            String[] broadcastStreamNames) {
+        super(parameters, operatorFactory, broadcastStreamNames);
     }
 
     @Override

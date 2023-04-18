@@ -19,11 +19,9 @@
 package org.apache.flink.ml.common.broadcast;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.api.dag.Transformation;
 import org.apache.flink.iteration.compile.DraftExecutionEnvironment;
 import org.apache.flink.ml.common.broadcast.operator.BroadcastVariableReceiverOperatorFactory;
 import org.apache.flink.ml.common.broadcast.operator.BroadcastWrapper;
-import org.apache.flink.ml.common.broadcast.operator.DefaultWrapper;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.MultipleConnectedStreams;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -34,7 +32,6 @@ import org.apache.flink.util.AbstractID;
 import org.apache.flink.util.Preconditions;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -170,37 +167,14 @@ public class BroadcastUtils {
             List<DataStream<?>> inputList,
             String[] broadcastStreamNames,
             Function<List<DataStream<?>>, DataStream<OUT>> graphBuilder) {
-
-        // Executes the graph builder and gets real non-broadcast inputs.
         DraftExecutionEnvironment draftEnv =
-                new DraftExecutionEnvironment(env, new DefaultWrapper<>());
-
+                new DraftExecutionEnvironment(env, new BroadcastWrapper<>(broadcastStreamNames));
         List<DataStream<?>> draftSources = new ArrayList<>();
         for (DataStream<?> dataStream : inputList) {
             draftSources.add(draftEnv.addDraftSource(dataStream, dataStream.getType()));
         }
         DataStream<OUT> draftOutStream = graphBuilder.apply(draftSources);
-
-        List<Transformation<?>> realNonBroadcastInputs =
-                draftOutStream.getTransformation().getInputs();
-        TypeInformation<?>[] inTypes = new TypeInformation[realNonBroadcastInputs.size()];
-        for (int i = 0; i < realNonBroadcastInputs.size(); i++) {
-            inTypes[i] = realNonBroadcastInputs.get(i).getOutputType();
-        }
-        // Does not block all non-broadcast input edges by default.
-        boolean[] isBlocked = new boolean[realNonBroadcastInputs.size()];
-        Arrays.fill(isBlocked, false);
-
-        // Executes the graph builder and adds the operators to real execution environment.
-        DraftExecutionEnvironment draftEnv2 =
-                new DraftExecutionEnvironment(
-                        env, new BroadcastWrapper<>(broadcastStreamNames, inTypes, isBlocked));
-        List<DataStream<?>> draftSources2 = new ArrayList<>();
-        for (DataStream<?> dataStream : inputList) {
-            draftSources2.add(draftEnv2.addDraftSource(dataStream, dataStream.getType()));
-        }
-        DataStream<OUT> draftOutStream2 = graphBuilder.apply(draftSources2);
-        draftEnv2.copyToActualEnvironment();
-        return draftEnv2.getActualStream(draftOutStream2.getId());
+        draftEnv.copyToActualEnvironment();
+        return draftEnv.getActualStream(draftOutStream.getId());
     }
 }

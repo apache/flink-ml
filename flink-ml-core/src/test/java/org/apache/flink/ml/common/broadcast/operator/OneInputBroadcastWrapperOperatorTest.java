@@ -64,8 +64,7 @@ public class OneInputBroadcastWrapperOperatorTest {
         OneInputStreamOperator<Integer, Integer> inputOp =
                 new TestOneInputOp(
                         new MyRichFunction(), BROADCAST_NAMES, Arrays.asList(SOURCE_1, SOURCE_2));
-        BroadcastWrapper<Integer> broadcastWrapper =
-                new BroadcastWrapper<>(BROADCAST_NAMES, TYPE_INFORMATIONS);
+        BroadcastWrapper<Integer> broadcastWrapper = new BroadcastWrapper<>(BROADCAST_NAMES);
         BroadcastWrapperOperatorFactory<Integer> wrapperFactory =
                 new BroadcastWrapperOperatorFactory<>(
                         SimpleOperatorFactory.of(inputOp), broadcastWrapper);

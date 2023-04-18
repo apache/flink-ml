@@ -20,7 +20,6 @@ package org.apache.flink.ml.common.broadcast.operator;
 
 import org.apache.flink.api.common.functions.RichFunction;
 import org.apache.flink.api.common.operators.MailboxExecutor;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.core.memory.ManagedMemoryUseCase;
@@ -34,7 +33,7 @@ import org.apache.flink.metrics.groups.OperatorMetricGroup;
 import org.apache.flink.ml.common.broadcast.BroadcastContext;
 import org.apache.flink.ml.common.broadcast.BroadcastStreamingRuntimeContext;
 import org.apache.flink.ml.common.broadcast.typeinfo.CacheElement;
-import org.apache.flink.ml.common.broadcast.typeinfo.CacheElementTypeInfo;
+import org.apache.flink.ml.common.broadcast.typeinfo.CacheElementSerializer;
 import org.apache.flink.runtime.checkpoint.CheckpointOptions;
 import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -48,6 +47,8 @@ import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.runtime.util.NonClosingInputStreamDecorator;
 import org.apache.flink.runtime.util.NonClosingOutputStreamDecorator;
 import org.apache.flink.streaming.api.graph.StreamConfig;
+import org.apache.flink.streaming.api.graph.StreamConfig.InputConfig;
+import org.apache.flink.streaming.api.graph.StreamConfig.NetworkInputConfig;
 import org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator;
 import org.apache.flink.streaming.api.operators.InternalTimeServiceManager;
 import org.apache.flink.streaming.api.operators.OperatorSnapshotFutures;
@@ -112,12 +113,6 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
 
     protected transient InternalTimeServiceManager<?> timeServiceManager;
 
-    /** Index of this subtask. */
-    protected final transient int indexOfSubtask;
-
-    /** Number of the inputs of this operator. */
-    protected final int numInputs;
-
     // ---------------- context info for rich function ----------------
     private MailboxExecutor mailboxExecutor;
 
@@ -131,11 +126,16 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
      */
     private boolean[] isBlocked;
 
-    /** Type information of each input. */
-    private TypeInformation<?>[] inTypes;
+    /** Type serializer of each input. */
+    private TypeSerializer<?>[] inTypeSerializers;
 
     /** Whether all broadcast variables of this operator are ready. */
     private boolean broadcastVariablesReady;
+    /** Index of this subtask. */
+    protected transient int indexOfSubtask;
+
+    /** Number of the inputs of this operator. */
+    protected int numInputs;
 
     /** RuntimeContext of the rich function in wrapped operator. */
     private BroadcastStreamingRuntimeContext wrappedOperatorRuntimeContext;
@@ -163,9 +163,7 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
     AbstractBroadcastWrapperOperator(
             StreamOperatorParameters<T> parameters,
             StreamOperatorFactory<T> operatorFactory,
-            String[] broadcastStreamNames,
-            TypeInformation<?>[] inTypes,
-            boolean[] isBlocked) {
+            String[] broadcastStreamNames) {
         this.parameters = Objects.requireNonNull(parameters);
         this.streamConfig = Objects.requireNonNull(parameters.getStreamConfig());
         this.containingTask = Objects.requireNonNull(parameters.getContainingTask());
@@ -181,9 +179,6 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
                                         output,
                                         parameters.getOperatorEventDispatcher())
                                 .f0;
-
-        this.indexOfSubtask = containingTask.getIndexInSubtaskGroup();
-        this.numInputs = inTypes.length;
 
         this.hasRichFunction =
                 wrappedOperator instanceof AbstractUdfStreamOperator
@@ -210,14 +205,35 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
                             .getMailboxExecutorFactory()
                             .createExecutor(TaskMailbox.MIN_PRIORITY);
 
+            this.indexOfSubtask = containingTask.getIndexInSubtaskGroup();
+
             // Puts in mailboxExecutor.
             for (String name : broadcastStreamNames) {
                 BroadcastContext.putMailBoxExecutor(name + "-" + indexOfSubtask, mailboxExecutor);
             }
 
             this.broadcastStreamNames = broadcastStreamNames;
-            this.isBlocked = isBlocked;
-            this.inTypes = inTypes;
+
+            InputConfig[] inputConfigs =
+                    streamConfig.getInputs(containingTask.getUserCodeClassLoader());
+
+            int numNetworkInputs = 0;
+            while (numNetworkInputs < inputConfigs.length
+                    && inputConfigs[numNetworkInputs] instanceof NetworkInputConfig) {
+                numNetworkInputs++;
+            }
+            this.numInputs = numNetworkInputs;
+
+            this.isBlocked = new boolean[numInputs];
+            Arrays.fill(isBlocked, false);
+
+            this.inTypeSerializers = new TypeSerializer[numInputs];
+            for (int i = 0; i < numInputs; i++) {
+                inTypeSerializers[i] =
+                        streamConfig.getTypeSerializerIn(
+                                i, containingTask.getUserCodeClassLoader());
+            }
+
             this.broadcastVariablesReady = false;
 
             this.basePath =
@@ -415,8 +431,7 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
         if (pendingSegments.size() != 0) {
             DataCacheReader dataCacheReader =
                     new DataCacheReader<>(
-                            new CacheElementTypeInfo<>(inTypes[inputIndex])
-                                    .createSerializer(containingTask.getExecutionConfig()),
+                            new CacheElementSerializer<>(inTypeSerializers[inputIndex]),
                             pendingSegments);
             while (dataCacheReader.hasNext()) {
                 CacheElement cacheElement = (CacheElement) dataCacheReader.next();
@@ -546,8 +561,7 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
             for (int i = 0; i < numInputs; i++) {
                 dataCacheWriters[i] =
                         new DataCacheWriter(
-                                new CacheElementTypeInfo<>(inTypes[i])
-                                        .createSerializer(containingTask.getExecutionConfig()),
+                                new CacheElementSerializer(inTypeSerializers[i]),
                                 basePath.getFileSystem(),
                                 OperatorUtils.createDataCacheFileGenerator(
                                         basePath, "cache", streamConfig.getOperatorID()));
@@ -566,8 +580,7 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
                                         basePath, "cache", streamConfig.getOperatorID()));
                 dataCacheWriters[i] =
                         new DataCacheWriter(
-                                new CacheElementTypeInfo<>(inTypes[i])
-                                        .createSerializer(containingTask.getExecutionConfig()),
+                                new CacheElementSerializer(inTypeSerializers[i]),
                                 basePath.getFileSystem(),
                                 OperatorUtils.createDataCacheFileGenerator(
                                         basePath, "cache", streamConfig.getOperatorID()),
