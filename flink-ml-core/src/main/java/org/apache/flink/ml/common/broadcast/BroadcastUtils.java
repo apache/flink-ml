@@ -58,7 +58,8 @@ public class BroadcastUtils {
      * @param userDefinedFunction the user defined logic in which users can access the broadcast
      *     data streams and produce the output data stream. Note that though users can add more than
      *     one operator in this logic, but only the operator that generates the result stream can
-     *     contain a rich function and access the broadcast variables.
+     *     contain a rich function and access the broadcast variables. Other operators will
+     *     encounter NPE when accessing the broadcast variables.
      * @return the output data stream.
      */
     public static <OUT> DataStream<OUT> withBroadcastStream(

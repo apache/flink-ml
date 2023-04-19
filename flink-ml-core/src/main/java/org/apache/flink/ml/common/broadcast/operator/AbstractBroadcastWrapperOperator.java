@@ -449,6 +449,7 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
                                 "Unsupported CacheElement type: " + cacheElement.getType());
                 }
             }
+            dataCacheWriters[inputIndex].clear();
         }
     }
 
