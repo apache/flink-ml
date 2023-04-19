@@ -18,7 +18,6 @@
 
 package org.apache.flink.ml.common.broadcast.operator;
 
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.iteration.operator.OperatorUtils;
 import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
@@ -37,10 +36,8 @@ public class OneInputBroadcastWrapperOperator<IN, OUT>
     OneInputBroadcastWrapperOperator(
             StreamOperatorParameters<OUT> parameters,
             StreamOperatorFactory<OUT> operatorFactory,
-            String[] broadcastStreamNames,
-            TypeInformation<?>[] inTypes,
-            boolean[] isBlocking) {
-        super(parameters, operatorFactory, broadcastStreamNames, inTypes, isBlocking);
+            String[] broadcastStreamNames) {
+        super(parameters, operatorFactory, broadcastStreamNames);
     }
 
     @Override
@@ -49,12 +46,17 @@ public class OneInputBroadcastWrapperOperator<IN, OUT>
                 streamRecord,
                 0,
                 wrappedOperator::processElement,
-                wrappedOperator::processWatermark);
+                wrappedOperator::processWatermark,
+                wrappedOperator::setKeyContextElement);
     }
 
     @Override
     public void endInput() throws Exception {
-        endInputX(0, wrappedOperator::processElement, wrappedOperator::processWatermark);
+        endInputX(
+                0,
+                wrappedOperator::processElement,
+                wrappedOperator::processWatermark,
+                wrappedOperator::setKeyContextElement);
         OperatorUtils.processOperatorOrUdfIfSatisfy(
                 wrappedOperator, BoundedOneInput.class, BoundedOneInput::endInput);
     }
@@ -62,7 +64,11 @@ public class OneInputBroadcastWrapperOperator<IN, OUT>
     @Override
     public void processWatermark(Watermark watermark) throws Exception {
         processWatermarkX(
-                watermark, 0, wrappedOperator::processElement, wrappedOperator::processWatermark);
+                watermark,
+                0,
+                wrappedOperator::processElement,
+                wrappedOperator::processWatermark,
+                wrappedOperator::setKeyContextElement);
     }
 
     @Override

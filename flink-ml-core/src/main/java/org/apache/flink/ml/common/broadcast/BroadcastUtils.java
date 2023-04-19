@@ -32,7 +32,6 @@ import org.apache.flink.util.AbstractID;
 import org.apache.flink.util.Preconditions;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -41,7 +40,7 @@ import java.util.function.Function;
 /** Utility class to support withBroadcast in DataStream. */
 public class BroadcastUtils {
     /**
-     * supports withBroadcastStream in DataStream API. Broadcast data streams are available at all
+     * Supports withBroadcastStream in DataStream API. Broadcast data streams are available at all
      * parallel instances of an operator that extends {@code
      * org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator<OUT, ? extends
      * org.apache.flink.api.common.functions.RichFunction>}. Users can access the broadcast
@@ -57,8 +56,10 @@ public class BroadcastUtils {
      * @param bcStreams map of the broadcast data streams, where the key is the name and the value
      *     is the corresponding data stream.
      * @param userDefinedFunction the user defined logic in which users can access the broadcast
-     *     data streams and produce the output data stream. Note that users can add only one
-     *     operator in this function, otherwise it raises an exception.
+     *     data streams and produce the output data stream. Note that though users can add more than
+     *     one operator in this logic, but only the operator that generates the result stream can
+     *     contain a rich function and access the broadcast variables. Other operators will
+     *     encounter NPE when accessing the broadcast variables.
      * @return the output data stream.
      */
     public static <OUT> DataStream<OUT> withBroadcastStream(
@@ -116,9 +117,9 @@ public class BroadcastUtils {
     }
 
     /**
-     * caches all broadcast iput data streams in static variables and returns the result multi-input
-     * stream operator. The result multi-input stream operator emits nothing and the only
-     * functionality of this operator is to cache all the input records in ${@link
+     * Caches all broadcast input data streams in static variables and returns the result
+     * multi-input stream operator. The result multi-input stream operator emits nothing and the
+     * only functionality of this operator is to cache all the input records in ${@link
      * BroadcastContext}.
      *
      * @param env execution environment.
@@ -152,7 +153,7 @@ public class BroadcastUtils {
     }
 
     /**
-     * uses {@link DraftExecutionEnvironment} to execute the userDefinedFunction and returns the
+     * Uses {@link DraftExecutionEnvironment} to execute the userDefinedFunction and returns the
      * resultStream.
      *
      * @param env execution environment.
@@ -167,25 +168,13 @@ public class BroadcastUtils {
             List<DataStream<?>> inputList,
             String[] broadcastStreamNames,
             Function<List<DataStream<?>>, DataStream<OUT>> graphBuilder) {
-        TypeInformation<?>[] inTypes = new TypeInformation[inputList.size()];
-        for (int i = 0; i < inputList.size(); i++) {
-            inTypes[i] = inputList.get(i).getType();
-        }
-        // do not block all non-broadcast input edges by default.
-        boolean[] isBlocked = new boolean[inputList.size()];
-        Arrays.fill(isBlocked, false);
         DraftExecutionEnvironment draftEnv =
-                new DraftExecutionEnvironment(
-                        env, new BroadcastWrapper<>(broadcastStreamNames, inTypes, isBlocked));
-
+                new DraftExecutionEnvironment(env, new BroadcastWrapper<>(broadcastStreamNames));
         List<DataStream<?>> draftSources = new ArrayList<>();
         for (DataStream<?> dataStream : inputList) {
             draftSources.add(draftEnv.addDraftSource(dataStream, dataStream.getType()));
         }
         DataStream<OUT> draftOutStream = graphBuilder.apply(draftSources);
-        Preconditions.checkState(
-                draftEnv.getStreamGraph(false).getStreamNodes().size() == 1 + inputList.size(),
-                "cannot add more than one operator in withBroadcastStream's lambda function.");
         draftEnv.copyToActualEnvironment();
         return draftEnv.getActualStream(draftOutStream.getId());
     }

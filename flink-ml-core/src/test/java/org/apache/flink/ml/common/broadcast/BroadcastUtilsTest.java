@@ -19,13 +19,17 @@
 package org.apache.flink.ml.common.broadcast;
 
 import org.apache.flink.api.common.functions.AbstractRichFunction;
+import org.apache.flink.api.common.functions.RichJoinFunction;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
+import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.RestOptions;
 import org.apache.flink.iteration.config.IterationOptions;
+import org.apache.flink.ml.common.broadcast.operator.BroadcastVariableReceiverOperatorTest;
 import org.apache.flink.ml.common.broadcast.operator.TestOneInputOp;
 import org.apache.flink.ml.common.broadcast.operator.TestTwoInputOp;
+import org.apache.flink.ml.common.datastream.EndOfStreamWindows;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.minicluster.MiniCluster;
@@ -42,6 +46,7 @@ import org.junit.rules.TemporaryFolder;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.function.Function;
@@ -99,6 +104,52 @@ public class BroadcastUtilsTest {
         }
     }
 
+    @Test
+    public void testBroadcastWithJoin() throws Exception {
+        try (MiniCluster miniCluster = new MiniCluster(createMiniClusterConfiguration())) {
+            miniCluster.start();
+            JobGraph jobGraph = getBroadcastWithJoinJobGraph();
+            miniCluster.executeJobBlocking(jobGraph);
+        }
+    }
+
+    private JobGraph getBroadcastWithJoinJobGraph() {
+        StreamExecutionEnvironment env = TestUtils.getExecutionEnvironment();
+        env.setRestartStrategy(RestartStrategies.fallBackRestart());
+        env.enableCheckpointing(500, CheckpointingMode.EXACTLY_ONCE);
+        env.setParallelism(NUM_SLOT * NUM_TM);
+
+        DataStream<Integer> source1 = env.addSource(new TestSource(NUM_RECORDS_PER_PARTITION));
+        DataStream<Integer> source2 = env.addSource(new TestSource(NUM_RECORDS_PER_PARTITION));
+
+        List<Integer> expectedNumSequence = new ArrayList<>(NUM_TM * NUM_SLOT * 10);
+        for (int i = 0; i < NUM_TM * NUM_SLOT * NUM_RECORDS_PER_PARTITION; i++) {
+            expectedNumSequence.add(i);
+        }
+
+        List<Integer> expectedBroadcastVariable = expectedNumSequence;
+
+        List<DataStream<?>> inputList = Arrays.asList(source1, source2);
+        DataStream<Integer> result =
+                BroadcastUtils.withBroadcastStream(
+                        inputList,
+                        Collections.singletonMap(BROADCAST_NAMES[0], source1),
+                        inputs -> {
+                            DataStream<Integer> input1 = (DataStream<Integer>) inputs.get(0);
+                            DataStream<Integer> input2 = (DataStream<Integer>) inputs.get(1);
+                            return input1.join(input2)
+                                    .where((KeySelector<Integer, Integer>) x0 -> x0)
+                                    .equalTo((KeySelector<Integer, Integer>) x1 -> x1)
+                                    .window(EndOfStreamWindows.get())
+                                    .apply(
+                                            new RichJoinFunctionWithBroadcastVariable(
+                                                    BROADCAST_NAMES[0], expectedBroadcastVariable));
+                        });
+
+        result.addSink(new TestSink(expectedNumSequence)).getTransformation().setParallelism(1);
+        return env.getStreamGraph().getJobGraph();
+    }
+
     private JobGraph getJobGraph(int numNonBroadcastInputs) {
         StreamExecutionEnvironment env = TestUtils.getExecutionEnvironment();
         env.setRestartStrategy(RestartStrategies.fallBackRestart());
@@ -112,7 +163,7 @@ public class BroadcastUtilsTest {
         bcStreamsMap.put(BROADCAST_NAMES[1], source2);
 
         List<DataStream<?>> inputList = new ArrayList<>(1);
-        // create a deadlock.
+        // Creates a deadlock.
         inputList.add(source1);
         for (int i = 0; i < numNonBroadcastInputs - 1; i++) {
             inputList.add(env.addSource(new TestSource(NUM_RECORDS_PER_PARTITION)));
@@ -166,5 +217,29 @@ public class BroadcastUtilsTest {
             };
         }
         return null;
+    }
+
+    private static class RichJoinFunctionWithBroadcastVariable
+            extends RichJoinFunction<Integer, Integer, Integer> {
+        private final String broadcastVariableName;
+        private final List<Integer> expectedBroadcastVariable;
+        // Stores the received broadcast variable.
+        private List<Integer> broadcastVariable;
+
+        public RichJoinFunctionWithBroadcastVariable(
+                String broadcastVariableName, List<Integer> expectedBroadcastVariable) {
+            this.broadcastVariableName = broadcastVariableName;
+            this.expectedBroadcastVariable = expectedBroadcastVariable;
+        }
+
+        @Override
+        public Integer join(Integer first, Integer second) throws Exception {
+            if (broadcastVariable == null) {
+                broadcastVariable = getRuntimeContext().getBroadcastVariable(broadcastVariableName);
+                BroadcastVariableReceiverOperatorTest.compareLists(
+                        expectedBroadcastVariable, broadcastVariable);
+            }
+            return first;
+        }
     }
 }

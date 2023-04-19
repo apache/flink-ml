@@ -20,7 +20,6 @@ package org.apache.flink.ml.common.broadcast.operator;
 
 import org.apache.flink.api.common.functions.RichFunction;
 import org.apache.flink.api.common.operators.MailboxExecutor;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.core.memory.ManagedMemoryUseCase;
@@ -34,7 +33,7 @@ import org.apache.flink.metrics.groups.OperatorMetricGroup;
 import org.apache.flink.ml.common.broadcast.BroadcastContext;
 import org.apache.flink.ml.common.broadcast.BroadcastStreamingRuntimeContext;
 import org.apache.flink.ml.common.broadcast.typeinfo.CacheElement;
-import org.apache.flink.ml.common.broadcast.typeinfo.CacheElementTypeInfo;
+import org.apache.flink.ml.common.broadcast.typeinfo.CacheElementSerializer;
 import org.apache.flink.runtime.checkpoint.CheckpointOptions;
 import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -48,6 +47,8 @@ import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.runtime.util.NonClosingInputStreamDecorator;
 import org.apache.flink.runtime.util.NonClosingOutputStreamDecorator;
 import org.apache.flink.streaming.api.graph.StreamConfig;
+import org.apache.flink.streaming.api.graph.StreamConfig.InputConfig;
+import org.apache.flink.streaming.api.graph.StreamConfig.NetworkInputConfig;
 import org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator;
 import org.apache.flink.streaming.api.operators.InternalTimeServiceManager;
 import org.apache.flink.streaming.api.operators.OperatorSnapshotFutures;
@@ -80,7 +81,14 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Base class for the broadcast wrapper operators. */
+/**
+ * Base class for the broadcast wrapper operators.
+ *
+ * <p>Note that not all instances of {@link AbstractBroadcastWrapperOperator} need to access the
+ * broadcast variables. If one instance of {@link AbstractBroadcastWrapperOperator} does not contain
+ * a rich function, then it can directly process the input without waiting for the broadcast
+ * variables.
+ */
 public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperator<T>>
         implements StreamOperator<T>, StreamOperatorStateHandler.CheckpointedStreamOperator {
 
@@ -105,54 +113,57 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
 
     protected transient InternalTimeServiceManager<?> timeServiceManager;
 
-    protected final MailboxExecutor mailboxExecutor;
+    // ---------------- context info for rich function ----------------
+    private MailboxExecutor mailboxExecutor;
 
-    /** variables specific for withBroadcast functionality. */
-    protected final String[] broadcastStreamNames;
+    private String[] broadcastStreamNames;
 
     /**
-     * whether each input is blocked. Inputs with broadcast variables can only process their input
+     * Whether each input is blocked. Inputs with broadcast variables can only process their input
      * records after broadcast variables are ready. One input is non-blocked if it can consume its
      * inputs (by caching) when broadcast variables are not ready. Otherwise it has to block the
      * processing and wait until the broadcast variables are ready to be accessed.
      */
-    protected final boolean[] isBlocked;
+    private boolean[] isBlocked;
 
-    /** type information of each input. */
-    protected final TypeInformation<?>[] inTypes;
+    /** Type serializer of each input. */
+    private TypeSerializer<?>[] inTypeSerializers;
 
-    /** whether all broadcast variables of this operator are ready. */
-    protected boolean broadcastVariablesReady;
+    /** Whether all broadcast variables of this operator are ready. */
+    private boolean broadcastVariablesReady;
+    /** Index of this subtask. */
+    protected transient int indexOfSubtask;
 
-    /** index of this subtask. */
-    protected final transient int indexOfSubtask;
+    /** Number of the inputs of this operator. */
+    protected int numInputs;
 
-    /** number of the inputs of this operator. */
-    protected final int numInputs;
-
-    /** runtimeContext of the rich function in wrapped operator. */
-    BroadcastStreamingRuntimeContext wrappedOperatorRuntimeContext;
+    /** RuntimeContext of the rich function in wrapped operator. */
+    private BroadcastStreamingRuntimeContext wrappedOperatorRuntimeContext;
 
     /**
-     * path of the file used to stored the cached records. It could be local file system or remote
+     * Path of the file used to store the cached records. It could be local file system or remote
      * file system.
      */
-    private final Path basePath;
+    private Path basePath;
 
     /** DataCacheWriter for each input. */
     @SuppressWarnings("rawtypes")
-    protected DataCacheWriter[] dataCacheWriters;
+    private DataCacheWriter[] dataCacheWriters;
 
-    /** whether each input has pending elements. */
-    protected boolean[] hasPendingElements;
+    /** Whether each input has pending elements. */
+    private boolean[] hasPendingElements;
+
+    /**
+     * Whether this operator has a rich function and needs to access the broadcast variable. If yes,
+     * it cannot process elements until the broadcast variables are ready.
+     */
+    private final boolean hasRichFunction;
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     AbstractBroadcastWrapperOperator(
             StreamOperatorParameters<T> parameters,
             StreamOperatorFactory<T> operatorFactory,
-            String[] broadcastStreamNames,
-            TypeInformation<?>[] inTypes,
-            boolean[] isBlocked) {
+            String[] broadcastStreamNames) {
         this.parameters = Objects.requireNonNull(parameters);
         this.streamConfig = Objects.requireNonNull(parameters.getStreamConfig());
         this.containingTask = Objects.requireNonNull(parameters.getContainingTask());
@@ -169,13 +180,13 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
                                         parameters.getOperatorEventDispatcher())
                                 .f0;
 
-        boolean hasRichFunction =
+        this.hasRichFunction =
                 wrappedOperator instanceof AbstractUdfStreamOperator
                         && ((AbstractUdfStreamOperator) wrappedOperator).getUserFunction()
                                 instanceof RichFunction;
 
         if (hasRichFunction) {
-            wrappedOperatorRuntimeContext =
+            this.wrappedOperatorRuntimeContext =
                     new BroadcastStreamingRuntimeContext(
                             containingTask.getEnvironment(),
                             containingTask.getEnvironment().getAccumulatorRegistry().getUserMap(),
@@ -188,43 +199,58 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
 
             ((RichFunction) ((AbstractUdfStreamOperator) wrappedOperator).getUserFunction())
                     .setRuntimeContext(wrappedOperatorRuntimeContext);
-        } else {
-            throw new RuntimeException(
-                    "The operator is not a instance of "
-                            + AbstractUdfStreamOperator.class.getSimpleName()
-                            + " that contains a "
-                            + RichFunction.class.getSimpleName());
+
+            this.mailboxExecutor =
+                    containingTask
+                            .getMailboxExecutorFactory()
+                            .createExecutor(TaskMailbox.MIN_PRIORITY);
+
+            this.indexOfSubtask = containingTask.getIndexInSubtaskGroup();
+
+            // Puts in mailboxExecutor.
+            for (String name : broadcastStreamNames) {
+                BroadcastContext.putMailBoxExecutor(name + "-" + indexOfSubtask, mailboxExecutor);
+            }
+
+            this.broadcastStreamNames = broadcastStreamNames;
+
+            InputConfig[] inputConfigs =
+                    streamConfig.getInputs(containingTask.getUserCodeClassLoader());
+
+            int numNetworkInputs = 0;
+            while (numNetworkInputs < inputConfigs.length
+                    && inputConfigs[numNetworkInputs] instanceof NetworkInputConfig) {
+                numNetworkInputs++;
+            }
+            this.numInputs = numNetworkInputs;
+
+            this.isBlocked = new boolean[numInputs];
+            Arrays.fill(isBlocked, false);
+
+            this.inTypeSerializers = new TypeSerializer[numInputs];
+            for (int i = 0; i < numInputs; i++) {
+                inTypeSerializers[i] =
+                        streamConfig.getTypeSerializerIn(
+                                i, containingTask.getUserCodeClassLoader());
+            }
+
+            this.broadcastVariablesReady = false;
+
+            this.basePath =
+                    OperatorUtils.getDataCachePath(
+                            containingTask.getEnvironment().getTaskManagerInfo().getConfiguration(),
+                            containingTask
+                                    .getEnvironment()
+                                    .getIOManager()
+                                    .getSpillingDirectoriesPaths());
+            this.dataCacheWriters = new DataCacheWriter[numInputs];
+            this.hasPendingElements = new boolean[numInputs];
+            Arrays.fill(hasPendingElements, true);
         }
-
-        this.mailboxExecutor =
-                containingTask.getMailboxExecutorFactory().createExecutor(TaskMailbox.MIN_PRIORITY);
-        // variables specific for withBroadcast functionality.
-        this.broadcastStreamNames = broadcastStreamNames;
-        this.isBlocked = isBlocked;
-        this.inTypes = inTypes;
-        this.broadcastVariablesReady = false;
-        this.indexOfSubtask = containingTask.getIndexInSubtaskGroup();
-        this.numInputs = inTypes.length;
-
-        // puts in mailboxExecutor
-        for (String name : broadcastStreamNames) {
-            BroadcastContext.putMailBoxExecutor(name + "-" + indexOfSubtask, mailboxExecutor);
-        }
-
-        basePath =
-                OperatorUtils.getDataCachePath(
-                        containingTask.getEnvironment().getTaskManagerInfo().getConfiguration(),
-                        containingTask
-                                .getEnvironment()
-                                .getIOManager()
-                                .getSpillingDirectoriesPaths());
-        dataCacheWriters = new DataCacheWriter[numInputs];
-        hasPendingElements = new boolean[numInputs];
-        Arrays.fill(hasPendingElements, true);
     }
 
     /**
-     * checks whether all of broadcast variables are ready. Besides it maintains a state
+     * Checks whether all broadcast variables are ready. Besides, it maintains a state
      * {broadcastVariablesReady} to avoiding invoking {@code BroadcastContext.isCacheFinished(...)}
      * repeatedly. Finally, it sets broadcast variables for {wrappedOperatorRuntimeContext} if the
      * broadcast variables are ready.
@@ -269,7 +295,7 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
     }
 
     /**
-     * extracts common processing logic in subclasses' processing elements.
+     * Extracts common processing logic in subclasses' processing elements.
      *
      * @param streamRecord the input record.
      * @param inputIndex input id, starts from zero.
@@ -277,6 +303,8 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
      *     operator.processElement(...).
      * @param watermarkConsumer the consumer function of WaterMark, i.e.,
      *     operator.processWatermark(...).
+     * @param keyContextSetter the consumer function of setting key context, i.e.,
+     *     operator.setKeyContext(...).
      * @throws Exception possible exception.
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
@@ -284,32 +312,31 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
             StreamRecord streamRecord,
             int inputIndex,
             ThrowingConsumer<StreamRecord, Exception> elementConsumer,
-            ThrowingConsumer<Watermark, Exception> watermarkConsumer)
+            ThrowingConsumer<Watermark, Exception> watermarkConsumer,
+            ThrowingConsumer<StreamRecord, Exception> keyContextSetter)
             throws Exception {
-        if (!isBlocked[inputIndex]) {
-            if (areBroadcastVariablesReady()) {
-                if (hasPendingElements[inputIndex]) {
-                    processPendingElementsAndWatermarks(
-                            inputIndex, elementConsumer, watermarkConsumer);
-                    hasPendingElements[inputIndex] = false;
-                }
-                elementConsumer.accept(streamRecord);
-
-            } else {
-                dataCacheWriters[inputIndex].addRecord(
-                        CacheElement.newRecord(streamRecord.getValue()));
-            }
-
-        } else {
+        if (!hasRichFunction) {
+            elementConsumer.accept(streamRecord);
+        } else if (isBlocked[inputIndex]) {
             while (!areBroadcastVariablesReady()) {
                 mailboxExecutor.yield();
             }
+            elementConsumer.accept(streamRecord);
+        } else if (!areBroadcastVariablesReady()) {
+            dataCacheWriters[inputIndex].addRecord(CacheElement.newRecord(streamRecord.getValue()));
+        } else {
+            if (hasPendingElements[inputIndex]) {
+                processPendingElementsAndWatermarks(
+                        inputIndex, elementConsumer, watermarkConsumer, keyContextSetter);
+                hasPendingElements[inputIndex] = false;
+            }
+            keyContextSetter.accept(streamRecord);
             elementConsumer.accept(streamRecord);
         }
     }
 
     /**
-     * extracts common processing logic in subclasses' processing watermarks.
+     * Extracts common processing logic in subclasses' processing watermarks.
      *
      * @param watermark the input watermark.
      * @param inputIndex input id, starts from zero.
@@ -317,6 +344,8 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
      *     operator.processElement(...).
      * @param watermarkConsumer the consumer function of WaterMark, i.e.,
      *     operator.processWatermark(...).
+     * @param keyContextSetter the consumer function of setting key context, i.e.,
+     *     operator.setKeyContext(...).
      * @throws Exception possible exception.
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
@@ -324,83 +353,93 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
             Watermark watermark,
             int inputIndex,
             ThrowingConsumer<StreamRecord, Exception> elementConsumer,
-            ThrowingConsumer<Watermark, Exception> watermarkConsumer)
+            ThrowingConsumer<Watermark, Exception> watermarkConsumer,
+            ThrowingConsumer<StreamRecord, Exception> keyContextSetter)
             throws Exception {
-        if (!isBlocked[inputIndex]) {
-            if (areBroadcastVariablesReady()) {
-                if (hasPendingElements[inputIndex]) {
-                    processPendingElementsAndWatermarks(
-                            inputIndex, elementConsumer, watermarkConsumer);
-                    hasPendingElements[inputIndex] = false;
-                }
-                watermarkConsumer.accept(watermark);
-
-            } else {
-                dataCacheWriters[inputIndex].addRecord(
-                        CacheElement.newWatermark(watermark.getTimestamp()));
-            }
-
-        } else {
+        if (!hasRichFunction) {
+            watermarkConsumer.accept(watermark);
+        } else if (isBlocked[inputIndex]) {
             while (!areBroadcastVariablesReady()) {
                 mailboxExecutor.yield();
+            }
+            watermarkConsumer.accept(watermark);
+        } else if (!areBroadcastVariablesReady()) {
+            dataCacheWriters[inputIndex].addRecord(
+                    CacheElement.newWatermark(watermark.getTimestamp()));
+        } else {
+            if (hasPendingElements[inputIndex]) {
+                processPendingElementsAndWatermarks(
+                        inputIndex, elementConsumer, watermarkConsumer, keyContextSetter);
+                hasPendingElements[inputIndex] = false;
             }
             watermarkConsumer.accept(watermark);
         }
     }
 
     /**
-     * extracts common processing logic in subclasses' endInput(...).
+     * Extracts common processing logic in subclasses' endInput(...).
      *
      * @param inputIndex input id, starts from zero.
      * @param elementConsumer the consumer function of StreamRecord, i.e.,
      *     operator.processElement(...).
      * @param watermarkConsumer the consumer function of WaterMark, i.e.,
      *     operator.processWatermark(...).
+     * @param keyContextSetter the consumer function of setting key context, i.e.,
+     *     operator.setKeyContext(...).
      * @throws Exception possible exception.
      */
     @SuppressWarnings("rawtypes")
     protected void endInputX(
             int inputIndex,
             ThrowingConsumer<StreamRecord, Exception> elementConsumer,
-            ThrowingConsumer<Watermark, Exception> watermarkConsumer)
+            ThrowingConsumer<Watermark, Exception> watermarkConsumer,
+            ThrowingConsumer<StreamRecord, Exception> keyContextSetter)
             throws Exception {
+        if (!hasRichFunction) {
+            return;
+        }
         while (!areBroadcastVariablesReady()) {
             mailboxExecutor.yield();
         }
         if (hasPendingElements[inputIndex]) {
-            processPendingElementsAndWatermarks(inputIndex, elementConsumer, watermarkConsumer);
+            processPendingElementsAndWatermarks(
+                    inputIndex, elementConsumer, watermarkConsumer, keyContextSetter);
             hasPendingElements[inputIndex] = false;
         }
     }
 
     /**
-     * processes the pending elements that are cached by {@link DataCacheWriter}.
+     * Processes the pending elements that are cached by {@link DataCacheWriter}.
      *
      * @param inputIndex input id, starts from zero.
      * @param elementConsumer the consumer function of StreamRecord, i.e.,
      *     operator.processElement(...).
      * @param watermarkConsumer the consumer function of WaterMark, i.e.,
      *     operator.processWatermark(...).
+     * @param keyContextSetter the consumer function of setting key context, i.e.,
+     *     operator.setKeyContext(...).
      * @throws Exception possible exception.
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
     private void processPendingElementsAndWatermarks(
             int inputIndex,
             ThrowingConsumer<StreamRecord, Exception> elementConsumer,
-            ThrowingConsumer<Watermark, Exception> watermarkConsumer)
+            ThrowingConsumer<Watermark, Exception> watermarkConsumer,
+            ThrowingConsumer<StreamRecord, Exception> keyContextSetter)
             throws Exception {
         List<Segment> pendingSegments = dataCacheWriters[inputIndex].getSegments();
         if (pendingSegments.size() != 0) {
             DataCacheReader dataCacheReader =
                     new DataCacheReader<>(
-                            new CacheElementTypeInfo<>(inTypes[inputIndex])
-                                    .createSerializer(containingTask.getExecutionConfig()),
+                            new CacheElementSerializer<>(inTypeSerializers[inputIndex]),
                             pendingSegments);
             while (dataCacheReader.hasNext()) {
                 CacheElement cacheElement = (CacheElement) dataCacheReader.next();
                 switch (cacheElement.getType()) {
                     case RECORD:
-                        elementConsumer.accept(new StreamRecord(cacheElement.getRecord()));
+                        StreamRecord record = new StreamRecord(cacheElement.getRecord());
+                        keyContextSetter.accept(record);
+                        elementConsumer.accept(record);
                         break;
                     case WATERMARK:
                         watermarkConsumer.accept(new Watermark(cacheElement.getWatermark()));
@@ -410,6 +449,7 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
                                 "Unsupported CacheElement type: " + cacheElement.getType());
                 }
             }
+            dataCacheWriters[inputIndex].clear();
         }
     }
 
@@ -421,6 +461,9 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
     @Override
     public void close() throws Exception {
         wrappedOperator.close();
+        if (!hasRichFunction) {
+            return;
+        }
         for (String name : broadcastStreamNames) {
             BroadcastContext.remove(name + "-" + indexOfSubtask);
         }
@@ -468,8 +511,6 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
 
         timeServiceManager = streamOperatorStateContext.internalTimerServiceManager();
 
-        broadcastVariablesReady = false;
-
         wrappedOperator.initializeState(
                 (operatorID,
                         operatorClassName,
@@ -514,12 +555,14 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
                         stateInitializationContext.getRawOperatorStateInputs().iterator());
         Preconditions.checkState(
                 inputs.size() < 2, "The input from raw operator state should be one or zero.");
+        if (!hasRichFunction) {
+            return;
+        }
         if (inputs.size() == 0) {
             for (int i = 0; i < numInputs; i++) {
                 dataCacheWriters[i] =
                         new DataCacheWriter(
-                                new CacheElementTypeInfo<>(inTypes[i])
-                                        .createSerializer(containingTask.getExecutionConfig()),
+                                new CacheElementSerializer(inTypeSerializers[i]),
                                 basePath.getFileSystem(),
                                 OperatorUtils.createDataCacheFileGenerator(
                                         basePath, "cache", streamConfig.getOperatorID()));
@@ -538,8 +581,7 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
                                         basePath, "cache", streamConfig.getOperatorID()));
                 dataCacheWriters[i] =
                         new DataCacheWriter(
-                                new CacheElementTypeInfo<>(inTypes[i])
-                                        .createSerializer(containingTask.getExecutionConfig()),
+                                new CacheElementSerializer(inTypeSerializers[i]),
                                 basePath.getFileSystem(),
                                 OperatorUtils.createDataCacheFileGenerator(
                                         basePath, "cache", streamConfig.getOperatorID()),
@@ -553,6 +595,10 @@ public abstract class AbstractBroadcastWrapperOperator<T, S extends StreamOperat
     public void snapshotState(StateSnapshotContext stateSnapshotContext) throws Exception {
         if (wrappedOperator instanceof StreamOperatorStateHandler.CheckpointedStreamOperator) {
             ((CheckpointedStreamOperator) wrappedOperator).snapshotState(stateSnapshotContext);
+        }
+
+        if (!hasRichFunction) {
+            return;
         }
 
         OperatorStateCheckpointOutputStream checkpointOutputStream =

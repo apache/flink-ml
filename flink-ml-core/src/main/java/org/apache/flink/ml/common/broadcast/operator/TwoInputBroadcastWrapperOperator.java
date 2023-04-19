@@ -18,7 +18,6 @@
 
 package org.apache.flink.ml.common.broadcast.operator;
 
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.iteration.operator.OperatorUtils;
 import org.apache.flink.streaming.api.operators.BoundedMultiInput;
 import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
@@ -37,10 +36,8 @@ public class TwoInputBroadcastWrapperOperator<IN1, IN2, OUT>
     TwoInputBroadcastWrapperOperator(
             StreamOperatorParameters<OUT> parameters,
             StreamOperatorFactory<OUT> operatorFactory,
-            String[] broadcastStreamNames,
-            TypeInformation<?>[] inTypes,
-            boolean[] isBlocking) {
-        super(parameters, operatorFactory, broadcastStreamNames, inTypes, isBlocking);
+            String[] broadcastStreamNames) {
+        super(parameters, operatorFactory, broadcastStreamNames);
     }
 
     @Override
@@ -49,7 +46,8 @@ public class TwoInputBroadcastWrapperOperator<IN1, IN2, OUT>
                 streamRecord,
                 0,
                 wrappedOperator::processElement1,
-                wrappedOperator::processWatermark1);
+                wrappedOperator::processWatermark1,
+                wrappedOperator::setKeyContextElement1);
     }
 
     @Override
@@ -58,7 +56,8 @@ public class TwoInputBroadcastWrapperOperator<IN1, IN2, OUT>
                 streamRecord,
                 1,
                 wrappedOperator::processElement2,
-                wrappedOperator::processWatermark2);
+                wrappedOperator::processWatermark2,
+                wrappedOperator::setKeyContextElement2);
     }
 
     @Override
@@ -67,12 +66,14 @@ public class TwoInputBroadcastWrapperOperator<IN1, IN2, OUT>
             endInputX(
                     inputId - 1,
                     wrappedOperator::processElement1,
-                    wrappedOperator::processWatermark1);
+                    wrappedOperator::processWatermark1,
+                    wrappedOperator::setKeyContextElement1);
         } else {
             endInputX(
                     inputId - 1,
                     wrappedOperator::processElement2,
-                    wrappedOperator::processWatermark2);
+                    wrappedOperator::processWatermark2,
+                    wrappedOperator::setKeyContextElement2);
         }
         OperatorUtils.processOperatorOrUdfIfSatisfy(
                 wrappedOperator,
@@ -83,13 +84,21 @@ public class TwoInputBroadcastWrapperOperator<IN1, IN2, OUT>
     @Override
     public void processWatermark1(Watermark watermark) throws Exception {
         processWatermarkX(
-                watermark, 0, wrappedOperator::processElement1, wrappedOperator::processWatermark1);
+                watermark,
+                0,
+                wrappedOperator::processElement1,
+                wrappedOperator::processWatermark1,
+                wrappedOperator::setKeyContextElement1);
     }
 
     @Override
     public void processWatermark2(Watermark watermark) throws Exception {
         processWatermarkX(
-                watermark, 1, wrappedOperator::processElement2, wrappedOperator::processWatermark2);
+                watermark,
+                1,
+                wrappedOperator::processElement2,
+                wrappedOperator::processWatermark2,
+                wrappedOperator::setKeyContextElement2);
     }
 
     @Override

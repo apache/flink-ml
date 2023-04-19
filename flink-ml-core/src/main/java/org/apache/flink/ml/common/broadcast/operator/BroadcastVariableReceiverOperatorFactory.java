@@ -29,10 +29,10 @@ import java.io.Serializable;
 public class BroadcastVariableReceiverOperatorFactory<OUT>
         extends AbstractStreamOperatorFactory<OUT> implements Serializable {
 
-    /** names of the broadcast data streams. */
+    /** Names of the broadcast data streams. */
     private final String[] broadcastNames;
 
-    /** types of the broadcast data streams. */
+    /** Types of the broadcast data streams. */
     private final TypeInformation<?>[] inTypes;
 
     public BroadcastVariableReceiverOperatorFactory(
