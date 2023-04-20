@@ -116,7 +116,9 @@ public class TwoInputAllRoundWrapperOperator<IN1, IN2, OUT>
         super.endInput(i);
 
         if (wrappedOperator instanceof BoundedMultiInput) {
+            setIterationContextRound(Integer.MAX_VALUE);
             ((BoundedMultiInput) wrappedOperator).endInput(i);
+            clearIterationContextRound();
         }
     }
 }
