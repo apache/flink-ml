@@ -18,6 +18,7 @@
 
 package org.apache.flink.test.iteration;
 
+import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.iteration.DataStreamList;
 import org.apache.flink.iteration.IterationBody;
@@ -32,6 +33,10 @@ import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
+import org.apache.flink.streaming.api.operators.BoundedOneInput;
+import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
+import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.test.iteration.operators.CollectSink;
 import org.apache.flink.test.iteration.operators.EpochRecord;
 import org.apache.flink.test.iteration.operators.IncrementEpochMap;
@@ -44,6 +49,7 @@ import org.apache.flink.testutils.junit.SharedReference;
 import org.apache.flink.util.OutputTag;
 import org.apache.flink.util.TestLogger;
 
+import org.apache.commons.collections.IteratorUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -51,6 +57,7 @@ import org.junit.Test;
 
 import javax.annotation.Nullable;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -152,6 +159,37 @@ public class BoundedAllRoundStreamIterationITCase extends TestLogger {
 
         verifyResult(roundsStat, 5, 1, 4 * (0 + 999) * 1000 / 2);
         assertEquals(OutputRecord.Event.TERMINATED, result.get().take().getEvent());
+    }
+
+    @Test
+    public void testBoundedIterationWithEndInput() throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(1);
+        env.getConfig().enableObjectReuse();
+
+        DataStream<Integer> inputStream = env.fromElements(1, 2, 3);
+
+        DataStreamList outputs =
+                Iterations.iterateBoundedStreamsUntilTermination(
+                        DataStreamList.of(inputStream),
+                        ReplayableDataStreamList.replay(inputStream),
+                        IterationConfig.newBuilder().build(),
+                        (variableStreams, dataStreams) -> {
+                            DataStream<Integer> variables = variableStreams.get(0);
+                            DataStream<Integer> result =
+                                    dataStreams
+                                            .<Integer>get(0)
+                                            .transform(
+                                                    "sum",
+                                                    BasicTypeInfo.INT_TYPE_INFO,
+                                                    new SumOperator());
+                            return new IterationBodyResult(
+                                    DataStreamList.of(variables),
+                                    DataStreamList.of(result),
+                                    variables.flatMap(new TerminateOnMaxIter<>(10)));
+                        });
+        List<Integer> result = IteratorUtils.toList(outputs.get(0).executeAndCollect());
+        result.forEach(r -> r.equals(60));
     }
 
     private static JobGraph createVariableOnlyJobGraph(
@@ -276,5 +314,31 @@ public class BoundedAllRoundStreamIterationITCase extends TestLogger {
         outputs.<OutputRecord<Integer>>get(0).addSink(new CollectSink(result));
 
         return env.getStreamGraph().getJobGraph();
+    }
+
+    private static class SumOperator extends AbstractStreamOperator<Integer>
+            implements OneInputStreamOperator<Integer, Integer>, BoundedOneInput {
+
+        private int sum = 0;
+
+        @Override
+        public void processElement(StreamRecord<Integer> element) {
+            sum += element.getValue();
+        }
+
+        @Override
+        public void endInput() {
+            output.collect(new StreamRecord<>(sum));
+        }
+
+        @Override
+        public void finish() {
+            output.collect(new StreamRecord<>(sum));
+        }
+
+        @Override
+        public void close() {
+            output.collect(new StreamRecord<>(sum));
+        }
     }
 }

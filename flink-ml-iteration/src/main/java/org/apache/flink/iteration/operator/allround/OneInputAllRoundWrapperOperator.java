@@ -87,7 +87,9 @@ public class OneInputAllRoundWrapperOperator<IN, OUT>
     @Override
     public void endInput() throws Exception {
         if (wrappedOperator instanceof BoundedOneInput) {
+            setIterationContextRound(Integer.MAX_VALUE);
             ((BoundedOneInput) wrappedOperator).endInput();
+            clearIterationContextRound();
         }
     }
 }
