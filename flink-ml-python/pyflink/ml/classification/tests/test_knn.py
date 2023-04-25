@@ -89,8 +89,8 @@ class KNNTest(PyFlinkMLTestCase):
             .set_k(4) \
             .set_prediction_col('test_prediction')
 
-        model = knn.fit(self.train_data.alias('test_features, test_label'))
-        output = model.transform(self.predict_data.alias('test_features, test_label'))[0]
+        model = knn.fit(self.train_data.alias('test_features', 'test_label'))
+        output = model.transform(self.predict_data.alias('test_features', 'test_label'))[0]
         self.assertEqual(output.get_schema().get_field_names(),
                          ['test_features',
                           'test_label',

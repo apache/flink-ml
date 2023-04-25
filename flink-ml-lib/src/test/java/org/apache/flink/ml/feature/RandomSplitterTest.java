@@ -25,6 +25,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.test.util.AbstractTestBase;
+import org.apache.flink.test.util.TestBaseUtils;
 import org.apache.flink.types.Row;
 
 import org.apache.commons.collections.IteratorUtils;
@@ -152,7 +153,7 @@ public class RandomSplitterTest extends AbstractTestBase {
             results.addAll(result);
         }
         assertEquals(expectedData.size(), results.size());
-        compareResultCollections(
+        TestBaseUtils.compareResultCollections(
                 expectedData, results, Comparator.comparingLong(row -> row.getFieldAs(0)));
     }
 }

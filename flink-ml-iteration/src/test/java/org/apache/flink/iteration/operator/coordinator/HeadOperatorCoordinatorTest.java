@@ -41,7 +41,7 @@ import static org.junit.Assert.assertEquals;
 public class HeadOperatorCoordinatorTest extends TestLogger {
 
     @Test(timeout = 60000L)
-    public void testForwardEvents() throws InterruptedException {
+    public void testForwardEvents() throws Exception {
         IterationID iterationId = new IterationID();
         List<OperatorID> operatorIds = Arrays.asList(new OperatorID(), new OperatorID());
         List<Integer> parallelisms = Arrays.asList(2, 3);
@@ -88,19 +88,20 @@ public class HeadOperatorCoordinatorTest extends TestLogger {
             EventReceivingTasks receivingTasks,
             int parallelism) {
         for (int i = 0; i < parallelism; i++) {
-            coordinator.subtaskReady(i, receivingTasks.createGatewayForSubtask(i));
+            coordinator.executionAttemptReady(i, 0, receivingTasks.createGatewayForSubtask(i, 0));
         }
     }
 
     private void receiveEvent(
             List<HeadOperatorCoordinator> coordinators,
             List<Integer> parallelisms,
-            BiFunction<Integer, Integer, List<OperatorEvent>> eventFactory) {
+            BiFunction<Integer, Integer, List<OperatorEvent>> eventFactory)
+            throws Exception {
         for (int i = 0; i < coordinators.size(); ++i) {
             for (int j = 0; j < parallelisms.get(i); ++j) {
                 List<OperatorEvent> events = eventFactory.apply(i, j);
                 for (OperatorEvent event : events) {
-                    coordinators.get(i).handleEventFromOperator(j, event);
+                    coordinators.get(i).handleEventFromOperator(j, 0, event);
                 }
             }
         }

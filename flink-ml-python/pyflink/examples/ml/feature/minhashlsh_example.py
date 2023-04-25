@@ -22,6 +22,7 @@
 from pyflink.common import Types
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.table import StreamTableEnvironment
+from pyflink.table.expressions import col
 
 from pyflink.ml.linalg import Vectors, SparseVectorTypeInfo
 from pyflink.ml.feature.lsh import MinHashLSH
@@ -69,7 +70,7 @@ for result in t_env.to_data_stream(output).execute_and_collect():
 
 # Finds approximate nearest neighbors of the key.
 key = Vectors.sparse(6, [1, 3], [1., 1.])
-output = model.approx_nearest_neighbors(data_a, key, 2).select("id, distCol")
+output = model.approx_nearest_neighbors(data_a, key, 2).select(col("id"), col("distCol"))
 for result in t_env.to_data_stream(output).execute_and_collect():
     id_value = result[field_names.index("id")]
     dist_value = result[-1]

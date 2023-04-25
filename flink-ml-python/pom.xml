@@ -39,7 +39,7 @@ under the License.
 
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-python_2.12</artifactId>
+            <artifactId>flink-python</artifactId>
             <version>${flink.version}</version>
             <scope>provided</scope>
         </dependency>

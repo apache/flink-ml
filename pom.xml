@@ -77,7 +77,7 @@ under the License.
     <junit.version>4.13.2</junit.version>
     <flink.forkCount>1C</flink.forkCount>
     <flink.reuseForks>true</flink.reuseForks>
-    <flink.version>1.15.1</flink.version>
+    <flink.version>1.16.1</flink.version>
     <zookeeper.version>3.6.3</zookeeper.version>
     <hadoop.version>2.10.1</hadoop.version>
 

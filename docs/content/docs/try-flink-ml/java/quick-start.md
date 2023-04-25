@@ -50,7 +50,7 @@ $ java -version
 
 ## Download Flink
 
-[Download 1.15 or a higher version of
+[Download 1.16 or a higher version of
 Flink](https://flink.apache.org/downloads.html), then extract the archive:
 
 ```shell

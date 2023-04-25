@@ -27,6 +27,7 @@ import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
 import org.apache.flink.test.util.AbstractTestBase;
+import org.apache.flink.test.util.TestBaseUtils;
 import org.apache.flink.types.Row;
 
 import org.apache.commons.collections.IteratorUtils;
@@ -120,7 +121,7 @@ public class ChiSqTestTest extends AbstractTestBase {
 
         List<Row> result = IteratorUtils.toList(outputDataStream.executeAndCollect());
 
-        compareResultCollections(
+        TestBaseUtils.compareResultCollections(
                 expected,
                 result,
                 (row1, row2) -> {

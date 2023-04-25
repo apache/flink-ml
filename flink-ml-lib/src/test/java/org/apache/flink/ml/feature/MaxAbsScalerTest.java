@@ -32,6 +32,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
+import org.apache.flink.test.util.TestBaseUtils;
 import org.apache.flink.types.Row;
 
 import org.apache.commons.collections.IteratorUtils;
@@ -46,7 +47,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import static org.apache.flink.test.util.TestBaseUtils.compareResultCollections;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
@@ -135,7 +135,7 @@ public class MaxAbsScalerTest {
                                 VectorTypeInfo.INSTANCE);
 
         List<Vector> result = IteratorUtils.toList(stream.executeAndCollect());
-        compareResultCollections(expectedData, result, TestUtils::compare);
+        TestBaseUtils.compareResultCollections(expectedData, result, TestUtils::compare);
     }
 
     @Test
