@@ -30,6 +30,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.test.util.AbstractTestBase;
+import org.apache.flink.test.util.TestBaseUtils;
 import org.apache.flink.types.Row;
 
 import org.apache.commons.collections.IteratorUtils;
@@ -133,7 +134,7 @@ public class KBinsDiscretizerTest extends AbstractTestBase {
         List<Row> collectedResult =
                 IteratorUtils.toList(
                         tEnv.toDataStream(output.select($(predictionCol))).executeAndCollect());
-        compareResultCollections(
+        TestBaseUtils.compareResultCollections(
                 expectedOutput,
                 collectedResult,
                 (o1, o2) ->

@@ -35,6 +35,7 @@ import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
 import org.apache.flink.test.util.AbstractTestBase;
+import org.apache.flink.test.util.TestBaseUtils;
 import org.apache.flink.types.Row;
 
 import org.apache.commons.collections.IteratorUtils;
@@ -103,7 +104,7 @@ public class MinHashLSHTest extends AbstractTestBase {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) output).getTableEnvironment();
         List<Row> results = IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect());
-        compareResultCollections(
+        TestBaseUtils.compareResultCollections(
                 expected,
                 results,
                 (d0, d1) -> {
@@ -379,7 +380,8 @@ public class MinHashLSHTest extends AbstractTestBase {
         Table output =
                 lshModel.approxNearestNeighbors(inputTable, key, 2).select($("id"), $("distCol"));
         List<Row> results = IteratorUtils.toList(output.execute().collect());
-        compareResultCollections(expected, results, Comparator.comparing(r -> r.getFieldAs(0)));
+        TestBaseUtils.compareResultCollections(
+                expected, results, Comparator.comparing(r -> r.getFieldAs(0)));
     }
 
     @Test
@@ -418,7 +420,7 @@ public class MinHashLSHTest extends AbstractTestBase {
 
         Table output = lshModel.approxSimilarityJoin(dataA, dataB, .6, "id");
         List<Row> results = IteratorUtils.toList(output.execute().collect());
-        compareResultCollections(
+        TestBaseUtils.compareResultCollections(
                 expected,
                 results,
                 Comparator.<Row>comparingInt(r -> r.getFieldAs(0))

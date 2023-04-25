@@ -127,7 +127,7 @@ public class ProxyKeyedStateBackend<K> implements CheckpointableKeyedStateBacken
 
     @Nonnull
     @Override
-    public <N, SV, SEV, S extends State, IS extends S> IS createInternalState(
+    public <N, SV, SEV, S extends State, IS extends S> IS createOrUpdateInternalState(
             @Nonnull TypeSerializer<N> namespaceSerializer,
             @Nonnull StateDescriptor<S, SV> stateDesc,
             @Nonnull
@@ -135,7 +135,7 @@ public class ProxyKeyedStateBackend<K> implements CheckpointableKeyedStateBacken
                             snapshotTransformFactory)
             throws Exception {
         StateDescriptor<S, ?> newDescriptor = createNewDescriptor(stateDesc);
-        return wrappedBackend.createInternalState(
+        return wrappedBackend.createOrUpdateInternalState(
                 namespaceSerializer, newDescriptor, snapshotTransformFactory);
     }
 

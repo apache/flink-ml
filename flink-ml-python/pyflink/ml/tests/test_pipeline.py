@@ -18,6 +18,7 @@
 import os
 from typing import Dict, Any, List
 
+from pyflink.table.expressions import col
 from pyflink.table import Table, StreamTableEnvironment
 
 from pyflink.ml.api import Model
@@ -80,7 +81,7 @@ class PipelineTest(PyFlinkMLTestCase):
 class Add10Model(Model):
     def transform(self, *inputs: Table) -> List[Table]:
         assert len(inputs) == 1
-        return [inputs[0].select("a + 10 as a")]
+        return [inputs[0].select(col("a") + 10).alias("a")]
 
     def save(self, path: str) -> None:
         from pyflink.ml.util import read_write_utils

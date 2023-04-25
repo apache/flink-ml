@@ -28,6 +28,7 @@ import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
 import org.apache.flink.test.util.AbstractTestBase;
+import org.apache.flink.test.util.TestBaseUtils;
 import org.apache.flink.types.Row;
 
 import org.apache.commons.collections.IteratorUtils;
@@ -99,8 +100,10 @@ public class BinarizerTest extends AbstractTestBase {
         }
         doubleValues.sort(Double::compare);
         assertArrayEquals(EXPECTED_VALUE_OUTPUT, doubleValues.toArray());
-        compareResultCollections(EXPECTED_DENSE_OUTPUT, denseVectorValues, TestUtils::compare);
-        compareResultCollections(EXPECTED_SPARSE_OUTPUT, sparseVectorValues, TestUtils::compare);
+        TestBaseUtils.compareResultCollections(
+                EXPECTED_DENSE_OUTPUT, denseVectorValues, TestUtils::compare);
+        TestBaseUtils.compareResultCollections(
+                EXPECTED_SPARSE_OUTPUT, sparseVectorValues, TestUtils::compare);
     }
 
     @Test

@@ -151,8 +151,8 @@ public class KnnTest extends AbstractTestBase {
                         .setFeaturesCol("test_features")
                         .setK(4)
                         .setPredictionCol("test_prediction");
-        KnnModel model = knn.fit(trainData.as("test_features, test_label"));
-        Table output = model.transform(predictData.as("test_features, test_label"))[0];
+        KnnModel model = knn.fit(trainData.as("test_features", "test_label"));
+        Table output = model.transform(predictData.as("test_features", "test_label"))[0];
         assertEquals(
                 Arrays.asList("test_features", "test_label", "test_prediction"),
                 output.getResolvedSchema().getColumnNames());

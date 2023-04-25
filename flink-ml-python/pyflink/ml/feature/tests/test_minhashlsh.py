@@ -26,6 +26,7 @@ from pyflink.ml.wrapper import JavaWithParams
 from pyflink.ml.feature.lsh import MinHashLSH, MinHashLSHModel
 from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
 from pyflink.table import Table
+from pyflink.table.expressions import col
 
 
 class MinHashLSHTest(PyFlinkMLTestCase):
@@ -103,7 +104,7 @@ class MinHashLSHTest(PyFlinkMLTestCase):
             .set_num_hash_tables(5) \
             .set_num_hash_functions_per_table(3)
         model = lsh.fit(self.data)
-        output = model.transform(self.data)[0].select("hashes")
+        output = model.transform(self.data)[0].select(col("hashes"))
         self.verify_output_hashes(output, self.expected)
 
     def test_estimator_save_load_transform(self):
@@ -117,7 +118,7 @@ class MinHashLSHTest(PyFlinkMLTestCase):
         lsh.save(path)
         lsh = MinHashLSH.load(self.t_env, path)
         model = lsh.fit(self.data)
-        output = model.transform(self.data)[0].select(lsh.output_col)
+        output = model.transform(self.data)[0].select(col(lsh.output_col))
         self.verify_output_hashes(output, self.expected)
 
     def test_model_save_load_transform(self):
@@ -132,7 +133,7 @@ class MinHashLSHTest(PyFlinkMLTestCase):
         model.save(path)
         self.env.execute('save_model')
         model = MinHashLSHModel.load(self.t_env, path)
-        output = model.transform(self.data)[0].select(lsh.output_col)
+        output = model.transform(self.data)[0].select(col(lsh.output_col))
         self.verify_output_hashes(output, self.expected)
 
     def test_get_model_data(self):
@@ -167,7 +168,7 @@ class MinHashLSHTest(PyFlinkMLTestCase):
         model_data_table = model_a.get_model_data()[0]
         model_b: MinHashLSHModel = MinHashLSHModel().set_model_data(model_data_table)
         self.update_existing_params(model_b, model_a)
-        output = model_b.transform(self.data)[0].select(lsh.output_col)
+        output = model_b.transform(self.data)[0].select(col(lsh.output_col))
         self.verify_output_hashes(output, self.expected)
 
     def test_approx_nearest_neighbors(self):
@@ -184,7 +185,7 @@ class MinHashLSHTest(PyFlinkMLTestCase):
 
         model: MinHashLSHModel = lsh.fit(self.data)
         key = Vectors.sparse(6, [1, 3], [1., 1.])
-        output = model.approx_nearest_neighbors(self.data, key, 2).select("id, distCol")
+        output = model.approx_nearest_neighbors(self.data, key, 2).select(col("id"), col("distCol"))
         actual_result = [r for r in self.t_env.to_data_stream(output).execute_and_collect()]
         actual_result.sort(key=lambda r: r[0])
         self.assertEqual(expected, actual_result)
@@ -203,7 +204,7 @@ class MinHashLSHTest(PyFlinkMLTestCase):
 
         model: MinHashLSHModel = lsh.fit(self.data)
         key = Vectors.dense([0., 1., 0., 1., 0., 0.])
-        output = model.approx_nearest_neighbors(self.data, key, 2).select("id, distCol")
+        output = model.approx_nearest_neighbors(self.data, key, 2).select(col("id"), col("distCol"))
         actual_result = [r for r in self.t_env.to_data_stream(output).execute_and_collect()]
         actual_result.sort(key=lambda r: r[0])
         self.assertEqual(expected, actual_result)

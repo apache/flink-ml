@@ -824,7 +824,11 @@ public class HeadOperatorTest extends TestLogger {
                                         RecordingOperatorEventGateway::new),
                                 operatorId)
                         .build()) {
-            return runnable.apply(harness);
+            try {
+                return runnable.apply(harness);
+            } finally {
+                RecordingHeadOperatorFactory.latestHeadOperator.close();
+            }
         }
     }
 

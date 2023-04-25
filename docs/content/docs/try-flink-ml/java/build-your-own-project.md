@@ -80,7 +80,7 @@ the basic skeleton of a project, with some necessary Flink dependencies.
 $ mvn archetype:generate \
     -DarchetypeGroupId=org.apache.flink \
     -DarchetypeArtifactId=flink-quickstart-java \
-    -DarchetypeVersion=1.15.1 \
+    -DarchetypeVersion=1.16.1 \
     -DgroupId=kmeans-example \
     -DartifactId=kmeans-example \
     -Dversion=0.1 \

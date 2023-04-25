@@ -30,6 +30,7 @@ import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
 import org.apache.flink.test.util.AbstractTestBase;
+import org.apache.flink.test.util.TestBaseUtils;
 import org.apache.flink.types.Row;
 
 import org.apache.commons.collections.IteratorUtils;
@@ -110,7 +111,7 @@ public class CountVectorizerTest extends AbstractTestBase {
                                 (MapFunction<Row, SparseVector>)
                                         row -> (SparseVector) row.getField(outputCol));
         List<SparseVector> result = IteratorUtils.toList(stream.executeAndCollect());
-        compareResultCollections(expected, result, TestUtils::compare);
+        TestBaseUtils.compareResultCollections(expected, result, TestUtils::compare);
     }
 
     @Test

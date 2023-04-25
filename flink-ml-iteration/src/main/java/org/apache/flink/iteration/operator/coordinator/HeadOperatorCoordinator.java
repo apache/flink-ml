@@ -59,11 +59,6 @@ public class HeadOperatorCoordinator implements OperatorCoordinator, SharedProgr
     public void start() {}
 
     @Override
-    public void subtaskReady(int subtaskIndex, SubtaskGateway subtaskGateway) {
-        this.subtaskGateways[subtaskIndex] = subtaskGateway;
-    }
-
-    @Override
     public void resetToCheckpoint(long checkpointId, @Nullable byte[] bytes) {
         for (int i = 0; i < context.currentParallelism(); ++i) {
             sharedProgressAligner.removeProgressInfo(context.getOperatorId());
@@ -71,19 +66,15 @@ public class HeadOperatorCoordinator implements OperatorCoordinator, SharedProgr
     }
 
     @Override
-    public void subtaskFailed(int subtaskIndex, @Nullable Throwable throwable) {
-        sharedProgressAligner.removeProgressInfo(context.getOperatorId(), subtaskIndex);
-    }
-
-    @Override
-    public void handleEventFromOperator(int subtaskIndex, OperatorEvent operatorEvent) {
-        if (operatorEvent instanceof SubtaskAlignedEvent) {
+    public void handleEventFromOperator(int subtask, int attemptNumber, OperatorEvent event)
+            throws Exception {
+        if (event instanceof SubtaskAlignedEvent) {
             sharedProgressAligner.reportSubtaskProgress(
-                    context.getOperatorId(), subtaskIndex, (SubtaskAlignedEvent) operatorEvent);
-        } else if (operatorEvent instanceof TerminatingOnInitializeEvent) {
+                    context.getOperatorId(), subtask, (SubtaskAlignedEvent) event);
+        } else if (event instanceof TerminatingOnInitializeEvent) {
             sharedProgressAligner.notifyGloballyTerminating();
         } else {
-            throw new UnsupportedOperationException("Not supported event: " + operatorEvent);
+            throw new UnsupportedOperationException("Not supported event: " + event);
         }
     }
 
@@ -115,6 +106,16 @@ public class HeadOperatorCoordinator implements OperatorCoordinator, SharedProgr
 
     @Override
     public void subtaskReset(int i, long l) {}
+
+    @Override
+    public void executionAttemptFailed(int subtask, int attemptNumber, @Nullable Throwable reason) {
+        sharedProgressAligner.removeProgressInfo(context.getOperatorId(), subtask);
+    }
+
+    @Override
+    public void executionAttemptReady(int subtask, int attemptNumber, SubtaskGateway gateway) {
+        this.subtaskGateways[subtask] = gateway;
+    }
 
     /** The factory of {@link HeadOperatorCoordinator}. */
     public static class HeadOperatorCoordinatorProvider implements Provider {

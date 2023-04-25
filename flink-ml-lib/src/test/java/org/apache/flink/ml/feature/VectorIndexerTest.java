@@ -30,6 +30,7 @@ import org.apache.flink.table.api.Expressions;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.test.util.AbstractTestBase;
+import org.apache.flink.test.util.TestBaseUtils;
 import org.apache.flink.types.Row;
 
 import org.apache.commons.collections.IteratorUtils;
@@ -277,7 +278,7 @@ public class VectorIndexerTest extends AbstractTestBase {
                 IteratorUtils.toList(
                         tEnv.toDataStream(output.select(Expressions.$(outputCol)))
                                 .executeAndCollect());
-        compareResultCollections(
+        TestBaseUtils.compareResultCollections(
                 expectedOutput,
                 collectedResult,
                 Comparator.comparingInt(o -> (o.getField(0)).hashCode()));

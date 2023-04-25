@@ -506,12 +506,12 @@ class SparseVector(Vector):
             cur_len = len(self._indices)
             indices = np.zeros(cur_len + 1, dtype=np.int32)
             values = np.zeros(cur_len + 1, dtype=np.float64)
-            indices[0:idx] = self._indices[0:idx]
-            values[0:idx] = self._values[0:idx]
+            indices[0:idx] = self._indices[0:idx]  # type: ignore
+            values[0:idx] = self._values[0:idx]  # type: ignore
             indices[idx] = i
             values[idx] = value
-            indices[idx + 1:] = self._indices[idx:]
-            values[idx + 1:] = self._values[idx]
+            indices[idx + 1:] = self._indices[idx:]  # type: ignore
+            values[idx + 1:] = self._values[idx]  # type: ignore
             self._indices = indices
             self._values = values
 
@@ -555,7 +555,7 @@ class SparseVector(Vector):
             self_cmind = np.in1d(self._indices, other._indices, assume_unique=True)
             self_values = self._values[self_cmind]
             if self_values.size == 0:
-                return np.float_(0.0)
+                return np.float_(0.0)  # type: ignore
             else:
                 other_cmind = np.in1d(other._indices, self._indices, assume_unique=True)
                 return np.dot(self_values, other._values[other_cmind])
@@ -623,7 +623,7 @@ class SparseVector(Vector):
             while j < len(other._indices):
                 result += other._values[j] * other._values[j]
                 j += 1
-            return np.float_(result)
+            return np.float_(result)  # type: ignore
         else:
             if isinstance(other, (array.array, np.ndarray, list, tuple, range)):
                 return self.squared_distance(DenseVector(other))
