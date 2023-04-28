@@ -22,6 +22,7 @@ import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.iteration.utils.ReflectionUtils;
 import org.apache.flink.runtime.io.network.api.writer.RecordWriter;
 import org.apache.flink.runtime.plugable.SerializationDelegate;
+import org.apache.flink.streaming.api.operators.CountingOutput;
 import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.io.RecordWriterOutput;
 import org.apache.flink.streaming.runtime.streamrecord.StreamElement;
@@ -41,6 +42,7 @@ public class OutputReflectionContext {
     private final Field recordWriterField;
     private final Field recordWriterSerializationDelegateField;
     private final Field serializationDelegateSerializerField;
+    private final Field countingOutputField;
 
     public OutputReflectionContext() {
         try {
@@ -62,6 +64,8 @@ public class OutputReflectionContext {
                             RecordWriterOutput.class, "serializationDelegate");
             this.serializationDelegateSerializerField =
                     ReflectionUtils.getClassField(SerializationDelegate.class, "serializer");
+            this.countingOutputField =
+                    ReflectionUtils.getClassField(CountingOutput.class, "output");
         } catch (Exception e) {
             throw new RuntimeException("Failed to initialize the OutputReflectionContext", e);
         }
@@ -79,20 +83,26 @@ public class OutputReflectionContext {
         return RecordWriterOutput.class.isAssignableFrom(rawOutput.getClass());
     }
 
+    public boolean isCountingOutput(Output<?> rawOutput) {
+        return CountingOutput.class.isAssignableFrom(rawOutput.getClass());
+    }
+
     public <OUT> Output<StreamRecord<OUT>>[] getBroadcastingInternalOutputs(Object output) {
         return ReflectionUtils.getFieldValue(output, broadcastingOutputsField);
+    }
+
+    public <OUT> Output<StreamRecord<OUT>> getCountingInternalOutput(Object output) {
+        return ReflectionUtils.getFieldValue(output, countingOutputField);
     }
 
     public OutputTag<?> getChainingOutputTag(Object output) {
         return ReflectionUtils.getFieldValue(output, chainingOutputTagField);
     }
 
-    @SuppressWarnings("unchecked")
     public RecordWriter<SerializationDelegate<StreamElement>> getRecordWriter(Object output) {
         return ReflectionUtils.getFieldValue(output, recordWriterField);
     }
 
-    @SuppressWarnings("unchecked")
     public TypeSerializer<StreamElement> getRecordWriterTypeSerializer(Object output) {
         SerializationDelegate<StreamElement> serializationDelegate =
                 ReflectionUtils.getFieldValue(output, recordWriterSerializationDelegateField);

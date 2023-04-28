@@ -44,6 +44,10 @@ public class BroadcastOutputFactory {
 
         OutputReflectionContext outputReflectionContext = new OutputReflectionContext();
 
+        if (outputReflectionContext.isCountingOutput(output)) {
+            output = outputReflectionContext.getCountingInternalOutput(output);
+        }
+
         List<BroadcastOutput<OUT>> internalOutputs = new ArrayList<>();
         if (outputReflectionContext.isBroadcastingOutput(output)) {
             Output<StreamRecord<OUT>>[] rawOutputs =
