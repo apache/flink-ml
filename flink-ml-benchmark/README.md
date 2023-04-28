@@ -7,7 +7,7 @@ stages in a Linux/MacOS environment.
 
 ### Install Flink
 
-Please make sure Flink 1.16 or higher version has been installed in your local
+Please make sure Flink 1.17 or higher version has been installed in your local
 environment. You can refer to the [local
 installation](https://nightlies.apache.org/flink/flink-docs-master/docs/try-flink/local_installation/)
 instruction on Flink's document website for how to achieve this.

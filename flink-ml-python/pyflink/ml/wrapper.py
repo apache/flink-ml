@@ -114,7 +114,14 @@ class JavaWithParams(WithParams, JavaWrapper):
             converter = default_converter
         java_param_name = snake_to_camel(param.name)
         set_method_name = ''.join(['set', java_param_name[0].upper(), java_param_name[1:]])
-        getattr(self._java_obj, set_method_name)(converter.to_java(value))
+
+        gateway = get_gateway()
+        gateway.jvm.org.apache.flink.iteration.utils.ReflectionUtils.callMethod(
+            self._java_obj,
+            self._java_obj.getClass(),
+            set_method_name,
+            to_jarray(gateway.jvm.Object, [converter.to_java(value)])
+        )
         return self
 
     def get(self, param: Param):
@@ -124,7 +131,14 @@ class JavaWithParams(WithParams, JavaWrapper):
             converter = default_converter
         java_param_name = snake_to_camel(param.name)
         get_method_name = ''.join(['get', java_param_name[0].upper(), java_param_name[1:]])
-        return converter.to_python(getattr(self._java_obj, get_method_name)())
+
+        gateway = get_gateway()
+        result = gateway.jvm.org.apache.flink.iteration.utils.ReflectionUtils.callMethod(
+            self._java_obj,
+            self._java_obj.getClass(),
+            get_method_name
+        )
+        return converter.to_python(result)
 
     def get_param_map(self) -> Dict[Param, Any]:
         return self._java_obj.getParamMap()

@@ -7,7 +7,7 @@ Flink ML is developed under the umbrella of [Apache Flink](https://flink.apache.
 Prerequisites for building apache-flink-ml:
 
 * Unix-like environment (we use Linux, Mac OS X)
-* Python version(3.6, 3.7 or 3.8) is required
+* Python version(3.7 or 3.8) is required
 
 Then go to the root directory of flink-ml-python source code and run this command to build the sdist package of apache-flink-ml:
 ```bash

@@ -60,10 +60,10 @@ If you want to follow along, you will require a computer with:
 
 {{< stable >}}
 - Java 8
-- Python 3.6, 3.7 or 3.8 {{< /stable >}} {{< unstable >}}
+- Python 3.7 or 3.8 {{< /stable >}} {{< unstable >}}
 - Java 8
 - Maven 3
-- Python 3.6, 3.7 or 3.8 {{< /unstable >}}
+- Python 3.7 or 3.8 {{< /unstable >}}
 
 {{< stable >}}
 
@@ -248,7 +248,7 @@ $ java -version
 
 ### Download Flink
 
-[Download 1.16 or a higher version of
+[Download 1.17 or a higher version of
 Flink](https://flink.apache.org/downloads.html), then extract the archive:
 
 ```shell
