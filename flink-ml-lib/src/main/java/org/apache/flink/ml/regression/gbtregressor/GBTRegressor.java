@@ -84,7 +84,7 @@ public class GBTRegressor
                 tEnv.fromDataStream(modelData).renameColumns($("f0").as("modelData")),
                 tEnv.fromDataStream(featureImportance)
                         .renameColumns($("f0").as("featureImportance")));
-        ReadWriteUtils.updateExistingParams(model, getParamMap());
+        ParamUtils.updateExistingParams(model, getParamMap());
         return model;
     }
 

@@ -30,7 +30,7 @@ import org.apache.flink.ml.common.gbt.defs.TaskType;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
-import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -406,7 +406,8 @@ public class GBTClassifierTest extends AbstractTestBase {
                         .setMaxBins(3)
                         .setSeed(123);
         GBTClassifier loadedGbtc =
-                TestUtils.saveAndReload(tEnv, gbtc, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv, gbtc, tempFolder.newFolder().getAbsolutePath(), GBTClassifier::load);
         GBTClassifierModel model = loadedGbtc.fit(inputTable);
         Assert.assertEquals(
                 Collections.singletonList("modelData"),
@@ -434,7 +435,11 @@ public class GBTClassifierTest extends AbstractTestBase {
                         .setSeed(123);
         GBTClassifierModel model = gbtc.fit(inputTable);
         GBTClassifierModel loadedModel =
-                TestUtils.saveAndReload(tEnv, model, tempFolder.newFolder().getAbsolutePath());
+                TestUtils.saveAndReload(
+                        tEnv,
+                        model,
+                        tempFolder.newFolder().getAbsolutePath(),
+                        GBTClassifierModel::load);
         Table output =
                 loadedModel.transform(inputTable)[0].select(
                         $(gbtc.getPredictionCol()),
@@ -503,7 +508,7 @@ public class GBTClassifierTest extends AbstractTestBase {
                         .setSeed(123);
         GBTClassifierModel modelA = gbtc.fit(inputTable);
         GBTClassifierModel modelB = new GBTClassifierModel().setModelData(modelA.getModelData());
-        ReadWriteUtils.updateExistingParams(modelB, modelA.getParamMap());
+        ParamUtils.updateExistingParams(modelB, modelA.getParamMap());
         Table output =
                 modelA.transform(inputTable)[0].select(
                         $(gbtc.getPredictionCol()),

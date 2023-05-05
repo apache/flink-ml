@@ -343,7 +343,7 @@ public class ReadWriteUtils {
             TypeInformation<T> typeInfo) {
         StreamExecutionEnvironment env = TableUtils.getExecutionEnvironment(tEnv);
         Source<T, ?, ?> source =
-                FileSource.forRecordStreamFormat(modelDecoder, new Path(getDataPath(path))).build();
+                FileSource.forRecordStreamFormat(modelDecoder, FileUtils.getDataPath(path)).build();
         DataStream<T> modelDataStream =
                 env.fromSource(source, WatermarkStrategy.noWatermarks(), "modelData", typeInfo);
         return tEnv.fromDataStream(modelDataStream);
