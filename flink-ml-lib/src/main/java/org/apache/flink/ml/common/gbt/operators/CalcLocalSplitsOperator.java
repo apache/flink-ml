@@ -26,8 +26,8 @@ import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.common.gbt.defs.Histogram;
 import org.apache.flink.ml.common.gbt.defs.LearningNode;
 import org.apache.flink.ml.common.gbt.defs.Split;
-import org.apache.flink.ml.common.sharedstorage.SharedStorageContext;
-import org.apache.flink.ml.common.sharedstorage.SharedStorageStreamOperator;
+import org.apache.flink.ml.common.sharedobjects.SharedObjectsContext;
+import org.apache.flink.ml.common.sharedobjects.SharedObjectsStreamOperator;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
@@ -50,18 +50,18 @@ import java.util.UUID;
 public class CalcLocalSplitsOperator extends AbstractStreamOperator<Tuple3<Integer, Integer, Split>>
         implements OneInputStreamOperator<
                         Tuple2<Integer, Histogram>, Tuple3<Integer, Integer, Split>>,
-                SharedStorageStreamOperator {
+                SharedObjectsStreamOperator {
 
     private static final Logger LOG = LoggerFactory.getLogger(CalcLocalSplitsOperator.class);
     private static final String SPLIT_FINDER_STATE_NAME = "split_finder";
-    private final String sharedStorageAccessorID;
+    private final String sharedObjectsAccessorID;
     // States of local data.
     private transient ListStateWithCache<SplitFinder> splitFinderState;
     private transient SplitFinder splitFinder;
-    private transient SharedStorageContext sharedStorageContext;
+    private transient SharedObjectsContext sharedObjectsContext;
 
     public CalcLocalSplitsOperator() {
-        sharedStorageAccessorID = getClass().getSimpleName() + "-" + UUID.randomUUID();
+        sharedObjectsAccessorID = getClass().getSimpleName() + "-" + UUID.randomUUID();
     }
 
     @Override
@@ -88,10 +88,10 @@ public class CalcLocalSplitsOperator extends AbstractStreamOperator<Tuple3<Integ
     @Override
     public void processElement(StreamRecord<Tuple2<Integer, Histogram>> element) throws Exception {
         if (null == splitFinder) {
-            sharedStorageContext.invoke(
+            sharedObjectsContext.invoke(
                     (getter, setter) -> {
                         splitFinder =
-                                new SplitFinder(getter.get(SharedStorageConstants.TRAIN_CONTEXT));
+                                new SplitFinder(getter.get(SharedObjectsConstants.TRAIN_CONTEXT));
                         splitFinderState.update(Collections.singletonList(splitFinder));
                     });
         }
@@ -100,16 +100,16 @@ public class CalcLocalSplitsOperator extends AbstractStreamOperator<Tuple3<Integ
         int pairId = value.f0;
         Histogram histogram = value.f1;
         LOG.debug("Received histogram for pairId: {}", pairId);
-        sharedStorageContext.invoke(
+        sharedObjectsContext.invoke(
                 (getter, setter) -> {
-                    List<LearningNode> layer = getter.get(SharedStorageConstants.LAYER);
+                    List<LearningNode> layer = getter.get(SharedObjectsConstants.LAYER);
                     if (layer.size() == 0) {
                         layer =
                                 Collections.singletonList(
-                                        getter.get(SharedStorageConstants.ROOT_LEARNING_NODE));
+                                        getter.get(SharedObjectsConstants.ROOT_LEARNING_NODE));
                     }
 
-                    int[] nodeFeaturePairs = getter.get(SharedStorageConstants.NODE_FEATURE_PAIRS);
+                    int[] nodeFeaturePairs = getter.get(SharedObjectsConstants.NODE_FEATURE_PAIRS);
                     int nodeId = nodeFeaturePairs[2 * pairId];
                     int featureId = nodeFeaturePairs[2 * pairId + 1];
                     LearningNode node = layer.get(nodeId);
@@ -118,7 +118,7 @@ public class CalcLocalSplitsOperator extends AbstractStreamOperator<Tuple3<Integ
                             splitFinder.calc(
                                     node,
                                     featureId,
-                                    getter.get(SharedStorageConstants.LEAVES).size(),
+                                    getter.get(SharedObjectsConstants.LEAVES).size(),
                                     histogram);
                     output.collect(new StreamRecord<>(Tuple3.of(nodeId, pairId, bestSplit)));
                 });
@@ -132,12 +132,12 @@ public class CalcLocalSplitsOperator extends AbstractStreamOperator<Tuple3<Integ
     }
 
     @Override
-    public void onSharedStorageContextSet(SharedStorageContext context) {
-        this.sharedStorageContext = context;
+    public void onSharedObjectsContextSet(SharedObjectsContext context) {
+        this.sharedObjectsContext = context;
     }
 
     @Override
-    public String getSharedStorageAccessorID() {
-        return sharedStorageAccessorID;
+    public String getSharedObjectsAccessorID() {
+        return sharedObjectsAccessorID;
     }
 }

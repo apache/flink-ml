@@ -16,9 +16,10 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.sharedstorage;
+package org.apache.flink.ml.common.sharedobjects;
 
 import org.apache.flink.annotation.Experimental;
+import org.apache.flink.api.dag.Transformation;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
 import java.io.Serializable;
@@ -26,54 +27,52 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The builder of the subgraph that will be executed with a common shared storage. Users can only
+ * The builder of the subgraph that will be executed with a common shared objects. Users can only
  * create data streams from {@code inputs}. Users can not refer to data streams outside, and can not
  * add sources/sinks.
  *
- * <p>The shared storage body requires all streams accessing the shared storage, i.e., {@link
- * SharedStorageBodyResult#accessors} have same parallelism and can be co-located.
+ * <p>The shared objects body requires all transformations accessing the shared objects, i.e.,
+ * {@link SharedObjectsBodyResult#coLocatedTransformations}, to have same parallelism and can be
+ * co-located.
  */
 @Experimental
 @FunctionalInterface
-public interface SharedStorageBody extends Serializable {
+public interface SharedObjectsBody extends Serializable {
 
     /**
-     * This method creates the subgraph for the shared storage body.
+     * This method creates the subgraph for the shared objects body.
      *
      * @param inputs Input data streams.
      * @return Result of the subgraph, including output data streams, data streams with access to
-     *     the shared storage, and a mapping from share items to their owners.
+     *     the shared objects, and a mapping from share items to their owners.
      */
-    SharedStorageBodyResult process(List<DataStream<?>> inputs);
+    SharedObjectsBodyResult process(List<DataStream<?>> inputs);
 
     /**
-     * The result of a {@link SharedStorageBody}, including output data streams, data streams with
-     * access to the shared storage, and a mapping from descriptors of share items to their owners.
+     * The result of a {@link SharedObjectsBody}, including output data streams, data streams with
+     * access to the shared objects, and a mapping from descriptors of share items to their owners.
      */
     @Experimental
-    class SharedStorageBodyResult {
+    class SharedObjectsBodyResult {
         /** A list of output streams. */
         private final List<DataStream<?>> outputs;
 
-        /**
-         * A list of data streams which access to the shared storage. All data streams in the list
-         * should implement {@link SharedStorageStreamOperator}.
-         */
-        private final List<DataStream<?>> accessors;
+        /** A list of {@link Transformation}s that should be co-located. */
+        private final List<Transformation<?>> coLocatedTransformations;
 
         /**
          * A mapping from descriptors of shared items to their owners. The owner is specified by
-         * {@link SharedStorageStreamOperator#getSharedStorageAccessorID()}, which must be kept
-         * unchanged for an instance of {@link SharedStorageStreamOperator}.
+         * {@link SharedObjectsStreamOperator#getSharedObjectsAccessorID()}, which must be kept
+         * unchanged for an instance of {@link SharedObjectsStreamOperator}.
          */
-        private final Map<ItemDescriptor<?>, SharedStorageStreamOperator> ownerMap;
+        private final Map<ItemDescriptor<?>, SharedObjectsStreamOperator> ownerMap;
 
-        public SharedStorageBodyResult(
+        public SharedObjectsBodyResult(
                 List<DataStream<?>> outputs,
-                List<DataStream<?>> accessors,
-                Map<ItemDescriptor<?>, SharedStorageStreamOperator> ownerMap) {
+                List<Transformation<?>> coLocatedTransformations,
+                Map<ItemDescriptor<?>, SharedObjectsStreamOperator> ownerMap) {
             this.outputs = outputs;
-            this.accessors = accessors;
+            this.coLocatedTransformations = coLocatedTransformations;
             this.ownerMap = ownerMap;
         }
 
@@ -81,11 +80,11 @@ public interface SharedStorageBody extends Serializable {
             return outputs;
         }
 
-        public List<DataStream<?>> getAccessors() {
-            return accessors;
+        public List<Transformation<?>> getCoLocatedTransformations() {
+            return coLocatedTransformations;
         }
 
-        public Map<ItemDescriptor<?>, SharedStorageStreamOperator> getOwnerMap() {
+        public Map<ItemDescriptor<?>, SharedObjectsStreamOperator> getOwnerMap() {
             return ownerMap;
         }
     }

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.sharedstorage;
+package org.apache.flink.ml.common.sharedobjects;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.functions.KeySelector;
@@ -31,13 +31,13 @@ import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.util.OutputTag;
 
-/** The operator wrapper for {@link AbstractSharedStorageWrapperOperator}. */
-class SharedStorageWrapper<T> implements OperatorWrapper<T, T> {
+/** The operator wrapper for {@link AbstractSharedObjectsWrapperOperator}. */
+class SharedObjectsWrapper<T> implements OperatorWrapper<T, T> {
 
-    /** Shared storage context. */
-    private final SharedStorageContextImpl context;
+    /** Shared objects context. */
+    private final SharedObjectsContextImpl context;
 
-    public SharedStorageWrapper(SharedStorageContextImpl context) {
+    public SharedObjectsWrapper(SharedObjectsContextImpl context) {
         this.context = context;
     }
 
@@ -47,12 +47,12 @@ class SharedStorageWrapper<T> implements OperatorWrapper<T, T> {
             StreamOperatorFactory<T> operatorFactory) {
         Class<? extends StreamOperator> operatorClass =
                 operatorFactory.getStreamOperatorClass(getClass().getClassLoader());
-        if (SharedStorageStreamOperator.class.isAssignableFrom(operatorClass)) {
+        if (SharedObjectsStreamOperator.class.isAssignableFrom(operatorClass)) {
             if (OneInputStreamOperator.class.isAssignableFrom(operatorClass)) {
-                return new OneInputSharedStorageWrapperOperator<>(
+                return new OneInputSharedObjectsWrapperOperator<>(
                         operatorParameters, operatorFactory, context);
             } else if (TwoInputStreamOperator.class.isAssignableFrom(operatorClass)) {
-                return new TwoInputSharedStorageWrapperOperator<>(
+                return new TwoInputSharedObjectsWrapperOperator<>(
                         operatorParameters, operatorFactory, context);
             } else {
                 return nowrap(operatorParameters, operatorFactory);
@@ -79,12 +79,12 @@ class SharedStorageWrapper<T> implements OperatorWrapper<T, T> {
         Class<? extends StreamOperator> operatorClass =
                 operatorFactory.getStreamOperatorClass(getClass().getClassLoader());
         if (OneInputStreamOperator.class.isAssignableFrom(operatorClass)) {
-            return OneInputSharedStorageWrapperOperator.class;
+            return OneInputSharedObjectsWrapperOperator.class;
         } else if (TwoInputStreamOperator.class.isAssignableFrom(operatorClass)) {
-            return TwoInputSharedStorageWrapperOperator.class;
+            return TwoInputSharedObjectsWrapperOperator.class;
         } else {
             throw new UnsupportedOperationException(
-                    "Unsupported operator class for shared storage wrapper: " + operatorClass);
+                    "Unsupported operator class for shared objects wrapper: " + operatorClass);
         }
     }
 

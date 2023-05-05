@@ -33,8 +33,8 @@ import org.apache.flink.ml.common.gbt.defs.TrainContext;
 import org.apache.flink.ml.common.gbt.typeinfo.BinnedInstanceSerializer;
 import org.apache.flink.ml.common.gbt.typeinfo.LearningNodeSerializer;
 import org.apache.flink.ml.common.gbt.typeinfo.NodeSerializer;
-import org.apache.flink.ml.common.sharedstorage.ItemDescriptor;
-import org.apache.flink.ml.common.sharedstorage.SharedStorageUtils;
+import org.apache.flink.ml.common.sharedobjects.ItemDescriptor;
+import org.apache.flink.ml.common.sharedobjects.SharedObjectsUtils;
 import org.apache.flink.ml.linalg.typeinfo.OptimizedDoublePrimitiveArraySerializer;
 
 import java.util.ArrayList;
@@ -42,11 +42,11 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Stores constants used for {@link SharedStorageUtils} in {@link GBTRunner}.
+ * Stores constants used for {@link SharedObjectsUtils} in {@link GBTRunner}.
  *
  * <p>In the iteration, some data needs to be shared and accessed between subtasks of different
  * operators within one JVM to reduce memory footprint and communication cost. We use {@link
- * SharedStorageUtils} with co-location mechanism to achieve such purpose.
+ * SharedObjectsUtils} with co-location mechanism to achieve such purpose.
  *
  * <p>All shared data items have corresponding {@link ItemDescriptor}s, and can be read/written
  * through {@link ItemDescriptor}s from different operator subtasks. Note that every shared item has
@@ -55,7 +55,7 @@ import java.util.List;
  * <p>This class records all {@link ItemDescriptor}s used in {@link GBTRunner} and their owners.
  */
 @Internal
-public class SharedStorageConstants {
+public class SharedObjectsConstants {
 
     /** Instances (after binned). */
     static final ItemDescriptor<BinnedInstance[]> INSTANCES =

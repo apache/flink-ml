@@ -16,10 +16,11 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.sharedstorage;
+package org.apache.flink.ml.common.sharedobjects;
 
 import org.apache.flink.annotation.Experimental;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.util.Preconditions;
 
 import java.io.Serializable;
 
@@ -32,27 +33,29 @@ import java.io.Serializable;
 public class ItemDescriptor<T> implements Serializable {
 
     /** Name of the item. */
-    public String key;
+    public final String name;
 
     /** Type serializer. */
-    public TypeSerializer<T> serializer;
+    public final TypeSerializer<T> serializer;
 
     /** Initialize value. */
-    public T initVal;
+    public final T initVal;
 
-    private ItemDescriptor(String key, TypeSerializer<T> serializer, T initVal) {
-        this.key = key;
+    private ItemDescriptor(String name, TypeSerializer<T> serializer, T initVal) {
+        Preconditions.checkNotNull(
+                initVal, "Cannot use `null` as the initial value of a shared item.");
+        this.name = name;
         this.serializer = serializer;
         this.initVal = initVal;
     }
 
-    public static <T> ItemDescriptor<T> of(String key, TypeSerializer<T> serializer, T initVal) {
-        return new ItemDescriptor<>(key, serializer, initVal);
+    public static <T> ItemDescriptor<T> of(String name, TypeSerializer<T> serializer, T initVal) {
+        return new ItemDescriptor<>(name, serializer, initVal);
     }
 
     @Override
     public int hashCode() {
-        return key.hashCode();
+        return name.hashCode();
     }
 
     @Override
@@ -64,12 +67,12 @@ public class ItemDescriptor<T> implements Serializable {
             return false;
         }
         ItemDescriptor<?> that = (ItemDescriptor<?>) o;
-        return key.equals(that.key);
+        return name.equals(that.name);
     }
 
     @Override
     public String toString() {
         return String.format(
-                "ItemDescriptor{key='%s', serializer=%s, initVal=%s}", key, serializer, initVal);
+                "ItemDescriptor{name='%s', serializer=%s, initVal=%s}", name, serializer, initVal);
     }
 }

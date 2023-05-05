@@ -16,22 +16,22 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.sharedstorage;
+package org.apache.flink.ml.common.sharedobjects;
 
 import org.apache.flink.annotation.Experimental;
 import org.apache.flink.util.function.BiConsumerWithException;
 
 /**
- * Context for shared storage. Every operator implementing {@link SharedStorageStreamOperator} will
- * have an instance of this context set by {@link
- * SharedStorageStreamOperator#onSharedStorageContextSet} in runtime. User defined logic can be
+ * Context for shared objects. Every operator implementing {@link SharedObjectsStreamOperator} will
+ * get an instance of this context set by {@link
+ * SharedObjectsStreamOperator#onSharedObjectsContextSet} in runtime. User-defined logic can be
  * invoked through {@link #invoke} with the access to shared items.
  */
 @Experimental
-public interface SharedStorageContext {
+public interface SharedObjectsContext {
 
     /**
-     * Invoke user defined function with provided getters/setters of the shared storage.
+     * Invoke user defined function with provided getters/setters of the shared objects.
      *
      * @param func User defined function where share items can be accessed through getters/setters.
      * @throws Exception Possible exception.

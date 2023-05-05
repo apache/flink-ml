@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.sharedstorage;
+package org.apache.flink.ml.common.sharedobjects;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.tuple.Tuple3;
@@ -33,43 +33,56 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** A shared storage to support access through subtasks of different operators. */
-class SharedStorage {
-    private static final Map<Tuple3<StorageID, Integer, String>, Object> m =
+/**
+ * Stores and manages all shared objects. Every shared object is identified by a tuple of (Pool ID,
+ * subtask ID, name). Every call of {@link SharedObjectsUtils#withSharedObjects} generated a
+ * different {@link PoolID}, so that they do not interfere with each other.
+ */
+class SharedObjectsPools {
+
+    // Stores values of all shared objects.
+    private static final Map<Tuple3<PoolID, Integer, String>, Object> values =
             new ConcurrentHashMap<>();
 
-    private static final Map<Tuple3<StorageID, Integer, String>, String> owners =
+    /**
+     * Stores owners of all shared objects, where the owner is identified by the accessor ID
+     * obtained from {@link SharedObjectsStreamOperator#getSharedObjectsAccessorID()}.
+     */
+    private static final Map<Tuple3<PoolID, Integer, String>, String> owners =
             new ConcurrentHashMap<>();
 
-    private static final ConcurrentHashMap<Tuple3<StorageID, Integer, String>, Integer>
-            numItemRefs = new ConcurrentHashMap<>();
+    // Stores number of references of all shared objects. A shared object is removed when its number
+    // of references decreased to 0.
+    private static final ConcurrentHashMap<Tuple3<PoolID, Integer, String>, Integer> numRefs =
+            new ConcurrentHashMap<>();
 
-    static int incRef(Tuple3<StorageID, Integer, String> t) {
-        return numItemRefs.compute(t, (k, oldV) -> null == oldV ? 1 : oldV + 1);
+    @SuppressWarnings("UnusedReturnValue")
+    static int incRef(Tuple3<PoolID, Integer, String> itemId) {
+        return numRefs.compute(itemId, (k, oldV) -> null == oldV ? 1 : oldV + 1);
     }
 
-    static int decRef(Tuple3<StorageID, Integer, String> t) {
-        int numRefs = numItemRefs.compute(t, (k, oldV) -> oldV - 1);
-        if (numRefs == 0) {
-            m.remove(t);
-            owners.remove(t);
-            numItemRefs.remove(t);
+    @SuppressWarnings("UnusedReturnValue")
+    static int decRef(Tuple3<PoolID, Integer, String> itemId) {
+        int num = numRefs.compute(itemId, (k, oldV) -> oldV - 1);
+        if (num == 0) {
+            values.remove(itemId);
+            owners.remove(itemId);
+            numRefs.remove(itemId);
         }
-        return numRefs;
+        return num;
     }
 
-    /** Gets a {@link Reader} of shared item identified by (storageID, subtaskId, descriptor). */
-    static <T> Reader<T> getReader(
-            StorageID storageID, int subtaskId, ItemDescriptor<T> descriptor) {
-        Tuple3<StorageID, Integer, String> t = Tuple3.of(storageID, subtaskId, descriptor.key);
-        Reader<T> reader = new Reader<>(t);
-        incRef(t);
+    /** Gets a {@link Reader} of a shared object. */
+    static <T> Reader<T> getReader(PoolID poolID, int subtaskId, ItemDescriptor<T> descriptor) {
+        Tuple3<PoolID, Integer, String> itemId = Tuple3.of(poolID, subtaskId, descriptor.name);
+        Reader<T> reader = new Reader<>(itemId);
+        incRef(itemId);
         return reader;
     }
 
-    /** Gets a {@link Writer} of shared item identified by (storageID, subtaskId, key). */
+    /** Gets a {@link Writer} of a shared object. */
     static <T> Writer<T> getWriter(
-            StorageID storageID,
+            PoolID poolId,
             int subtaskId,
             ItemDescriptor<T> descriptor,
             String ownerId,
@@ -77,17 +90,17 @@ class SharedStorage {
             StreamTask<?, ?> containingTask,
             StreamingRuntimeContext runtimeContext,
             StateInitializationContext stateInitializationContext) {
-        Tuple3<StorageID, Integer, String> t = Tuple3.of(storageID, subtaskId, descriptor.key);
-        String lastOwner = owners.putIfAbsent(t, ownerId);
+        Tuple3<PoolID, Integer, String> objId = Tuple3.of(poolId, subtaskId, descriptor.name);
+        String lastOwner = owners.putIfAbsent(objId, ownerId);
         if (null != lastOwner) {
             throw new IllegalStateException(
                     String.format(
                             "The shared item (%s, %s, %s) already has a writer %s.",
-                            storageID, subtaskId, descriptor.key, ownerId));
+                            poolId, subtaskId, descriptor.name, ownerId));
         }
         Writer<T> writer =
                 new Writer<>(
-                        t,
+                        objId,
                         ownerId,
                         descriptor.serializer,
                         containingTask,
@@ -95,15 +108,15 @@ class SharedStorage {
                         stateInitializationContext,
                         operatorID);
         writer.set(descriptor.initVal);
-        incRef(t);
+        incRef(objId);
         return writer;
     }
 
     static class Reader<T> {
-        protected final Tuple3<StorageID, Integer, String> t;
+        protected final Tuple3<PoolID, Integer, String> objId;
 
-        Reader(Tuple3<StorageID, Integer, String> t) {
-            this.t = t;
+        Reader(Tuple3<PoolID, Integer, String> objId) {
+            this.objId = objId;
         }
 
         T get() {
@@ -112,7 +125,7 @@ class SharedStorage {
             long waitTime = 10;
             do {
                 //noinspection unchecked
-                T value = (T) m.get(t);
+                T value = (T) values.get(objId);
                 if (null != value) {
                     return value;
                 }
@@ -124,11 +137,12 @@ class SharedStorage {
                 waitTime *= 2;
             } while (waitTime < 10 * 1000);
             throw new IllegalStateException(
-                    String.format("Failed to get value of %s after waiting %d ms.", t, waitTime));
+                    String.format(
+                            "Failed to get value of %s after waiting %d ms.", objId, waitTime));
         }
 
         void remove() {
-            decRef(t);
+            decRef(objId);
         }
     }
 
@@ -138,14 +152,14 @@ class SharedStorage {
         private boolean isDirty;
 
         Writer(
-                Tuple3<StorageID, Integer, String> t,
+                Tuple3<PoolID, Integer, String> itemId,
                 String ownerId,
                 TypeSerializer<T> serializer,
                 StreamTask<?, ?> containingTask,
                 StreamingRuntimeContext runtimeContext,
                 StateInitializationContext stateInitializationContext,
                 OperatorID operatorID) {
-            super(t);
+            super(itemId);
             this.ownerId = ownerId;
             try {
                 cache =
@@ -159,7 +173,7 @@ class SharedStorage {
                 if (iterator.hasNext()) {
                     T value = iterator.next();
                     ensureOwner();
-                    m.put(t, value);
+                    values.put(itemId, value);
                 }
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -170,12 +184,12 @@ class SharedStorage {
         private void ensureOwner() {
             // Double-checks the owner, because a writer may call this method after the key removed
             // and re-added by other operators.
-            Preconditions.checkState(owners.get(t).equals(ownerId));
+            Preconditions.checkState(owners.get(objId).equals(ownerId));
         }
 
         void set(T value) {
             ensureOwner();
-            m.put(t, value);
+            values.put(objId, value);
             isDirty = true;
         }
 

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.sharedstorage;
+package org.apache.flink.ml.common.sharedobjects;
 
 import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
@@ -44,14 +44,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Tests the {@link SharedStorageUtils}. */
-public class SharedStorageUtilsTest {
+/** Tests the {@link SharedObjectsUtils}. */
+public class SharedObjectsUtilsTest {
 
     private static final ItemDescriptor<Long> SUM =
             ItemDescriptor.of("sum", LongSerializer.INSTANCE, 0L);
     @Rule public TemporaryFolder tempFolder = new TemporaryFolder();
 
-    static SharedStorageBody.SharedStorageBodyResult sharedStorageBody(List<DataStream<?>> inputs) {
+    static SharedObjectsBody.SharedObjectsBodyResult sharedObjectsBody(List<DataStream<?>> inputs) {
         //noinspection unchecked
         DataStream<Long> data = (DataStream<Long>) inputs.get(0);
 
@@ -63,21 +63,23 @@ public class SharedStorageUtilsTest {
         SingleOutputStreamOperator<Long> afterBOp =
                 afterAOp.transform("b", TypeInformation.of(Long.class), bOp);
 
-        Map<ItemDescriptor<?>, SharedStorageStreamOperator> ownerMap = new HashMap<>();
+        Map<ItemDescriptor<?>, SharedObjectsStreamOperator> ownerMap = new HashMap<>();
         ownerMap.put(SUM, aOp);
 
-        return new SharedStorageBody.SharedStorageBodyResult(
-                Collections.singletonList(afterBOp), Arrays.asList(afterAOp, afterBOp), ownerMap);
+        return new SharedObjectsBody.SharedObjectsBodyResult(
+                Collections.singletonList(afterBOp),
+                Arrays.asList(afterAOp.getTransformation(), afterBOp.getTransformation()),
+                ownerMap);
     }
 
     @Test
-    public void testSharedStorage() throws Exception {
+    public void testSharedObjects() throws Exception {
         StreamExecutionEnvironment env = TestUtils.getExecutionEnvironment();
 
         DataStream<Long> data = env.fromSequence(1, 100);
         List<DataStream<?>> outputs =
-                SharedStorageUtils.withSharedStorage(
-                        Collections.singletonList(data), SharedStorageUtilsTest::sharedStorageBody);
+                SharedObjectsUtils.withSharedObjects(
+                        Collections.singletonList(data), SharedObjectsUtilsTest::sharedObjectsBody);
         //noinspection unchecked
         DataStream<Long> partitionSum = (DataStream<Long>) outputs.get(0);
         DataStream<Long> allSum = DataStreamUtils.reduce(partitionSum, new SumReduceFunction());
@@ -90,29 +92,29 @@ public class SharedStorageUtilsTest {
     /** Operator A: add input elements to the shared {@link #SUM}. */
     static class AOperator extends AbstractStreamOperator<Long>
             implements OneInputStreamOperator<Long, Long>,
-                    SharedStorageStreamOperator,
+                    SharedObjectsStreamOperator,
                     BoundedOneInput {
 
-        private final String sharedStorageAccessorID;
-        private SharedStorageContext sharedStorageContext;
+        private final String sharedObjectsAccessorID;
+        private SharedObjectsContext sharedObjectsContext;
 
         public AOperator() {
-            sharedStorageAccessorID = getClass().getSimpleName() + "-" + UUID.randomUUID();
+            sharedObjectsAccessorID = getClass().getSimpleName() + "-" + UUID.randomUUID();
         }
 
         @Override
-        public void onSharedStorageContextSet(SharedStorageContext context) {
-            this.sharedStorageContext = context;
+        public void onSharedObjectsContextSet(SharedObjectsContext context) {
+            this.sharedObjectsContext = context;
         }
 
         @Override
-        public String getSharedStorageAccessorID() {
-            return sharedStorageAccessorID;
+        public String getSharedObjectsAccessorID() {
+            return sharedObjectsAccessorID;
         }
 
         @Override
         public void processElement(StreamRecord<Long> element) throws Exception {
-            sharedStorageContext.invoke(
+            sharedObjectsContext.invoke(
                     (getter, setter) -> {
                         Long currentSum = getter.get(SUM);
                         setter.set(SUM, currentSum + element.getValue());
@@ -128,28 +130,28 @@ public class SharedStorageUtilsTest {
 
     /** Operator B: when input ends, get the value from shared {@link #SUM}. */
     static class BOperator extends AbstractStreamOperator<Long>
-            implements OneInputStreamOperator<Long, Long>, SharedStorageStreamOperator {
+            implements OneInputStreamOperator<Long, Long>, SharedObjectsStreamOperator {
 
-        private final String sharedStorageAccessorID;
-        private SharedStorageContext sharedStorageContext;
+        private final String sharedObjectsAccessorID;
+        private SharedObjectsContext sharedObjectsContext;
 
         public BOperator() {
-            sharedStorageAccessorID = getClass().getSimpleName() + "-" + UUID.randomUUID();
+            sharedObjectsAccessorID = getClass().getSimpleName() + "-" + UUID.randomUUID();
         }
 
         @Override
-        public void onSharedStorageContextSet(SharedStorageContext context) {
-            this.sharedStorageContext = context;
+        public void onSharedObjectsContextSet(SharedObjectsContext context) {
+            this.sharedObjectsContext = context;
         }
 
         @Override
-        public String getSharedStorageAccessorID() {
-            return sharedStorageAccessorID;
+        public String getSharedObjectsAccessorID() {
+            return sharedObjectsAccessorID;
         }
 
         @Override
         public void processElement(StreamRecord<Long> element) throws Exception {
-            sharedStorageContext.invoke(
+            sharedObjectsContext.invoke(
                     (getter, setter) -> {
                         output.collect(new StreamRecord<>(getter.get(SUM)));
                     });

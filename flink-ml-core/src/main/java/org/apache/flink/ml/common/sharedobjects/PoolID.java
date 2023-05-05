@@ -16,23 +16,17 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.sharedstorage;
+package org.apache.flink.ml.common.sharedobjects;
 
-/** Interface for all operators that need to access the shared storage. */
-public interface SharedStorageStreamOperator {
+import org.apache.flink.util.AbstractID;
 
-    /**
-     * Set the shared storage context in runtime.
-     *
-     * @param context The shared storage context.
-     */
-    void onSharedStorageContextSet(SharedStorageContext context);
+/** ID of a pool for shared objects. */
+class PoolID extends AbstractID {
+    private static final long serialVersionUID = 1L;
 
-    /**
-     * Get a unique ID to represent the operator instance. The ID must be kept unchanged through its
-     * lifetime.
-     *
-     * @return A unique ID.
-     */
-    String getSharedStorageAccessorID();
+    public PoolID(byte[] bytes) {
+        super(bytes);
+    }
+
+    public PoolID() {}
 }

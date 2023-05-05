@@ -16,9 +16,10 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.sharedstorage;
+package org.apache.flink.ml.common.sharedobjects;
 
 import org.apache.flink.annotation.Experimental;
+import org.apache.flink.api.dag.Transformation;
 import org.apache.flink.iteration.compile.DraftExecutionEnvironment;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -31,16 +32,16 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/** Utility class to support {@link SharedStorage} in DataStream. */
+/** Utility class to support shared objects mechanism in DataStream. */
 @Experimental
-public class SharedStorageUtils {
+public class SharedObjectsUtils {
 
     /**
-     * Support read/write access of data in the shared storage from operators which implements
-     * {@link SharedStorageStreamOperator}.
+     * Support read/write access of data in the shared objects from operators which implements
+     * {@link SharedObjectsStreamOperator}.
      *
-     * <p>In the shared storage `body`, users build the subgraph with data streams only from
-     * `inputs`, return streams that have access to the shared storage, and return the mapping from
+     * <p>In the shared objects `body`, users build the subgraph with data streams only from
+     * `inputs`, return streams that have access to the shared objects, and return the mapping from
      * shared items to their owners.
      *
      * @param inputs Input data streams.
@@ -48,28 +49,28 @@ public class SharedStorageUtils {
      *     item.
      * @return The output data streams.
      */
-    public static List<DataStream<?>> withSharedStorage(
-            List<DataStream<?>> inputs, SharedStorageBody body) {
+    public static List<DataStream<?>> withSharedObjects(
+            List<DataStream<?>> inputs, SharedObjectsBody body) {
         Preconditions.checkArgument(inputs.size() > 0);
         StreamExecutionEnvironment env = inputs.get(0).getExecutionEnvironment();
         String coLocationID = "shared-storage-" + UUID.randomUUID();
-        SharedStorageContextImpl context = new SharedStorageContextImpl();
+        SharedObjectsContextImpl context = new SharedObjectsContextImpl();
 
         DraftExecutionEnvironment draftEnv =
-                new DraftExecutionEnvironment(env, new SharedStorageWrapper<>(context));
+                new DraftExecutionEnvironment(env, new SharedObjectsWrapper<>(context));
         List<DataStream<?>> draftSources =
                 inputs.stream()
                         .map(
                                 dataStream ->
                                         draftEnv.addDraftSource(dataStream, dataStream.getType()))
                         .collect(Collectors.toList());
-        SharedStorageBody.SharedStorageBodyResult result = body.process(draftSources);
+        SharedObjectsBody.SharedObjectsBodyResult result = body.process(draftSources);
 
         List<DataStream<?>> draftOutputs = result.getOutputs();
-        Map<ItemDescriptor<?>, SharedStorageStreamOperator> rawOwnerMap = result.getOwnerMap();
+        Map<ItemDescriptor<?>, SharedObjectsStreamOperator> rawOwnerMap = result.getOwnerMap();
         Map<ItemDescriptor<?>, String> ownerMap = new HashMap<>();
         for (ItemDescriptor<?> item : rawOwnerMap.keySet()) {
-            ownerMap.put(item, rawOwnerMap.get(item).getSharedStorageAccessorID());
+            ownerMap.put(item, rawOwnerMap.get(item).getSharedObjectsAccessorID());
         }
         context.setOwnerMap(ownerMap);
 
@@ -78,8 +79,8 @@ public class SharedStorageUtils {
         }
         draftEnv.copyToActualEnvironment();
 
-        for (DataStream<?> accessor : result.getAccessors()) {
-            DataStream<?> ds = draftEnv.getActualStream(accessor.getTransformation().getId());
+        for (Transformation<?> transformation : result.getCoLocatedTransformations()) {
+            DataStream<?> ds = draftEnv.getActualStream(transformation.getId());
             ds.getTransformation().setCoLocationGroupKey(coLocationID);
         }
 

@@ -21,8 +21,8 @@ package org.apache.flink.ml.common.gbt.operators;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.ml.common.gbt.defs.Split;
-import org.apache.flink.ml.common.sharedstorage.SharedStorageContext;
-import org.apache.flink.ml.common.sharedstorage.SharedStorageStreamOperator;
+import org.apache.flink.ml.common.sharedobjects.SharedObjectsContext;
+import org.apache.flink.ml.common.sharedobjects.SharedObjectsStreamOperator;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
@@ -45,30 +45,30 @@ import java.util.UUID;
  */
 public class ReduceSplitsOperator extends AbstractStreamOperator<Tuple2<Integer, Split>>
         implements OneInputStreamOperator<Tuple3<Integer, Integer, Split>, Tuple2<Integer, Split>>,
-                SharedStorageStreamOperator {
+                SharedObjectsStreamOperator {
 
     private static final Logger LOG = LoggerFactory.getLogger(ReduceSplitsOperator.class);
 
-    private final String sharedStorageAccessorID;
+    private final String sharedObjectsAccessorID;
 
-    private transient SharedStorageContext sharedStorageContext;
+    private transient SharedObjectsContext sharedObjectsContext;
 
     private Map<Integer, BitSet> nodeFeatureMap;
     private Map<Integer, Split> nodeBestSplit;
     private Map<Integer, Integer> nodeFeatureCounter;
 
     public ReduceSplitsOperator() {
-        sharedStorageAccessorID = getClass().getSimpleName() + "-" + UUID.randomUUID();
+        sharedObjectsAccessorID = getClass().getSimpleName() + "-" + UUID.randomUUID();
     }
 
     @Override
-    public void onSharedStorageContextSet(SharedStorageContext context) {
-        sharedStorageContext = context;
+    public void onSharedObjectsContextSet(SharedObjectsContext context) {
+        sharedObjectsContext = context;
     }
 
     @Override
-    public String getSharedStorageAccessorID() {
-        return sharedStorageAccessorID;
+    public String getSharedObjectsAccessorID() {
+        return sharedObjectsAccessorID;
     }
 
     @Override
@@ -84,10 +84,10 @@ public class ReduceSplitsOperator extends AbstractStreamOperator<Tuple2<Integer,
         if (nodeFeatureMap.isEmpty()) {
             Preconditions.checkState(nodeBestSplit.isEmpty());
             nodeFeatureCounter.clear();
-            sharedStorageContext.invoke(
+            sharedObjectsContext.invoke(
                     (getter, setter) -> {
                         int[] nodeFeaturePairs =
-                                getter.get(SharedStorageConstants.NODE_FEATURE_PAIRS);
+                                getter.get(SharedObjectsConstants.NODE_FEATURE_PAIRS);
                         for (int i = 0; i < nodeFeaturePairs.length / 2; i += 1) {
                             int nodeId = nodeFeaturePairs[2 * i];
                             nodeFeatureCounter.compute(nodeId, (k, v) -> null == v ? 1 : v + 1);
@@ -103,9 +103,9 @@ public class ReduceSplitsOperator extends AbstractStreamOperator<Tuple2<Integer,
         if (featureMap.isEmpty()) {
             LOG.debug("Received split for new node {}", nodeId);
         }
-        sharedStorageContext.invoke(
+        sharedObjectsContext.invoke(
                 (getter, setter) -> {
-                    int[] nodeFeaturePairs = getter.get(SharedStorageConstants.NODE_FEATURE_PAIRS);
+                    int[] nodeFeaturePairs = getter.get(SharedObjectsConstants.NODE_FEATURE_PAIRS);
                     Preconditions.checkState(nodeId == nodeFeaturePairs[pairId * 2]);
                     int featureId = nodeFeaturePairs[pairId * 2 + 1];
                     Preconditions.checkState(!featureMap.get(featureId));

@@ -30,8 +30,8 @@ import org.apache.flink.ml.common.gbt.defs.LearningNode;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
 import org.apache.flink.ml.common.gbt.typeinfo.BinnedInstanceSerializer;
 import org.apache.flink.ml.common.lossfunc.LossFunc;
-import org.apache.flink.ml.common.sharedstorage.SharedStorageContext;
-import org.apache.flink.ml.common.sharedstorage.SharedStorageStreamOperator;
+import org.apache.flink.ml.common.sharedobjects.SharedObjectsContext;
+import org.apache.flink.ml.common.sharedobjects.SharedObjectsStreamOperator;
 import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.runtime.state.StateInitializationContext;
@@ -61,13 +61,13 @@ public class CacheDataCalcLocalHistsOperator
         extends AbstractStreamOperator<Tuple3<Integer, Integer, Histogram>>
         implements TwoInputStreamOperator<Row, TrainContext, Tuple3<Integer, Integer, Histogram>>,
                 IterationListener<Tuple3<Integer, Integer, Histogram>>,
-                SharedStorageStreamOperator {
+                SharedObjectsStreamOperator {
 
     private static final String TREE_INITIALIZER_STATE_NAME = "tree_initializer";
     private static final String HIST_BUILDER_STATE_NAME = "hist_builder";
 
     private final BoostingStrategy strategy;
-    private final String sharedStorageAccessorID;
+    private final String sharedObjectsAccessorID;
 
     // States of local data.
     private transient ListStateWithCache<BinnedInstance> instancesCollecting;
@@ -75,12 +75,12 @@ public class CacheDataCalcLocalHistsOperator
     private transient TreeInitializer treeInitializer;
     private transient ListStateWithCache<HistBuilder> histBuilderState;
     private transient HistBuilder histBuilder;
-    private transient SharedStorageContext sharedStorageContext;
+    private transient SharedObjectsContext sharedObjectsContext;
 
     public CacheDataCalcLocalHistsOperator(BoostingStrategy strategy) {
         super();
         this.strategy = strategy;
-        sharedStorageAccessorID = getClass().getSimpleName() + "-" + UUID.randomUUID();
+        sharedObjectsAccessorID = getClass().getSimpleName() + "-" + UUID.randomUUID();
     }
 
     @Override
@@ -149,9 +149,9 @@ public class CacheDataCalcLocalHistsOperator
     @Override
     public void processElement2(StreamRecord<TrainContext> streamRecord) throws Exception {
         TrainContext rawTrainContext = streamRecord.getValue();
-        sharedStorageContext.invoke(
+        sharedObjectsContext.invoke(
                 (getter, setter) ->
-                        setter.set(SharedStorageConstants.TRAIN_CONTEXT, rawTrainContext));
+                        setter.set(SharedObjectsConstants.TRAIN_CONTEXT, rawTrainContext));
     }
 
     public void onEpochWatermarkIncremented(
@@ -159,18 +159,18 @@ public class CacheDataCalcLocalHistsOperator
             throws Exception {
         if (0 == epochWatermark) {
             // Initializes local state in first round.
-            sharedStorageContext.invoke(
+            sharedObjectsContext.invoke(
                     (getter, setter) -> {
                         BinnedInstance[] instances =
                                 (BinnedInstance[])
                                         IteratorUtils.toArray(
                                                 instancesCollecting.get().iterator(),
                                                 BinnedInstance.class);
-                        setter.set(SharedStorageConstants.INSTANCES, instances);
+                        setter.set(SharedObjectsConstants.INSTANCES, instances);
                         instancesCollecting.clear();
 
                         TrainContext rawTrainContext =
-                                getter.get(SharedStorageConstants.TRAIN_CONTEXT);
+                                getter.get(SharedObjectsConstants.TRAIN_CONTEXT);
                         TrainContext trainContext =
                                 new TrainContextInitializer(strategy)
                                         .init(
@@ -178,7 +178,7 @@ public class CacheDataCalcLocalHistsOperator
                                                 getRuntimeContext().getIndexOfThisSubtask(),
                                                 getRuntimeContext().getNumberOfParallelSubtasks(),
                                                 instances);
-                        setter.set(SharedStorageConstants.TRAIN_CONTEXT, trainContext);
+                        setter.set(SharedObjectsConstants.TRAIN_CONTEXT, trainContext);
 
                         treeInitializer = new TreeInitializer(trainContext);
                         treeInitializerState.update(Collections.singletonList(treeInitializer));
@@ -187,13 +187,13 @@ public class CacheDataCalcLocalHistsOperator
                     });
         }
 
-        sharedStorageContext.invoke(
+        sharedObjectsContext.invoke(
                 (getter, setter) -> {
-                    TrainContext trainContext = getter.get(SharedStorageConstants.TRAIN_CONTEXT);
+                    TrainContext trainContext = getter.get(SharedObjectsConstants.TRAIN_CONTEXT);
                     Preconditions.checkArgument(
                             getRuntimeContext().getIndexOfThisSubtask() == trainContext.subtaskId);
-                    BinnedInstance[] instances = getter.get(SharedStorageConstants.INSTANCES);
-                    double[] pgh = getter.get(SharedStorageConstants.PREDS_GRADS_HESSIANS);
+                    BinnedInstance[] instances = getter.get(SharedObjectsConstants.INSTANCES);
+                    double[] pgh = getter.get(SharedObjectsConstants.PREDS_GRADS_HESSIANS);
                     // In the first round, use prior as the predictions.
                     if (0 == pgh.length) {
                         pgh = new double[instances.length * 3];
@@ -207,26 +207,26 @@ public class CacheDataCalcLocalHistsOperator
                         }
                     }
 
-                    boolean needInitTree = getter.get(SharedStorageConstants.NEED_INIT_TREE);
+                    boolean needInitTree = getter.get(SharedObjectsConstants.NEED_INIT_TREE);
                     int[] indices;
                     List<LearningNode> layer;
                     if (needInitTree) {
                         // When last tree is finished, initializes a new tree, and shuffle instance
                         // indices.
                         treeInitializer.init(
-                                getter.get(SharedStorageConstants.ALL_TREES).size(),
-                                d -> setter.set(SharedStorageConstants.SHUFFLED_INDICES, d));
+                                getter.get(SharedObjectsConstants.ALL_TREES).size(),
+                                d -> setter.set(SharedObjectsConstants.SHUFFLED_INDICES, d));
                         LearningNode rootLearningNode = treeInitializer.getRootLearningNode();
-                        indices = getter.get(SharedStorageConstants.SHUFFLED_INDICES);
+                        indices = getter.get(SharedObjectsConstants.SHUFFLED_INDICES);
                         layer = Collections.singletonList(rootLearningNode);
-                        setter.set(SharedStorageConstants.ROOT_LEARNING_NODE, rootLearningNode);
-                        setter.set(SharedStorageConstants.HAS_INITED_TREE, true);
+                        setter.set(SharedObjectsConstants.ROOT_LEARNING_NODE, rootLearningNode);
+                        setter.set(SharedObjectsConstants.HAS_INITED_TREE, true);
                     } else {
                         // Otherwise, uses the swapped instance indices.
-                        indices = getter.get(SharedStorageConstants.SWAPPED_INDICES);
-                        layer = getter.get(SharedStorageConstants.LAYER);
-                        setter.set(SharedStorageConstants.SHUFFLED_INDICES, new int[0]);
-                        setter.set(SharedStorageConstants.HAS_INITED_TREE, false);
+                        indices = getter.get(SharedObjectsConstants.SWAPPED_INDICES);
+                        layer = getter.get(SharedObjectsConstants.LAYER);
+                        setter.set(SharedObjectsConstants.SHUFFLED_INDICES, new int[0]);
+                        setter.set(SharedObjectsConstants.HAS_INITED_TREE, false);
                     }
 
                     histBuilder.build(
@@ -234,7 +234,7 @@ public class CacheDataCalcLocalHistsOperator
                             indices,
                             instances,
                             pgh,
-                            d -> setter.set(SharedStorageConstants.NODE_FEATURE_PAIRS, d),
+                            d -> setter.set(SharedObjectsConstants.NODE_FEATURE_PAIRS, d),
                             out);
                 });
     }
@@ -247,11 +247,11 @@ public class CacheDataCalcLocalHistsOperator
         treeInitializerState.clear();
         histBuilderState.clear();
 
-        sharedStorageContext.invoke(
+        sharedObjectsContext.invoke(
                 (getter, setter) -> {
-                    setter.set(SharedStorageConstants.INSTANCES, new BinnedInstance[0]);
-                    setter.set(SharedStorageConstants.SHUFFLED_INDICES, new int[0]);
-                    setter.set(SharedStorageConstants.NODE_FEATURE_PAIRS, new int[0]);
+                    setter.set(SharedObjectsConstants.INSTANCES, new BinnedInstance[0]);
+                    setter.set(SharedObjectsConstants.SHUFFLED_INDICES, new int[0]);
+                    setter.set(SharedObjectsConstants.NODE_FEATURE_PAIRS, new int[0]);
                 });
     }
 
@@ -264,12 +264,12 @@ public class CacheDataCalcLocalHistsOperator
     }
 
     @Override
-    public void onSharedStorageContextSet(SharedStorageContext context) {
-        this.sharedStorageContext = context;
+    public void onSharedObjectsContextSet(SharedObjectsContext context) {
+        this.sharedObjectsContext = context;
     }
 
     @Override
-    public String getSharedStorageAccessorID() {
-        return sharedStorageAccessorID;
+    public String getSharedObjectsAccessorID() {
+        return sharedObjectsAccessorID;
     }
 }

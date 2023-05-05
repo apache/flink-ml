@@ -28,8 +28,8 @@ import org.apache.flink.ml.common.gbt.defs.LearningNode;
 import org.apache.flink.ml.common.gbt.defs.Node;
 import org.apache.flink.ml.common.gbt.defs.Split;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
-import org.apache.flink.ml.common.sharedstorage.SharedStorageContext;
-import org.apache.flink.ml.common.sharedstorage.SharedStorageStreamOperator;
+import org.apache.flink.ml.common.sharedobjects.SharedObjectsContext;
+import org.apache.flink.ml.common.sharedobjects.SharedObjectsStreamOperator;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
@@ -52,14 +52,14 @@ import java.util.UUID;
 public class PostSplitsOperator extends AbstractStreamOperator<Integer>
         implements OneInputStreamOperator<Tuple2<Integer, Split>, Integer>,
                 IterationListener<Integer>,
-                SharedStorageStreamOperator {
+                SharedObjectsStreamOperator {
 
     private static final String NODE_SPLITTER_STATE_NAME = "node_splitter";
     private static final String INSTANCE_UPDATER_STATE_NAME = "instance_updater";
 
     private static final Logger LOG = LoggerFactory.getLogger(PostSplitsOperator.class);
 
-    private final String sharedStorageAccessorID;
+    private final String sharedObjectsAccessorID;
 
     // States of local data.
     private transient Split[] nodeSplits;
@@ -67,10 +67,10 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
     private transient NodeSplitter nodeSplitter;
     private transient ListStateWithCache<InstanceUpdater> instanceUpdaterState;
     private transient InstanceUpdater instanceUpdater;
-    private transient SharedStorageContext sharedStorageContext;
+    private transient SharedObjectsContext sharedObjectsContext;
 
     public PostSplitsOperator() {
-        sharedStorageAccessorID = getClass().getSimpleName() + "-" + UUID.randomUUID();
+        sharedObjectsAccessorID = getClass().getSimpleName() + "-" + UUID.randomUUID();
     }
 
     @Override
@@ -111,10 +111,10 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
     public void onEpochWatermarkIncremented(
             int epochWatermark, Context context, Collector<Integer> collector) throws Exception {
         if (0 == epochWatermark) {
-            sharedStorageContext.invoke(
+            sharedObjectsContext.invoke(
                     (getter, setter) -> {
                         TrainContext trainContext =
-                                getter.get(SharedStorageConstants.TRAIN_CONTEXT);
+                                getter.get(SharedObjectsConstants.TRAIN_CONTEXT);
                         nodeSplitter = new NodeSplitter(trainContext);
                         nodeSplitterState.update(Collections.singletonList(nodeSplitter));
                         instanceUpdater = new InstanceUpdater(trainContext);
@@ -122,25 +122,25 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
                     });
         }
 
-        sharedStorageContext.invoke(
+        sharedObjectsContext.invoke(
                 (getter, setter) -> {
-                    int[] indices = getter.get(SharedStorageConstants.SWAPPED_INDICES);
+                    int[] indices = getter.get(SharedObjectsConstants.SWAPPED_INDICES);
                     if (0 == indices.length) {
-                        indices = getter.get(SharedStorageConstants.SHUFFLED_INDICES).clone();
+                        indices = getter.get(SharedObjectsConstants.SHUFFLED_INDICES).clone();
                     }
 
-                    BinnedInstance[] instances = getter.get(SharedStorageConstants.INSTANCES);
-                    List<LearningNode> leaves = getter.get(SharedStorageConstants.LEAVES);
-                    List<LearningNode> layer = getter.get(SharedStorageConstants.LAYER);
+                    BinnedInstance[] instances = getter.get(SharedObjectsConstants.INSTANCES);
+                    List<LearningNode> leaves = getter.get(SharedObjectsConstants.LEAVES);
+                    List<LearningNode> layer = getter.get(SharedObjectsConstants.LAYER);
                     List<Node> currentTreeNodes;
                     if (layer.size() == 0) {
                         layer =
                                 Collections.singletonList(
-                                        getter.get(SharedStorageConstants.ROOT_LEARNING_NODE));
+                                        getter.get(SharedObjectsConstants.ROOT_LEARNING_NODE));
                         currentTreeNodes = new ArrayList<>();
                         currentTreeNodes.add(new Node());
                     } else {
-                        currentTreeNodes = getter.get(SharedStorageConstants.CURRENT_TREE_NODES);
+                        currentTreeNodes = getter.get(SharedObjectsConstants.CURRENT_TREE_NODES);
                     }
 
                     List<LearningNode> nextLayer =
@@ -152,31 +152,31 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
                                     indices,
                                     instances);
                     nodeSplits = null;
-                    setter.set(SharedStorageConstants.LEAVES, leaves);
-                    setter.set(SharedStorageConstants.LAYER, nextLayer);
-                    setter.set(SharedStorageConstants.CURRENT_TREE_NODES, currentTreeNodes);
+                    setter.set(SharedObjectsConstants.LEAVES, leaves);
+                    setter.set(SharedObjectsConstants.LAYER, nextLayer);
+                    setter.set(SharedObjectsConstants.CURRENT_TREE_NODES, currentTreeNodes);
 
                     if (nextLayer.isEmpty()) {
                         // Current tree is finished.
-                        setter.set(SharedStorageConstants.NEED_INIT_TREE, true);
+                        setter.set(SharedObjectsConstants.NEED_INIT_TREE, true);
                         instanceUpdater.update(
-                                getter.get(SharedStorageConstants.PREDS_GRADS_HESSIANS),
+                                getter.get(SharedObjectsConstants.PREDS_GRADS_HESSIANS),
                                 leaves,
                                 indices,
                                 instances,
-                                d -> setter.set(SharedStorageConstants.PREDS_GRADS_HESSIANS, d),
+                                d -> setter.set(SharedObjectsConstants.PREDS_GRADS_HESSIANS, d),
                                 currentTreeNodes);
                         leaves.clear();
-                        List<List<Node>> allTrees = getter.get(SharedStorageConstants.ALL_TREES);
+                        List<List<Node>> allTrees = getter.get(SharedObjectsConstants.ALL_TREES);
                         allTrees.add(currentTreeNodes);
 
-                        setter.set(SharedStorageConstants.LEAVES, new ArrayList<>());
-                        setter.set(SharedStorageConstants.SWAPPED_INDICES, new int[0]);
-                        setter.set(SharedStorageConstants.ALL_TREES, allTrees);
+                        setter.set(SharedObjectsConstants.LEAVES, new ArrayList<>());
+                        setter.set(SharedObjectsConstants.SWAPPED_INDICES, new int[0]);
+                        setter.set(SharedObjectsConstants.ALL_TREES, allTrees);
                         LOG.info("finalize {}-th tree", allTrees.size());
                     } else {
-                        setter.set(SharedStorageConstants.SWAPPED_INDICES, indices);
-                        setter.set(SharedStorageConstants.NEED_INIT_TREE, false);
+                        setter.set(SharedObjectsConstants.SWAPPED_INDICES, indices);
+                        setter.set(SharedObjectsConstants.NEED_INIT_TREE, false);
                     }
                 });
     }
@@ -184,22 +184,22 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
     @Override
     public void onIterationTerminated(Context context, Collector<Integer> collector)
             throws Exception {
-        sharedStorageContext.invoke(
+        sharedObjectsContext.invoke(
                 (getter, setter) -> {
-                    setter.set(SharedStorageConstants.PREDS_GRADS_HESSIANS, new double[0]);
-                    setter.set(SharedStorageConstants.SWAPPED_INDICES, new int[0]);
-                    setter.set(SharedStorageConstants.LEAVES, Collections.emptyList());
-                    setter.set(SharedStorageConstants.LAYER, Collections.emptyList());
-                    setter.set(SharedStorageConstants.CURRENT_TREE_NODES, Collections.emptyList());
+                    setter.set(SharedObjectsConstants.PREDS_GRADS_HESSIANS, new double[0]);
+                    setter.set(SharedObjectsConstants.SWAPPED_INDICES, new int[0]);
+                    setter.set(SharedObjectsConstants.LEAVES, Collections.emptyList());
+                    setter.set(SharedObjectsConstants.LAYER, Collections.emptyList());
+                    setter.set(SharedObjectsConstants.CURRENT_TREE_NODES, Collections.emptyList());
                 });
     }
 
     @Override
     public void processElement(StreamRecord<Tuple2<Integer, Split>> element) throws Exception {
         if (null == nodeSplits) {
-            sharedStorageContext.invoke(
+            sharedObjectsContext.invoke(
                     (getter, setter) -> {
-                        List<LearningNode> layer = getter.get(SharedStorageConstants.LAYER);
+                        List<LearningNode> layer = getter.get(SharedObjectsConstants.LAYER);
                         int numNodes = (layer.size() == 0) ? 1 : layer.size();
                         nodeSplits = new Split[numNodes];
                     });
@@ -219,12 +219,12 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
     }
 
     @Override
-    public void onSharedStorageContextSet(SharedStorageContext context) {
-        sharedStorageContext = context;
+    public void onSharedObjectsContextSet(SharedObjectsContext context) {
+        sharedObjectsContext = context;
     }
 
     @Override
-    public String getSharedStorageAccessorID() {
-        return sharedStorageAccessorID;
+    public String getSharedObjectsAccessorID() {
+        return sharedObjectsAccessorID;
     }
 }

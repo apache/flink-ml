@@ -20,8 +20,8 @@ package org.apache.flink.ml.common.gbt.operators;
 
 import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.ml.common.gbt.GBTModelData;
-import org.apache.flink.ml.common.sharedstorage.SharedStorageContext;
-import org.apache.flink.ml.common.sharedstorage.SharedStorageStreamOperator;
+import org.apache.flink.ml.common.sharedobjects.SharedObjectsContext;
+import org.apache.flink.ml.common.sharedobjects.SharedObjectsStreamOperator;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
@@ -35,15 +35,15 @@ import java.util.UUID;
 public class TerminationOperator extends AbstractStreamOperator<Integer>
         implements OneInputStreamOperator<Integer, Integer>,
                 IterationListener<GBTModelData>,
-                SharedStorageStreamOperator {
+                SharedObjectsStreamOperator {
 
     private final OutputTag<GBTModelData> modelDataOutputTag;
-    private final String sharedStorageAccessorID;
-    private transient SharedStorageContext sharedStorageContext;
+    private final String sharedObjectsAccessorID;
+    private transient SharedObjectsContext sharedObjectsContext;
 
     public TerminationOperator(OutputTag<GBTModelData> modelDataOutputTag) {
         this.modelDataOutputTag = modelDataOutputTag;
-        sharedStorageAccessorID = getClass().getSimpleName() + "-" + UUID.randomUUID();
+        sharedObjectsAccessorID = getClass().getSimpleName() + "-" + UUID.randomUUID();
     }
 
     @Override
@@ -58,11 +58,11 @@ public class TerminationOperator extends AbstractStreamOperator<Integer>
     public void onEpochWatermarkIncremented(
             int epochWatermark, Context context, Collector<GBTModelData> collector)
             throws Exception {
-        sharedStorageContext.invoke(
+        sharedObjectsContext.invoke(
                 (getter, setter) -> {
                     boolean terminated =
-                            getter.get(SharedStorageConstants.ALL_TREES).size()
-                                    == getter.get(SharedStorageConstants.TRAIN_CONTEXT)
+                            getter.get(SharedObjectsConstants.ALL_TREES).size()
+                                    == getter.get(SharedObjectsConstants.TRAIN_CONTEXT)
                                             .strategy
                                             .maxIter;
                     // TODO: Add validation error rate
@@ -76,23 +76,23 @@ public class TerminationOperator extends AbstractStreamOperator<Integer>
     public void onIterationTerminated(Context context, Collector<GBTModelData> collector)
             throws Exception {
         if (0 == getRuntimeContext().getIndexOfThisSubtask()) {
-            sharedStorageContext.invoke(
+            sharedObjectsContext.invoke(
                     (getter, setter) ->
                             context.output(
                                     modelDataOutputTag,
                                     GBTModelData.from(
-                                            getter.get(SharedStorageConstants.TRAIN_CONTEXT),
-                                            getter.get(SharedStorageConstants.ALL_TREES))));
+                                            getter.get(SharedObjectsConstants.TRAIN_CONTEXT),
+                                            getter.get(SharedObjectsConstants.ALL_TREES))));
         }
     }
 
     @Override
-    public void onSharedStorageContextSet(SharedStorageContext context) {
-        sharedStorageContext = context;
+    public void onSharedObjectsContextSet(SharedObjectsContext context) {
+        sharedObjectsContext = context;
     }
 
     @Override
-    public String getSharedStorageAccessorID() {
-        return sharedStorageAccessorID;
+    public String getSharedObjectsAccessorID() {
+        return sharedObjectsAccessorID;
     }
 }
