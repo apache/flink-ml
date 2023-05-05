@@ -61,7 +61,7 @@ public class SharedStorageUtilsTest {
 
         BOperator bOp = new BOperator();
         SingleOutputStreamOperator<Long> afterBOp =
-                data.transform("b", TypeInformation.of(Long.class), bOp);
+                afterAOp.transform("b", TypeInformation.of(Long.class), bOp);
 
         Map<ItemDescriptor<?>, SharedStorageStreamOperator> ownerMap = new HashMap<>();
         ownerMap.put(SUM, aOp);
@@ -89,7 +89,9 @@ public class SharedStorageUtilsTest {
 
     /** Operator A: add input elements to the shared {@link #SUM}. */
     static class AOperator extends AbstractStreamOperator<Long>
-            implements OneInputStreamOperator<Long, Long>, SharedStorageStreamOperator {
+            implements OneInputStreamOperator<Long, Long>,
+                    SharedStorageStreamOperator,
+                    BoundedOneInput {
 
         private final String sharedStorageAccessorID;
         private SharedStorageContext sharedStorageContext;
@@ -115,15 +117,18 @@ public class SharedStorageUtilsTest {
                         Long currentSum = getter.get(SUM);
                         setter.set(SUM, currentSum + element.getValue());
                     });
-            output.collect(element);
+        }
+
+        @Override
+        public void endInput() throws Exception {
+            // Informs BOperator to get the value from shared {@link #SUM}.
+            output.collect(new StreamRecord<>(0L));
         }
     }
 
     /** Operator B: when input ends, get the value from shared {@link #SUM}. */
     static class BOperator extends AbstractStreamOperator<Long>
-            implements OneInputStreamOperator<Long, Long>,
-                    SharedStorageStreamOperator,
-                    BoundedOneInput {
+            implements OneInputStreamOperator<Long, Long>, SharedStorageStreamOperator {
 
         private final String sharedStorageAccessorID;
         private SharedStorageContext sharedStorageContext;
@@ -143,10 +148,7 @@ public class SharedStorageUtilsTest {
         }
 
         @Override
-        public void processElement(StreamRecord<Long> element) throws Exception {}
-
-        @Override
-        public void endInput() throws Exception {
+        public void processElement(StreamRecord<Long> element) throws Exception {
             sharedStorageContext.invoke(
                     (getter, setter) -> {
                         output.collect(new StreamRecord<>(getter.get(SUM)));
