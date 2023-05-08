@@ -85,7 +85,7 @@ public class LogisticRegression
                                         throw new RuntimeException(
                                                 "Multinomial classification is not supported yet. Supported options: [auto, binomial].");
                                     }
-                                    DenseVector features =
+                                    Vector features =
                                             ((Vector) dataPoint.getField(getFeaturesCol()))
                                                     .toDense();
                                     return new LabeledPointWithWeight(features, label, weight);
