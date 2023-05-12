@@ -103,6 +103,12 @@ class ClassificationCompletenessTest(CompletenessTest, MLLibTest):
         from pyflink.ml import classification
         return classification
 
+    def exclude_java_stage(self) -> List[str]:
+        # TODO: Add python support for LogisticRegressionWithFtrl.
+        return [
+            "logisticregression.LogisticRegressionWithFtrl",
+        ]
+
 
 class ClusteringCompletenessTest(CompletenessTest, MLLibTest):
 

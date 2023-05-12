@@ -44,6 +44,17 @@ public class Bits {
         return Double.longBitsToDouble(getLong(b, off));
     }
 
+    public static int getInt(byte[] b, int off) {
+        return ((b[off + 3] & 0xFF))
+                + ((b[off + 2] & 0xFF) << 8)
+                + ((b[off + 1] & 0xFF) << 16)
+                + ((b[off]) << 24);
+    }
+
+    public static char getChar(byte[] b, int off) {
+        return (char) ((b[off + 1] & 0xFF) + (b[off] << 8));
+    }
+
     /*
      * Methods for packing primitive values into byte arrays starting at given
      * offsets.
@@ -62,5 +73,17 @@ public class Bits {
 
     public static void putDouble(byte[] b, int off, double val) {
         putLong(b, off, Double.doubleToLongBits(val));
+    }
+
+    public static void putInt(byte[] b, int off, int val) {
+        b[off + 3] = (byte) (val);
+        b[off + 2] = (byte) (val >>> 8);
+        b[off + 1] = (byte) (val >>> 16);
+        b[off] = (byte) (val >>> 24);
+    }
+
+    public static void putChar(byte[] b, int off, char val) {
+        b[off + 1] = (byte) (val);
+        b[off] = (byte) (val >>> 8);
     }
 }

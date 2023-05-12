@@ -47,4 +47,16 @@ public class BinaryLogisticLoss implements LossFunc {
                 dataPoint.getWeight() * (-labelScaled / (Math.exp(dot * labelScaled) + 1));
         BLAS.axpy(multiplier, dataPoint.getFeatures(), cumGradient, dataPoint.getFeatures().size());
     }
+
+    @Override
+    public double computeLoss(double label, double prediction) {
+        double labelScaled = 2 * label - 1;
+        return Math.log(1 + Math.exp(-prediction * labelScaled));
+    }
+
+    @Override
+    public double computeGradient(double label, double prediction) {
+        double labelScaled = 2 * label - 1;
+        return -labelScaled / (Math.exp(prediction * labelScaled) + 1);
+    }
 }
