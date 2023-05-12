@@ -316,7 +316,7 @@ public class LogisticRegressionTest extends AbstractTestBase {
                         tempFolder.newFolder().getAbsolutePath(),
                         LogisticRegressionModel::load);
         assertEquals(
-                Arrays.asList("coefficient", "modelVersion"),
+                Arrays.asList("coefficient", "startIndex", "endIndex", "modelVersion"),
                 model.getModelData()[0].getResolvedSchema().getColumnNames());
         Table output = model.transform(binomialDataTable)[0];
         verifyPredictionResult(

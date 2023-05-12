@@ -256,6 +256,8 @@ public class OnlineLogisticRegressionTest extends TestLogger {
                                                 new double[] {
                                                     0.41233679404769874, -0.18088118293232122
                                                 }),
+                                        0L,
+                                        2L,
                                         0L)));
         initSparseModel =
                 tEnv.fromDataStream(
@@ -266,6 +268,8 @@ public class OnlineLogisticRegressionTest extends TestLogger {
                                                     0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01,
                                                     0.01, 0.01
                                                 }),
+                                        0L,
+                                        10L,
                                         0L)));
     }
 

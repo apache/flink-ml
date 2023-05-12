@@ -25,13 +25,14 @@ import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.servable.api.TransformerServable;
 import org.apache.flink.ml.servable.builder.PipelineModelServable;
 import org.apache.flink.util.InstantiationUtil;
-import org.apache.flink.util.Preconditions;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.SequenceInputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -143,10 +144,10 @@ public class ServableReadWriteUtils {
         FileSystem fileSystem = modelDataPath.getFileSystem();
 
         FileStatus[] files = fileSystem.listStatus(modelDataPath);
-        Preconditions.checkState(
-                files.length == 1,
-                "Only one model data file is expected in the directory %s.",
-                path);
-        return fileSystem.open(files[0].getPath());
+        List<InputStream> inputStreams = new ArrayList<>();
+        for (FileStatus file : files) {
+            inputStreams.add(fileSystem.open(file.getPath()));
+        }
+        return new SequenceInputStream(Collections.enumeration(inputStreams));
     }
 }

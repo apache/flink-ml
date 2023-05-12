@@ -120,7 +120,7 @@ class LogisticRegressionTest(PyFlinkMLTestCase):
         model = regression.fit(self.binomial_data_table)
         self.assertEqual(
             model.get_model_data()[0].get_schema().get_field_names(),
-            ['coefficient', 'modelVersion'])
+            ['coefficient', "startIndex", "endIndex", 'modelVersion'])
         output = model.transform(self.binomial_data_table)[0]
         field_names = output.get_schema().get_field_names()
         self.verify_predict_result(

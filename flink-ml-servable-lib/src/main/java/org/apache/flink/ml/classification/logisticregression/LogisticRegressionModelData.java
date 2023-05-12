@@ -33,12 +33,23 @@ public class LogisticRegressionModelData {
 
     public DenseVector coefficient;
 
+    public long startIndex;
+
+    public long endIndex;
+
     public long modelVersion;
 
     public LogisticRegressionModelData() {}
 
     public LogisticRegressionModelData(DenseVector coefficient, long modelVersion) {
+        this(coefficient, 0L, coefficient.size(), modelVersion);
+    }
+
+    public LogisticRegressionModelData(
+            DenseVector coefficient, long startIndex, long endIndex, long modelVersion) {
         this.coefficient = coefficient;
+        this.startIndex = startIndex;
+        this.endIndex = endIndex;
         this.modelVersion = modelVersion;
     }
 
@@ -54,6 +65,8 @@ public class LogisticRegressionModelData {
 
         DenseVectorSerializer serializer = new DenseVectorSerializer();
         serializer.serialize(coefficient, dataOutputViewStreamWrapper);
+        dataOutputViewStreamWrapper.writeLong(startIndex);
+        dataOutputViewStreamWrapper.writeLong(endIndex);
         dataOutputViewStreamWrapper.writeLong(modelVersion);
     }
 
@@ -69,8 +82,10 @@ public class LogisticRegressionModelData {
 
         DenseVectorSerializer serializer = new DenseVectorSerializer();
         DenseVector coefficient = serializer.deserialize(dataInputViewStreamWrapper);
+        long startIndex = dataInputViewStreamWrapper.readLong();
+        long endIndex = dataInputViewStreamWrapper.readLong();
         long modelVersion = dataInputViewStreamWrapper.readLong();
 
-        return new LogisticRegressionModelData(coefficient, modelVersion);
+        return new LogisticRegressionModelData(coefficient, startIndex, endIndex, modelVersion);
     }
 }

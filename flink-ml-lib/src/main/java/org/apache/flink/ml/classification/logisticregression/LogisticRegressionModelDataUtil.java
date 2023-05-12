@@ -89,7 +89,13 @@ public class LogisticRegressionModelDataUtil {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) modelData).getTableEnvironment();
         return tEnv.toDataStream(modelData)
-                .map(x -> new LogisticRegressionModelData(x.getFieldAs(0), x.getFieldAs(1)));
+                .map(
+                        x ->
+                                new LogisticRegressionModelData(
+                                        x.getFieldAs(0),
+                                        x.getFieldAs(1),
+                                        x.getFieldAs(2),
+                                        x.getFieldAs(3)));
     }
 
     /**
@@ -107,7 +113,10 @@ public class LogisticRegressionModelDataUtil {
                         x -> {
                             LogisticRegressionModelData modelData =
                                     new LogisticRegressionModelData(
-                                            x.getFieldAs(0), x.getFieldAs(1));
+                                            x.getFieldAs(0),
+                                            x.getFieldAs(1),
+                                            x.getFieldAs(2),
+                                            x.getFieldAs(3));
 
                             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
                             modelData.encode(outputStream);

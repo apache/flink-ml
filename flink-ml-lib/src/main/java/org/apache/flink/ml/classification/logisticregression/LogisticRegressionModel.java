@@ -43,6 +43,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /** A Model which classifies data using the model data computed by {@link LogisticRegression}. */
@@ -147,10 +148,16 @@ public class LogisticRegressionModel
         @Override
         public Row map(Row dataPoint) {
             if (servable == null) {
-                LogisticRegressionModelData modelData =
-                        (LogisticRegressionModelData)
-                                getRuntimeContext().getBroadcastVariable(broadcastModelKey).get(0);
-                servable = new LogisticRegressionModelServable(modelData);
+                List<LogisticRegressionModelData> modelData =
+                        getRuntimeContext().getBroadcastVariable(broadcastModelKey);
+
+                if (modelData.size() == 1) {
+                    servable = new LogisticRegressionModelServable(modelData.get(0));
+                } else {
+                    LogisticRegressionModelData mergedModel =
+                            LogisticRegressionModelServable.mergePieces(modelData);
+                    servable = new LogisticRegressionModelServable(mergedModel);
+                }
                 ParamUtils.updateExistingParams(servable, params);
             }
             Vector features = (Vector) dataPoint.getField(servable.getFeaturesCol());

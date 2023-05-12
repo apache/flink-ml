@@ -323,7 +323,7 @@ public class OnlineLogisticRegressionExample {
 
         // Creates an online LogisticRegression object and initializes its parameters and initial
         // model data.
-        Row initModelData = Row.of(Vectors.dense(0.41233679404769874, -0.18088118293232122), 0L);
+		Row initModelData = Row.of(Vectors.dense(0.41233679404769874, -0.18088118293232122), 0L, 2L, 0L);
         Table initModelDataTable = tEnv.fromDataStream(env.fromElements(initModelData));
         OnlineLogisticRegression olr =
                 new OnlineLogisticRegression()
