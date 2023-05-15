@@ -27,10 +27,14 @@ import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.LatencyMarker;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.watermarkstatus.WatermarkStatus;
+import org.apache.flink.util.Preconditions;
+
+import java.util.List;
 
 /** Wrapper for {@link OneInputStreamOperator}. */
 class OneInputSharedObjectsWrapperOperator<IN, OUT>
-        extends AbstractSharedObjectsWrapperOperator<OUT, OneInputStreamOperator<IN, OUT>>
+        extends AbstractSharedObjectsWrapperOperator<
+                OUT, AbstractSharedObjectsOneInputStreamOperator<IN, OUT>>
         implements OneInputStreamOperator<IN, OUT>, BoundedOneInput {
 
     OneInputSharedObjectsWrapperOperator(
@@ -41,19 +45,50 @@ class OneInputSharedObjectsWrapperOperator<IN, OUT>
     }
 
     @Override
+    protected List<ReadRequest<?>> getInputReadRequests(int inputId) {
+        Preconditions.checkArgument(0 == inputId);
+        return wrappedOperator.readRequestsInProcessElement();
+    }
+
+    @Override
+    protected void processCachedElementsBeforeEpochIncremented(int inputId) throws Exception {
+        Preconditions.checkArgument(0 == inputId);
+        endInputX(
+                0,
+                wrappedOperator::processElement,
+                wrappedOperator::processWatermark,
+                wrappedOperator::setKeyContextElement);
+    }
+
+    @Override
     public void processElement(StreamRecord<IN> streamRecord) throws Exception {
-        wrappedOperator.processElement(streamRecord);
+        processElementX(
+                streamRecord,
+                0,
+                wrappedOperator::processElement,
+                wrappedOperator::processWatermark,
+                wrappedOperator::setKeyContextElement);
     }
 
     @Override
     public void endInput() throws Exception {
+        endInputX(
+                0,
+                wrappedOperator::processElement,
+                wrappedOperator::processWatermark,
+                wrappedOperator::setKeyContextElement);
         OperatorUtils.processOperatorOrUdfIfSatisfy(
                 wrappedOperator, BoundedOneInput.class, BoundedOneInput::endInput);
     }
 
     @Override
     public void processWatermark(Watermark watermark) throws Exception {
-        wrappedOperator.processWatermark(watermark);
+        processWatermarkX(
+                watermark,
+                0,
+                wrappedOperator::processElement,
+                wrappedOperator::processWatermark,
+                wrappedOperator::setKeyContextElement);
     }
 
     @Override

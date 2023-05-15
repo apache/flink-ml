@@ -19,35 +19,48 @@
 package org.apache.flink.ml.common.sharedobjects;
 
 import org.apache.flink.annotation.Experimental;
-import org.apache.flink.util.function.BiConsumerWithException;
 
 /**
- * Context for shared objects. Every operator implementing {@link SharedObjectsStreamOperator} will
- * get an instance of this context set by {@link
- * SharedObjectsStreamOperator#onSharedObjectsContextSet} in runtime. User-defined logic can be
- * invoked through {@link #invoke} with the access to shared items.
+ * Context for shared objects. Every operator implementing {@link
+ * AbstractSharedObjectsStreamOperator} will get an instance of this context set by {@link
+ * AbstractSharedObjectsStreamOperator#onSharedObjectsContextSet} in runtime.
+ *
+ * <p>See {@link ReadRequest} for details about coordination between reads and writes.
  */
 @Experimental
 public interface SharedObjectsContext {
 
     /**
-     * Invoke user defined function with provided getters/setters of the shared objects.
+     * Reads the value of a shared object.
      *
-     * @param func User defined function where share items can be accessed through getters/setters.
-     * @throws Exception Possible exception.
+     * <p>For subclasses of {@link AbstractSharedObjectsOneInputStreamOperator} and {@link
+     * AbstractSharedObjectsTwoInputStreamOperator}, this method is guaranteed to return non-null
+     * values immediately.
+     *
+     * @param request A read request of a shared object.
+     * @return The value of the shared object.
+     * @param <T> The type of the shared object.
      */
-    void invoke(BiConsumerWithException<SharedItemGetter, SharedItemSetter, Exception> func)
-            throws Exception;
+    <T> T read(ReadRequest<T> request);
 
-    /** Interface of shared item getter. */
-    @FunctionalInterface
-    interface SharedItemGetter {
-        <T> T get(ItemDescriptor<T> key);
-    }
+    /**
+     * Writes a new value to the shared object.
+     *
+     * @param descriptor The shared object descriptor.
+     * @param value The value to be set.
+     * @param <T> The type of the shared object.
+     */
+    <T> void write(Descriptor<T> descriptor, T value);
 
-    /** Interface of shared item writer. */
-    @FunctionalInterface
-    interface SharedItemSetter {
-        <T> void set(ItemDescriptor<T> key, T value);
-    }
+    /**
+     * Renew the shared object with current step.
+     *
+     * <p>For subclasses of {@link AbstractSharedObjectsOneInputStreamOperator} and {@link
+     * AbstractSharedObjectsTwoInputStreamOperator}, this method is guaranteed to return
+     * immediately.
+     *
+     * @param descriptor The shared object descriptor.
+     * @param <T> The type of the shared object.
+     */
+    <T> void renew(Descriptor<T> descriptor);
 }

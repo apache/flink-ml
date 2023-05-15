@@ -36,9 +36,9 @@ import org.apache.flink.ml.common.gbt.operators.ReduceHistogramFunction;
 import org.apache.flink.ml.common.gbt.operators.ReduceSplitsOperator;
 import org.apache.flink.ml.common.gbt.operators.SharedObjectsConstants;
 import org.apache.flink.ml.common.gbt.operators.TerminationOperator;
-import org.apache.flink.ml.common.sharedobjects.ItemDescriptor;
+import org.apache.flink.ml.common.sharedobjects.AbstractSharedObjectsStreamOperator;
+import org.apache.flink.ml.common.sharedobjects.Descriptor;
 import org.apache.flink.ml.common.sharedobjects.SharedObjectsBody;
-import org.apache.flink.ml.common.sharedobjects.SharedObjectsStreamOperator;
 import org.apache.flink.ml.common.sharedobjects.SharedObjectsUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
@@ -68,7 +68,7 @@ class BoostIterationBody implements IterationBody {
         //noinspection unchecked
         DataStream<TrainContext> trainContext = (DataStream<TrainContext>) inputs.get(1);
 
-        Map<ItemDescriptor<?>, SharedObjectsStreamOperator> ownerMap = new HashMap<>();
+        Map<Descriptor<?>, AbstractSharedObjectsStreamOperator<?>> ownerMap = new HashMap<>();
 
         CacheDataCalcLocalHistsOperator cacheDataCalcLocalHistsOp =
                 new CacheDataCalcLocalHistsOperator(strategy);
@@ -79,7 +79,7 @@ class BoostIterationBody implements IterationBody {
                                 Types.TUPLE(
                                         Types.INT, Types.INT, TypeInformation.of(Histogram.class)),
                                 cacheDataCalcLocalHistsOp);
-        for (ItemDescriptor<?> s : SharedObjectsConstants.OWNED_BY_CACHE_DATA_CALC_LOCAL_HISTS_OP) {
+        for (Descriptor<?> s : SharedObjectsConstants.OWNED_BY_CACHE_DATA_CALC_LOCAL_HISTS_OP) {
             ownerMap.put(s, cacheDataCalcLocalHistsOp);
         }
 
@@ -105,7 +105,7 @@ class BoostIterationBody implements IterationBody {
                 globalSplits
                         .broadcast()
                         .transform("PostSplits", TypeInformation.of(Integer.class), postSplitsOp);
-        for (ItemDescriptor<?> descriptor : SharedObjectsConstants.OWNED_BY_POST_SPLITS_OP) {
+        for (Descriptor<?> descriptor : SharedObjectsConstants.OWNED_BY_POST_SPLITS_OP) {
             ownerMap.put(descriptor, postSplitsOp);
         }
 

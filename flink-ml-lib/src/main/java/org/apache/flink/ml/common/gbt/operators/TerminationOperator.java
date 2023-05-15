@@ -20,30 +20,28 @@ package org.apache.flink.ml.common.gbt.operators;
 
 import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.ml.common.gbt.GBTModelData;
-import org.apache.flink.ml.common.sharedobjects.SharedObjectsContext;
-import org.apache.flink.ml.common.sharedobjects.SharedObjectsStreamOperator;
+import org.apache.flink.ml.common.sharedobjects.AbstractSharedObjectsOneInputStreamOperator;
+import org.apache.flink.ml.common.sharedobjects.ReadRequest;
 import org.apache.flink.runtime.state.StateInitializationContext;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
-import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.OutputTag;
 
-import java.util.UUID;
+import java.util.Collections;
+import java.util.List;
+
+import static org.apache.flink.ml.common.gbt.operators.SharedObjectsConstants.ALL_TREES;
+import static org.apache.flink.ml.common.gbt.operators.SharedObjectsConstants.TRAIN_CONTEXT;
 
 /** Determines whether to terminated training. */
-public class TerminationOperator extends AbstractStreamOperator<Integer>
-        implements OneInputStreamOperator<Integer, Integer>,
-                IterationListener<GBTModelData>,
-                SharedObjectsStreamOperator {
+public class TerminationOperator
+        extends AbstractSharedObjectsOneInputStreamOperator<Integer, Integer>
+        implements IterationListener<GBTModelData> {
 
     private final OutputTag<GBTModelData> modelDataOutputTag;
-    private final String sharedObjectsAccessorID;
-    private transient SharedObjectsContext sharedObjectsContext;
 
     public TerminationOperator(OutputTag<GBTModelData> modelDataOutputTag) {
         this.modelDataOutputTag = modelDataOutputTag;
-        sharedObjectsAccessorID = getClass().getSimpleName() + "-" + UUID.randomUUID();
     }
 
     @Override
@@ -55,44 +53,30 @@ public class TerminationOperator extends AbstractStreamOperator<Integer>
     public void processElement(StreamRecord<Integer> element) throws Exception {}
 
     @Override
-    public void onEpochWatermarkIncremented(
-            int epochWatermark, Context context, Collector<GBTModelData> collector)
-            throws Exception {
-        sharedObjectsContext.invoke(
-                (getter, setter) -> {
-                    boolean terminated =
-                            getter.get(SharedObjectsConstants.ALL_TREES).size()
-                                    == getter.get(SharedObjectsConstants.TRAIN_CONTEXT)
-                                            .strategy
-                                            .maxIter;
-                    // TODO: Add validation error rate
-                    if (!terminated) {
-                        output.collect(new StreamRecord<>(0));
-                    }
-                });
+    public List<ReadRequest<?>> readRequestsInProcessElement() {
+        return Collections.emptyList();
     }
 
     @Override
-    public void onIterationTerminated(Context context, Collector<GBTModelData> collector)
-            throws Exception {
-        if (0 == getRuntimeContext().getIndexOfThisSubtask()) {
-            sharedObjectsContext.invoke(
-                    (getter, setter) ->
-                            context.output(
-                                    modelDataOutputTag,
-                                    GBTModelData.from(
-                                            getter.get(SharedObjectsConstants.TRAIN_CONTEXT),
-                                            getter.get(SharedObjectsConstants.ALL_TREES))));
+    public void onEpochWatermarkIncremented(
+            int epochWatermark, Context c, Collector<GBTModelData> collector) {
+        boolean terminated =
+                context.read(ALL_TREES.sameStep()).size()
+                        == context.read(TRAIN_CONTEXT.sameStep()).strategy.maxIter;
+        // TODO: Add validation error rate
+        if (!terminated) {
+            output.collect(new StreamRecord<>(0));
         }
     }
 
     @Override
-    public void onSharedObjectsContextSet(SharedObjectsContext context) {
-        sharedObjectsContext = context;
-    }
-
-    @Override
-    public String getSharedObjectsAccessorID() {
-        return sharedObjectsAccessorID;
+    public void onIterationTerminated(Context c, Collector<GBTModelData> collector) {
+        if (0 == getRuntimeContext().getIndexOfThisSubtask()) {
+            c.output(
+                    modelDataOutputTag,
+                    GBTModelData.from(
+                            context.read(TRAIN_CONTEXT.prevStep()),
+                            context.read(ALL_TREES.prevStep())));
+        }
     }
 }

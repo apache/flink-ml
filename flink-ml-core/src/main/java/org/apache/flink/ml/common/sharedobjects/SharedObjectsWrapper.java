@@ -47,7 +47,7 @@ class SharedObjectsWrapper<T> implements OperatorWrapper<T, T> {
             StreamOperatorFactory<T> operatorFactory) {
         Class<? extends StreamOperator> operatorClass =
                 operatorFactory.getStreamOperatorClass(getClass().getClassLoader());
-        if (SharedObjectsStreamOperator.class.isAssignableFrom(operatorClass)) {
+        if (AbstractSharedObjectsStreamOperator.class.isAssignableFrom(operatorClass)) {
             if (OneInputStreamOperator.class.isAssignableFrom(operatorClass)) {
                 return new OneInputSharedObjectsWrapperOperator<>(
                         operatorParameters, operatorFactory, context);

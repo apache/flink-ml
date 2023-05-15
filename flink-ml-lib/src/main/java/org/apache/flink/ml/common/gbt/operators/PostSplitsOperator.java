@@ -28,12 +28,10 @@ import org.apache.flink.ml.common.gbt.defs.LearningNode;
 import org.apache.flink.ml.common.gbt.defs.Node;
 import org.apache.flink.ml.common.gbt.defs.Split;
 import org.apache.flink.ml.common.gbt.defs.TrainContext;
-import org.apache.flink.ml.common.sharedobjects.SharedObjectsContext;
-import org.apache.flink.ml.common.sharedobjects.SharedObjectsStreamOperator;
+import org.apache.flink.ml.common.sharedobjects.AbstractSharedObjectsOneInputStreamOperator;
+import org.apache.flink.ml.common.sharedobjects.ReadRequest;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
-import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.util.Collector;
 
@@ -43,23 +41,31 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
+
+import static org.apache.flink.ml.common.gbt.operators.SharedObjectsConstants.ALL_TREES;
+import static org.apache.flink.ml.common.gbt.operators.SharedObjectsConstants.CURRENT_TREE_NODES;
+import static org.apache.flink.ml.common.gbt.operators.SharedObjectsConstants.INSTANCES;
+import static org.apache.flink.ml.common.gbt.operators.SharedObjectsConstants.LAYER;
+import static org.apache.flink.ml.common.gbt.operators.SharedObjectsConstants.LEAVES;
+import static org.apache.flink.ml.common.gbt.operators.SharedObjectsConstants.NEED_INIT_TREE;
+import static org.apache.flink.ml.common.gbt.operators.SharedObjectsConstants.PREDS_GRADS_HESSIANS;
+import static org.apache.flink.ml.common.gbt.operators.SharedObjectsConstants.ROOT_LEARNING_NODE;
+import static org.apache.flink.ml.common.gbt.operators.SharedObjectsConstants.SHUFFLED_INDICES;
+import static org.apache.flink.ml.common.gbt.operators.SharedObjectsConstants.SWAPPED_INDICES;
+import static org.apache.flink.ml.common.gbt.operators.SharedObjectsConstants.TRAIN_CONTEXT;
 
 /**
  * Post-process after global splits obtained, including split instances to left or child nodes, and
  * update instances scores after a tree is complete.
  */
-public class PostSplitsOperator extends AbstractStreamOperator<Integer>
-        implements OneInputStreamOperator<Tuple2<Integer, Split>, Integer>,
-                IterationListener<Integer>,
-                SharedObjectsStreamOperator {
+public class PostSplitsOperator
+        extends AbstractSharedObjectsOneInputStreamOperator<Tuple2<Integer, Split>, Integer>
+        implements IterationListener<Integer> {
 
     private static final String NODE_SPLITTER_STATE_NAME = "node_splitter";
     private static final String INSTANCE_UPDATER_STATE_NAME = "instance_updater";
 
     private static final Logger LOG = LoggerFactory.getLogger(PostSplitsOperator.class);
-
-    private final String sharedObjectsAccessorID;
 
     // States of local data.
     private transient Split[] nodeSplits;
@@ -67,11 +73,6 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
     private transient NodeSplitter nodeSplitter;
     private transient ListStateWithCache<InstanceUpdater> instanceUpdaterState;
     private transient InstanceUpdater instanceUpdater;
-    private transient SharedObjectsContext sharedObjectsContext;
-
-    public PostSplitsOperator() {
-        sharedObjectsAccessorID = getClass().getSimpleName() + "-" + UUID.randomUUID();
-    }
 
     @Override
     public void initializeState(StateInitializationContext context) throws Exception {
@@ -109,100 +110,84 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
 
     @Override
     public void onEpochWatermarkIncremented(
-            int epochWatermark, Context context, Collector<Integer> collector) throws Exception {
+            int epochWatermark, Context c, Collector<Integer> collector) throws Exception {
         if (0 == epochWatermark) {
-            sharedObjectsContext.invoke(
-                    (getter, setter) -> {
-                        TrainContext trainContext =
-                                getter.get(SharedObjectsConstants.TRAIN_CONTEXT);
-                        nodeSplitter = new NodeSplitter(trainContext);
-                        nodeSplitterState.update(Collections.singletonList(nodeSplitter));
-                        instanceUpdater = new InstanceUpdater(trainContext);
-                        instanceUpdaterState.update(Collections.singletonList(instanceUpdater));
-                    });
+            TrainContext trainContext = context.read(TRAIN_CONTEXT.sameStep());
+            nodeSplitter = new NodeSplitter(trainContext);
+            nodeSplitterState.update(Collections.singletonList(nodeSplitter));
+            instanceUpdater = new InstanceUpdater(trainContext);
+            instanceUpdaterState.update(Collections.singletonList(instanceUpdater));
         }
 
-        sharedObjectsContext.invoke(
-                (getter, setter) -> {
-                    int[] indices = getter.get(SharedObjectsConstants.SWAPPED_INDICES);
-                    if (0 == indices.length) {
-                        indices = getter.get(SharedObjectsConstants.SHUFFLED_INDICES).clone();
-                    }
+        int[] indices = new int[0];
+        if (epochWatermark > 0) {
+            indices = context.read(SWAPPED_INDICES.prevStep());
+        }
+        if (0 == indices.length) {
+            indices = context.read(SHUFFLED_INDICES.sameStep()).clone();
+        }
 
-                    BinnedInstance[] instances = getter.get(SharedObjectsConstants.INSTANCES);
-                    List<LearningNode> leaves = getter.get(SharedObjectsConstants.LEAVES);
-                    List<LearningNode> layer = getter.get(SharedObjectsConstants.LAYER);
-                    List<Node> currentTreeNodes;
-                    if (layer.size() == 0) {
-                        layer =
-                                Collections.singletonList(
-                                        getter.get(SharedObjectsConstants.ROOT_LEARNING_NODE));
-                        currentTreeNodes = new ArrayList<>();
-                        currentTreeNodes.add(new Node());
-                    } else {
-                        currentTreeNodes = getter.get(SharedObjectsConstants.CURRENT_TREE_NODES);
-                    }
+        BinnedInstance[] instances = context.read(INSTANCES.sameStep());
+        List<LearningNode> leaves = context.read(LEAVES.prevStep());
+        List<LearningNode> layer = context.read(LAYER.prevStep());
+        List<Node> currentTreeNodes;
+        if (layer.isEmpty()) {
+            layer = Collections.singletonList(context.read(ROOT_LEARNING_NODE.sameStep()));
+            currentTreeNodes = new ArrayList<>();
+            currentTreeNodes.add(new Node());
+        } else {
+            currentTreeNodes = context.read(CURRENT_TREE_NODES.prevStep());
+        }
 
-                    List<LearningNode> nextLayer =
-                            nodeSplitter.split(
-                                    currentTreeNodes,
-                                    layer,
-                                    leaves,
-                                    nodeSplits,
-                                    indices,
-                                    instances);
-                    nodeSplits = null;
-                    setter.set(SharedObjectsConstants.LEAVES, leaves);
-                    setter.set(SharedObjectsConstants.LAYER, nextLayer);
-                    setter.set(SharedObjectsConstants.CURRENT_TREE_NODES, currentTreeNodes);
+        List<LearningNode> nextLayer =
+                nodeSplitter.split(currentTreeNodes, layer, leaves, nodeSplits, indices, instances);
+        nodeSplits = null;
+        context.write(LEAVES, leaves);
+        context.write(LAYER, nextLayer);
+        context.write(CURRENT_TREE_NODES, currentTreeNodes);
 
-                    if (nextLayer.isEmpty()) {
-                        // Current tree is finished.
-                        setter.set(SharedObjectsConstants.NEED_INIT_TREE, true);
-                        instanceUpdater.update(
-                                getter.get(SharedObjectsConstants.PREDS_GRADS_HESSIANS),
-                                leaves,
-                                indices,
-                                instances,
-                                d -> setter.set(SharedObjectsConstants.PREDS_GRADS_HESSIANS, d),
-                                currentTreeNodes);
-                        leaves.clear();
-                        List<List<Node>> allTrees = getter.get(SharedObjectsConstants.ALL_TREES);
-                        allTrees.add(currentTreeNodes);
+        if (nextLayer.isEmpty()) {
+            // Current tree is finished.
+            context.write(NEED_INIT_TREE, true);
+            instanceUpdater.update(
+                    context.read(PREDS_GRADS_HESSIANS.prevStep()),
+                    leaves,
+                    indices,
+                    instances,
+                    d -> context.write(PREDS_GRADS_HESSIANS, d),
+                    currentTreeNodes);
+            leaves.clear();
+            List<List<Node>> allTrees = context.read(ALL_TREES.prevStep());
+            allTrees.add(currentTreeNodes);
 
-                        setter.set(SharedObjectsConstants.LEAVES, new ArrayList<>());
-                        setter.set(SharedObjectsConstants.SWAPPED_INDICES, new int[0]);
-                        setter.set(SharedObjectsConstants.ALL_TREES, allTrees);
-                        LOG.info("finalize {}-th tree", allTrees.size());
-                    } else {
-                        setter.set(SharedObjectsConstants.SWAPPED_INDICES, indices);
-                        setter.set(SharedObjectsConstants.NEED_INIT_TREE, false);
-                    }
-                });
+            context.write(LEAVES, new ArrayList<>());
+            context.write(SWAPPED_INDICES, new int[0]);
+            context.write(ALL_TREES, allTrees);
+            LOG.info("finalize {}-th tree", allTrees.size());
+        } else {
+            context.write(SWAPPED_INDICES, indices);
+            context.write(NEED_INIT_TREE, false);
+
+            context.renew(PREDS_GRADS_HESSIANS);
+            context.renew(ALL_TREES);
+        }
     }
 
     @Override
-    public void onIterationTerminated(Context context, Collector<Integer> collector)
-            throws Exception {
-        sharedObjectsContext.invoke(
-                (getter, setter) -> {
-                    setter.set(SharedObjectsConstants.PREDS_GRADS_HESSIANS, new double[0]);
-                    setter.set(SharedObjectsConstants.SWAPPED_INDICES, new int[0]);
-                    setter.set(SharedObjectsConstants.LEAVES, Collections.emptyList());
-                    setter.set(SharedObjectsConstants.LAYER, Collections.emptyList());
-                    setter.set(SharedObjectsConstants.CURRENT_TREE_NODES, Collections.emptyList());
-                });
+    public void onIterationTerminated(Context c, Collector<Integer> collector) {
+        context.write(PREDS_GRADS_HESSIANS, new double[0]);
+        context.write(SWAPPED_INDICES, new int[0]);
+        context.write(LEAVES, Collections.emptyList());
+        context.write(LAYER, Collections.emptyList());
+        context.write(CURRENT_TREE_NODES, Collections.emptyList());
     }
 
     @Override
     public void processElement(StreamRecord<Tuple2<Integer, Split>> element) throws Exception {
         if (null == nodeSplits) {
-            sharedObjectsContext.invoke(
-                    (getter, setter) -> {
-                        List<LearningNode> layer = getter.get(SharedObjectsConstants.LAYER);
-                        int numNodes = (layer.size() == 0) ? 1 : layer.size();
-                        nodeSplits = new Split[numNodes];
-                    });
+            List<LearningNode> layer = context.read(LAYER.sameStep());
+            int numNodes = (layer.isEmpty()) ? 1 : layer.size();
+            nodeSplits = new Split[numNodes];
         }
         Tuple2<Integer, Split> value = element.getValue();
         int nodeId = value.f0;
@@ -212,19 +197,14 @@ public class PostSplitsOperator extends AbstractStreamOperator<Integer>
     }
 
     @Override
+    public List<ReadRequest<?>> readRequestsInProcessElement() {
+        return Collections.singletonList(LAYER.sameStep());
+    }
+
+    @Override
     public void close() throws Exception {
         nodeSplitterState.clear();
         instanceUpdaterState.clear();
         super.close();
-    }
-
-    @Override
-    public void onSharedObjectsContextSet(SharedObjectsContext context) {
-        sharedObjectsContext = context;
-    }
-
-    @Override
-    public String getSharedObjectsAccessorID() {
-        return sharedObjectsAccessorID;
     }
 }

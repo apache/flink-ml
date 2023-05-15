@@ -44,33 +44,33 @@ public interface SharedObjectsBody extends Serializable {
      *
      * @param inputs Input data streams.
      * @return Result of the subgraph, including output data streams, data streams with access to
-     *     the shared objects, and a mapping from share items to their owners.
+     *     the shared objects, and a mapping from share objects to their owners.
      */
     SharedObjectsBodyResult process(List<DataStream<?>> inputs);
 
     /**
      * The result of a {@link SharedObjectsBody}, including output data streams, data streams with
-     * access to the shared objects, and a mapping from descriptors of share items to their owners.
+     * access to the shared objects, and a mapping from descriptors of share objects to their
+     * owners.
      */
     @Experimental
     class SharedObjectsBodyResult {
         /** A list of output streams. */
         private final List<DataStream<?>> outputs;
 
-        /** A list of {@link Transformation}s that should be co-located. */
+        /**
+         * A list of {@link Transformation}s that should be co-located, which should include all
+         * subclasses of {@link AbstractSharedObjectsStreamOperator}.
+         */
         private final List<Transformation<?>> coLocatedTransformations;
 
-        /**
-         * A mapping from descriptors of shared items to their owners. The owner is specified by
-         * {@link SharedObjectsStreamOperator#getSharedObjectsAccessorID()}, which must be kept
-         * unchanged for an instance of {@link SharedObjectsStreamOperator}.
-         */
-        private final Map<ItemDescriptor<?>, SharedObjectsStreamOperator> ownerMap;
+        /** A mapping from descriptors of shared objects to their owner operators. */
+        private final Map<Descriptor<?>, AbstractSharedObjectsStreamOperator<?>> ownerMap;
 
         public SharedObjectsBodyResult(
                 List<DataStream<?>> outputs,
                 List<Transformation<?>> coLocatedTransformations,
-                Map<ItemDescriptor<?>, SharedObjectsStreamOperator> ownerMap) {
+                Map<Descriptor<?>, AbstractSharedObjectsStreamOperator<?>> ownerMap) {
             this.outputs = outputs;
             this.coLocatedTransformations = coLocatedTransformations;
             this.ownerMap = ownerMap;
@@ -84,7 +84,7 @@ public interface SharedObjectsBody extends Serializable {
             return coLocatedTransformations;
         }
 
-        public Map<ItemDescriptor<?>, SharedObjectsStreamOperator> getOwnerMap() {
+        public Map<Descriptor<?>, AbstractSharedObjectsStreamOperator<?>> getOwnerMap() {
             return ownerMap;
         }
     }

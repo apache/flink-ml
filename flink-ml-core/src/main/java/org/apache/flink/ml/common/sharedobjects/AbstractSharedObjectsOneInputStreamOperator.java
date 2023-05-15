@@ -18,21 +18,14 @@
 
 package org.apache.flink.ml.common.sharedobjects;
 
-/** Interface for all operators that need to access the shared objects. */
-public interface SharedObjectsStreamOperator {
+import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 
-    /**
-     * Set the shared objects context in runtime.
-     *
-     * @param context The context for shared objects.
-     */
-    void onSharedObjectsContextSet(SharedObjectsContext context);
+import java.util.List;
 
-    /**
-     * Get a unique ID to represent the operator instance. The ID must be kept unchanged through its
-     * lifetime.
-     *
-     * @return A unique ID.
-     */
-    String getSharedObjectsAccessorID();
+/** The base class for {@link OneInputStreamOperator}s where shared objects are accessed. */
+public abstract class AbstractSharedObjectsOneInputStreamOperator<IN, OUT>
+        extends AbstractSharedObjectsStreamOperator<OUT>
+        implements OneInputStreamOperator<IN, OUT> {
+
+    public abstract List<ReadRequest<?>> readRequestsInProcessElement();
 }

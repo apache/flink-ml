@@ -18,15 +18,16 @@
 
 package org.apache.flink.ml.common.sharedobjects;
 
-import org.apache.flink.util.AbstractID;
+import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
 
-/** ID of a pool for shared objects. */
-class PoolID extends AbstractID {
-    private static final long serialVersionUID = 1L;
+import java.util.List;
 
-    public PoolID(byte[] bytes) {
-        super(bytes);
-    }
+/** The base class for {@link TwoInputStreamOperator}s where shared objects are accessed. */
+public abstract class AbstractSharedObjectsTwoInputStreamOperator<IN1, IN2, OUT>
+        extends AbstractSharedObjectsStreamOperator<OUT>
+        implements TwoInputStreamOperator<IN1, IN2, OUT> {
 
-    public PoolID() {}
+    public abstract List<ReadRequest<?>> readRequestsInProcessElement1();
+
+    public abstract List<ReadRequest<?>> readRequestsInProcessElement2();
 }

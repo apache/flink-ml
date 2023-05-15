@@ -24,77 +24,65 @@ import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamingRuntimeContext;
 import org.apache.flink.util.Preconditions;
-import org.apache.flink.util.function.BiConsumerWithException;
+
+import javax.annotation.Nullable;
 
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.apache.flink.ml.common.sharedobjects.SharedObjectsPools.getReader;
+import static org.apache.flink.ml.common.sharedobjects.SharedObjectsPools.getWriter;
+
 /**
- * Default implementation of {@link SharedObjectsContext}.
+ * A default implementation of {@link SharedObjectsContext}.
  *
- * <p>It initializes readers and writers according to the owner map when the subtask starts and
- * clean internal states when the subtask finishes. It also handles `initializeState` and
- * `snapshotState` automatically.
+ * <p>It initializes readers and writers of shared objects according to the owner map when the
+ * subtask starts and clean internal states when the subtask finishes. It also handles
+ * `initializeState` and `snapshotState` automatically.
  */
 @SuppressWarnings("rawtypes")
 class SharedObjectsContextImpl implements SharedObjectsContext, Serializable {
-    private final PoolID poolID;
-    private final Map<ItemDescriptor, SharedObjectsPools.Writer> writers = new HashMap<>();
-    private final Map<ItemDescriptor, SharedObjectsPools.Reader> readers = new HashMap<>();
-    private Map<ItemDescriptor<?>, String> ownerMap;
+    private final SharedObjectsPools.PoolID poolID;
+    private final Map<Descriptor, SharedObjectsPools.Writer> writers = new HashMap<>();
+    private final Map<Descriptor, SharedObjectsPools.Reader> readers = new HashMap<>();
+    private Map<Descriptor<?>, String> ownerMap;
+
+    /** The step of corresponding operator. See {@link ReadRequest} for more information. */
+    private int step;
 
     public SharedObjectsContextImpl() {
-        this.poolID = new PoolID();
+        this.poolID = new SharedObjectsPools.PoolID();
+        step = -1;
     }
 
-    void setOwnerMap(Map<ItemDescriptor<?>, String> ownerMap) {
+    void setOwnerMap(Map<Descriptor<?>, String> ownerMap) {
         this.ownerMap = ownerMap;
     }
 
-    @Override
-    public void invoke(BiConsumerWithException<SharedItemGetter, SharedItemSetter, Exception> func)
-            throws Exception {
-        func.accept(this::getSharedItem, this::setSharedItem);
+    void incStep(@Nullable Integer targetStep) {
+        step += 1;
+        // Sanity check
+        Preconditions.checkState(null == targetStep || step == targetStep);
     }
 
-    private <T> T getSharedItem(ItemDescriptor<T> key) {
-        //noinspection unchecked
-        SharedObjectsPools.Reader<T> reader = readers.get(key);
-        Preconditions.checkState(
-                null != reader,
-                String.format(
-                        "The operator requested to read a shared item %s not owned by itself.",
-                        key));
-        return reader.get();
-    }
-
-    private <T> void setSharedItem(ItemDescriptor<T> key, T value) {
-        //noinspection unchecked
-        SharedObjectsPools.Writer<T> writer = writers.get(key);
-        Preconditions.checkState(
-                null != writer,
-                String.format(
-                        "The operator requested to read a shared item %s not owned by itself.",
-                        key));
-        writer.set(value);
+    void incStep() {
+        incStep(null);
     }
 
     void initializeState(
             StreamOperator<?> operator,
             StreamingRuntimeContext runtimeContext,
             StateInitializationContext context) {
-        Preconditions.checkArgument(
-                operator instanceof SharedObjectsStreamOperator
-                        && operator instanceof AbstractStreamOperator);
-        String ownerId = ((SharedObjectsStreamOperator) operator).getSharedObjectsAccessorID();
+        Preconditions.checkArgument(operator instanceof AbstractSharedObjectsStreamOperator);
+        String ownerId = ((AbstractSharedObjectsStreamOperator) operator).getAccessorID();
         int subtaskId = runtimeContext.getIndexOfThisSubtask();
-        for (Map.Entry<ItemDescriptor<?>, String> entry : ownerMap.entrySet()) {
-            ItemDescriptor descriptor = entry.getKey();
+        for (Map.Entry<Descriptor<?>, String> entry : ownerMap.entrySet()) {
+            Descriptor<?> descriptor = entry.getKey();
             if (ownerId.equals(entry.getValue())) {
                 writers.put(
                         descriptor,
-                        SharedObjectsPools.getWriter(
+                        getWriter(
                                 poolID,
                                 subtaskId,
                                 descriptor,
@@ -102,9 +90,10 @@ class SharedObjectsContextImpl implements SharedObjectsContext, Serializable {
                                 operator.getOperatorID(),
                                 ((AbstractStreamOperator<?>) operator).getContainingTask(),
                                 runtimeContext,
-                                context));
+                                context,
+                                step));
             }
-            readers.put(descriptor, SharedObjectsPools.getReader(poolID, subtaskId, descriptor));
+            readers.put(descriptor, getReader(poolID, subtaskId, descriptor));
         }
     }
 
@@ -123,5 +112,62 @@ class SharedObjectsContextImpl implements SharedObjectsContext, Serializable {
         }
         writers.clear();
         readers.clear();
+    }
+
+    @Override
+    public <T> T read(ReadRequest<T> request) {
+        try {
+            return read(request, false);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Gets the value of the shared object with possible waiting.
+     *
+     * @param request A read request of a shared object.
+     * @param wait Whether to wait or not.
+     * @return The value of the shared object, or null if not set yet.
+     * @param <T> The type of the shared object.
+     */
+    <T> T read(ReadRequest<T> request, boolean wait) throws InterruptedException {
+        Descriptor<T> descriptor = request.descriptor;
+        //noinspection unchecked
+        SharedObjectsPools.Reader<T> reader = readers.get(descriptor);
+        switch (request.offset) {
+            case SAME:
+                return reader.get(step, wait);
+            case PREV:
+                return reader.get(step - 1, wait);
+            case NEXT:
+                return reader.get(step + 1, wait);
+            default:
+                throw new UnsupportedOperationException();
+        }
+    }
+
+    @Override
+    public <T> void write(Descriptor<T> descriptor, T value) {
+        //noinspection unchecked
+        SharedObjectsPools.Writer<T> writer = writers.get(descriptor);
+        Preconditions.checkState(
+                null != writer,
+                String.format(
+                        "The operator requestes to write a shared object %s not owned by itself.",
+                        descriptor));
+        writer.set(value, step);
+    }
+
+    @Override
+    public <T> void renew(Descriptor<T> descriptor) {
+        try {
+            //noinspection unchecked
+            write(
+                    descriptor,
+                    ((SharedObjectsPools.Reader<T>) readers.get(descriptor)).get(step - 1, false));
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

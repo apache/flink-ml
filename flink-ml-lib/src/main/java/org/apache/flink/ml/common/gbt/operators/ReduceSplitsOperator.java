@@ -21,11 +21,9 @@ package org.apache.flink.ml.common.gbt.operators;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.ml.common.gbt.defs.Split;
-import org.apache.flink.ml.common.sharedobjects.SharedObjectsContext;
-import org.apache.flink.ml.common.sharedobjects.SharedObjectsStreamOperator;
+import org.apache.flink.ml.common.sharedobjects.AbstractSharedObjectsOneInputStreamOperator;
+import org.apache.flink.ml.common.sharedobjects.ReadRequest;
 import org.apache.flink.runtime.state.StateInitializationContext;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
-import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.util.Preconditions;
 
@@ -33,9 +31,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.BitSet;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.UUID;
+
+import static org.apache.flink.ml.common.gbt.operators.SharedObjectsConstants.NODE_FEATURE_PAIRS;
 
 /**
  * Reduces best splits for nodes.
@@ -43,33 +44,15 @@ import java.util.UUID;
  * <p>The input elements are tuples of (node index, (nodeId, featureId) pair index, Split). The
  * output elements are tuples of (node index, Split).
  */
-public class ReduceSplitsOperator extends AbstractStreamOperator<Tuple2<Integer, Split>>
-        implements OneInputStreamOperator<Tuple3<Integer, Integer, Split>, Tuple2<Integer, Split>>,
-                SharedObjectsStreamOperator {
+public class ReduceSplitsOperator
+        extends AbstractSharedObjectsOneInputStreamOperator<
+                Tuple3<Integer, Integer, Split>, Tuple2<Integer, Split>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(ReduceSplitsOperator.class);
-
-    private final String sharedObjectsAccessorID;
-
-    private transient SharedObjectsContext sharedObjectsContext;
 
     private Map<Integer, BitSet> nodeFeatureMap;
     private Map<Integer, Split> nodeBestSplit;
     private Map<Integer, Integer> nodeFeatureCounter;
-
-    public ReduceSplitsOperator() {
-        sharedObjectsAccessorID = getClass().getSimpleName() + "-" + UUID.randomUUID();
-    }
-
-    @Override
-    public void onSharedObjectsContextSet(SharedObjectsContext context) {
-        sharedObjectsContext = context;
-    }
-
-    @Override
-    public String getSharedObjectsAccessorID() {
-        return sharedObjectsAccessorID;
-    }
 
     @Override
     public void initializeState(StateInitializationContext context) throws Exception {
@@ -84,15 +67,11 @@ public class ReduceSplitsOperator extends AbstractStreamOperator<Tuple2<Integer,
         if (nodeFeatureMap.isEmpty()) {
             Preconditions.checkState(nodeBestSplit.isEmpty());
             nodeFeatureCounter.clear();
-            sharedObjectsContext.invoke(
-                    (getter, setter) -> {
-                        int[] nodeFeaturePairs =
-                                getter.get(SharedObjectsConstants.NODE_FEATURE_PAIRS);
-                        for (int i = 0; i < nodeFeaturePairs.length / 2; i += 1) {
-                            int nodeId = nodeFeaturePairs[2 * i];
-                            nodeFeatureCounter.compute(nodeId, (k, v) -> null == v ? 1 : v + 1);
-                        }
-                    });
+            int[] nodeFeaturePairs = context.read(NODE_FEATURE_PAIRS.nextStep());
+            for (int i = 0; i < nodeFeaturePairs.length / 2; i += 1) {
+                int nodeId = nodeFeaturePairs[2 * i];
+                nodeFeatureCounter.compute(nodeId, (k, v) -> null == v ? 1 : v + 1);
+            }
         }
 
         Tuple3<Integer, Integer, Split> value = element.getValue();
@@ -103,14 +82,11 @@ public class ReduceSplitsOperator extends AbstractStreamOperator<Tuple2<Integer,
         if (featureMap.isEmpty()) {
             LOG.debug("Received split for new node {}", nodeId);
         }
-        sharedObjectsContext.invoke(
-                (getter, setter) -> {
-                    int[] nodeFeaturePairs = getter.get(SharedObjectsConstants.NODE_FEATURE_PAIRS);
-                    Preconditions.checkState(nodeId == nodeFeaturePairs[pairId * 2]);
-                    int featureId = nodeFeaturePairs[pairId * 2 + 1];
-                    Preconditions.checkState(!featureMap.get(featureId));
-                    featureMap.set(featureId);
-                });
+        int[] nodeFeaturePairs = context.read(NODE_FEATURE_PAIRS.nextStep());
+        Preconditions.checkState(nodeId == nodeFeaturePairs[pairId * 2]);
+        int featureId = nodeFeaturePairs[pairId * 2 + 1];
+        Preconditions.checkState(!featureMap.get(featureId));
+        featureMap.set(featureId);
         nodeFeatureMap.put(nodeId, featureMap);
 
         nodeBestSplit.compute(nodeId, (k, v) -> null == v ? split : v.accumulate(split));
@@ -124,7 +100,7 @@ public class ReduceSplitsOperator extends AbstractStreamOperator<Tuple2<Integer,
     }
 
     @Override
-    public void close() throws Exception {
-        super.close();
+    public List<ReadRequest<?>> readRequestsInProcessElement() {
+        return Collections.singletonList(NODE_FEATURE_PAIRS.nextStep());
     }
 }
