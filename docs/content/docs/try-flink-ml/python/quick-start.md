@@ -248,8 +248,7 @@ $ java -version
 
 ### Download Flink
 
-[Download 1.17 or a higher version of
-Flink](https://flink.apache.org/downloads.html), then extract the archive:
+[Download Flink 1.17](https://flink.apache.org/downloads.html), then extract the archive:
 
 ```shell
 $ tar -xzf flink-*.tgz
@@ -339,4 +338,8 @@ detailed instructions to submit it to a Flink cluster can be found in [Job
 Submission
 Examples](https://nightlies.apache.org/flink/flink-docs-master/docs/deployment/cli/#submitting-pyflink-jobs).
 
+Finally, you can stop the Flink standalone cluster with the following command.
 
+```bash
+$FLINK_HOME/bin/stop-cluster.sh
+```

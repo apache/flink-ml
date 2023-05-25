@@ -50,8 +50,7 @@ $ java -version
 
 ## Download Flink
 
-[Download 1.17 or a higher version of
-Flink](https://flink.apache.org/downloads.html), then extract the archive:
+[Download Flink 1.17](https://flink.apache.org/downloads.html), then extract the archive:
 
 ```shell
 $ tar -xzf flink-*.tgz
@@ -141,3 +140,8 @@ Features: [9.0, 0.6]    Cluster ID: 1
 
 Now you have successfully run a Flink ML job.
 
+Finally, you can stop the Flink standalone cluster with the following command.
+
+```bash
+$FLINK_HOME/bin/stop-cluster.sh
+```
