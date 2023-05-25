@@ -66,8 +66,8 @@ under the License.
   </modules>
 
   <properties>
-    <flink.shaded.version>15.0</flink.shaded.version>
-    <jackson.version>2.12.4</jackson.version>
+    <flink.shaded.version>16.1</flink.shaded.version>
+    <jackson.version>2.13.4</jackson.version>
     <jackson-databind.version>2.12.6.1</jackson-databind.version>
     <target.java.version>1.8</target.java.version>
     <spotless.version>2.4.2</spotless.version>
@@ -79,7 +79,7 @@ under the License.
     <flink.reuseForks>true</flink.reuseForks>
     <flink.version>1.17.0</flink.version>
     <zookeeper.version>3.6.3</zookeeper.version>
-    <hadoop.version>2.10.1</hadoop.version>
+    <hadoop.version>2.10.2</hadoop.version>
 
     <!-- Can be set to any value to reproduce a specific build. -->
     <test.randomization.seed/>
@@ -145,6 +145,7 @@ under the License.
         <artifactId>flink-shaded-zookeeper-3</artifactId>
         <version>${zookeeper.version}-${flink.shaded.version}</version>
       </dependency>
+
       <dependency>
         <groupId>org.apache.flink</groupId>
         <artifactId>flink-connector-files</artifactId>
@@ -220,18 +221,21 @@ under the License.
         <version>${flink.version}</version>
         <scope>test</scope>
       </dependency>
+
       <dependency>
         <groupId>org.apache.flink</groupId>
         <artifactId>flink-table-runtime</artifactId>
         <version>${flink.version}</version>
         <scope>provided</scope>
       </dependency>
+
       <dependency>
         <groupId>org.apache.flink</groupId>
         <artifactId>flink-table-planner-loader</artifactId>
         <version>${flink.version}</version>
         <scope>test</scope>
       </dependency>
+
       <!-- hdfs is required for the data cache test -->
       <dependency>
         <groupId>org.apache.hadoop</groupId>
@@ -240,23 +244,28 @@ under the License.
         <version>${hadoop.version}</version>
         <exclusions>
           <exclusion>
+            <groupId>jdk.tools</groupId>
+            <artifactId>jdk.tools</artifactId>
+          </exclusion>
+          <exclusion>
             <groupId>log4j</groupId>
             <artifactId>log4j</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-annotations</artifactId>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-core</artifactId>
+            <groupId>ch.qos.reload4j</groupId>
+            <artifactId>reload4j</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-reload4j</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
+
       <dependency>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-common</artifactId>
@@ -290,6 +299,7 @@ under the License.
           </exclusion>
         </exclusions>
       </dependency>
+
       <dependency>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-hdfs</artifactId>
@@ -298,20 +308,24 @@ under the License.
         <version>${hadoop.version}</version>
         <exclusions>
           <exclusion>
+            <groupId>jdk.tools</groupId>
+            <artifactId>jdk.tools</artifactId>
+          </exclusion>
+          <exclusion>
             <groupId>log4j</groupId>
             <artifactId>log4j</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-annotations</artifactId>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-core</artifactId>
+            <groupId>ch.qos.reload4j</groupId>
+            <artifactId>reload4j</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-reload4j</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -350,6 +364,7 @@ under the License.
           </exclusion>
         </exclusions>
       </dependency>
+
       <dependency>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-minicluster</artifactId>
@@ -390,11 +405,13 @@ under the License.
         <artifactId>jackson-databind</artifactId>
         <version>${jackson-databind.version}</version>
       </dependency>
+
       <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-core</artifactId>
         <version>${jackson.version}</version>
       </dependency>
+
       <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-annotations</artifactId>
@@ -643,13 +660,14 @@ under the License.
               <rules>
                 <bannedDependencies>
                   <excludes>
-                    <exclude>org.yaml:snakeyaml:(,1.26]</exclude>
+                    <exclude>org.yaml:snakeyaml:(,1.31]</exclude>
                   </excludes>
                   <includes>
                     <!-- Snakeyaml is pulled in by many modules without using it in production,
                       so there's no benefit in us investing time into bumping these. -->
-                    <include>org.yaml:snakeyaml:(,1.26]:*:test</include>
+                    <include>org.yaml:snakeyaml:(,1.31]:*:test</include>
                   </includes>
+                  <message>Older snakeyaml versions are not allowed due to security vulnerabilities.</message>
                 </bannedDependencies>
               </rules>
             </configuration>
@@ -665,6 +683,7 @@ under the License.
                   <excludes>
                     <exclude>com.fasterxml.jackson*:*:(,2.12.0]</exclude>
                   </excludes>
+                  <message>Older jackson versions are not allowed due to security vulnerabilities.</message>
                 </bannedDependencies>
               </rules>
             </configuration>
@@ -796,7 +815,7 @@ under the License.
               <groupId>com.puppycrawl.tools</groupId>
               <artifactId>checkstyle</artifactId>
               <!-- Note: match version with docs/flinkDev/ide_setup.md -->
-              <version>8.14</version>
+              <version>8.18</version>
             </dependency>
           </dependencies>
           <executions>
