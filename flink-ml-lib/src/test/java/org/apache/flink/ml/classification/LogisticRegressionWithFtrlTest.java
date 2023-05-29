@@ -69,8 +69,9 @@ public class LogisticRegressionWithFtrlTest {
 
     @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
     private final double[] expectedCoefficient =
-            new double[] {0.3140991, -0.6776634, -0.5825635, -0.4035519};
-
+            new double[] {0.5287258, -1.2163098, -1.0710997, -0.8591691};
+    private static final int MAX_ITER = 100;
+    private static final int NUM_SERVERS = 2;
     private static final double TOLERANCE = 1e-7;
 
     private static final List<Row> trainRows =
@@ -100,14 +101,16 @@ public class LogisticRegressionWithFtrlTest {
                     Row.of(Vectors.sparse(4, new int[] {0, 2}, new double[] {15, 4}), 1., 5.));
 
     private StreamTableEnvironment tEnv;
+    private StreamExecutionEnvironment env;
     private Table trainTable;
     private Table testTable;
     private DataFrame testDataFrame;
 
     @Before
     public void before() {
-        StreamExecutionEnvironment env = TestUtils.getExecutionEnvironment();
+        env = TestUtils.getExecutionEnvironment();
         tEnv = StreamTableEnvironment.create(env);
+
         trainTable =
                 tEnv.fromDataStream(
                         env.fromCollection(
@@ -227,16 +230,17 @@ public class LogisticRegressionWithFtrlTest {
     @Test
     @SuppressWarnings("unchecked")
     public void testGetModelData() throws Exception {
-        int numServers = 2;
+        // Fix the parallelism as one for stability tests.
+        env.setParallelism(1);
         LogisticRegressionWithFtrl logisticRegressionWithFtrl =
-                new LogisticRegressionWithFtrl().setNumServers(numServers).setNumServerCores(1);
+                new LogisticRegressionWithFtrl().setMaxIter(MAX_ITER).setNumServers(NUM_SERVERS);
         LogisticRegressionModel model = logisticRegressionWithFtrl.fit(trainTable);
         List<LogisticRegressionModelData> modelData =
                 IteratorUtils.toList(
                         LogisticRegressionModelDataUtil.getModelDataStream(model.getModelData()[0])
                                 .executeAndCollect());
 
-        assertEquals(numServers, modelData.size());
+        assertEquals(NUM_SERVERS, modelData.size());
 
         modelData.sort(Comparator.comparingLong(o -> o.startIndex));
 
@@ -252,7 +256,7 @@ public class LogisticRegressionWithFtrlTest {
     @Test
     public void testFitAndPredict() throws Exception {
         LogisticRegressionWithFtrl logisticRegressionWithFtrl =
-                new LogisticRegressionWithFtrl().setNumServers(2);
+                new LogisticRegressionWithFtrl().setMaxIter(MAX_ITER).setNumServers(NUM_SERVERS);
         Table output = logisticRegressionWithFtrl.fit(trainTable).transform(testTable)[0];
         verifyPredictionResult(
                 output,
@@ -264,7 +268,7 @@ public class LogisticRegressionWithFtrlTest {
     @Test
     public void testSaveLoadAndPredict() throws Exception {
         LogisticRegressionWithFtrl logisticRegressionWithFtrl =
-                new LogisticRegressionWithFtrl().setNumServers(2);
+                new LogisticRegressionWithFtrl().setMaxIter(MAX_ITER).setNumServers(NUM_SERVERS);
         logisticRegressionWithFtrl =
                 TestUtils.saveAndReload(
                         tEnv,
@@ -292,7 +296,7 @@ public class LogisticRegressionWithFtrlTest {
     @Test
     public void testSetModelData() throws Exception {
         LogisticRegressionWithFtrl logisticRegressionWithFtrl =
-                new LogisticRegressionWithFtrl().setNumServers(2);
+                new LogisticRegressionWithFtrl().setMaxIter(MAX_ITER).setNumServers(NUM_SERVERS);
         LogisticRegressionModel model = logisticRegressionWithFtrl.fit(trainTable);
 
         LogisticRegressionModel newModel = new LogisticRegressionModel();
@@ -309,7 +313,7 @@ public class LogisticRegressionWithFtrlTest {
     @Test
     public void testSaveLoadServableAndPredict() throws Exception {
         LogisticRegressionWithFtrl logisticRegressionWithFtrl =
-                new LogisticRegressionWithFtrl().setNumServers(2);
+                new LogisticRegressionWithFtrl().setMaxIter(MAX_ITER).setNumServers(NUM_SERVERS);
         LogisticRegressionModel model = logisticRegressionWithFtrl.fit(trainTable);
 
         LogisticRegressionModelServable servable =
@@ -330,7 +334,7 @@ public class LogisticRegressionWithFtrlTest {
     @Test
     public void testSetModelDataToServable() throws Exception {
         LogisticRegressionWithFtrl logisticRegressionWithFtrl =
-                new LogisticRegressionWithFtrl().setNumServers(2);
+                new LogisticRegressionWithFtrl().setMaxIter(MAX_ITER).setNumServers(NUM_SERVERS);
         LogisticRegressionModel model = logisticRegressionWithFtrl.fit(trainTable);
         List<byte[]> serializedModelData =
                 IteratorUtils.toList(

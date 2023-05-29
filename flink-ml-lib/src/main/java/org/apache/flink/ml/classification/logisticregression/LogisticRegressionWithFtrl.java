@@ -38,6 +38,7 @@ import org.apache.flink.ml.common.ps.training.SerializableConsumer;
 import org.apache.flink.ml.common.ps.training.TrainingContext;
 import org.apache.flink.ml.common.ps.training.TrainingUtils;
 import org.apache.flink.ml.common.updater.FTRL;
+import org.apache.flink.ml.linalg.BLAS;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -150,7 +151,13 @@ public class LogisticRegressionWithFtrl
                 .setTerminationCriteria(
                         (SerializableFunction<LogisticRegressionWithFtrlTrainingContext, Boolean>)
                                 o -> o.iterationId >= getMaxIter());
-        FTRL ftrl = new FTRL(getAlpha(), getBeta(), getReg(), getElasticNet());
+        FTRL ftrl =
+                new FTRL(
+                        getAlpha(),
+                        getBeta(),
+                        getReg(),
+                        getElasticNet(),
+                        trainData.getParallelism());
 
         DataStream<Tuple3<Long, Long, double[]>> rawModelData =
                 TrainingUtils.train(
@@ -274,6 +281,7 @@ class ComputeGradients extends ProcessStage<LogisticRegressionWithFtrlTrainingCo
         for (int i = 0; i < sortedBatchIndices.length; i++) {
             cumGradientValues[i] = cumGradients.get(sortedBatchIndices[i]);
         }
+        BLAS.scal(1.0 / batchData.size(), Vectors.dense(cumGradientValues));
         return cumGradientValues;
     }
 

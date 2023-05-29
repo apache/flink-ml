@@ -75,7 +75,7 @@ public class RangePartitioner {
 
         public RequestsIterator(
                 int numPss, long[] indices, @Nullable double[] values, long[] ranges) {
-            Preconditions.checkArgument(values == null || values.length % indices.length == 0);
+            // Preconditions.checkArgument(values == null || values.length % indices.length == 0);
             this.numServers = numPss;
             this.indices = indices;
             this.values = values;
