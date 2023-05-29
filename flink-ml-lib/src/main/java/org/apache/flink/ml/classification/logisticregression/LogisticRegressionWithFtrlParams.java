@@ -51,13 +51,6 @@ public interface LogisticRegressionWithFtrlParams<T>
                     1,
                     ParamValidators.gtEq(1));
 
-    Param<Integer> NUM_SERVER_CORES =
-            new IntParam(
-                    "numServerCores",
-                    "number of cores that a server can use.",
-                    1,
-                    ParamValidators.gtEq(1));
-
     Param<Double> ALPHA =
             new DoubleParam(
                     "alpha",
@@ -79,14 +72,6 @@ public interface LogisticRegressionWithFtrlParams<T>
 
     default T setNumServers(Integer value) {
         return set(NUM_SERVERS, value);
-    }
-
-    default int getNumServerCores() {
-        return get(NUM_SERVER_CORES);
-    }
-
-    default T setNumServerCores(int value) {
-        return set(NUM_SERVER_CORES, value);
     }
 
     default double getAlpha() {

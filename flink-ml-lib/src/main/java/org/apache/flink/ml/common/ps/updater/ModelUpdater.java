@@ -32,7 +32,7 @@ import java.util.Iterator;
  */
 public interface ModelUpdater extends Serializable {
 
-    /** Initialize the model data. */
+    /** Initializes the model data. */
     void open(long startFeatureIndex, long endFeatureIndex);
 
     /** Applies the push to update the model data, e.g., using gradient to update model. */
@@ -44,7 +44,7 @@ public interface ModelUpdater extends Serializable {
     /** Returns model pieces with the format of (startFeatureIdx, endFeatureIdx, modelValues). */
     Iterator<Tuple3<Long, Long, double[]>> getModelPieces();
 
-    /** Recover the model data from state. */
+    /** Recovers the model data from state. */
     void initializeState(StateInitializationContext context) throws Exception;
 
     /** Snapshots the model data to state. */

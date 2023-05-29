@@ -44,11 +44,13 @@ import org.apache.flink.util.SerializableObject;
 
 import it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap;
 
+import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -60,7 +62,7 @@ import java.util.concurrent.Future;
  *
  * <ul>
  *   <li>The server operator deals with the message from workers and decide when to process the
- *       received message. (i.e., synchronous vs. asynchronous).
+ *       received message.
  *   <li>The server operator calls {@link ModelUpdater#handlePush(long[], double[])} and {@link
  *       ModelUpdater#handlePull(long[])} to process the messages in detail.
  *   <li>The server operator ensures that {@link ModelUpdater} is robust to failures.
@@ -79,55 +81,59 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
     private final ModelUpdater modelUpdater;
     /** Format of model data: start index, end index, dense double array. */
     private final OutputTag<Tuple3<Long, Long, double[]>> modelOutputTag;
-
+    /** Index of the server task. */
     private int serverId = -1;
-
     /**
-     * Lock for output records to downstream operators. Note that we use multiple threads to deal
-     * with push/pull requests for better performance.
+     * Thread pool to answer push/pull requests, to decouple the network traffic and computation
+     * logic.
      */
-    private final SerializableObject lock = new SerializableObject();
-    /** Number of threads to answer push/pull requests. */
-    private final int numServerCores;
-    /** Thread pool to answer push/pull requests. */
-    private transient ExecutorService fixedThreadPool;
+    private transient ExecutorService singleThreadExecutor;
     /** The future objects of thread calls in one epoch. */
     private final List<Future<?>> futuresInEpoch = new ArrayList<>();
-    /** The accumulated push request from workers by threadId. */
-    private final ConcurrentHashMap<Long, Long2DoubleOpenHashMap> accumulatedKvsByThreadId;
-    /** The accumulated results of Kvs. */
-    private final Long2DoubleOpenHashMap accumulatedKvs;
-    /** The state for accumulated Kvs. */
-    private ListState<byte[]> accumulatedKvsState;
+    /** The merger for push requests. */
+    private final PushRequestMerger pushRequestMerger;
     /** The pending pull requests. */
     private ListState<byte[]> pendingPulls;
 
     public ServerOperator(
-            ModelUpdater modelUpdater,
-            OutputTag<Tuple3<Long, Long, double[]>> modelOutputTag,
-            int numServerCores) {
+            ModelUpdater modelUpdater, OutputTag<Tuple3<Long, Long, double[]>> modelOutputTag) {
         this.modelUpdater = modelUpdater;
         this.modelOutputTag = modelOutputTag;
-        this.numServerCores = numServerCores;
-        this.accumulatedKvsByThreadId = new ConcurrentHashMap<>();
-        this.accumulatedKvs = new Long2DoubleOpenHashMap();
+        this.pushRequestMerger = new PushRequestMerger();
     }
 
     @Override
     public void open() throws Exception {
         super.open();
-        serverId = getRuntimeContext().getIndexOfThisSubtask();
-        fixedThreadPool = Executors.newFixedThreadPool(numServerCores);
+        this.serverId = getRuntimeContext().getIndexOfThisSubtask();
+        this.singleThreadExecutor = Executors.newSingleThreadExecutor();
     }
 
     @Override
     public void processElement(StreamRecord<Tuple2<Integer, byte[]>> element) throws Exception {
         byte[] request = element.getValue().f1;
         MessageType type = MessageUtils.getMessageType(request);
-        if (type == MessageType.INDICES_TO_PULL) {
-            pendingPulls.add(request);
-        } else {
-            processPushRequest(request);
+        switch (type) {
+            case INDICES_TO_PULL:
+                pendingPulls.add(request);
+                break;
+            case ZEROS_TO_PUSH:
+                ZerosToPushM zerosToPush = ZerosToPushM.fromBytes(request);
+                Preconditions.checkState(serverId == zerosToPush.serverId);
+
+                long start = zerosToPush.startIndex;
+                long end = zerosToPush.endIndex;
+                if (zerosToPush.workerId == 0) {
+                    modelUpdater.open(start, end);
+                }
+                break;
+            case KVS_TO_PUSH:
+                futuresInEpoch.add(
+                        singleThreadExecutor.submit(
+                                () -> pushRequestMerger.processPushRequest(request)));
+                break;
+            default:
+                throw new UnsupportedOperationException("Unsupported message type: " + type + ".");
         }
     }
 
@@ -141,12 +147,11 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
         }
         futuresInEpoch.clear();
 
-        Iterator<Long2DoubleOpenHashMap> kvsFromAllThreads =
-                accumulatedKvsByThreadId.values().iterator();
-        if (kvsFromAllThreads.hasNext()) {
-            Tuple2<long[], double[]> kvs = mergeKvsFromAllThreads(kvsFromAllThreads);
+        if (epochWatermark > 0) {
+            Tuple2<long[], double[]> kvs = pushRequestMerger.toKvArrays();
+            pushRequestMerger.accumulatedKvsForMatrix.clear();
+            pushRequestMerger.accumulatedKvsForVector.clear();
             modelUpdater.handlePush(kvs.f0, kvs.f1);
-            accumulatedKvs.clear();
         }
 
         Iterator<byte[]> pullsIterator = pendingPulls.get().iterator();
@@ -154,7 +159,7 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
             // The last iteration contains no pulls.
             while (pullsIterator.hasNext()) {
                 byte[] pull = pullsIterator.next();
-                futuresInEpoch.add(fixedThreadPool.submit(() -> processPullRequest(pull)));
+                futuresInEpoch.add(singleThreadExecutor.submit(() -> processPullRequest(pull)));
             }
         }
         for (Future<?> future : futuresInEpoch) {
@@ -184,25 +189,7 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
                                         "pendingPulls",
                                         PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO));
         modelUpdater.initializeState(context);
-
-        accumulatedKvsState =
-                context.getOperatorStateStore()
-                        .getListState(
-                                new ListStateDescriptor<>(
-                                        "accumulatedKvs",
-                                        PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO));
-
-        byte[] accumulatedKvsInBytes =
-                OperatorStateUtils.getUniqueElement(accumulatedKvsState, "accumulatedKvs")
-                        .orElse(null);
-        if (accumulatedKvsInBytes != null) {
-            Tuple2<long[], double[]> kvs =
-                    MessageUtils.readLongDoubleArray(accumulatedKvsInBytes, 0);
-            accumulatedKvs.clear();
-            for (int i = 0; i < kvs.f0.length; i++) {
-                accumulatedKvs.put(kvs.f0[i], kvs.f1[i]);
-            }
-        }
+        pushRequestMerger.initializeState(context);
     }
 
     @Override
@@ -215,51 +202,7 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
         }
         futuresInEpoch.clear();
         modelUpdater.snapshotState(context);
-
-        // Snapshots the pending pushes.
-        Tuple2<long[], double[]> kvs =
-                mergeKvsFromAllThreads(accumulatedKvsByThreadId.values().iterator());
-        accumulatedKvsState.clear();
-        if (kvs.f0.length > 0) {
-            byte[] bytes = new byte[MessageUtils.getLongDoubleArraySizeInBytes(kvs)];
-            MessageUtils.writeLongDoubleArray(kvs, bytes, 0);
-            accumulatedKvsState.add(bytes);
-        }
-    }
-
-    private void processPushRequest(byte[] pushRpc) {
-        MessageType type = MessageUtils.getMessageType(pushRpc);
-        if (type == MessageType.ZEROS_TO_PUSH) {
-            ZerosToPushM zerosToPush = ZerosToPushM.fromBytes(pushRpc);
-            Preconditions.checkState(serverId == zerosToPush.serverId);
-
-            long start = zerosToPush.startIndex;
-            long end = zerosToPush.endIndex;
-            if (zerosToPush.workerId == 0) {
-                modelUpdater.open(start, end);
-            }
-        } else if (type == MessageType.KVS_TO_PUSH) {
-            futuresInEpoch.add(fixedThreadPool.submit(() -> processPushedKvs(pushRpc)));
-        } else {
-            throw new UnsupportedOperationException("Unsupported message type: " + type + ".");
-        }
-    }
-
-    private Object processPushedKvs(byte[] pushKv) {
-        KVsToPushM kvsToPush = KVsToPushM.fromBytes(pushKv);
-        Preconditions.checkState(kvsToPush.serverId == serverId);
-        long threadId = Thread.currentThread().getId();
-        accumulatedKvsByThreadId.putIfAbsent(threadId, new Long2DoubleOpenHashMap());
-        Long2DoubleOpenHashMap tmpGrad = accumulatedKvsByThreadId.get(threadId);
-
-        Tuple2<long[], double[]> pushedGrad = kvsToPush.kvs;
-        long[] indices = pushedGrad.f0;
-        double[] values = pushedGrad.f1;
-        for (int i = 0; i < indices.length; i++) {
-            tmpGrad.merge(indices[i], values[i], Double::sum);
-        }
-
-        return new Object();
+        pushRequestMerger.snapshotState(context);
     }
 
     private Object processPullRequest(byte[] bytesData) {
@@ -272,30 +215,120 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
         StreamRecord<Tuple2<Integer, byte[]>> record =
                 new StreamRecord<>(Tuple2.of(workerId, pulledModelM.toBytes()));
 
-        // Holds the lock for output.
-        synchronized (lock) {
-            output.collect(record);
-        }
+        output.collect(record);
         return new Object();
     }
 
-    private Tuple2<long[], double[]> mergeKvsFromAllThreads(
-            Iterator<Long2DoubleOpenHashMap> kvsFromAllThreads) {
-        while (kvsFromAllThreads.hasNext()) {
-            Long2DoubleOpenHashMap kv = kvsFromAllThreads.next();
-            for (Map.Entry<Long, Double> entry : kv.entrySet()) {
-                accumulatedKvs.merge(entry.getKey(), entry.getValue(), Double::sum);
+    /** Utility class to merge the push request from different workers. */
+    private static class PushRequestMerger implements Serializable {
+        /** The accumulated kv if the push request is for a vector. */
+        private final Long2DoubleOpenHashMap accumulatedKvsForVector;
+        /** The accumulated kv if the push request is for a matrix. */
+        private final Map<Long, double[]> accumulatedKvsForMatrix;
+        /** The state for accumulated kv. */
+        private ListState<byte[]> accumulatedKvsState;
+
+        public PushRequestMerger() {
+            this.accumulatedKvsForVector = new Long2DoubleOpenHashMap();
+            this.accumulatedKvsForMatrix = new HashMap<>();
+        }
+
+        private Object processPushRequest(byte[] pushKv) {
+            KVsToPushM kvsToPush = KVsToPushM.fromBytes(pushKv);
+            Tuple2<long[], double[]> pushedKvs = kvsToPush.kvs;
+            long[] keys = pushedKvs.f0;
+            double[] values = pushedKvs.f1;
+
+            if (values.length == keys.length) {
+                for (int i = 0; i < keys.length; i++) {
+                    accumulatedKvsForVector.merge(keys[i], values[i], Double::sum);
+                }
+            } else {
+                int valuesPerKey = values.length / keys.length;
+                for (int i = 0; i < keys.length; i++) {
+                    accumulatedKvsForMatrix.putIfAbsent(keys[i], new double[valuesPerKey]);
+                    double[] partialValue = accumulatedKvsForMatrix.get(keys[i]);
+                    for (int j = 0; j < valuesPerKey; j++) {
+                        partialValue[j] += values[i * valuesPerKey + j];
+                    }
+                }
             }
-            kv.clear();
+            return new Object();
         }
-        long[] indices = new long[accumulatedKvs.size()];
-        double[] values = new double[indices.length];
-        int idx = 0;
-        for (Map.Entry<Long, Double> entry : accumulatedKvs.entrySet()) {
-            indices[idx] = entry.getKey();
-            values[idx] = entry.getValue();
-            idx++;
+
+        /** Transforms the processed push request to kv arrays. */
+        private Tuple2<long[], double[]> toKvArrays() {
+            long[] indices = new long[0];
+            double[] values = new double[0];
+            if (accumulatedKvsForVector.size() != 0) {
+                indices = new long[accumulatedKvsForVector.size()];
+                values = new double[indices.length];
+
+                int idx = 0;
+                for (Map.Entry<Long, Double> entry : accumulatedKvsForVector.entrySet()) {
+                    indices[idx] = entry.getKey();
+                    values[idx] = entry.getValue();
+                    idx++;
+                }
+            } else if (accumulatedKvsForMatrix.size() != 0) {
+                indices = new long[accumulatedKvsForMatrix.size()];
+                int numValuesPerKey =
+                        accumulatedKvsForMatrix.entrySet().iterator().next().getValue().length;
+                values = new double[indices.length * numValuesPerKey];
+                int idx = 0;
+                for (Map.Entry<Long, double[]> entry : accumulatedKvsForMatrix.entrySet()) {
+                    indices[idx] = entry.getKey();
+                    System.arraycopy(
+                            entry.getValue(), 0, values, idx * numValuesPerKey, numValuesPerKey);
+                    idx++;
+                }
+            }
+            return Tuple2.of(indices, values);
         }
-        return Tuple2.of(indices, values);
+
+        private void initializeState(StateInitializationContext context) throws Exception {
+            accumulatedKvsState =
+                    context.getOperatorStateStore()
+                            .getListState(
+                                    new ListStateDescriptor<>(
+                                            "accumulatedKvs",
+                                            PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO));
+
+            byte[] accumulatedKvsInBytes =
+                    OperatorStateUtils.getUniqueElement(accumulatedKvsState, "accumulatedKvs")
+                            .orElse(null);
+
+            if (accumulatedKvsInBytes != null) {
+                Tuple2<long[], double[]> kvs =
+                        MessageUtils.readLongDoubleArray(accumulatedKvsInBytes, 0);
+                long[] keys = kvs.f0;
+                double[] values = kvs.f1;
+                int numValuesPerKey = values.length / keys.length;
+                if (numValuesPerKey == 1) {
+                    for (int i = 0; i < keys.length; i++) {
+                        accumulatedKvsForVector.put(keys[i], values[i]);
+                    }
+                } else {
+                    for (int i = 0; i < keys.length; i++) {
+                        accumulatedKvsForMatrix.put(
+                                keys[i],
+                                Arrays.copyOfRange(
+                                        values,
+                                        i * numValuesPerKey,
+                                        i * numValuesPerKey + numValuesPerKey));
+                    }
+                }
+            }
+        }
+
+        private void snapshotState(StateSnapshotContext context) throws Exception {
+            Tuple2<long[], double[]> kvs = toKvArrays();
+            accumulatedKvsState.clear();
+            if (kvs.f0.length > 0) {
+                byte[] bytes = new byte[MessageUtils.getLongDoubleArraySizeInBytes(kvs)];
+                MessageUtils.writeLongDoubleArray(kvs, bytes, 0);
+                accumulatedKvsState.add(bytes);
+            }
+        }
     }
 }

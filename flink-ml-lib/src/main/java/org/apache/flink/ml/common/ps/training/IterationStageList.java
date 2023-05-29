@@ -45,7 +45,7 @@ public class IterationStageList<T extends TrainingContext> implements Serializab
     }
 
     /** Adds an iteration stage into the stage list. */
-    public IterationStageList<T> addTrainingStage(IterationStage stage) {
+    public IterationStageList<T> addStage(IterationStage stage) {
         stageList.add(stage);
         return this;
     }

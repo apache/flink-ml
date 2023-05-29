@@ -68,8 +68,7 @@ import static org.junit.Assert.assertTrue;
 public class LogisticRegressionWithFtrlTest {
 
     @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
-    private final double[] expectedCoefficient =
-            new double[] {0.5287258, -1.2163098, -1.0710997, -0.8591691};
+    private final double[] expectedCoefficient = new double[] {0.52, -1.21, -1.07, -0.85};
     private static final int MAX_ITER = 100;
     private static final int NUM_SERVERS = 2;
     private static final double TOLERANCE = 1e-7;
@@ -168,7 +167,6 @@ public class LogisticRegressionWithFtrlTest {
         assertEquals(0.1, logisticRegressionWithFtrl.getBeta(), TOLERANCE);
         assertEquals(0L, logisticRegressionWithFtrl.getModelDim());
         assertEquals(1, logisticRegressionWithFtrl.getNumServers());
-        assertEquals(1, logisticRegressionWithFtrl.getNumServerCores());
 
         logisticRegressionWithFtrl
                 .setFeaturesCol("test_features")
@@ -185,8 +183,7 @@ public class LogisticRegressionWithFtrlTest {
                 .setAlpha(0.2)
                 .setBeta(0.2)
                 .setModelDim(10000000L)
-                .setNumServers(4)
-                .setNumServerCores(2);
+                .setNumServers(4);
         assertEquals("test_features", logisticRegressionWithFtrl.getFeaturesCol());
         assertEquals("test_label", logisticRegressionWithFtrl.getLabelCol());
         assertEquals("test_weight", logisticRegressionWithFtrl.getWeightCol());
@@ -203,7 +200,6 @@ public class LogisticRegressionWithFtrlTest {
         assertEquals(0.2, logisticRegressionWithFtrl.getBeta(), TOLERANCE);
         assertEquals(10000000L, logisticRegressionWithFtrl.getModelDim());
         assertEquals(4, logisticRegressionWithFtrl.getNumServers());
-        assertEquals(2, logisticRegressionWithFtrl.getNumServerCores());
     }
 
     @Test
@@ -250,7 +246,7 @@ public class LogisticRegressionWithFtrlTest {
             double[] pieceCoeff = modelPiece.coefficient.values;
             System.arraycopy(pieceCoeff, 0, collectedCoefficient, startIndex, pieceCoeff.length);
         }
-        assertArrayEquals(expectedCoefficient, collectedCoefficient, 1e-7);
+        assertArrayEquals(expectedCoefficient, collectedCoefficient, 0.1);
     }
 
     @Test

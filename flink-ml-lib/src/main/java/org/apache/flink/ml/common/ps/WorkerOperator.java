@@ -121,7 +121,7 @@ public class WorkerOperator<DT, ContextT extends TrainingContext>
             modelDim = Bits.getLong(feedback, 0);
             serverAgent.setPartitioner(new RangePartitioner(modelDim, numServers));
             serverAgent.zeros();
-            iterationStages.context.setTrainData(new ResettableTrainDataIterator<>(trainDataState));
+            iterationStages.context.setInputData(new ResettableTrainDataIterator<>(trainDataState));
             nextStageToExecute = processTrainingStage(nextStageToExecute, iterationStages);
         }
     }

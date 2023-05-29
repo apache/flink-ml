@@ -67,6 +67,12 @@ public class RangePartitioner {
         private final int numServers;
         private final long[] indices;
         private final double[] values;
+        /**
+         * Number of values per key. If the model data is a vector, numValuesPerKey is one. If the
+         * model data is a matrix, numValuesPerKey is the number of columns.
+         */
+        private final int numValuesPerKey;
+
         private final long[] ranges;
 
         private int serverId = 0;
@@ -75,11 +81,18 @@ public class RangePartitioner {
 
         public RequestsIterator(
                 int numPss, long[] indices, @Nullable double[] values, long[] ranges) {
-            // Preconditions.checkArgument(values == null || values.length % indices.length == 0);
             this.numServers = numPss;
             this.indices = indices;
             this.values = values;
             this.ranges = ranges;
+            if (indices.length != 0 && values != null) {
+                numValuesPerKey = values.length / indices.length;
+                Preconditions.checkArgument(
+                        numValuesPerKey * indices.length == values.length,
+                        "The size of values cannot be divided by size of keys.");
+            } else {
+                numValuesPerKey = 1;
+            }
         }
 
         @Override
@@ -98,7 +111,11 @@ public class RangePartitioner {
             double[] splitValues = values == null ? null : new double[0];
             if (s < e) {
                 splitIndices = Arrays.copyOfRange(indices, s, e);
-                splitValues = values == null ? null : Arrays.copyOfRange(values, s, e);
+                splitValues =
+                        values == null
+                                ? null
+                                : Arrays.copyOfRange(
+                                        values, s * numValuesPerKey, e * numValuesPerKey);
             }
             s = e;
             serverId++;

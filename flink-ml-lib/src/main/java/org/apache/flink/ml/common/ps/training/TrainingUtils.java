@@ -52,6 +52,8 @@ public final class TrainingUtils {
      * @param modelDim dimension of the input model.
      * @param trainData the training data.
      * @param iterationStages the iterative training logic.
+     * @param modelUpdater the logic to update model on servers.
+     * @param numServers number of servers.
      * @return the fitted model data.
      */
     public static <T> DataStream<Tuple3<Long, Long, double[]>> train(
@@ -59,9 +61,7 @@ public final class TrainingUtils {
             DataStream<T> trainData,
             ModelUpdater modelUpdater,
             IterationStageList<? extends TrainingContext> iterationStages,
-            int numServers,
-            int numServerCores) {
-        // TODO: Support different types for model data types.
+            int numServers) {
         // TODO: Support incremental training for multiple models.
         // TODO: Support user defined model partitioner.
 
@@ -81,8 +81,7 @@ public final class TrainingUtils {
                         ReplayableDataStreamList.notReplay(
                                 trainData.rebalance().map(x -> x, trainData.getType())),
                         IterationConfig.newBuilder().build(),
-                        new TrainIterationBody(
-                                modelUpdater, iterationStages, numServers, numServerCores));
+                        new TrainIterationBody(modelUpdater, iterationStages, numServers));
 
         return resultList.get(0);
     }
@@ -92,17 +91,14 @@ public final class TrainingUtils {
         private final ModelUpdater modelUpdater;
         private final IterationStageList<? extends TrainingContext> iterationStages;
         private final int numServers;
-        private final int numServerCores;
 
         public TrainIterationBody(
                 ModelUpdater modelUpdater,
                 IterationStageList<? extends TrainingContext> iterationStages,
-                int numServers,
-                int numServerCores) {
+                int numServers) {
             this.iterationStages = iterationStages;
             this.modelUpdater = modelUpdater;
             this.numServers = numServers;
-            this.numServerCores = numServerCores;
         }
 
         @Override
@@ -138,8 +134,7 @@ public final class TrainingUtils {
                                     new TupleTypeInfo<>(
                                             Types.INT,
                                             PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO),
-                                    new ServerOperator(
-                                            modelUpdater, modelDataOutputTag, numServerCores));
+                                    new ServerOperator(modelUpdater, modelDataOutputTag));
             messageToWorker.setParallelism(numServers);
 
             DataStream<byte[]> combinedMessageToWorker =

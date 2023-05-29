@@ -30,7 +30,12 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-/** The FTRL model updater. */
+/**
+ * FTRL (Follow-the-regularized-leader) is an optimization algorithm which is widely deployed by online learning.
+ *
+ * <p>See <a href="https://doi.org/10.1145/2487575.2488200">H. Brendan McMahan et al., Ad click
+ *  * prediction: a view from the trenches.</a>
+ */
 public class FTRL implements ModelUpdater {
     private final double alpha;
     private final double beta;

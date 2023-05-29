@@ -22,12 +22,13 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.util.Bits;
 import org.apache.flink.util.Preconditions;
 
+import static org.apache.flink.ml.common.ps.message.MessageType.PUSH_KV;
+
 /** The sparse key-values to push from workers to servers. */
 public class KVsToPushM implements Message {
     public final int serverId;
     public final int workerId;
     public final Tuple2<long[], double[]> kvs;
-    public static final MessageType MESSAGE_TYPE = MessageType.KVS_TO_PUSH;
 
     public KVsToPushM(int workerId, int serverId, Tuple2<long[], double[]> kvs) {
         this.workerId = workerId;
@@ -35,17 +36,17 @@ public class KVsToPushM implements Message {
         this.kvs = kvs;
     }
 
-    public static KVsToPushM fromBytes(byte[] bytesData) {
+    public static KVsToPushM fromBytes(byte[] bytes) {
         int offset = 0;
-        char type = Bits.getChar(bytesData, offset);
+        char type = Bits.getChar(bytes, offset);
         offset += Character.BYTES;
-        Preconditions.checkState(type == MESSAGE_TYPE.type);
+        Preconditions.checkState(type == PUSH_KV.type);
 
-        int workerId = Bits.getInt(bytesData, offset);
+        int workerId = Bits.getInt(bytes, offset);
         offset += Integer.BYTES;
-        int psId = Bits.getInt(bytesData, offset);
+        int psId = Bits.getInt(bytes, offset);
         offset += Integer.BYTES;
-        Tuple2<long[], double[]> grad = MessageUtils.readLongDoubleArray(bytesData, offset);
+        Tuple2<long[], double[]> grad = MessageUtils.readLongDoubleArray(bytes, offset);
         return new KVsToPushM(workerId, psId, grad);
     }
 
@@ -59,7 +60,7 @@ public class KVsToPushM implements Message {
         byte[] buffer = new byte[numBytes];
         int offset = 0;
 
-        Bits.putChar(buffer, offset, MESSAGE_TYPE.type);
+        Bits.putChar(buffer, offset, PUSH_KV.type);
         offset += Character.BYTES;
 
         Bits.putInt(buffer, offset, this.workerId);

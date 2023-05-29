@@ -21,6 +21,8 @@ package org.apache.flink.ml.common.ps.message;
 import org.apache.flink.ml.util.Bits;
 import org.apache.flink.util.Preconditions;
 
+import static org.apache.flink.ml.common.ps.message.MessageType.INITIALIZE_MODEL_AS_ZERO;
+
 /**
  * Message sent by worker to server that initializes the model as a dense array with defined range.
  */
@@ -30,8 +32,6 @@ public class ZerosToPushM implements Message {
     public final long startIndex;
     public final long endIndex;
 
-    public static final MessageType MESSAGE_TYPE = MessageType.ZEROS_TO_PUSH;
-
     public ZerosToPushM(int workerId, int serverId, long startIndex, long endIndex) {
         this.workerId = workerId;
         this.serverId = serverId;
@@ -39,19 +39,19 @@ public class ZerosToPushM implements Message {
         this.endIndex = endIndex;
     }
 
-    public static ZerosToPushM fromBytes(byte[] bytesData) {
+    public static ZerosToPushM fromBytes(byte[] bytes) {
         int offset = 0;
-        char type = Bits.getChar(bytesData, offset);
+        char type = Bits.getChar(bytes, offset);
         offset += Character.BYTES;
-        Preconditions.checkState(type == MESSAGE_TYPE.type);
+        Preconditions.checkState(type == INITIALIZE_MODEL_AS_ZERO.type);
 
-        int workerId = Bits.getInt(bytesData, offset);
+        int workerId = Bits.getInt(bytes, offset);
         offset += Integer.BYTES;
-        int serverId = Bits.getInt(bytesData, offset);
+        int serverId = Bits.getInt(bytes, offset);
         offset += Integer.BYTES;
-        long startIndex = Bits.getLong(bytesData, offset);
+        long startIndex = Bits.getLong(bytes, offset);
         offset += Long.BYTES;
-        long endIndex = Bits.getLong(bytesData, offset);
+        long endIndex = Bits.getLong(bytes, offset);
         return new ZerosToPushM(workerId, serverId, startIndex, endIndex);
     }
 
@@ -60,7 +60,7 @@ public class ZerosToPushM implements Message {
         int numBytes = Character.BYTES + Integer.BYTES + Integer.BYTES + Long.BYTES + Long.BYTES;
         byte[] buffer = new byte[numBytes];
         int offset = 0;
-        Bits.putChar(buffer, offset, MESSAGE_TYPE.type);
+        Bits.putChar(buffer, offset, INITIALIZE_MODEL_AS_ZERO.type);
         offset += Character.BYTES;
 
         Bits.putInt(buffer, offset, this.workerId);

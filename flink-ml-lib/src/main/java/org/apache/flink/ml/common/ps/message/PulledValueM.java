@@ -21,50 +21,52 @@ package org.apache.flink.ml.common.ps.message;
 import org.apache.flink.ml.util.Bits;
 import org.apache.flink.util.Preconditions;
 
-/** The indices one worker needs to pull from servers. */
-public class IndicesToPullM implements Message {
+import static org.apache.flink.ml.common.ps.message.MessageType.PULLED_VALUE;
+
+/** The values pulled from servers. */
+public class ValuesPulledM implements Message {
     public final int serverId;
     public final int workerId;
-    public final long[] indicesToPull;
+    public final double[] valuesPulled;
 
-    public static final MessageType MESSAGE_TYPE = MessageType.INDICES_TO_PULL;
-
-    public IndicesToPullM(int serverId, int workerId, long[] indicesToPull) {
+    public ValuesPulledM(int serverId, int workerId, double[] valuesPulled) {
         this.serverId = serverId;
         this.workerId = workerId;
-        this.indicesToPull = indicesToPull;
+        this.valuesPulled = valuesPulled;
     }
 
-    public static IndicesToPullM fromBytes(byte[] bytesData) {
+    public static ValuesPulledM fromBytes(byte[] bytes) {
         int offset = 0;
-        char type = Bits.getChar(bytesData, offset);
+        char type = Bits.getChar(bytes, offset);
         offset += Character.BYTES;
-        Preconditions.checkState(type == MESSAGE_TYPE.type);
+        Preconditions.checkState(type == PULLED_VALUE.type);
 
-        int psId = Bits.getInt(bytesData, offset);
+        int psId = Bits.getInt(bytes, offset);
         offset += Integer.BYTES;
-        int workerId = Bits.getInt(bytesData, offset);
+        int workerId = Bits.getInt(bytes, offset);
         offset += Integer.BYTES;
-        long[] toPullIndices = MessageUtils.readLongArray(bytesData, offset);
-        return new IndicesToPullM(psId, workerId, toPullIndices);
+        double[] pulledValues = MessageUtils.readDoubleArray(bytes, offset);
+        return new ValuesPulledM(psId, workerId, pulledValues);
     }
 
     @Override
     public byte[] toBytes() {
         int numBytes =
                 Character.BYTES
-                        + Integer.BYTES * 2
-                        + MessageUtils.getLongArraySizeInBytes(indicesToPull);
+                        + Integer.BYTES
+                        + Integer.BYTES
+                        + MessageUtils.getDoubleArraySizeInBytes(valuesPulled);
         byte[] buffer = new byte[numBytes];
         int offset = 0;
-
-        Bits.putChar(buffer, offset, MESSAGE_TYPE.type);
+        Bits.putChar(buffer, offset, PULLED_VALUE.type);
         offset += Character.BYTES;
+
         Bits.putInt(buffer, offset, this.serverId);
         offset += Integer.BYTES;
         Bits.putInt(buffer, offset, this.workerId);
         offset += Integer.BYTES;
-        MessageUtils.writeLongArray(this.indicesToPull, buffer, offset);
+        MessageUtils.writeDoubleArray(valuesPulled, buffer, offset);
+
         return buffer;
     }
 }

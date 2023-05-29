@@ -137,14 +137,14 @@ public class LogisticRegressionWithFtrl
         IterationStageList<LogisticRegressionWithFtrlTrainingContext> iterationStages =
                 new IterationStageList<>(trainingContext);
         iterationStages
-                .addTrainingStage(new ComputeIndices())
-                .addTrainingStage(
+                .addStage(new ComputeIndices())
+                .addStage(
                         new PullStage(
                                 (SerializableSupplier<long[]>) () -> trainingContext.pullIndices,
                                 (SerializableConsumer<double[]>)
                                         x -> trainingContext.pulledValues = x))
-                .addTrainingStage(new ComputeGradients(BinaryLogisticLoss.INSTANCE))
-                .addTrainingStage(
+                .addStage(new ComputeGradients(BinaryLogisticLoss.INSTANCE))
+                .addStage(
                         new PushStage(
                                 (SerializableSupplier<long[]>) () -> trainingContext.pushIndices,
                                 (SerializableSupplier<double[]>) () -> trainingContext.pushValues))
@@ -160,13 +160,7 @@ public class LogisticRegressionWithFtrl
                         trainData.getParallelism());
 
         DataStream<Tuple3<Long, Long, double[]>> rawModelData =
-                TrainingUtils.train(
-                        modelDim,
-                        trainData,
-                        ftrl,
-                        iterationStages,
-                        getNumServers(),
-                        getNumServerCores());
+                TrainingUtils.train(modelDim, trainData, ftrl, iterationStages, getNumServers());
 
         final long modelVersion = 0L;
 
@@ -341,8 +335,8 @@ class LogisticRegressionWithFtrlTrainingContext
     }
 
     @Override
-    public void setTrainData(ResettableIterator<?> trainData) {
-        this.trainData = (ResettableIterator<LabeledLargePointWithWeight>) trainData;
+    public void setInputData(ResettableIterator<?> inputData) {
+        this.trainData = (ResettableIterator<LabeledLargePointWithWeight>) inputData;
     }
 
     @Override

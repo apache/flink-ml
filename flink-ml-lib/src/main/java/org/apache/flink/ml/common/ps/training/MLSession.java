@@ -40,7 +40,7 @@ public interface TrainingContext extends Serializable {
     default void setWorldInfo(int workerId, int numWorkers) {}
 
     /** Sets the training data. */
-    default void setTrainData(ResettableIterator<?> trainData) {}
+    default void setInputData(ResettableIterator<?> inputData) {}
 
     /** Recover from state. */
     default void initializeState(StateInitializationContext context) throws Exception {}
