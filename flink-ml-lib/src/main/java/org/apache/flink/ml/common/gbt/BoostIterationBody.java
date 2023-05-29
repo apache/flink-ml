@@ -73,7 +73,7 @@ class BoostIterationBody implements IterationBody {
         CacheDataCalcLocalHistsOperator cacheDataCalcLocalHistsOp =
                 new CacheDataCalcLocalHistsOperator(strategy);
         SingleOutputStreamOperator<Tuple3<Integer, Integer, Histogram>> localHists =
-                data.connect(trainContext)
+                data.connect(trainContext.broadcast())
                         .transform(
                                 "CacheDataCalcLocalHists",
                                 Types.TUPLE(

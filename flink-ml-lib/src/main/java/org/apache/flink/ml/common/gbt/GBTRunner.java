@@ -168,8 +168,8 @@ public class GBTRunner {
         DataStream<Row> data = tEnv.toDataStream(dataTable);
         DataStreamList dataStreamList =
                 Iterations.iterateBoundedStreamsUntilTermination(
-                        DataStreamList.of(initTrainContext.broadcast()),
-                        ReplayableDataStreamList.notReplay(data, featureMeta),
+                        DataStreamList.of(initTrainContext),
+                        ReplayableDataStreamList.notReplay(data),
                         IterationConfig.newBuilder()
                                 .setOperatorLifeCycle(IterationConfig.OperatorLifeCycle.ALL_ROUND)
                                 .build(),
