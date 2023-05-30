@@ -25,14 +25,14 @@ import org.apache.flink.runtime.util.ResettableIterator;
 import java.io.Serializable;
 
 /**
- * Stores the context information that is alive during the training process. Note that the context
+ * Stores the session information that is alive during the training process. Note that the session
  * information will be updated by each {@link IterationStage}.
  *
- * <p>Note that subclasses should take care of the snapshot of object stored in {@link
- * TrainingContext} if the object satisfies that: the write-process is followed by an {@link
- * PullStage}, which is later again read by other stages.
+ * <p>Note that subclasses should take care of the snapshot of object stored in {@link MLSession} if
+ * the object satisfies that: the write-process is followed by an {@link PullStage}, which is later
+ * again read by other stages.
  */
-public interface TrainingContext extends Serializable {
+public interface MLSession extends Serializable {
     /** Sets the current iteration ID. */
     default void setIterationId(int iterationId) {}
 

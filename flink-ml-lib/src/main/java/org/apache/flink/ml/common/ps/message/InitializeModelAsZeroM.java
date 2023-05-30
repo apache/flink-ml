@@ -23,23 +23,21 @@ import org.apache.flink.util.Preconditions;
 
 import static org.apache.flink.ml.common.ps.message.MessageType.INITIALIZE_MODEL_AS_ZERO;
 
-/**
- * Message sent by worker to server that initializes the model as a dense array with defined range.
- */
-public class ZerosToPushM implements Message {
+/** Message sent by worker to server that initializes the model as zeros with defined range. */
+public class InitializeModelAsZeroM implements Message {
     public final int workerId;
     public final int serverId;
     public final long startIndex;
     public final long endIndex;
 
-    public ZerosToPushM(int workerId, int serverId, long startIndex, long endIndex) {
+    public InitializeModelAsZeroM(int workerId, int serverId, long startIndex, long endIndex) {
         this.workerId = workerId;
         this.serverId = serverId;
         this.startIndex = startIndex;
         this.endIndex = endIndex;
     }
 
-    public static ZerosToPushM fromBytes(byte[] bytes) {
+    public static InitializeModelAsZeroM fromBytes(byte[] bytes) {
         int offset = 0;
         char type = Bits.getChar(bytes, offset);
         offset += Character.BYTES;
@@ -52,7 +50,7 @@ public class ZerosToPushM implements Message {
         long startIndex = Bits.getLong(bytes, offset);
         offset += Long.BYTES;
         long endIndex = Bits.getLong(bytes, offset);
-        return new ZerosToPushM(workerId, serverId, startIndex, endIndex);
+        return new InitializeModelAsZeroM(workerId, serverId, startIndex, endIndex);
     }
 
     @Override

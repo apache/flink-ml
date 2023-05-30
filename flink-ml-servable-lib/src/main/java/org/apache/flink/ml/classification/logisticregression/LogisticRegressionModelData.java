@@ -23,10 +23,12 @@ import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
+import org.apache.flink.util.Preconditions;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.List;
 
 /** Model data of {@link LogisticRegressionModelServable}. */
 public class LogisticRegressionModelData {
@@ -87,5 +89,32 @@ public class LogisticRegressionModelData {
         long modelVersion = dataInputViewStreamWrapper.readLong();
 
         return new LogisticRegressionModelData(coefficient, startIndex, endIndex, modelVersion);
+    }
+
+    @VisibleForTesting
+    public static LogisticRegressionModelData mergeSegments(
+            List<LogisticRegressionModelData> segments) {
+        long dim = 0;
+        for (LogisticRegressionModelData segment : segments) {
+            dim = Math.max(dim, segment.endIndex);
+        }
+        // TODO: Add distributed inference for very large models.
+        Preconditions.checkState(
+                dim < Integer.MAX_VALUE,
+                "The dimension of logistic regression model is larger than INT.MAX. Please consider using distributed inference.");
+        int intDim = (int) dim;
+        DenseVector mergedCoefficient = new DenseVector(intDim);
+        for (LogisticRegressionModelData segment : segments) {
+            int startIndex = (int) segment.startIndex;
+            int endIndex = (int) segment.endIndex;
+            System.arraycopy(
+                    segment.coefficient.values,
+                    0,
+                    mergedCoefficient.values,
+                    startIndex,
+                    endIndex - startIndex);
+        }
+        return new LogisticRegressionModelData(
+                mergedCoefficient, 0, mergedCoefficient.size(), segments.get(0).modelVersion);
     }
 }

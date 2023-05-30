@@ -20,10 +20,20 @@ package org.apache.flink.ml.common.ps.message;
 
 /** Message Type between workers and servers. */
 public enum MessageType {
-    ZEROS_TO_PUSH((char) 0),
-    INDICES_TO_PULL((char) 1),
-    VALUES_PULLED((char) 2),
-    KVS_TO_PUSH((char) 3);
+    /** Message sent from workers to servers, which initializes the model on servers as zero. */
+    INITIALIZE_MODEL_AS_ZERO((char) 0),
+    /** Message sent from workers to servers, which specifies the indices of model to pull. */
+    PULL_INDEX((char) 1),
+    /**
+     * Message sent from server to workers, which specifies the values of the model pulled from
+     * servers.
+     */
+    PULLED_VALUE((char) 2),
+    /**
+     * Message sent from workers to servers, which specifies the indices and values of the model to
+     * push to servers.
+     */
+    PUSH_KV((char) 3);
 
     public final char type;
 
@@ -34,13 +44,13 @@ public enum MessageType {
     public static MessageType valueOf(char value) {
         switch (value) {
             case (char) 0:
-                return MessageType.ZEROS_TO_PUSH;
+                return MessageType.INITIALIZE_MODEL_AS_ZERO;
             case (char) 1:
-                return MessageType.INDICES_TO_PULL;
+                return MessageType.PULL_INDEX;
             case ((char) 2):
-                return MessageType.VALUES_PULLED;
+                return MessageType.PULLED_VALUE;
             case ((char) 3):
-                return MessageType.KVS_TO_PUSH;
+                return MessageType.PUSH_KV;
             default:
                 throw new UnsupportedOperationException();
         }

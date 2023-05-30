@@ -36,7 +36,7 @@ import org.apache.flink.ml.common.feature.LabeledLargePointWithWeight;
 import org.apache.flink.ml.common.ps.MirrorWorkerOperator;
 import org.apache.flink.ml.common.ps.ServerOperator;
 import org.apache.flink.ml.common.ps.WorkerOperator;
-import org.apache.flink.ml.common.updater.ModelUpdater;
+import org.apache.flink.ml.common.ps.updater.ModelUpdater;
 import org.apache.flink.ml.util.Bits;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
@@ -60,10 +60,9 @@ public final class TrainingUtils {
             DataStream<Long> modelDim,
             DataStream<T> trainData,
             ModelUpdater modelUpdater,
-            IterationStageList<? extends TrainingContext> iterationStages,
+            IterationStageList<? extends MLSession> iterationStages,
             int numServers) {
         // TODO: Support incremental training for multiple models.
-        // TODO: Support user defined model partitioner.
 
         DataStream<byte[]> variableStream =
                 modelDim.broadcast()
@@ -89,12 +88,12 @@ public final class TrainingUtils {
     /** The iteration implementation for training process. */
     private static class TrainIterationBody implements IterationBody {
         private final ModelUpdater modelUpdater;
-        private final IterationStageList<? extends TrainingContext> iterationStages;
+        private final IterationStageList<? extends MLSession> iterationStages;
         private final int numServers;
 
         public TrainIterationBody(
                 ModelUpdater modelUpdater,
-                IterationStageList<? extends TrainingContext> iterationStages,
+                IterationStageList<? extends MLSession> iterationStages,
                 int numServers) {
             this.iterationStages = iterationStages;
             this.modelUpdater = modelUpdater;

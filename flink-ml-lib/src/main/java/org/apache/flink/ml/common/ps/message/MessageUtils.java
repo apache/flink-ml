@@ -25,33 +25,33 @@ import org.apache.flink.ml.util.Bits;
 public class MessageUtils {
 
     /** Retrieves the message type from the byte array. */
-    public static MessageType getMessageType(byte[] bytesData) {
-        char type = Bits.getChar(bytesData, 0);
+    public static MessageType getMessageType(byte[] bytes) {
+        char type = Bits.getChar(bytes, 0);
         return MessageType.valueOf(type);
     }
 
-    /** Reads a long array from the byte array starting from the given offset. */
-    public static long[] readLongArray(byte[] bytesData, int offset) {
-        int size = Bits.getInt(bytesData, offset);
+    /** Gets a long array from the byte array starting from the given offset. */
+    public static long[] getLongArray(byte[] bytes, int offset) {
+        int size = Bits.getInt(bytes, offset);
         offset += Integer.BYTES;
         long[] result = new long[size];
         for (int i = 0; i < size; i++) {
-            result[i] = Bits.getLong(bytesData, offset);
+            result[i] = Bits.getLong(bytes, offset);
             offset += Long.BYTES;
         }
         return result;
     }
 
     /**
-     * Writes a long array to the byte array starting from the given offset.
+     * Puts a long array to the byte array starting from the given offset.
      *
      * @return the next position to write on.
      */
-    public static int writeLongArray(long[] array, byte[] bytesData, int offset) {
-        Bits.putInt(bytesData, offset, array.length);
+    public static int putLongArray(long[] array, byte[] bytes, int offset) {
+        Bits.putInt(bytes, offset, array.length);
         offset += Integer.BYTES;
         for (int i = 0; i < array.length; i++) {
-            Bits.putLong(bytesData, offset, array[i]);
+            Bits.putLong(bytes, offset, array[i]);
             offset += Long.BYTES;
         }
         return offset;
@@ -62,28 +62,28 @@ public class MessageUtils {
         return Integer.BYTES + array.length * Long.BYTES;
     }
 
-    /** Reads a double array from the byte array starting from the given offset. */
-    public static double[] readDoubleArray(byte[] bytesData, int offset) {
-        int size = Bits.getInt(bytesData, offset);
+    /** Gets a double array from the byte array starting from the given offset. */
+    public static double[] getDoubleArray(byte[] bytes, int offset) {
+        int size = Bits.getInt(bytes, offset);
         offset += Integer.BYTES;
         double[] result = new double[size];
         for (int i = 0; i < size; i++) {
-            result[i] = Bits.getDouble(bytesData, offset);
+            result[i] = Bits.getDouble(bytes, offset);
             offset += Long.BYTES;
         }
         return result;
     }
 
     /**
-     * Writes a double array to the byte array starting from the given offset.
+     * Puts a double array to the byte array starting from the given offset.
      *
      * @return the next position to write on.
      */
-    public static int writeDoubleArray(double[] array, byte[] bytesData, int offset) {
-        Bits.putInt(bytesData, offset, array.length);
+    public static int putDoubleArray(double[] array, byte[] bytes, int offset) {
+        Bits.putInt(bytes, offset, array.length);
         offset += Integer.BYTES;
         for (int i = 0; i < array.length; i++) {
-            Bits.putDouble(bytesData, offset, array[i]);
+            Bits.putDouble(bytes, offset, array[i]);
             offset += Double.BYTES;
         }
         return offset;
@@ -94,23 +94,23 @@ public class MessageUtils {
         return Integer.BYTES + array.length * Long.BYTES;
     }
 
-    /** Reads a long-double array from the byte array starting from the given offset. */
-    public static Tuple2<long[], double[]> readLongDoubleArray(byte[] bytesData, int offset) {
-        long[] indices = readLongArray(bytesData, offset);
+    /** Gets a long-double array from the byte array starting from the given offset. */
+    public static Tuple2<long[], double[]> getLongDoubleArray(byte[] bytes, int offset) {
+        long[] indices = getLongArray(bytes, offset);
         offset += getLongArraySizeInBytes(indices);
-        double[] values = readDoubleArray(bytesData, offset);
+        double[] values = getDoubleArray(bytes, offset);
         return Tuple2.of(indices, values);
     }
 
     /**
-     * Writes a long-double to the byte array starting from the given offset.
+     * Puts a long-double array to the byte array starting from the given offset.
      *
      * @return the next position to write on.
      */
-    public static int writeLongDoubleArray(
-            Tuple2<long[], double[]> longDoubleArray, byte[] bytesData, int offset) {
-        offset = writeLongArray(longDoubleArray.f0, bytesData, offset);
-        offset = writeDoubleArray(longDoubleArray.f1, bytesData, offset);
+    public static int putLongDoubleArray(
+            Tuple2<long[], double[]> longDoubleArray, byte[] bytes, int offset) {
+        offset = putLongArray(longDoubleArray.f0, bytes, offset);
+        offset = putDoubleArray(longDoubleArray.f1, bytes, offset);
 
         return offset;
     }

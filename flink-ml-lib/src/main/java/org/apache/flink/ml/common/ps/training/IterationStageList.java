@@ -29,14 +29,14 @@ import java.util.function.Function;
  * A list of iteration stages to express the logic of an iterative machine learning training
  * process.
  */
-public class IterationStageList<T extends TrainingContext> implements Serializable {
-    public final T context;
+public class IterationStageList<T extends MLSession> implements Serializable {
+    public final T session;
     public Function<T, Boolean> shouldTerminate;
     public List<IterationStage> stageList;
 
-    public IterationStageList(T context) {
+    public IterationStageList(T session) {
         this.stageList = new ArrayList<>();
-        this.context = context;
+        this.session = session;
     }
 
     /** Sets the criteria of termination. */

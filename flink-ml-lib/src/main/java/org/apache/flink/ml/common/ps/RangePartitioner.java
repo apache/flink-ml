@@ -26,7 +26,11 @@ import javax.annotation.Nullable;
 import java.util.Arrays;
 import java.util.Iterator;
 
-/** Range partitioner for model data. */
+/**
+ * Range partitioner for model data. It partitions the model data for each dimension according to
+ * the dimension id. The model data for each dimension could be a double or several doubles. Note
+ * that the model data for all dimensions should share the same size.
+ */
 public class RangePartitioner {
     public final long dim;
     public final int numServers;
@@ -54,9 +58,9 @@ public class RangePartitioner {
      * Splits the push/pull request according to the given sorted indices and the corresponding
      * values.
      *
-     * @param indices Sorted indices of push/pull request.
-     * @param values The push values if not null.
-     * @return The split requests for each server task.
+     * @param indices sorted indices of push/pull request.
+     * @param values the push values if not null.
+     * @return the split requests for each server.
      */
     public Iterator<Tuple3<Integer, long[], double[]>> splitRequest(
             long[] indices, @Nullable double[] values) {
@@ -89,7 +93,9 @@ public class RangePartitioner {
                 numValuesPerKey = values.length / indices.length;
                 Preconditions.checkArgument(
                         numValuesPerKey * indices.length == values.length,
-                        "The size of values cannot be divided by size of keys.");
+                        String.format(
+                                "The size of values [%d] cannot be divided by size of keys [%d].",
+                                values.length, indices.length));
             } else {
                 numValuesPerKey = 1;
             }

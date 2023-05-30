@@ -86,8 +86,7 @@ public class LogisticRegression
                                                 "Multinomial classification is not supported yet. Supported options: [auto, binomial].");
                                     }
                                     Vector features =
-                                            ((Vector) dataPoint.getField(getFeaturesCol()))
-                                                    .toDense();
+                                            ((Vector) dataPoint.getField(getFeaturesCol()));
                                     return new LabeledPointWithWeight(features, label, weight);
                                 });
 

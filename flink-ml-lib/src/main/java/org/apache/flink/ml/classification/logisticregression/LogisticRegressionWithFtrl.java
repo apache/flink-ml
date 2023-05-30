@@ -20,8 +20,6 @@ package org.apache.flink.ml.classification.logisticregression;
 
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
-import org.apache.flink.api.common.state.ListState;
-import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
@@ -29,23 +27,19 @@ import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.common.feature.LabeledLargePointWithWeight;
 import org.apache.flink.ml.common.lossfunc.BinaryLogisticLoss;
-import org.apache.flink.ml.common.lossfunc.LossFunc;
+import org.apache.flink.ml.common.ps.training.ComputeGradients;
+import org.apache.flink.ml.common.ps.training.ComputeIndices;
 import org.apache.flink.ml.common.ps.training.IterationStageList;
-import org.apache.flink.ml.common.ps.training.ProcessStage;
+import org.apache.flink.ml.common.ps.training.MiniBatchMLSession;
 import org.apache.flink.ml.common.ps.training.PullStage;
 import org.apache.flink.ml.common.ps.training.PushStage;
 import org.apache.flink.ml.common.ps.training.SerializableConsumer;
-import org.apache.flink.ml.common.ps.training.TrainingContext;
 import org.apache.flink.ml.common.ps.training.TrainingUtils;
-import org.apache.flink.ml.common.updater.FTRL;
-import org.apache.flink.ml.linalg.BLAS;
+import org.apache.flink.ml.common.ps.updater.FTRL;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
-import org.apache.flink.runtime.state.StateInitializationContext;
-import org.apache.flink.runtime.state.StateSnapshotContext;
-import org.apache.flink.runtime.util.ResettableIterator;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -55,16 +49,8 @@ import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.function.SerializableFunction;
 import org.apache.flink.util.function.SerializableSupplier;
 
-import it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap;
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import org.apache.commons.collections.IteratorUtils;
-
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -131,25 +117,27 @@ public class LogisticRegressionWithFtrl
                             .map((MapFunction<Long, Long>) value -> value + 1);
         }
 
-        LogisticRegressionWithFtrlTrainingContext trainingContext =
-                new LogisticRegressionWithFtrlTrainingContext(getParamMap());
+        MiniBatchMLSession<LabeledLargePointWithWeight> mlSession =
+                new MiniBatchMLSession<>(
+                        getGlobalBatchSize(),
+                        TypeInformation.of(LabeledLargePointWithWeight.class));
 
-        IterationStageList<LogisticRegressionWithFtrlTrainingContext> iterationStages =
-                new IterationStageList<>(trainingContext);
+        IterationStageList<MiniBatchMLSession<LabeledLargePointWithWeight>> iterationStages =
+                new IterationStageList<>(mlSession);
         iterationStages
                 .addStage(new ComputeIndices())
                 .addStage(
                         new PullStage(
-                                (SerializableSupplier<long[]>) () -> trainingContext.pullIndices,
-                                (SerializableConsumer<double[]>)
-                                        x -> trainingContext.pulledValues = x))
+                                (SerializableSupplier<long[]>) () -> mlSession.pullIndices,
+                                (SerializableConsumer<double[]>) x -> mlSession.pulledValues = x))
                 .addStage(new ComputeGradients(BinaryLogisticLoss.INSTANCE))
                 .addStage(
                         new PushStage(
-                                (SerializableSupplier<long[]>) () -> trainingContext.pushIndices,
-                                (SerializableSupplier<double[]>) () -> trainingContext.pushValues))
+                                (SerializableSupplier<long[]>) () -> mlSession.pushIndices,
+                                (SerializableSupplier<double[]>) () -> mlSession.pushValues))
                 .setTerminationCriteria(
-                        (SerializableFunction<LogisticRegressionWithFtrlTrainingContext, Boolean>)
+                        (SerializableFunction<
+                                        MiniBatchMLSession<LabeledLargePointWithWeight>, Boolean>)
                                 o -> o.iterationId >= getMaxIter());
         FTRL ftrl =
                 new FTRL(
@@ -192,191 +180,5 @@ public class LogisticRegressionWithFtrl
     @Override
     public Map<Param<?>, Object> getParamMap() {
         return paramMap;
-    }
-}
-
-/**
- * An iteration stage that samples a batch of training data and computes the indices needed to
- * compute gradients.
- */
-class ComputeIndices extends ProcessStage<LogisticRegressionWithFtrlTrainingContext> {
-
-    @Override
-    public void process(LogisticRegressionWithFtrlTrainingContext context) throws Exception {
-        context.readInNextBatchData();
-        context.pullIndices = computeIndices(context.batchData);
-    }
-
-    public static long[] computeIndices(List<LabeledLargePointWithWeight> dataPoints) {
-        LongOpenHashSet indices = new LongOpenHashSet();
-        for (LabeledLargePointWithWeight dataPoint : dataPoints) {
-            long[] notZeros = dataPoint.features.f0;
-            for (long index : notZeros) {
-                indices.add(index);
-            }
-        }
-
-        long[] sortedIndices = new long[indices.size()];
-        Iterator<Long> iterator = indices.iterator();
-        int i = 0;
-        while (iterator.hasNext()) {
-            sortedIndices[i++] = iterator.next();
-        }
-        Arrays.sort(sortedIndices);
-        return sortedIndices;
-    }
-}
-
-/**
- * An iteration stage that uses the pulled model values and sampled batch data to compute the
- * gradients.
- */
-class ComputeGradients extends ProcessStage<LogisticRegressionWithFtrlTrainingContext> {
-    private final LossFunc lossFunc;
-
-    public ComputeGradients(LossFunc lossFunc) {
-        this.lossFunc = lossFunc;
-    }
-
-    @Override
-    public void process(LogisticRegressionWithFtrlTrainingContext context) throws IOException {
-        long[] indices = ComputeIndices.computeIndices(context.batchData);
-        double[] pulledModelValues = context.pulledValues;
-        double[] gradients = computeGradient(context.batchData, indices, pulledModelValues);
-
-        context.pushIndices = indices;
-        context.pushValues = gradients;
-    }
-
-    private double[] computeGradient(
-            List<LabeledLargePointWithWeight> batchData,
-            long[] sortedBatchIndices,
-            double[] pulledModelValues) {
-        Long2DoubleOpenHashMap coefficient = new Long2DoubleOpenHashMap(sortedBatchIndices.length);
-        for (int i = 0; i < sortedBatchIndices.length; i++) {
-            coefficient.put(sortedBatchIndices[i], pulledModelValues[i]);
-        }
-        Long2DoubleOpenHashMap cumGradients = new Long2DoubleOpenHashMap(sortedBatchIndices.length);
-
-        for (LabeledLargePointWithWeight dataPoint : batchData) {
-            double dot = dot(dataPoint.features, coefficient);
-            double multiplier = lossFunc.computeGradient(dataPoint.label, dot) * dataPoint.weight;
-
-            long[] featureIndices = dataPoint.features.f0;
-            double[] featureValues = dataPoint.features.f1;
-            double z;
-            for (int i = 0; i < featureIndices.length; i++) {
-                long currentIndex = featureIndices[i];
-                z = featureValues[i] * multiplier + cumGradients.getOrDefault(currentIndex, 0.);
-                cumGradients.put(currentIndex, z);
-            }
-        }
-        double[] cumGradientValues = new double[sortedBatchIndices.length];
-        for (int i = 0; i < sortedBatchIndices.length; i++) {
-            cumGradientValues[i] = cumGradients.get(sortedBatchIndices[i]);
-        }
-        BLAS.scal(1.0 / batchData.size(), Vectors.dense(cumGradientValues));
-        return cumGradientValues;
-    }
-
-    private static double dot(
-            Tuple2<long[], double[]> features, Long2DoubleOpenHashMap coefficient) {
-        double dot = 0;
-        for (int i = 0; i < features.f0.length; i++) {
-            dot += features.f1[i] * coefficient.get(features.f0[i]);
-        }
-        return dot;
-    }
-}
-
-/** The context information of local computing process. */
-class LogisticRegressionWithFtrlTrainingContext
-        implements TrainingContext,
-                LogisticRegressionWithFtrlParams<LogisticRegressionWithFtrlTrainingContext> {
-    /** Parameters of LogisticRegressionWithFtrl. */
-    private final Map<Param<?>, Object> paramMap;
-    /** Current iteration id. */
-    int iterationId;
-    /** The local batch size. */
-    private int localBatchSize = -1;
-    /** The training data. */
-    private ResettableIterator<LabeledLargePointWithWeight> trainData;
-    /** The batch of training data for computing gradients. */
-    List<LabeledLargePointWithWeight> batchData;
-
-    private ListState<LabeledLargePointWithWeight> batchDataState;
-
-    /** The placeholder for indices to pull for each iteration. */
-    long[] pullIndices;
-    /** The placeholder for the pulled values for each iteration. */
-    double[] pulledValues;
-    /** The placeholder for indices to push for each iteration. */
-    long[] pushIndices;
-    /** The placeholder for values to push for each iteration. */
-    double[] pushValues;
-
-    public LogisticRegressionWithFtrlTrainingContext(Map<Param<?>, Object> paramMap) {
-        this.paramMap = paramMap;
-    }
-
-    @Override
-    public void setIterationId(int iterationId) {
-        this.iterationId = iterationId;
-    }
-
-    @Override
-    public void setWorldInfo(int workerId, int numWorkers) {
-        int globalBatchSize = getGlobalBatchSize();
-        this.localBatchSize = globalBatchSize / numWorkers;
-        if (globalBatchSize % numWorkers > workerId) {
-            localBatchSize++;
-        }
-        this.batchData = new ArrayList<>(localBatchSize);
-    }
-
-    @Override
-    public void setInputData(ResettableIterator<?> inputData) {
-        this.trainData = (ResettableIterator<LabeledLargePointWithWeight>) inputData;
-    }
-
-    @Override
-    public void initializeState(StateInitializationContext context) throws Exception {
-        batchDataState =
-                context.getOperatorStateStore()
-                        .getListState(
-                                new ListStateDescriptor<>(
-                                        "batchDataState",
-                                        TypeInformation.of(LabeledLargePointWithWeight.class)));
-
-        Iterator<LabeledLargePointWithWeight> batchDataIterator = batchDataState.get().iterator();
-        if (batchDataIterator.hasNext()) {
-            batchData = IteratorUtils.toList(batchDataIterator);
-        }
-    }
-
-    @Override
-    public void snapshotState(StateSnapshotContext context) throws Exception {
-        batchDataState.clear();
-        if (batchData.size() > 0) {
-            batchDataState.addAll(batchData);
-        }
-    }
-
-    @Override
-    public Map<Param<?>, Object> getParamMap() {
-        return paramMap;
-    }
-
-    /** Reads in next batch of training data. */
-    public void readInNextBatchData() throws IOException {
-        batchData.clear();
-        int i = 0;
-        while (i < localBatchSize && trainData.hasNext()) {
-            batchData.add(trainData.next());
-            i++;
-        }
-        if (!trainData.hasNext()) {
-            trainData.reset();
-        }
     }
 }

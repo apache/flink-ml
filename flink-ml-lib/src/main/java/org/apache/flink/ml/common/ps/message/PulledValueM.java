@@ -24,18 +24,18 @@ import org.apache.flink.util.Preconditions;
 import static org.apache.flink.ml.common.ps.message.MessageType.PULLED_VALUE;
 
 /** The values pulled from servers. */
-public class ValuesPulledM implements Message {
+public class PulledValueM implements Message {
     public final int serverId;
     public final int workerId;
-    public final double[] valuesPulled;
+    public final double[] values;
 
-    public ValuesPulledM(int serverId, int workerId, double[] valuesPulled) {
+    public PulledValueM(int serverId, int workerId, double[] values) {
         this.serverId = serverId;
         this.workerId = workerId;
-        this.valuesPulled = valuesPulled;
+        this.values = values;
     }
 
-    public static ValuesPulledM fromBytes(byte[] bytes) {
+    public static PulledValueM fromBytes(byte[] bytes) {
         int offset = 0;
         char type = Bits.getChar(bytes, offset);
         offset += Character.BYTES;
@@ -45,8 +45,8 @@ public class ValuesPulledM implements Message {
         offset += Integer.BYTES;
         int workerId = Bits.getInt(bytes, offset);
         offset += Integer.BYTES;
-        double[] pulledValues = MessageUtils.readDoubleArray(bytes, offset);
-        return new ValuesPulledM(psId, workerId, pulledValues);
+        double[] values = MessageUtils.getDoubleArray(bytes, offset);
+        return new PulledValueM(psId, workerId, values);
     }
 
     @Override
@@ -55,7 +55,7 @@ public class ValuesPulledM implements Message {
                 Character.BYTES
                         + Integer.BYTES
                         + Integer.BYTES
-                        + MessageUtils.getDoubleArraySizeInBytes(valuesPulled);
+                        + MessageUtils.getDoubleArraySizeInBytes(values);
         byte[] buffer = new byte[numBytes];
         int offset = 0;
         Bits.putChar(buffer, offset, PULLED_VALUE.type);
@@ -65,7 +65,7 @@ public class ValuesPulledM implements Message {
         offset += Integer.BYTES;
         Bits.putInt(buffer, offset, this.workerId);
         offset += Integer.BYTES;
-        MessageUtils.writeDoubleArray(valuesPulled, buffer, offset);
+        MessageUtils.putDoubleArray(values, buffer, offset);
 
         return buffer;
     }

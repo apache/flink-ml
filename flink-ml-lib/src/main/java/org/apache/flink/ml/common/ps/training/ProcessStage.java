@@ -20,14 +20,14 @@ package org.apache.flink.ml.common.ps.training;
 
 /**
  * A local computation stage of the training process. The input and output of {@link ProcessStage}
- * can be accessed via {@link TrainingContext}.
+ * can be accessed via {@link MLSession}.
  *
  * @param <T> Type of the training data.
  */
-public abstract class ProcessStage<T extends TrainingContext> implements IterationStage {
+public abstract class ProcessStage<T extends MLSession> implements IterationStage {
     /**
      * Does a local computation logic using the information from context. Example stages could be
      * computing gradients.
      */
-    public abstract void process(T context) throws Exception;
+    public abstract void process(T session) throws Exception;
 }

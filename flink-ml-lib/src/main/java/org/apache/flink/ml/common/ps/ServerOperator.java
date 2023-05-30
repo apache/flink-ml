@@ -25,13 +25,13 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
-import org.apache.flink.ml.common.ps.message.IndicesToPullM;
-import org.apache.flink.ml.common.ps.message.KVsToPushM;
+import org.apache.flink.ml.common.ps.message.InitializeModelAsZeroM;
 import org.apache.flink.ml.common.ps.message.MessageType;
 import org.apache.flink.ml.common.ps.message.MessageUtils;
-import org.apache.flink.ml.common.ps.message.ValuesPulledM;
-import org.apache.flink.ml.common.ps.message.ZerosToPushM;
-import org.apache.flink.ml.common.updater.ModelUpdater;
+import org.apache.flink.ml.common.ps.message.PullIndexM;
+import org.apache.flink.ml.common.ps.message.PulledValueM;
+import org.apache.flink.ml.common.ps.message.PushKvM;
+import org.apache.flink.ml.common.ps.updater.ModelUpdater;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
@@ -40,7 +40,6 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.OutputTag;
 import org.apache.flink.util.Preconditions;
-import org.apache.flink.util.SerializableObject;
 
 import it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap;
 
@@ -65,9 +64,9 @@ import java.util.concurrent.Future;
  *       received message.
  *   <li>The server operator calls {@link ModelUpdater#handlePush(long[], double[])} and {@link
  *       ModelUpdater#handlePull(long[])} to process the messages in detail.
- *   <li>The server operator ensures that {@link ModelUpdater} is robust to failures.
+ *   <li>The server operator triggers checkpoint for {@link ModelUpdater}.
  *   <li>The server operator outputs the final output parameters by calling {@link
- *       ModelUpdater#getModelPieces()}.
+ *       ModelUpdater#getModelSegments()}.
  * </ul>
  *
  * <p>TODO: Add support for asynchronous operations on servers.
@@ -114,11 +113,11 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
         byte[] request = element.getValue().f1;
         MessageType type = MessageUtils.getMessageType(request);
         switch (type) {
-            case INDICES_TO_PULL:
+            case PULL_INDEX:
                 pendingPulls.add(request);
                 break;
-            case ZEROS_TO_PUSH:
-                ZerosToPushM zerosToPush = ZerosToPushM.fromBytes(request);
+            case INITIALIZE_MODEL_AS_ZERO:
+                InitializeModelAsZeroM zerosToPush = InitializeModelAsZeroM.fromBytes(request);
                 Preconditions.checkState(serverId == zerosToPush.serverId);
 
                 long start = zerosToPush.startIndex;
@@ -127,7 +126,7 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
                     modelUpdater.open(start, end);
                 }
                 break;
-            case KVS_TO_PUSH:
+            case PUSH_KV:
                 futuresInEpoch.add(
                         singleThreadExecutor.submit(
                                 () -> pushRequestMerger.processPushRequest(request)));
@@ -148,6 +147,7 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
         futuresInEpoch.clear();
 
         if (epochWatermark > 0) {
+            // The first iteration contains no push kvs, but model initialization request.
             Tuple2<long[], double[]> kvs = pushRequestMerger.toKvArrays();
             pushRequestMerger.accumulatedKvsForMatrix.clear();
             pushRequestMerger.accumulatedKvsForVector.clear();
@@ -172,10 +172,10 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
     @Override
     public void onIterationTerminated(
             Context context, Collector<Tuple2<Integer, byte[]>> collector) {
-        Iterator<Tuple3<Long, Long, double[]>> modelPieces = modelUpdater.getModelPieces();
-        while (modelPieces.hasNext()) {
-            Tuple3<Long, Long, double[]> modelPiece = modelPieces.next();
-            output.collect(modelOutputTag, new StreamRecord<>(modelPiece));
+        Iterator<Tuple3<Long, Long, double[]>> modelSegments = modelUpdater.getModelSegments();
+        while (modelSegments.hasNext()) {
+            Tuple3<Long, Long, double[]> modelSegment = modelSegments.next();
+            output.collect(modelOutputTag, new StreamRecord<>(modelSegment));
         }
     }
 
@@ -206,14 +206,14 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
     }
 
     private Object processPullRequest(byte[] bytesData) {
-        IndicesToPullM sparsePullModeM = IndicesToPullM.fromBytes(bytesData);
-        Preconditions.checkState(serverId == sparsePullModeM.serverId);
-        int workerId = sparsePullModeM.workerId;
-        long[] indices = sparsePullModeM.indicesToPull;
+        PullIndexM pullIndexM = PullIndexM.fromBytes(bytesData);
+        Preconditions.checkState(serverId == pullIndexM.serverId);
+        int workerId = pullIndexM.workerId;
+        long[] indices = pullIndexM.indices;
         double[] pulledValues = modelUpdater.handlePull(indices);
-        ValuesPulledM pulledModelM = new ValuesPulledM(serverId, workerId, pulledValues);
+        PulledValueM pulledValueM = new PulledValueM(serverId, workerId, pulledValues);
         StreamRecord<Tuple2<Integer, byte[]>> record =
-                new StreamRecord<>(Tuple2.of(workerId, pulledModelM.toBytes()));
+                new StreamRecord<>(Tuple2.of(workerId, pulledValueM.toBytes()));
 
         output.collect(record);
         return new Object();
@@ -234,10 +234,10 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
         }
 
         private Object processPushRequest(byte[] pushKv) {
-            KVsToPushM kvsToPush = KVsToPushM.fromBytes(pushKv);
-            Tuple2<long[], double[]> pushedKvs = kvsToPush.kvs;
-            long[] keys = pushedKvs.f0;
-            double[] values = pushedKvs.f1;
+            PushKvM pushKvM = PushKvM.fromBytes(pushKv);
+            Tuple2<long[], double[]> pushKvs = pushKvM.kvs;
+            long[] keys = pushKvs.f0;
+            double[] values = pushKvs.f1;
 
             if (values.length == keys.length) {
                 for (int i = 0; i < keys.length; i++) {
@@ -300,7 +300,7 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
 
             if (accumulatedKvsInBytes != null) {
                 Tuple2<long[], double[]> kvs =
-                        MessageUtils.readLongDoubleArray(accumulatedKvsInBytes, 0);
+                        MessageUtils.getLongDoubleArray(accumulatedKvsInBytes, 0);
                 long[] keys = kvs.f0;
                 double[] values = kvs.f1;
                 int numValuesPerKey = values.length / keys.length;
@@ -326,7 +326,7 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
             accumulatedKvsState.clear();
             if (kvs.f0.length > 0) {
                 byte[] bytes = new byte[MessageUtils.getLongDoubleArraySizeInBytes(kvs)];
-                MessageUtils.writeLongDoubleArray(kvs, bytes, 0);
+                MessageUtils.putLongDoubleArray(kvs, bytes, 0);
                 accumulatedKvsState.add(bytes);
             }
         }

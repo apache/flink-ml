@@ -241,10 +241,10 @@ public class LogisticRegressionWithFtrlTest {
         modelData.sort(Comparator.comparingLong(o -> o.startIndex));
 
         double[] collectedCoefficient = new double[4];
-        for (LogisticRegressionModelData modelPiece : modelData) {
-            int startIndex = (int) modelPiece.startIndex;
-            double[] pieceCoeff = modelPiece.coefficient.values;
-            System.arraycopy(pieceCoeff, 0, collectedCoefficient, startIndex, pieceCoeff.length);
+        for (LogisticRegressionModelData modelSegment : modelData) {
+            int startIndex = (int) modelSegment.startIndex;
+            double[] segment = modelSegment.coefficient.values;
+            System.arraycopy(segment, 0, collectedCoefficient, startIndex, segment.length);
         }
         assertArrayEquals(expectedCoefficient, collectedCoefficient, 0.1);
     }

@@ -155,7 +155,7 @@ public class LogisticRegressionModel
                     servable = new LogisticRegressionModelServable(modelData.get(0));
                 } else {
                     LogisticRegressionModelData mergedModel =
-                            LogisticRegressionModelServable.mergePieces(modelData);
+                            LogisticRegressionModelData.mergeSegments(modelData);
                     servable = new LogisticRegressionModelServable(mergedModel);
                 }
                 ParamUtils.updateExistingParams(servable, params);

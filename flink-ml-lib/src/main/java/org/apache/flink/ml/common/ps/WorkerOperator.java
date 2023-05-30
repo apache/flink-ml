@@ -26,13 +26,13 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.datacache.nonkeyed.ListStateWithCache;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
-import org.apache.flink.ml.common.ps.message.ValuesPulledM;
+import org.apache.flink.ml.common.ps.message.PulledValueM;
 import org.apache.flink.ml.common.ps.training.IterationStage;
 import org.apache.flink.ml.common.ps.training.IterationStageList;
+import org.apache.flink.ml.common.ps.training.MLSession;
 import org.apache.flink.ml.common.ps.training.ProcessStage;
 import org.apache.flink.ml.common.ps.training.PullStage;
 import org.apache.flink.ml.common.ps.training.PushStage;
-import org.apache.flink.ml.common.ps.training.TrainingContext;
 import org.apache.flink.ml.util.Bits;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
@@ -53,15 +53,15 @@ import java.util.Iterator;
  *
  * <ul>
  *   <li>Caches the training data.
- *   <li>Initializes the {@link TrainingContext}.
+ *   <li>Initializes the {@link MLSession}.
  *   <li>Splits the {@link IterationStageList} by {@link PullStage} into multiple sequences and map
  *       it into flink-ml-iterations.
  *   <li>Executes the process function in each {@link ProcessStage}.
  *   <li>Executes the push/pull request in {@link PushStage} and {@link PullStage} and talk to
- *       servers, by reading/writing {@link TrainingContext}.
+ *       servers, by reading/writing {@link MLSession}.
  * </ul>
  */
-public class WorkerOperator<DT, ContextT extends TrainingContext>
+public class WorkerOperator<DT, SessionT extends MLSession>
         extends AbstractStreamOperator<Tuple2<Integer, byte[]>>
         implements TwoInputStreamOperator<DT, byte[], Tuple2<Integer, byte[]>>,
                 IterationListener<Tuple2<Integer, byte[]>> {
@@ -72,7 +72,7 @@ public class WorkerOperator<DT, ContextT extends TrainingContext>
     private ServerAgent serverAgent;
 
     /** The user defined iteration logic. */
-    private final IterationStageList<ContextT> iterationStages;
+    private final IterationStageList<SessionT> iterationStages;
 
     /**
      * Iteration id in terms of {@link IterationStageList}. When we finished processing all stages
@@ -100,7 +100,7 @@ public class WorkerOperator<DT, ContextT extends TrainingContext>
 
     private ListState<Long> modelDimState;
 
-    public WorkerOperator(IterationStageList<ContextT> iterationStages, int numServers) {
+    public WorkerOperator(IterationStageList<SessionT> iterationStages, int numServers) {
         this.iterationStages = iterationStages;
         this.numServers = numServers;
     }
@@ -110,7 +110,7 @@ public class WorkerOperator<DT, ContextT extends TrainingContext>
         int numTasks = getRuntimeContext().getNumberOfParallelSubtasks();
         int workerId = getRuntimeContext().getIndexOfThisSubtask();
         this.serverAgent = new ServerAgent(workerId, output);
-        iterationStages.context.setWorldInfo(workerId, numTasks);
+        iterationStages.session.setWorldInfo(workerId, numTasks);
     }
 
     @Override
@@ -120,8 +120,8 @@ public class WorkerOperator<DT, ContextT extends TrainingContext>
         if (epochWatermark == 0) {
             modelDim = Bits.getLong(feedback, 0);
             serverAgent.setPartitioner(new RangePartitioner(modelDim, numServers));
-            serverAgent.zeros();
-            iterationStages.context.setInputData(new ResettableTrainDataIterator<>(trainDataState));
+            serverAgent.initializeModelAsZeros();
+            iterationStages.session.setInputData(new ResettableTrainDataIterator<>(trainDataState));
             nextStageToExecute = processTrainingStage(nextStageToExecute, iterationStages);
         }
     }
@@ -141,12 +141,12 @@ public class WorkerOperator<DT, ContextT extends TrainingContext>
     public void processElement2(StreamRecord<byte[]> streamRecord) throws Exception {
         feedback = streamRecord.getValue();
         if (modelDim > 0) {
-            // Decodes the pulled method and put it in training context.
+            // Decodes the pulled method and put it in ml session.
             PullStage pullStage = (PullStage) iterationStages.stageList.get(nextStageToExecute);
-            ValuesPulledM valuesPulledMessage = ValuesPulledM.fromBytes(streamRecord.getValue());
+            PulledValueM valuesPulledMessage = PulledValueM.fromBytes(streamRecord.getValue());
             Preconditions.checkState(
                     getRuntimeContext().getIndexOfThisSubtask() == valuesPulledMessage.workerId);
-            pullStage.valuesConsumer.accept(valuesPulledMessage.valuesPulled);
+            pullStage.valuesConsumer.accept(valuesPulledMessage.values);
             nextStageToExecute++;
 
             nextStageToExecute = processTrainingStage(nextStageToExecute, iterationStages);
@@ -197,7 +197,7 @@ public class WorkerOperator<DT, ContextT extends TrainingContext>
             serverAgent.setPartitioner(new RangePartitioner(modelDim, numServers));
         }
 
-        iterationStages.context.initializeState(context);
+        iterationStages.session.initializeState(context);
     }
 
     @Override
@@ -216,7 +216,7 @@ public class WorkerOperator<DT, ContextT extends TrainingContext>
         iterationIdState.add(iterationId);
 
         trainDataState.snapshotState(context);
-        iterationStages.context.snapshotState(context);
+        iterationStages.session.snapshotState(context);
     }
 
     /**
@@ -229,12 +229,12 @@ public class WorkerOperator<DT, ContextT extends TrainingContext>
      */
     @SuppressWarnings("unchecked")
     private int processTrainingStage(
-            int nextStageToExecute, IterationStageList<ContextT> iterationStages) throws Exception {
+            int nextStageToExecute, IterationStageList<SessionT> iterationStages) throws Exception {
         while (true) {
             if (nextStageToExecute >= iterationStages.stageList.size()) {
                 iterationId++;
-                iterationStages.context.setIterationId(iterationId);
-                if (iterationStages.shouldTerminate.apply(iterationStages.context)) {
+                iterationStages.session.setIterationId(iterationId);
+                if (iterationStages.shouldTerminate.apply(iterationStages.session)) {
                     return -1;
                 }
                 nextStageToExecute -= iterationStages.stageList.size();
@@ -252,7 +252,7 @@ public class WorkerOperator<DT, ContextT extends TrainingContext>
                 serverAgent.pushKVs(pushStage.keysSupplier.get(), pushStage.valuesSupplier.get());
                 nextStageToExecute++;
             } else if (stage instanceof ProcessStage) {
-                ((ProcessStage<ContextT>) stage).process(iterationStages.context);
+                ((ProcessStage<SessionT>) stage).process(iterationStages.session);
                 nextStageToExecute++;
             } else {
                 throw new IllegalStateException(

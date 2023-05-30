@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.updater;
+package org.apache.flink.ml.common.ps.updater;
 
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.runtime.state.StateInitializationContext;
@@ -28,7 +28,8 @@ import java.util.Iterator;
 /**
  * A model updater that could be used to handle push/pull request from workers.
  *
- * <p>Note that model updater should also ensure that model data is robust to failures.
+ * <p>Note that model updater should also ensure that model data is robust to failures, by writing
+ * model data to snapshots.
  */
 public interface ModelUpdater extends Serializable {
 
@@ -41,8 +42,12 @@ public interface ModelUpdater extends Serializable {
     /** Applies the pull and return the retrieved model data. */
     double[] handlePull(long[] keys);
 
-    /** Returns model pieces with the format of (startFeatureIdx, endFeatureIdx, modelValues). */
-    Iterator<Tuple3<Long, Long, double[]>> getModelPieces();
+    /**
+     * Returns model segments with the format of (startFeatureIdx, endFeatureIdx, modelValues). The
+     * model segments are continuously updated/retrieved by push/pull(i.e., `handlePush` and
+     * `handlePull`).
+     */
+    Iterator<Tuple3<Long, Long, double[]>> getModelSegments();
 
     /** Recovers the model data from state. */
     void initializeState(StateInitializationContext context) throws Exception;

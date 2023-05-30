@@ -22,7 +22,7 @@ import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.PrimitiveArrayTypeInfo;
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.ml.common.ps.message.ValuesPulledM;
+import org.apache.flink.ml.common.ps.message.PulledValueM;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
@@ -38,8 +38,8 @@ import java.util.List;
 /**
  * Merges the message from different servers for one pull request.
  *
- * <p>Note that for each single-thread worker, there are at exactly #numServers pieces for each pull
- * request in the feedback edge.
+ * <p>Note that for each single-thread worker, there are at exactly #numServers segments for each
+ * pull request in the feedback edge.
  */
 public class MirrorWorkerOperator extends AbstractStreamOperator<byte[]>
         implements OneInputStreamOperator<Tuple2<Integer, byte[]>, byte[]> {
@@ -47,7 +47,7 @@ public class MirrorWorkerOperator extends AbstractStreamOperator<byte[]>
     private int workerId;
 
     /** The received messages from servers for the current pull request. */
-    private List<ValuesPulledM> messageReceived;
+    private List<PulledValueM> messageReceived;
 
     private ListState<byte[]> messageReceivedState;
 
@@ -64,28 +64,28 @@ public class MirrorWorkerOperator extends AbstractStreamOperator<byte[]>
     @Override
     public void processElement(StreamRecord<Tuple2<Integer, byte[]>> element) throws Exception {
         Preconditions.checkState(element.getValue().f0 == workerId);
-        ValuesPulledM pulledModelM = ValuesPulledM.fromBytes(element.getValue().f1);
-        messageReceived.add(pulledModelM);
+        PulledValueM pulledValueM = PulledValueM.fromBytes(element.getValue().f1);
+        messageReceived.add(pulledValueM);
         trySendingPulls(numServers);
     }
 
-    private void trySendingPulls(int numPieces) {
-        if (messageReceived.size() == numPieces) {
-            Comparator<ValuesPulledM> comparator = Comparator.comparingInt(o -> o.serverId);
+    private void trySendingPulls(int numSegments) {
+        if (messageReceived.size() == numSegments) {
+            Comparator<PulledValueM> comparator = Comparator.comparingInt(o -> o.serverId);
             messageReceived.sort(comparator);
             int size = 0;
-            for (ValuesPulledM pulledModelM : messageReceived) {
-                size += pulledModelM.valuesPulled.length;
+            for (PulledValueM pulledValueM : messageReceived) {
+                size += pulledValueM.values.length;
             }
             double[] answer = new double[size];
             int offset = 0;
-            for (ValuesPulledM pulledModelM : messageReceived) {
-                double[] values = pulledModelM.valuesPulled;
+            for (PulledValueM pulledValueM : messageReceived) {
+                double[] values = pulledValueM.values;
                 System.arraycopy(values, 0, answer, offset, values.length);
                 offset += values.length;
             }
-            ValuesPulledM pulledModelM = new ValuesPulledM(-1, workerId, answer);
-            output.collect(new StreamRecord<>(pulledModelM.toBytes()));
+            PulledValueM pulledValueM = new PulledValueM(-1, workerId, answer);
+            output.collect(new StreamRecord<>(pulledValueM.toBytes()));
             messageReceived.clear();
         }
     }
@@ -104,7 +104,7 @@ public class MirrorWorkerOperator extends AbstractStreamOperator<byte[]>
         Iterator<byte[]> iterator = messageReceivedState.get().iterator();
         if (iterator.hasNext()) {
             while (iterator.hasNext()) {
-                messageReceived.add(ValuesPulledM.fromBytes(iterator.next()));
+                messageReceived.add(PulledValueM.fromBytes(iterator.next()));
             }
         }
     }
@@ -114,7 +114,7 @@ public class MirrorWorkerOperator extends AbstractStreamOperator<byte[]>
         super.snapshotState(context);
         messageReceivedState.clear();
         if (messageReceived.size() > 0) {
-            for (ValuesPulledM valuesPulled : messageReceived) {
+            for (PulledValueM valuesPulled : messageReceived) {
                 messageReceivedState.add(valuesPulled.toBytes());
             }
         }

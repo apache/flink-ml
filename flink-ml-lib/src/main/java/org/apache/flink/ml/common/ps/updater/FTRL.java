@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.common.updater;
+package org.apache.flink.ml.common.ps.updater;
 
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
@@ -31,10 +31,11 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
- * FTRL (Follow-the-regularized-leader) is an optimization algorithm which is widely deployed by online learning.
+ * FTRL (Follow-the-regularized-leader) is an optimization algorithm which is widely deployed by
+ * online learning.
  *
- * <p>See <a href="https://doi.org/10.1145/2487575.2488200">H. Brendan McMahan et al., Ad click
- *  * prediction: a view from the trenches.</a>
+ * <p>See <a href="https://doi.org/10.1145/2487575.2488200">H. Brendan McMahan et al., Ad click *
+ * prediction: a view from the trenches.</a>
  */
 public class FTRL implements ModelUpdater {
     private final double alpha;
@@ -108,10 +109,10 @@ public class FTRL implements ModelUpdater {
     }
 
     @Override
-    public Iterator<Tuple3<Long, Long, double[]>> getModelPieces() {
-        List<Tuple3<Long, Long, double[]>> modelPieces = new ArrayList<>();
-        modelPieces.add(Tuple3.of(startIndex, endIndex, weight));
-        return modelPieces.iterator();
+    public Iterator<Tuple3<Long, Long, double[]>> getModelSegments() {
+        List<Tuple3<Long, Long, double[]>> modelSegments = new ArrayList<>();
+        modelSegments.add(Tuple3.of(startIndex, endIndex, weight));
+        return modelSegments.iterator();
     }
 
     @Override

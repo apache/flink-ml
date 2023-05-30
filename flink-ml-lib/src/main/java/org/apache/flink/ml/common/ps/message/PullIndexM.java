@@ -24,18 +24,18 @@ import org.apache.flink.util.Preconditions;
 import static org.apache.flink.ml.common.ps.message.MessageType.PULL_INDEX;
 
 /** The indices one worker needs to pull from servers. */
-public class IndicesToPullM implements Message {
+public class PullIndexM implements Message {
     public final int serverId;
     public final int workerId;
-    public final long[] indicesToPull;
+    public final long[] indices;
 
-    public IndicesToPullM(int serverId, int workerId, long[] indicesToPull) {
+    public PullIndexM(int serverId, int workerId, long[] indices) {
         this.serverId = serverId;
         this.workerId = workerId;
-        this.indicesToPull = indicesToPull;
+        this.indices = indices;
     }
 
-    public static IndicesToPullM fromBytes(byte[] bytes) {
+    public static PullIndexM fromBytes(byte[] bytes) {
         int offset = 0;
         char type = Bits.getChar(bytes, offset);
         offset += Character.BYTES;
@@ -45,16 +45,14 @@ public class IndicesToPullM implements Message {
         offset += Integer.BYTES;
         int workerId = Bits.getInt(bytes, offset);
         offset += Integer.BYTES;
-        long[] toPullIndices = MessageUtils.readLongArray(bytes, offset);
-        return new IndicesToPullM(psId, workerId, toPullIndices);
+        long[] indices = MessageUtils.getLongArray(bytes, offset);
+        return new PullIndexM(psId, workerId, indices);
     }
 
     @Override
     public byte[] toBytes() {
         int numBytes =
-                Character.BYTES
-                        + Integer.BYTES * 2
-                        + MessageUtils.getLongArraySizeInBytes(indicesToPull);
+                Character.BYTES + Integer.BYTES * 2 + MessageUtils.getLongArraySizeInBytes(indices);
         byte[] buffer = new byte[numBytes];
         int offset = 0;
 
@@ -64,7 +62,7 @@ public class IndicesToPullM implements Message {
         offset += Integer.BYTES;
         Bits.putInt(buffer, offset, this.workerId);
         offset += Integer.BYTES;
-        MessageUtils.writeLongArray(this.indicesToPull, buffer, offset);
+        MessageUtils.putLongArray(this.indices, buffer, offset);
         return buffer;
     }
 }

@@ -18,7 +18,6 @@
 
 package org.apache.flink.ml.classification.logisticregression;
 
-import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.linalg.BLAS;
 import org.apache.flink.ml.linalg.DenseVector;
@@ -82,47 +81,20 @@ public class LogisticRegressionModelServable
     public LogisticRegressionModelServable setModelData(InputStream... modelDataInputs)
             throws IOException {
         Preconditions.checkArgument(modelDataInputs.length == 1);
-        List<LogisticRegressionModelData> modelPieces = new ArrayList<>();
+        List<LogisticRegressionModelData> modelSegments = new ArrayList<>();
         while (true) {
             try {
-                LogisticRegressionModelData piece =
+                LogisticRegressionModelData segment =
                         LogisticRegressionModelData.decode(modelDataInputs[0]);
-                modelPieces.add(piece);
+                modelSegments.add(segment);
             } catch (IOException e) {
                 // Reached the end of model stream.
                 break;
             }
         }
 
-        modelData = mergePieces(modelPieces);
+        modelData = LogisticRegressionModelData.mergeSegments(modelSegments);
         return this;
-    }
-
-    @VisibleForTesting
-    public static LogisticRegressionModelData mergePieces(
-            List<LogisticRegressionModelData> pieces) {
-        long dim = 0;
-        for (LogisticRegressionModelData piece : pieces) {
-            dim = Math.max(dim, piece.endIndex);
-        }
-        // TODO: Add distributed inference for very large models.
-        Preconditions.checkState(
-                dim < Integer.MAX_VALUE,
-                "The dimension of logistic regression model is larger than INT.MAX. Please consider using distributed inference.");
-        int intDim = (int) dim;
-        DenseVector mergedCoefficient = new DenseVector(intDim);
-        for (LogisticRegressionModelData piece : pieces) {
-            int startIndex = (int) piece.startIndex;
-            int endIndex = (int) piece.endIndex;
-            System.arraycopy(
-                    piece.coefficient.values,
-                    0,
-                    mergedCoefficient.values,
-                    startIndex,
-                    endIndex - startIndex);
-        }
-        return new LogisticRegressionModelData(
-                mergedCoefficient, 0, mergedCoefficient.size(), pieces.get(0).modelVersion);
     }
 
     public static LogisticRegressionModelServable load(String path) throws IOException {
