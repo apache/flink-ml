@@ -21,32 +21,32 @@ package org.apache.flink.ml.common.ps.message;
 import org.apache.flink.ml.util.Bits;
 import org.apache.flink.util.Preconditions;
 
-import static org.apache.flink.ml.common.ps.message.MessageType.PULLED_VALUE;
+import static org.apache.flink.ml.common.ps.message.MessageType.ALL_REDUCE_VALUE;
 
-/** The values pulled from servers. */
-public class PulledValueM implements Message {
+/** The message to apply all-reduce among workers. */
+public class AllReduceM implements Message {
     public final int serverId;
-    public int workerId;
+    public final int workerId;
     public final double[] values;
 
-    public PulledValueM(int serverId, int workerId, double[] values) {
+    public AllReduceM(int serverId, int workerId, double[] values) {
         this.serverId = serverId;
         this.workerId = workerId;
         this.values = values;
     }
 
-    public static PulledValueM fromBytes(byte[] bytes) {
+    public static AllReduceM fromBytes(byte[] bytes) {
         int offset = 0;
         char type = Bits.getChar(bytes, offset);
         offset += Character.BYTES;
-        Preconditions.checkState(type == PULLED_VALUE.type);
+        Preconditions.checkState(type == ALL_REDUCE_VALUE.type);
 
         int psId = Bits.getInt(bytes, offset);
         offset += Integer.BYTES;
         int workerId = Bits.getInt(bytes, offset);
         offset += Integer.BYTES;
         double[] values = MessageUtils.getDoubleArray(bytes, offset);
-        return new PulledValueM(psId, workerId, values);
+        return new AllReduceM(psId, workerId, values);
     }
 
     @Override
@@ -58,7 +58,7 @@ public class PulledValueM implements Message {
                         + MessageUtils.getDoubleArraySizeInBytes(values);
         byte[] buffer = new byte[numBytes];
         int offset = 0;
-        Bits.putChar(buffer, offset, PULLED_VALUE.type);
+        Bits.putChar(buffer, offset, ALL_REDUCE_VALUE.type);
         offset += Character.BYTES;
 
         Bits.putInt(buffer, offset, this.serverId);

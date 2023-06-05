@@ -18,9 +18,8 @@
 
 package org.apache.flink.ml.common.ps.training;
 
-import org.apache.flink.util.function.SerializableSupplier;
-
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * A communication stage that pulls data from servers using keys as {@code
@@ -28,10 +27,10 @@ import java.util.function.Consumer;
  * PullStage#valuesConsumer#accept()}.
  */
 public final class PullStage implements IterationStage {
-    public final SerializableSupplier<long[]> keysSupplier;
+    public final Supplier<long[]> keysSupplier;
     public final Consumer<double[]> valuesConsumer;
 
-    public PullStage(SerializableSupplier<long[]> keysSupplier, Consumer<double[]> valuesConsumer) {
+    public PullStage(Supplier<long[]> keysSupplier, Consumer<double[]> valuesConsumer) {
         this.keysSupplier = keysSupplier;
         this.valuesConsumer = valuesConsumer;
     }

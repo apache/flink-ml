@@ -84,8 +84,8 @@ public class RangePartitioner {
         private int s = 0;
 
         public RequestsIterator(
-                int numPss, long[] indices, @Nullable double[] values, long[] ranges) {
-            this.numServers = numPss;
+                int numServers, long[] indices, @Nullable double[] values, long[] ranges) {
+            this.numServers = numServers;
             this.indices = indices;
             this.values = values;
             this.ranges = ranges;

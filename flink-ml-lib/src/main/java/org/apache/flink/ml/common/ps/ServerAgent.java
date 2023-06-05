@@ -20,12 +20,14 @@ package org.apache.flink.ml.common.ps;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.ml.common.ps.message.AllReduceM;
 import org.apache.flink.ml.common.ps.message.InitializeModelAsZeroM;
 import org.apache.flink.ml.common.ps.message.PullIndexM;
 import org.apache.flink.ml.common.ps.message.PushKvM;
 import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
+import java.util.Arrays;
 import java.util.Iterator;
 
 /** ServerAgent resides on each worker. It serves as an agent for workers to talk with servers. */
@@ -37,28 +39,17 @@ public class ServerAgent {
     /** The collector on this worker. */
     private final Output<StreamRecord<Tuple2<Integer, byte[]>>> output;
 
-    public ServerAgent(int workerId, Output<StreamRecord<Tuple2<Integer, byte[]>>> output) {
+    ServerAgent(int workerId, Output<StreamRecord<Tuple2<Integer, byte[]>>> output) {
         this.workerId = workerId;
         this.output = output;
     }
 
-    public void setPartitioner(RangePartitioner partitioner) {
+    void setPartitioner(RangePartitioner partitioner) {
         this.partitioner = partitioner;
     }
 
-    /** Pushes a key-value arrays to servers. */
-    public void pushKVs(long[] indices, double[] values) {
-        Iterator<Tuple3<Integer, long[], double[]>> requests =
-                partitioner.splitRequest(indices, values);
-        while (requests.hasNext()) {
-            Tuple3<Integer, long[], double[]> request = requests.next();
-            PushKvM pushKvM = new PushKvM(workerId, request.f0, Tuple2.of(request.f1, request.f2));
-            output.collect(new StreamRecord<>(Tuple2.of(request.f0, pushKvM.toBytes())));
-        }
-    }
-
     /** Sends a request to servers to initialize the values stored as zeros. */
-    public void initializeModelAsZeros() {
+    void initializeModelAsZeros() {
         for (int serverId = 0; serverId < partitioner.numServers; serverId++) {
             long start = partitioner.ranges[serverId];
             long end = partitioner.ranges[serverId + 1];
@@ -69,14 +60,49 @@ public class ServerAgent {
         }
     }
 
+    /** Pushes a key-value arrays to servers. */
+    void push(long[] indices, double[] values) {
+        Iterator<Tuple3<Integer, long[], double[]>> requests =
+                partitioner.splitRequest(indices, values);
+        while (requests.hasNext()) {
+            Tuple3<Integer, long[], double[]> request = requests.next();
+            PushKvM pushKvM = new PushKvM(workerId, request.f0, Tuple2.of(request.f1, request.f2));
+            output.collect(new StreamRecord<>(Tuple2.of(request.f0, pushKvM.toBytes())));
+        }
+    }
+
     /** Pulls the values from servers with the specified indices. */
-    public void pull(long[] indices) {
+    void pull(long[] indices) {
         Iterator<Tuple3<Integer, long[], double[]>> requests =
                 partitioner.splitRequest(indices, null);
         while (requests.hasNext()) {
             Tuple3<Integer, long[], double[]> request = requests.next();
             PullIndexM pullIndexM = new PullIndexM(request.f0, workerId, request.f1);
             output.collect(new StreamRecord<>(Tuple2.of(request.f0, pullIndexM.toBytes())));
+        }
+    }
+
+    /**
+     * Pushes the values to servers to apply all reduce operation.
+     *
+     * <p>Note that the values pushed by this function are not going to update the model, but just
+     * perform an all reduce operation.
+     */
+    void allReducePush(double[] values) {
+        final int MIN_MESSAGE_SIZE = 1024;
+        int numServers = partitioner.numServers;
+        int messageSize = Math.max(MIN_MESSAGE_SIZE, values.length / numServers + 1);
+        for (int serverId = 0; serverId < numServers; serverId++) {
+            int s = Math.min(serverId * messageSize, values.length);
+            int e = Math.min(s + messageSize, values.length);
+            double[] segment;
+            if (s == e) {
+                segment = new double[0];
+            } else {
+                segment = Arrays.copyOfRange(values, s, e);
+            }
+            AllReduceM allReduceM = new AllReduceM(serverId, workerId, segment);
+            output.collect(new StreamRecord<>(Tuple2.of(serverId, allReduceM.toBytes())));
         }
     }
 }

@@ -133,7 +133,8 @@ public final class TrainingUtils {
                                     new TupleTypeInfo<>(
                                             Types.INT,
                                             PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO),
-                                    new ServerOperator(modelUpdater, modelDataOutputTag));
+                                    new ServerOperator(
+                                            numWorkers, modelUpdater, modelDataOutputTag));
             messageToWorker.setParallelism(numServers);
 
             DataStream<byte[]> combinedMessageToWorker =

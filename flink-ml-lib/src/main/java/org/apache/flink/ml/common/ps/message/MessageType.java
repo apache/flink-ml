@@ -33,7 +33,9 @@ public enum MessageType {
      * Message sent from workers to servers, which specifies the indices and values of the model to
      * push to servers.
      */
-    PUSH_KV((char) 3);
+    PUSH_KV((char) 3),
+    /** Message to apply all-reduce among workers. */
+    ALL_REDUCE_VALUE((char) 4);
 
     public final char type;
 
@@ -51,6 +53,8 @@ public enum MessageType {
                 return MessageType.PULLED_VALUE;
             case ((char) 3):
                 return MessageType.PUSH_KV;
+            case ((char) 4):
+                return MessageType.ALL_REDUCE_VALUE;
             default:
                 throw new UnsupportedOperationException();
         }

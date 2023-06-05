@@ -27,6 +27,7 @@ import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.datacache.nonkeyed.ListStateWithCache;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.common.ps.message.PulledValueM;
+import org.apache.flink.ml.common.ps.training.AllReduceStage;
 import org.apache.flink.ml.common.ps.training.IterationStage;
 import org.apache.flink.ml.common.ps.training.IterationStageList;
 import org.apache.flink.ml.common.ps.training.MLSession;
@@ -43,6 +44,7 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
 
+import java.util.Arrays;
 import java.util.Iterator;
 
 /**
@@ -141,12 +143,28 @@ public class WorkerOperator<DT, SessionT extends MLSession>
     public void processElement2(StreamRecord<byte[]> streamRecord) throws Exception {
         feedback = streamRecord.getValue();
         if (modelDim > 0) {
-            // Decodes the pulled method and put it in ml session.
-            PullStage pullStage = (PullStage) iterationStages.stageList.get(nextStageToExecute);
-            PulledValueM valuesPulledMessage = PulledValueM.fromBytes(streamRecord.getValue());
-            Preconditions.checkState(
-                    getRuntimeContext().getIndexOfThisSubtask() == valuesPulledMessage.workerId);
-            pullStage.valuesConsumer.accept(valuesPulledMessage.values);
+            // Decodes the pulled values and puts it in ml session.
+            IterationStage stage = iterationStages.stageList.get(nextStageToExecute);
+            if (stage instanceof PullStage) {
+                PullStage pullStage = (PullStage) stage;
+                PulledValueM valuesPulledMessage = PulledValueM.fromBytes(streamRecord.getValue());
+                Preconditions.checkState(
+                        getRuntimeContext().getIndexOfThisSubtask()
+                                == valuesPulledMessage.workerId);
+                pullStage.valuesConsumer.accept(valuesPulledMessage.values);
+            } else if (stage instanceof AllReduceStage) {
+                AllReduceStage allReduceStage = (AllReduceStage) stage;
+                PulledValueM pulledValueM = PulledValueM.fromBytes(streamRecord.getValue());
+                Preconditions.checkState(
+                        getRuntimeContext().getIndexOfThisSubtask() == pulledValueM.workerId);
+                System.out.println(
+                        "Worker received allreduce result: "
+                                + Arrays.toString(pulledValueM.values));
+                allReduceStage.valuesConsumer.accept(pulledValueM.values);
+            } else {
+                throw new IllegalStateException(
+                        String.format("Illegal stage type: %s", stage.getClass().getSimpleName()));
+            }
             nextStageToExecute++;
 
             nextStageToExecute = processTrainingStage(nextStageToExecute, iterationStages);
@@ -247,10 +265,17 @@ public class WorkerOperator<DT, SessionT extends MLSession>
                 PullStage pullStage = ((PullStage) stage);
                 serverAgent.pull(pullStage.keysSupplier.get());
                 return nextStageToExecute;
+            } else if (stage instanceof AllReduceStage) {
+                // We are not incrementing nextStageToExecute here, since we will need to pull
+                // values from servers.
+                AllReduceStage allReduceStage = (AllReduceStage) stage;
+                serverAgent.allReducePush(allReduceStage.valuesSupplier.get());
+                return nextStageToExecute;
             } else if (stage instanceof PushStage) {
                 PushStage pushStage = (PushStage) stage;
-                serverAgent.pushKVs(pushStage.keysSupplier.get(), pushStage.valuesSupplier.get());
+                serverAgent.push(pushStage.keysSupplier.get(), pushStage.valuesSupplier.get());
                 nextStageToExecute++;
+
             } else if (stage instanceof ProcessStage) {
                 ((ProcessStage<SessionT>) stage).process(iterationStages.session);
                 nextStageToExecute++;
