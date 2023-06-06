@@ -26,8 +26,8 @@ import org.apache.flink.ml.classification.naivebayes.NaiveBayesModelData.ModelDa
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -146,13 +146,13 @@ public class NaiveBayesModel
                         (NaiveBayesModelData)
                                 getRuntimeContext().getBroadcastVariable(broadcastModelKey).get(0);
             }
-            Vector vector = (Vector) row.getField(featuresCol);
+            IntDoubleVector vector = (IntDoubleVector) row.getField(featuresCol);
             double label = findMaxProbLabel(calculateProb(modelData, vector), modelData.labels);
             return Row.join(row, Row.of(label));
         }
     }
 
-    private static double findMaxProbLabel(DenseVector prob, Vector label) {
+    private static double findMaxProbLabel(DenseIntDoubleVector prob, IntDoubleVector label) {
         double result = 0.;
         int probSize = prob.size();
         double maxVal = Double.NEGATIVE_INFINITY;
@@ -167,9 +167,10 @@ public class NaiveBayesModel
     }
 
     /** Calculate probability of the input data. */
-    private static DenseVector calculateProb(NaiveBayesModelData modelData, Vector data) {
+    private static DenseIntDoubleVector calculateProb(
+            NaiveBayesModelData modelData, IntDoubleVector data) {
         int labelSize = modelData.labels.size();
-        DenseVector probs = new DenseVector(new double[labelSize]);
+        DenseIntDoubleVector probs = new DenseIntDoubleVector(new double[labelSize]);
         for (int i = 0; i < labelSize; i++) {
             Map<Double, Double>[] labelData = modelData.theta[i];
             for (int j = 0; j < data.size(); j++) {

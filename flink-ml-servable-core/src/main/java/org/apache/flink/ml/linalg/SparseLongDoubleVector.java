@@ -7,34 +7,39 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 package org.apache.flink.ml.linalg;
 
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.common.typeinfo.TypeInfo;
-import org.apache.flink.ml.linalg.typeinfo.SparseVectorTypeInfoFactory;
+import org.apache.flink.ml.linalg.typeinfo.SparseLongDoubleVectorTypeInfoFactory;
 import org.apache.flink.util.Preconditions;
 
 import java.util.Arrays;
-import java.util.Objects;
 
-/** A sparse vector of double values. */
-@TypeInfo(SparseVectorTypeInfoFactory.class)
+/**
+ * A sparse vector with long as keys and double as values.
+ *
+ * <p>TODO: Add processing logic for {@link SparseLongDoubleVector} for existing algorithms.
+ */
+@TypeInfo(SparseLongDoubleVectorTypeInfoFactory.class)
 @PublicEvolving
-public class SparseVector implements Vector {
-    public final int n;
-    public int[] indices;
+public class SparseLongDoubleVector implements LongDoubleVector {
+
+    public final long n;
+    public long[] indices;
     public double[] values;
 
-    public SparseVector(int n, int[] indices, double[] values) {
+    public SparseLongDoubleVector(long n, long[] indices, double[] values) {
         this.n = n;
         this.indices = indices;
         this.values = values;
@@ -45,12 +50,12 @@ public class SparseVector implements Vector {
     }
 
     @Override
-    public int size() {
+    public Long size() {
         return n;
     }
 
     @Override
-    public double get(int i) {
+    public Double get(Long i) {
         int pos = Arrays.binarySearch(indices, i);
         if (pos >= 0) {
             return values[pos];
@@ -59,13 +64,13 @@ public class SparseVector implements Vector {
     }
 
     @Override
-    public void set(int i, double value) {
+    public void set(Long i, Double value) {
         int pos = Arrays.binarySearch(indices, i);
         if (pos >= 0) {
             values[pos] = value;
         } else if (value != 0.0) {
             Preconditions.checkArgument(i < n, "Index out of bounds: " + i);
-            int[] indices = new int[this.indices.length + 1];
+            long[] indices = new long[this.indices.length + 1];
             double[] values = new double[this.indices.length + 1];
             System.arraycopy(this.indices, 0, indices, 0, -pos - 1);
             System.arraycopy(this.values, 0, values, 0, -pos - 1);
@@ -79,44 +84,8 @@ public class SparseVector implements Vector {
     }
 
     @Override
-    public double[] toArray() {
-        double[] result = new double[n];
-        for (int i = 0; i < indices.length; i++) {
-            result[indices[i]] = values[i];
-        }
-        return result;
-    }
-
-    @Override
-    public DenseVector toDense() {
-        return new DenseVector(toArray());
-    }
-
-    @Override
-    public SparseVector toSparse() {
+    public SparseLongDoubleVector toSparse() {
         return this;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        SparseVector that = (SparseVector) o;
-        return n == that.n
-                && Arrays.equals(indices, that.indices)
-                && Arrays.equals(values, that.values);
-    }
-
-    @Override
-    public int hashCode() {
-        int result = Objects.hash(n);
-        result = 31 * result + Arrays.hashCode(indices);
-        result = 31 * result + Arrays.hashCode(values);
-        return result;
     }
 
     /**
@@ -162,9 +131,9 @@ public class SparseVector implements Vector {
     }
 
     /** Sorts the indices and values using quick sort. */
-    private static void sortImpl(int[] indices, double[] values, int low, int high) {
+    private static void sortImpl(long[] indices, double[] values, int low, int high) {
         int pivotPos = (low + high) / 2;
-        int pivot = indices[pivotPos];
+        long pivot = indices[pivotPos];
         swapIndexAndValue(indices, values, pivotPos, high);
 
         int pos = low - 1;
@@ -182,8 +151,8 @@ public class SparseVector implements Vector {
         }
     }
 
-    private static void swapIndexAndValue(int[] indices, double[] values, int index1, int index2) {
-        int tempIndex = indices[index1];
+    private static void swapIndexAndValue(long[] indices, double[] values, int index1, int index2) {
+        long tempIndex = indices[index1];
         indices[index1] = indices[index2];
         indices[index2] = tempIndex;
         double tempValue = values[index1];
@@ -192,14 +161,7 @@ public class SparseVector implements Vector {
     }
 
     @Override
-    public String toString() {
-        String sbr =
-                "(" + n + ", " + Arrays.toString(indices) + ", " + Arrays.toString(values) + ")";
-        return sbr;
-    }
-
-    @Override
-    public SparseVector clone() {
-        return new SparseVector(n, indices.clone(), values.clone());
+    public SparseLongDoubleVector clone() {
+        return new SparseLongDoubleVector(n, indices.clone(), values.clone());
     }
 }

@@ -26,8 +26,8 @@ import org.apache.flink.ml.clustering.kmeans.KMeansModelData.ModelDataDecoder;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.common.distance.DistanceMeasure;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.VectorWithNorm;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -137,7 +137,8 @@ public class KMeansModel implements Model<KMeansModel>, KMeansModelParams<KMeans
                     centroids[i] = new VectorWithNorm(modelData.centroids[i]);
                 }
             }
-            DenseVector point = ((Vector) dataPoint.getField(featuresCol)).toDense();
+            DenseIntDoubleVector point =
+                    ((IntDoubleVector) dataPoint.getField(featuresCol)).toDense();
             int closestCentroidId =
                     distanceMeasure.findClosest(centroids, new VectorWithNorm(point));
             return Row.join(dataPoint, Row.of(closestCentroidId));

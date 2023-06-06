@@ -18,10 +18,11 @@
 
 package org.apache.flink.ml;
 
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.table.api.ApiExpression;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.catalog.DataTypeFactory;
@@ -37,18 +38,18 @@ import static org.apache.flink.table.api.Expressions.call;
 /** Built-in table functions for data transformations. */
 @SuppressWarnings("unused")
 public class Functions {
-    /** Converts a column of {@link Vector}s into a column of double arrays. */
+    /** Converts a column of {@link IntDoubleVector}s into a column of double arrays. */
     public static ApiExpression vectorToArray(Object... arguments) {
         return call(VectorToArrayFunction.class, arguments);
     }
 
     /**
-     * A {@link ScalarFunction} that converts a column of {@link Vector}s into a column of double
-     * arrays.
+     * A {@link ScalarFunction} that converts a column of {@link IntDoubleVector}s into a column of
+     * double arrays.
      */
     public static class VectorToArrayFunction extends ScalarFunction {
         public double[] eval(Vector vector) {
-            return vector.toArray();
+            return (double[]) vector.toArray();
         }
 
         @Override
@@ -66,7 +67,8 @@ public class Functions {
     }
 
     /**
-     * Converts a column of arrays of numeric type into a column of {@link DenseVector} instances.
+     * Converts a column of arrays of numeric type into a column of {@link DenseIntDoubleVector}
+     * instances.
      */
     public static ApiExpression arrayToVector(Object... arguments) {
         return call(ArrayToVectorFunction.class, arguments);
@@ -74,18 +76,18 @@ public class Functions {
 
     /**
      * A {@link ScalarFunction} that converts a column of arrays of numeric type into a column of
-     * {@link DenseVector} instances.
+     * {@link DenseIntDoubleVector} instances.
      */
     public static class ArrayToVectorFunction extends ScalarFunction {
-        public DenseVector eval(double[] array) {
+        public DenseIntDoubleVector eval(double[] array) {
             return Vectors.dense(array);
         }
 
-        public DenseVector eval(Double[] array) {
+        public DenseIntDoubleVector eval(Double[] array) {
             return eval(ArrayUtils.toPrimitive(array));
         }
 
-        public DenseVector eval(Number[] array) {
+        public DenseIntDoubleVector eval(Number[] array) {
             double[] doubles = new double[array.length];
             for (int i = 0; i < array.length; i++) {
                 doubles[i] = array[i].doubleValue();
@@ -99,7 +101,7 @@ public class Functions {
                     .outputTypeStrategy(
                             callContext ->
                                     Optional.of(
-                                            DataTypes.of(DenseVectorTypeInfo.INSTANCE)
+                                            DataTypes.of(DenseIntDoubleVectorTypeInfo.INSTANCE)
                                                     .toDataType(typeFactory)))
                     .build();
         }

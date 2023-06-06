@@ -29,10 +29,10 @@ import org.apache.flink.ml.classification.logisticregression.LogisticRegressionM
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelDataUtil;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelServable;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionWithFtrl;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.linalg.typeinfo.SparseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.SparseIntDoubleVectorTypeInfo;
 import org.apache.flink.ml.servable.api.DataFrame;
 import org.apache.flink.ml.servable.types.BasicType;
 import org.apache.flink.ml.servable.types.DataTypes;
@@ -131,7 +131,7 @@ public class LogisticRegressionWithFtrlTest {
                                 testRows,
                                 new RowTypeInfo(
                                         new TypeInformation[] {
-                                            SparseVectorTypeInfo.INSTANCE,
+                                            SparseIntDoubleVectorTypeInfo.INSTANCE,
                                             Types.DOUBLE,
                                             Types.DOUBLE
                                         },
@@ -359,9 +359,11 @@ public class LogisticRegressionWithFtrlTest {
             throws Exception {
         List<Row> predResult = IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect());
         for (Row predictionRow : predResult) {
-            DenseVector feature = ((Vector) predictionRow.getField(featuresCol)).toDense();
+            DenseIntDoubleVector feature =
+                    ((IntDoubleVector) predictionRow.getField(featuresCol)).toDense();
             double prediction = (double) predictionRow.getField(predictionCol);
-            DenseVector rawPrediction = (DenseVector) predictionRow.getField(rawPredictionCol);
+            DenseIntDoubleVector rawPrediction =
+                    (DenseIntDoubleVector) predictionRow.getField(rawPredictionCol);
             if (feature.get(0) <= 5) {
                 assertEquals(0, prediction, TOLERANCE);
                 assertTrue(rawPrediction.get(0) > 0.5);
@@ -379,9 +381,11 @@ public class LogisticRegressionWithFtrlTest {
         int rawPredictionColIndex = output.getIndex(rawPredictionCol);
 
         for (org.apache.flink.ml.servable.api.Row predictionRow : output.collect()) {
-            DenseVector feature = ((Vector) predictionRow.get(featuresColIndex)).toDense();
+            DenseIntDoubleVector feature =
+                    ((IntDoubleVector) predictionRow.get(featuresColIndex)).toDense();
             double prediction = (double) predictionRow.get(predictionColIndex);
-            DenseVector rawPrediction = (DenseVector) predictionRow.get(rawPredictionColIndex);
+            DenseIntDoubleVector rawPrediction =
+                    (DenseIntDoubleVector) predictionRow.get(rawPredictionColIndex);
             if (feature.get(0) <= 5) {
                 assertEquals(0, prediction, TOLERANCE);
                 assertTrue(rawPrediction.get(0) > 0.5);

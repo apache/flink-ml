@@ -24,7 +24,7 @@ import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.common.util.VectorUtils;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
@@ -127,14 +127,14 @@ public class UnivariateFeatureSelectorModel
             if (indices.length == 0) {
                 return Row.join(row, Row.of(Vectors.dense()));
             } else {
-                Vector inputVec = ((Vector) row.getField(inputCol));
+                IntDoubleVector inputVec = ((IntDoubleVector) row.getField(inputCol));
                 Preconditions.checkArgument(
                         inputVec.size() > indices[indices.length - 1],
                         "Input %s features, but UnivariateFeatureSelector is "
                                 + "expecting at least %s features as input.",
                         inputVec.size(),
                         indices[indices.length - 1] + 1);
-                Vector outputVec = VectorUtils.selectByIndices(inputVec, indices);
+                IntDoubleVector outputVec = VectorUtils.selectByIndices(inputVec, indices);
                 return Row.join(row, Row.of(outputVec));
             }
         }

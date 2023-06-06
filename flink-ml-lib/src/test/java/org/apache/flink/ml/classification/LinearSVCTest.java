@@ -24,11 +24,11 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.classification.linearsvc.LinearSVC;
 import org.apache.flink.ml.classification.linearsvc.LinearSVCModel;
 import org.apache.flink.ml.classification.linearsvc.LinearSVCModelData;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -93,7 +93,9 @@ public class LinearSVCTest extends AbstractTestBase {
                                 trainData,
                                 new RowTypeInfo(
                                         new TypeInformation[] {
-                                            DenseVectorTypeInfo.INSTANCE, Types.DOUBLE, Types.DOUBLE
+                                            DenseIntDoubleVectorTypeInfo.INSTANCE,
+                                            Types.DOUBLE,
+                                            Types.DOUBLE
                                         },
                                         new String[] {"features", "label", "weight"})));
     }
@@ -104,9 +106,11 @@ public class LinearSVCTest extends AbstractTestBase {
             throws Exception {
         List<Row> predResult = IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect());
         for (Row predictionRow : predResult) {
-            DenseVector feature = ((Vector) predictionRow.getField(featuresCol)).toDense();
+            DenseIntDoubleVector feature =
+                    ((IntDoubleVector) predictionRow.getField(featuresCol)).toDense();
             double prediction = (Double) predictionRow.getField(predictionCol);
-            DenseVector rawPrediction = (DenseVector) predictionRow.getField(rawPredictionCol);
+            DenseIntDoubleVector rawPrediction =
+                    (DenseIntDoubleVector) predictionRow.getField(rawPredictionCol);
             if (feature.get(0) <= 5) {
                 assertEquals(0, prediction, TOLERANCE);
                 assertTrue(rawPrediction.get(0) < 0);
@@ -196,7 +200,7 @@ public class LinearSVCTest extends AbstractTestBase {
     public void testInputTypeConversion() throws Exception {
         trainDataTable = TestUtils.convertDataTypesToSparseInt(tEnv, trainDataTable);
         assertArrayEquals(
-                new Class<?>[] {SparseVector.class, Integer.class, Integer.class},
+                new Class<?>[] {SparseIntDoubleVector.class, Integer.class, Integer.class},
                 TestUtils.getColumnDataTypes(trainDataTable));
 
         LinearSVC linearSVC = new LinearSVC().setWeightCol("weight");
@@ -274,7 +278,9 @@ public class LinearSVCTest extends AbstractTestBase {
                                 trainData,
                                 new RowTypeInfo(
                                         new TypeInformation[] {
-                                            DenseVectorTypeInfo.INSTANCE, Types.DOUBLE, Types.DOUBLE
+                                            DenseIntDoubleVectorTypeInfo.INSTANCE,
+                                            Types.DOUBLE,
+                                            Types.DOUBLE
                                         },
                                         new String[] {"features", "label", "weight"})));
 

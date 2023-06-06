@@ -18,18 +18,18 @@
 
 package org.apache.flink.ml.common.feature;
 
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 
 /** Utility class to represent a data point that contains features, label and weight. */
 public class LabeledPointWithWeight {
 
-    private Vector features;
+    private IntDoubleVector features;
 
     private double label;
 
     private double weight;
 
-    public LabeledPointWithWeight(Vector features, double label, double weight) {
+    public LabeledPointWithWeight(IntDoubleVector features, double label, double weight) {
         this.features = features;
         this.label = label;
         this.weight = weight;
@@ -37,11 +37,11 @@ public class LabeledPointWithWeight {
 
     public LabeledPointWithWeight() {}
 
-    public Vector getFeatures() {
+    public IntDoubleVector getFeatures() {
         return features;
     }
 
-    public void setFeatures(Vector features) {
+    public void setFeatures(IntDoubleVector features) {
         this.features = features;
     }
 

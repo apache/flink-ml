@@ -22,6 +22,7 @@ import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.ml.feature.variancethresholdselector.VarianceThresholdSelector;
 import org.apache.flink.ml.feature.variancethresholdselector.VarianceThresholdSelectorModel;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
@@ -74,7 +75,7 @@ public class VarianceThresholdSelectorTest extends AbstractTestBase {
                     Row.of(Vectors.dense(0.1, 0.2, 0.3, 0.4, 0.5, 0.6)),
                     Row.of(Vectors.sparse(6, new int[] {0, 3, 4}, new double[] {0.1, 0.3, 0.5})));
 
-    private static final List<Vector> EXPECTED_OUTPUT =
+    private static final List<IntDoubleVector> EXPECTED_OUTPUT =
             Arrays.asList(
                     Vectors.dense(1.0, 4.0, 6.0),
                     Vectors.dense(0.1, 0.4, 0.6),
@@ -98,7 +99,7 @@ public class VarianceThresholdSelectorTest extends AbstractTestBase {
     }
 
     private static void verifyPredictionResult(
-            Table output, String outputCol, List<Vector> expected) throws Exception {
+            Table output, String outputCol, List<IntDoubleVector> expected) throws Exception {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) output).getTableEnvironment();
         DataStream<Vector> stream =
@@ -106,7 +107,7 @@ public class VarianceThresholdSelectorTest extends AbstractTestBase {
                         .map(
                                 (MapFunction<Row, Vector>) row -> (Vector) row.getField(outputCol),
                                 VectorTypeInfo.INSTANCE);
-        List<Vector> result = IteratorUtils.toList(stream.executeAndCollect());
+        List<IntDoubleVector> result = IteratorUtils.toList(stream.executeAndCollect());
         compareResultCollections(expected, result, TestUtils::compare);
     }
 

@@ -19,7 +19,7 @@
 package org.apache.flink.ml.examples.feature;
 
 import org.apache.flink.ml.feature.featurehasher.FeatureHasher;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
@@ -61,7 +61,8 @@ public class FeatureHasherExample {
             for (int i = 0; i < inputValues.length; i++) {
                 inputValues[i] = row.getField(featureHash.getInputCols()[i]);
             }
-            Vector outputValue = (Vector) row.getField(featureHash.getOutputCol());
+            IntDoubleVector outputValue =
+                    (IntDoubleVector) row.getField(featureHash.getOutputCol());
 
             System.out.printf(
                     "Input Values: %s \tOutput Value: %s\n",

@@ -33,9 +33,9 @@ import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.common.datastream.EndOfStreamWindows;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.common.typeinfo.PriorityQueueTypeInfo;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vector;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -108,7 +108,7 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
                 tEnv.toDataStream(modelDataTable, modelDataClass);
 
         RowTypeInfo inputTypeInfo = TableUtils.getRowTypeInfo(inputs[0].getResolvedSchema());
-        TypeInformation<?> outputType = TypeInformation.of(DenseVector[].class);
+        TypeInformation<?> outputType = TypeInformation.of(DenseIntDoubleVector[].class);
         RowTypeInfo outputTypeInfo =
                 new RowTypeInfo(
                         ArrayUtils.addAll(inputTypeInfo.getFieldTypes(), outputType),
@@ -138,7 +138,7 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
      * @return A dataset containing at most k items closest to the key with a column named `distCol`
      *     appended.
      */
-    public Table approxNearestNeighbors(Table dataset, Vector key, int k, String distCol) {
+    public Table approxNearestNeighbors(Table dataset, IntDoubleVector key, int k, String distCol) {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) dataset).getTableEnvironment();
         Table transformedTable =
@@ -189,7 +189,7 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
      * An overloaded version of `approxNearestNeighbors` with "distCol" as default value of
      * `distCol`.
      */
-    public Table approxNearestNeighbors(Table dataset, Vector key, int k) {
+    public Table approxNearestNeighbors(Table dataset, IntDoubleVector key, int k) {
         return approxNearestNeighbors(dataset, key, k, "distCol");
     }
 
@@ -308,7 +308,7 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
                             idColType,
                             VectorTypeInfo.INSTANCE,
                             Types.INT,
-                            DenseVectorTypeInfo.INSTANCE
+                            DenseIntDoubleVectorTypeInfo.INSTANCE
                         },
                         new String[] {idCol, getInputCol(), indexCol, hashValueCol});
         return outputTypeInfo;
@@ -330,7 +330,7 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
                         (LSHModelData)
                                 getRuntimeContext().getBroadcastVariable(MODEL_DATA_BC_KEY).get(0);
             }
-            Vector[] hashValues = modelData.hashFunction(value.getFieldAs(inputCol));
+            IntDoubleVector[] hashValues = modelData.hashFunction(value.getFieldAs(inputCol));
             return Row.join(value, Row.of((Object) hashValues));
         }
     }
@@ -338,11 +338,11 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
     private static class FilterByBucketFunction extends RichFlatMapFunction<Row, Row> {
         private final String inputCol;
         private final String outputCol;
-        private final Vector key;
+        private final IntDoubleVector key;
         private LSHModelData modelData;
-        private DenseVector[] keyHashes;
+        private DenseIntDoubleVector[] keyHashes;
 
-        public FilterByBucketFunction(String inputCol, String outputCol, Vector key) {
+        public FilterByBucketFunction(String inputCol, String outputCol, IntDoubleVector key) {
             this.inputCol = inputCol;
             this.outputCol = outputCol;
             this.key = key;
@@ -356,7 +356,7 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
                                 getRuntimeContext().getBroadcastVariable(MODEL_DATA_BC_KEY).get(0);
                 keyHashes = modelData.hashFunction(key);
             }
-            DenseVector[] hashes = value.getFieldAs(outputCol);
+            DenseIntDoubleVector[] hashes = value.getFieldAs(outputCol);
             boolean sameBucket = false;
             for (int i = 0; i < keyHashes.length; i += 1) {
                 if (keyHashes[i].equals(hashes[i])) {
@@ -367,7 +367,7 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
             if (!sameBucket) {
                 return;
             }
-            Vector vec = value.getFieldAs(inputCol);
+            IntDoubleVector vec = value.getFieldAs(inputCol);
             double dist = modelData.keyDistance(key, vec);
             out.collect(Row.join(value, Row.of(dist)));
         }
@@ -447,7 +447,7 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
         @Override
         public void flatMap(Row value, Collector<Row> out) throws Exception {
             Row kept = Row.of(value.getField(idCol), value.getField(inputCol));
-            DenseVector[] hashValues = value.getFieldAs(outputCol);
+            DenseIntDoubleVector[] hashValues = value.getFieldAs(outputCol);
             for (int i = 0; i < hashValues.length; i += 1) {
                 out.collect(Row.join(kept, Row.of(i, hashValues[i])));
             }
@@ -455,10 +455,10 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
     }
 
     private static class IndexHashValueKeySelector
-            implements KeySelector<Row, Tuple2<Integer, DenseVector>> {
+            implements KeySelector<Row, Tuple2<Integer, DenseIntDoubleVector>> {
 
         @Override
-        public Tuple2<Integer, DenseVector> getKey(Row value) throws Exception {
+        public Tuple2<Integer, DenseIntDoubleVector> getKey(Row value) throws Exception {
             return Tuple2.of(value.getFieldAs(2), value.getFieldAs(3));
         }
     }

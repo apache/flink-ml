@@ -19,7 +19,7 @@
 package org.apache.flink.ml.examples.feature;
 
 import org.apache.flink.ml.feature.dct.DCT;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
@@ -37,7 +37,7 @@ public class DCTExample {
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         // Generates input data.
-        List<Vector> inputData =
+        List<IntDoubleVector> inputData =
                 Arrays.asList(
                         Vectors.dense(1.0, 1.0, 1.0, 1.0), Vectors.dense(1.0, 0.0, -1.0, 0.0));
         Table inputTable = tEnv.fromDataStream(env.fromCollection(inputData)).as("input");
@@ -52,8 +52,8 @@ public class DCTExample {
         for (CloseableIterator<Row> it = outputTable.execute().collect(); it.hasNext(); ) {
             Row row = it.next();
 
-            Vector inputValue = row.getFieldAs(dct.getInputCol());
-            Vector outputValue = row.getFieldAs(dct.getOutputCol());
+            IntDoubleVector inputValue = row.getFieldAs(dct.getInputCol());
+            IntDoubleVector outputValue = row.getFieldAs(dct.getOutputCol());
 
             System.out.printf("Input Value: %s\tOutput Value: %s\n", inputValue, outputValue);
         }

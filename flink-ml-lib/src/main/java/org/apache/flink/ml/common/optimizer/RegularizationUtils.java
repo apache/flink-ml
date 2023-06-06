@@ -20,7 +20,7 @@ package org.apache.flink.ml.common.optimizer;
 
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 
 /**
  * A utility class for algorithms that need to handle regularization. The regularization term is
@@ -45,7 +45,7 @@ class RegularizationUtils {
      * @return The loss introduced by regularization.
      */
     public static double regularize(
-            DenseVector coefficient,
+            DenseIntDoubleVector coefficient,
             final double reg,
             final double elasticNet,
             final double learningRate) {

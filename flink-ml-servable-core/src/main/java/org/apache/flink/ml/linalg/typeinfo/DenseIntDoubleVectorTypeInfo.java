@@ -21,15 +21,15 @@ package org.apache.flink.ml.linalg.typeinfo;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 
-/** A {@link TypeInformation} for the {@link DenseVector} type. */
-public class DenseVectorTypeInfo extends TypeInformation<DenseVector> {
+/** A {@link TypeInformation} for the {@link DenseIntDoubleVector} type. */
+public class DenseIntDoubleVectorTypeInfo extends TypeInformation<DenseIntDoubleVector> {
     private static final long serialVersionUID = 1L;
 
-    public static final DenseVectorTypeInfo INSTANCE = new DenseVectorTypeInfo();
+    public static final DenseIntDoubleVectorTypeInfo INSTANCE = new DenseIntDoubleVectorTypeInfo();
 
-    public DenseVectorTypeInfo() {}
+    public DenseIntDoubleVectorTypeInfo() {}
 
     @Override
     public int getArity() {
@@ -42,8 +42,8 @@ public class DenseVectorTypeInfo extends TypeInformation<DenseVector> {
     }
 
     @Override
-    public Class<DenseVector> getTypeClass() {
-        return DenseVector.class;
+    public Class<DenseIntDoubleVector> getTypeClass() {
+        return DenseIntDoubleVector.class;
     }
 
     @Override
@@ -62,8 +62,8 @@ public class DenseVectorTypeInfo extends TypeInformation<DenseVector> {
     }
 
     @Override
-    public TypeSerializer<DenseVector> createSerializer(ExecutionConfig executionConfig) {
-        return new DenseVectorSerializer();
+    public TypeSerializer<DenseIntDoubleVector> createSerializer(ExecutionConfig executionConfig) {
+        return new DenseIntDoubleVectorSerializer();
     }
 
     // --------------------------------------------------------------------------------------------
@@ -75,12 +75,12 @@ public class DenseVectorTypeInfo extends TypeInformation<DenseVector> {
 
     @Override
     public boolean equals(Object obj) {
-        return obj instanceof DenseVectorTypeInfo;
+        return obj instanceof DenseIntDoubleVectorTypeInfo;
     }
 
     @Override
     public boolean canEqual(Object obj) {
-        return obj instanceof DenseVectorTypeInfo;
+        return obj instanceof DenseIntDoubleVectorTypeInfo;
     }
 
     @Override

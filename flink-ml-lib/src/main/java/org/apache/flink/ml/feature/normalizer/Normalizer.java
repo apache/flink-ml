@@ -23,7 +23,7 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Transformer;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -95,8 +95,8 @@ public class Normalizer implements Transformer<Normalizer>, NormalizerParams<Nor
 
         @Override
         public Row map(Row row) throws Exception {
-            Vector inputVec = row.getFieldAs(inputCol);
-            Vector outputVec = inputVec.clone();
+            IntDoubleVector inputVec = row.getFieldAs(inputCol);
+            IntDoubleVector outputVec = inputVec.clone();
             double norm = BLAS.norm(inputVec, p);
             BLAS.scal(1.0 / norm, outputVec);
             return Row.join(row, Row.of(outputVec));

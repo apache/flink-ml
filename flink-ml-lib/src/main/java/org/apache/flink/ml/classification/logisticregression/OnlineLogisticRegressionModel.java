@@ -27,8 +27,8 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.datastream.TableUtils;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -76,7 +76,7 @@ public class OnlineLogisticRegressionModel
                         ArrayUtils.addAll(
                                 inputTypeInfo.getFieldTypes(),
                                 Types.DOUBLE,
-                                TypeInformation.of(DenseVector.class),
+                                TypeInformation.of(DenseIntDoubleVector.class),
                                 Types.LONG),
                         ArrayUtils.addAll(
                                 inputTypeInfo.getFieldNames(),
@@ -104,7 +104,7 @@ public class OnlineLogisticRegressionModel
 
         private final Map<Param<?>, Object> params;
         private ListState<Row> bufferedPointsState;
-        private DenseVector coefficient;
+        private DenseIntDoubleVector coefficient;
         private long modelDataVersion = 0L;
         private LogisticRegressionModelServable servable;
 
@@ -162,8 +162,9 @@ public class OnlineLogisticRegressionModel
                                 new LogisticRegressionModelData(coefficient, 0L));
                 ParamUtils.updateExistingParams(servable, params);
             }
-            Vector features = (Vector) dataPoint.getField(servable.getFeaturesCol());
-            Tuple2<Double, DenseVector> predictionResult = servable.transform(features);
+            IntDoubleVector features =
+                    (IntDoubleVector) dataPoint.getField(servable.getFeaturesCol());
+            Tuple2<Double, DenseIntDoubleVector> predictionResult = servable.transform(features);
 
             output.collect(
                     new StreamRecord<>(

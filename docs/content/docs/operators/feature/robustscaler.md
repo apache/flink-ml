@@ -87,7 +87,7 @@ Below are the parameters required by `RobustScalerModel`.
 ```java
 import org.apache.flink.ml.feature.robustscaler.RobustScaler;
 import org.apache.flink.ml.feature.robustscaler.RobustScalerModel;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;

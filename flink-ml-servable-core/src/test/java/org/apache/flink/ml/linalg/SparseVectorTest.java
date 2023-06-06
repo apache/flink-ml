@@ -20,7 +20,7 @@ package org.apache.flink.ml.linalg;
 
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
-import org.apache.flink.ml.linalg.typeinfo.SparseVectorSerializer;
+import org.apache.flink.ml.linalg.typeinfo.SparseIntDoubleVectorSerializer;
 
 import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.junit.Assert;
@@ -32,7 +32,7 @@ import java.io.IOException;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
-/** Tests the behavior of {@link SparseVector}. */
+/** Tests the behavior of {@link SparseIntDoubleVector}. */
 public class SparseVectorTest {
     private static final double TOLERANCE = 1e-7;
 
@@ -42,7 +42,7 @@ public class SparseVectorTest {
         int[] indices = new int[] {0, 2, 3};
         double[] values = new double[] {0.1, 0.3, 0.4};
 
-        SparseVector vector = Vectors.sparse(n, indices, values);
+        SparseIntDoubleVector vector = Vectors.sparse(n, indices, values);
         assertEquals(n, vector.n);
         assertArrayEquals(indices, vector.indices);
         assertArrayEquals(values, vector.values, 1e-5);
@@ -67,13 +67,13 @@ public class SparseVectorTest {
     @Test
     public void testAllZeroVector() {
         int n = 4;
-        SparseVector vector = Vectors.sparse(n, new int[0], new double[0]);
+        SparseIntDoubleVector vector = Vectors.sparse(n, new int[0], new double[0]);
         assertArrayEquals(vector.toArray(), new double[n], 1e-5);
     }
 
     @Test
     public void testUnsortedIndex() {
-        SparseVector vector;
+        SparseIntDoubleVector vector;
 
         vector = Vectors.sparse(4, new int[] {2}, new double[] {0.3});
         assertEquals(4, vector.n);
@@ -115,8 +115,8 @@ public class SparseVectorTest {
         int n = 4;
         int[] indices = new int[] {0, 2, 3};
         double[] values = new double[] {0.1, 0.3, 0.4};
-        SparseVector vector = Vectors.sparse(n, indices, values);
-        SparseVectorSerializer serializer = SparseVectorSerializer.INSTANCE;
+        SparseIntDoubleVector vector = Vectors.sparse(n, indices, values);
+        SparseIntDoubleVectorSerializer serializer = SparseIntDoubleVectorSerializer.INSTANCE;
 
         ByteArrayOutputStream bOutput = new ByteArrayOutputStream(1024);
         DataOutputViewStreamWrapper output = new DataOutputViewStreamWrapper(bOutput);
@@ -125,7 +125,7 @@ public class SparseVectorTest {
         byte[] b = bOutput.toByteArray();
         ByteArrayInputStream bInput = new ByteArrayInputStream(b);
         DataInputViewStreamWrapper input = new DataInputViewStreamWrapper(bInput);
-        SparseVector vector2 = serializer.deserialize(input);
+        SparseIntDoubleVector vector2 = serializer.deserialize(input);
 
         assertEquals(vector.n, vector2.n);
         assertArrayEquals(vector.indices, vector2.indices);
@@ -134,9 +134,9 @@ public class SparseVectorTest {
 
     @Test
     public void testClone() {
-        SparseVector sparseVec = Vectors.sparse(3, new int[] {0, 2}, new double[] {1, 3});
-        SparseVector clonedSparseVec = sparseVec.clone();
-        assertEquals(3, clonedSparseVec.size());
+        SparseIntDoubleVector sparseVec = Vectors.sparse(3, new int[] {0, 2}, new double[] {1, 3});
+        SparseIntDoubleVector clonedSparseVec = sparseVec.clone();
+        assertEquals(3, clonedSparseVec.size().intValue());
         assertArrayEquals(clonedSparseVec.indices, new int[] {0, 2});
         assertArrayEquals(clonedSparseVec.values, new double[] {1, 3}, TOLERANCE);
 
@@ -150,7 +150,7 @@ public class SparseVectorTest {
 
     @Test
     public void testGetAndSet() {
-        SparseVector sparseVec = Vectors.sparse(4, new int[] {2}, new double[] {0.3});
+        SparseIntDoubleVector sparseVec = Vectors.sparse(4, new int[] {2}, new double[] {0.3});
         assertEquals(0, sparseVec.get(0), TOLERANCE);
         assertEquals(0.3, sparseVec.get(2), TOLERANCE);
 

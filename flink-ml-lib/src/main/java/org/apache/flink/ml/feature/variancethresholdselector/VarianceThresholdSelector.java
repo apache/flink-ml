@@ -26,9 +26,10 @@ import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -80,8 +81,8 @@ public class VarianceThresholdSelector
                         new VarianceThresholdSelectorAggregator(getVarianceThreshold()),
                         Types.TUPLE(
                                 Types.LONG,
-                                DenseVectorTypeInfo.INSTANCE,
-                                DenseVectorTypeInfo.INSTANCE),
+                                DenseIntDoubleVectorTypeInfo.INSTANCE,
+                                DenseIntDoubleVectorTypeInfo.INSTANCE),
                         TypeInformation.of(VarianceThresholdSelectorModelData.class));
 
         VarianceThresholdSelectorModel model =
@@ -97,7 +98,7 @@ public class VarianceThresholdSelector
     private static class VarianceThresholdSelectorAggregator
             implements AggregateFunction<
                     Vector,
-                    Tuple3<Long, DenseVector, DenseVector>,
+                    Tuple3<Long, DenseIntDoubleVector, DenseIntDoubleVector>,
                     VarianceThresholdSelectorModelData> {
 
         private final double varianceThreshold;
@@ -107,31 +108,36 @@ public class VarianceThresholdSelector
         }
 
         @Override
-        public Tuple3<Long, DenseVector, DenseVector> createAccumulator() {
-            return Tuple3.of(0L, new DenseVector(new double[0]), new DenseVector(new double[0]));
+        public Tuple3<Long, DenseIntDoubleVector, DenseIntDoubleVector> createAccumulator() {
+            return Tuple3.of(
+                    0L,
+                    new DenseIntDoubleVector(new double[0]),
+                    new DenseIntDoubleVector(new double[0]));
         }
 
         @Override
-        public Tuple3<Long, DenseVector, DenseVector> add(
-                Vector vector, Tuple3<Long, DenseVector, DenseVector> numAndSums) {
+        public Tuple3<Long, DenseIntDoubleVector, DenseIntDoubleVector> add(
+                Vector vector,
+                Tuple3<Long, DenseIntDoubleVector, DenseIntDoubleVector> numAndSums) {
+            IntDoubleVector intDoubleVector = (IntDoubleVector) vector;
             if (numAndSums.f0 == 0) {
-                numAndSums.f1 = new DenseVector(vector.size());
-                numAndSums.f2 = new DenseVector(vector.size());
+                numAndSums.f1 = new DenseIntDoubleVector(intDoubleVector.size());
+                numAndSums.f2 = new DenseIntDoubleVector(intDoubleVector.size());
             }
             numAndSums.f0 += 1L;
-            BLAS.axpy(1.0, vector, numAndSums.f1);
-            for (int i = 0; i < vector.size(); i++) {
-                numAndSums.f2.values[i] += vector.get(i) * vector.get(i);
+            BLAS.axpy(1.0, intDoubleVector, numAndSums.f1);
+            for (int i = 0; i < intDoubleVector.size(); i++) {
+                numAndSums.f2.values[i] += intDoubleVector.get(i) * intDoubleVector.get(i);
             }
             return numAndSums;
         }
 
         @Override
         public VarianceThresholdSelectorModelData getResult(
-                Tuple3<Long, DenseVector, DenseVector> numAndSums) {
+                Tuple3<Long, DenseIntDoubleVector, DenseIntDoubleVector> numAndSums) {
             long numRows = numAndSums.f0;
-            DenseVector sumVector = numAndSums.f1;
-            DenseVector squareSumVector = numAndSums.f2;
+            DenseIntDoubleVector sumVector = numAndSums.f1;
+            DenseIntDoubleVector squareSumVector = numAndSums.f2;
             Preconditions.checkState(numRows > 0, "The training set is empty.");
 
             int[] indices =
@@ -149,9 +155,9 @@ public class VarianceThresholdSelector
         }
 
         @Override
-        public Tuple3<Long, DenseVector, DenseVector> merge(
-                Tuple3<Long, DenseVector, DenseVector> numAndSums1,
-                Tuple3<Long, DenseVector, DenseVector> acc) {
+        public Tuple3<Long, DenseIntDoubleVector, DenseIntDoubleVector> merge(
+                Tuple3<Long, DenseIntDoubleVector, DenseIntDoubleVector> numAndSums1,
+                Tuple3<Long, DenseIntDoubleVector, DenseIntDoubleVector> acc) {
             if (numAndSums1.f0 == 0) {
                 return acc;
             }

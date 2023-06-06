@@ -22,7 +22,7 @@ import org.apache.flink.annotation.Internal;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegression;
 import org.apache.flink.ml.common.feature.LabeledPointWithWeight;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 
 /** The loss function for binary logistic loss. See {@link LogisticRegression} for example. */
 @Internal
@@ -32,7 +32,7 @@ public class BinaryLogisticLoss implements LossFunc {
     private BinaryLogisticLoss() {}
 
     @Override
-    public double computeLoss(LabeledPointWithWeight dataPoint, DenseVector coefficient) {
+    public double computeLoss(LabeledPointWithWeight dataPoint, DenseIntDoubleVector coefficient) {
         double dot = BLAS.dot(dataPoint.getFeatures(), coefficient);
         double labelScaled = 2 * dataPoint.getLabel() - 1;
         return dataPoint.getWeight() * Math.log(1 + Math.exp(-dot * labelScaled));
@@ -40,7 +40,9 @@ public class BinaryLogisticLoss implements LossFunc {
 
     @Override
     public void computeGradient(
-            LabeledPointWithWeight dataPoint, DenseVector coefficient, DenseVector cumGradient) {
+            LabeledPointWithWeight dataPoint,
+            DenseIntDoubleVector coefficient,
+            DenseIntDoubleVector cumGradient) {
         double dot = BLAS.dot(dataPoint.getFeatures(), coefficient);
         double labelScaled = 2 * dataPoint.getLabel() - 1;
         double multiplier =

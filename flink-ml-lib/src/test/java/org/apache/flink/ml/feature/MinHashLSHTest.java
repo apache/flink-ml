@@ -21,9 +21,9 @@ package org.apache.flink.ml.feature;
 import org.apache.flink.ml.feature.lsh.MinHashLSH;
 import org.apache.flink.ml.feature.lsh.MinHashLSHModel;
 import org.apache.flink.ml.feature.lsh.MinHashLSHModelData;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
@@ -90,10 +90,10 @@ public class MinHashLSHTest extends AbstractTestBase {
         return arrays.stream()
                 .map(
                         array -> {
-                            DenseVector[] denseVectors =
+                            DenseIntDoubleVector[] denseVectors =
                                     Arrays.stream(array)
                                             .map(Vectors::dense)
-                                            .toArray(DenseVector[]::new);
+                                            .toArray(DenseIntDoubleVector[]::new);
                             return Row.of((Object) denseVectors);
                         })
                 .collect(Collectors.toList());
@@ -133,7 +133,7 @@ public class MinHashLSHTest extends AbstractTestBase {
         Schema schema =
                 Schema.newBuilder()
                         .column("f0", DataTypes.INT())
-                        .column("f1", DataTypes.of(SparseVector.class))
+                        .column("f1", DataTypes.of(SparseIntDoubleVector.class))
                         .build();
         DataStream<Row> dataStream = env.fromCollection(inputRows);
 
@@ -144,8 +144,9 @@ public class MinHashLSHTest extends AbstractTestBase {
     public void testHashFunction() {
         MinHashLSHModelData lshModelData =
                 new MinHashLSHModelData(3, 1, new int[] {0, 1, 3}, new int[] {1, 2, 0});
-        Vector vec = Vectors.sparse(10, new int[] {2, 3, 5, 7}, new double[] {1., 1., 1., 1.});
-        DenseVector[] result = lshModelData.hashFunction(vec);
+        IntDoubleVector vec =
+                Vectors.sparse(10, new int[] {2, 3, 5, 7}, new double[] {1., 1., 1., 1.});
+        DenseIntDoubleVector[] result = lshModelData.hashFunction(vec);
         Assert.assertEquals(3, result.length);
         Assert.assertEquals(Vectors.dense(1.), result[0]);
         Assert.assertEquals(Vectors.dense(5.), result[1]);
@@ -158,9 +159,10 @@ public class MinHashLSHTest extends AbstractTestBase {
         // least non-zero index.
         MinHashLSHModelData lshModelData = MinHashLSHModelData.generateModelData(3, 1, 10, 2022L);
         new MinHashLSHModelData(3, 1, new int[] {0, 1, 3}, new int[] {1, 2, 0});
-        Vector vec = Vectors.sparse(10, new int[] {2, 3, 5, 7}, new double[] {1., 1., 1., 1.});
-        DenseVector[] denseResults = lshModelData.hashFunction(vec.toDense());
-        DenseVector[] sparseResults = lshModelData.hashFunction(vec.toSparse());
+        IntDoubleVector vec =
+                Vectors.sparse(10, new int[] {2, 3, 5, 7}, new double[] {1., 1., 1., 1.});
+        DenseIntDoubleVector[] denseResults = lshModelData.hashFunction(vec.toDense());
+        DenseIntDoubleVector[] sparseResults = lshModelData.hashFunction(vec.toSparse());
         Assert.assertArrayEquals(denseResults, sparseResults);
     }
 
@@ -168,7 +170,7 @@ public class MinHashLSHTest extends AbstractTestBase {
     public void testHashFunctionWithEmptyVector() {
         MinHashLSHModelData lshModelData =
                 new MinHashLSHModelData(3, 1, new int[] {0, 1, 3}, new int[] {1, 2, 0});
-        Vector vec = Vectors.sparse(10, new int[] {}, new double[] {});
+        IntDoubleVector vec = Vectors.sparse(10, new int[] {}, new double[] {});
         lshModelData.hashFunction(vec);
     }
 
@@ -375,7 +377,7 @@ public class MinHashLSHTest extends AbstractTestBase {
         MinHashLSHModel lshModel = lsh.fit(inputTable);
         List<Row> expected = Arrays.asList(Row.of(0, .75), Row.of(1, .75));
 
-        Vector key = Vectors.sparse(6, new int[] {1, 3}, new double[] {1.0, 1.0});
+        IntDoubleVector key = Vectors.sparse(6, new int[] {1, 3}, new double[] {1.0, 1.0});
         Table output =
                 lshModel.approxNearestNeighbors(inputTable, key, 2).select($("id"), $("distCol"));
         List<Row> results = IteratorUtils.toList(output.execute().collect());
@@ -408,7 +410,7 @@ public class MinHashLSHTest extends AbstractTestBase {
         Schema schema =
                 Schema.newBuilder()
                         .column("f0", DataTypes.INT())
-                        .column("f1", DataTypes.of(SparseVector.class))
+                        .column("f1", DataTypes.of(SparseIntDoubleVector.class))
                         .build();
         Table dataB = tEnv.fromDataStream(env.fromCollection(inputRowsB), schema).as("id", "vec");
 
@@ -426,9 +428,9 @@ public class MinHashLSHTest extends AbstractTestBase {
                         .thenComparingDouble(r -> r.getFieldAs(2)));
     }
 
-    private static class DenseVectorArrayComparator implements Comparator<DenseVector[]> {
+    private static class DenseVectorArrayComparator implements Comparator<DenseIntDoubleVector[]> {
         @Override
-        public int compare(DenseVector[] o1, DenseVector[] o2) {
+        public int compare(DenseIntDoubleVector[] o1, DenseIntDoubleVector[] o2) {
             if (o1.length != o2.length) {
                 return o1.length - o2.length;
             }

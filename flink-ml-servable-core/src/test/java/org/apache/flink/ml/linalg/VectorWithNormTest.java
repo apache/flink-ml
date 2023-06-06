@@ -26,12 +26,13 @@ import static org.junit.Assert.assertEquals;
 public class VectorWithNormTest {
     @Test
     public void testL2Norm() {
-        DenseVector denseVector = Vectors.dense(1, 2, 3);
+        DenseIntDoubleVector denseVector = Vectors.dense(1, 2, 3);
         VectorWithNorm denseVectorWithNorm = new VectorWithNorm(denseVector);
         assertEquals(denseVector, denseVectorWithNorm.vector);
         assertEquals(Math.sqrt(14), denseVectorWithNorm.l2Norm, 1e-7);
 
-        SparseVector sparseVector = Vectors.sparse(5, new int[] {0, 2, 4}, new double[] {1, 2, 3});
+        SparseIntDoubleVector sparseVector =
+                Vectors.sparse(5, new int[] {0, 2, 4}, new double[] {1, 2, 3});
         VectorWithNorm sparseVectorWithNorm = new VectorWithNorm(sparseVector);
         assertEquals(sparseVector, sparseVectorWithNorm.vector);
         assertEquals(Math.sqrt(14), sparseVectorWithNorm.l2Norm, 1e-7);

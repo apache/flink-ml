@@ -18,6 +18,7 @@
 
 package org.apache.flink.ml.examples;
 
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
@@ -54,7 +55,7 @@ public class VectorToArrayExample {
         // Extracts and displays the results.
         for (CloseableIterator<Row> it = outputTable.execute().collect(); it.hasNext(); ) {
             Row row = it.next();
-            Vector vector = row.getFieldAs("vector");
+            IntDoubleVector vector = row.getFieldAs("vector");
             Double[] doubleArray = row.getFieldAs("array");
             System.out.printf(
                     "Input vector: %s\tOutput double array: %s\n",

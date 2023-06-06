@@ -19,7 +19,7 @@
 package org.apache.flink.ml.examples.feature;
 
 import org.apache.flink.ml.feature.normalizer.Normalizer;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -52,9 +52,9 @@ public class NormalizerExample {
         for (CloseableIterator<Row> it = outputTable.execute().collect(); it.hasNext(); ) {
             Row row = it.next();
 
-            Vector inputValue = (Vector) row.getField(normalizer.getInputCol());
+            IntDoubleVector inputValue = (IntDoubleVector) row.getField(normalizer.getInputCol());
 
-            Vector outputValue = (Vector) row.getField(normalizer.getOutputCol());
+            IntDoubleVector outputValue = (IntDoubleVector) row.getField(normalizer.getOutputCol());
 
             System.out.printf("Input Value: %s \tOutput Value: %s\n", inputValue, outputValue);
         }

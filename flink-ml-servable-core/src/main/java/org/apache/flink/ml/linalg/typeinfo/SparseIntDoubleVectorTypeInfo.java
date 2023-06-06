@@ -22,11 +22,12 @@ package org.apache.flink.ml.linalg.typeinfo;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 
-/** A {@link TypeInformation} for the {@link SparseVector} type. */
-public class SparseVectorTypeInfo extends TypeInformation<SparseVector> {
-    public static final SparseVectorTypeInfo INSTANCE = new SparseVectorTypeInfo();
+/** A {@link TypeInformation} for the {@link SparseIntDoubleVector} type. */
+public class SparseIntDoubleVectorTypeInfo extends TypeInformation<SparseIntDoubleVector> {
+    public static final SparseIntDoubleVectorTypeInfo INSTANCE =
+            new SparseIntDoubleVectorTypeInfo();
 
     @Override
     public boolean isBasicType() {
@@ -49,8 +50,8 @@ public class SparseVectorTypeInfo extends TypeInformation<SparseVector> {
     }
 
     @Override
-    public Class<SparseVector> getTypeClass() {
-        return SparseVector.class;
+    public Class<SparseIntDoubleVector> getTypeClass() {
+        return SparseIntDoubleVector.class;
     }
 
     @Override
@@ -59,8 +60,8 @@ public class SparseVectorTypeInfo extends TypeInformation<SparseVector> {
     }
 
     @Override
-    public TypeSerializer<SparseVector> createSerializer(ExecutionConfig executionConfig) {
-        return SparseVectorSerializer.INSTANCE;
+    public TypeSerializer<SparseIntDoubleVector> createSerializer(ExecutionConfig executionConfig) {
+        return SparseIntDoubleVectorSerializer.INSTANCE;
     }
 
     @Override
@@ -70,7 +71,7 @@ public class SparseVectorTypeInfo extends TypeInformation<SparseVector> {
 
     @Override
     public boolean equals(Object obj) {
-        return obj instanceof SparseVectorTypeInfo;
+        return obj instanceof SparseIntDoubleVectorTypeInfo;
     }
 
     @Override
@@ -80,6 +81,6 @@ public class SparseVectorTypeInfo extends TypeInformation<SparseVector> {
 
     @Override
     public boolean canEqual(Object obj) {
-        return obj instanceof SparseVectorTypeInfo;
+        return obj instanceof SparseIntDoubleVectorTypeInfo;
     }
 }

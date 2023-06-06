@@ -16,26 +16,26 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.linalg.typeinfo;
+package org.apache.flink.ml.linalg;
 
-import org.apache.flink.api.common.typeinfo.TypeInfoFactory;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.api.java.typeutils.TypeExtractor;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.api.common.typeinfo.TypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfoFactory;
 
-import java.lang.reflect.Type;
-import java.util.Map;
-
-/**
- * Used by {@link TypeExtractor} to create a {@link TypeInformation} for implementations of {@link
- * DenseVector}.
- */
-public class DenseVectorTypeInfoFactory extends TypeInfoFactory<DenseVector> {
+/** A vector with int as keys and double as values. */
+@TypeInfo(VectorTypeInfoFactory.class)
+@PublicEvolving
+public interface IntDoubleVector extends Vector<Integer, Double> {
 
     @Override
-    public TypeInformation<DenseVector> createTypeInfo(
-            Type t, Map<String, TypeInformation<?>> genericParameters) {
+    double[] toArray();
 
-        return new DenseVectorTypeInfo();
-    }
+    @Override
+    DenseIntDoubleVector toDense();
+
+    @Override
+    SparseIntDoubleVector toSparse();
+
+    @Override
+    IntDoubleVector clone();
 }

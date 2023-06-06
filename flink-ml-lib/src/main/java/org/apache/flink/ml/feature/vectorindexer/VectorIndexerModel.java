@@ -24,7 +24,7 @@ import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.common.param.HasHandleInvalid;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -149,7 +149,7 @@ public class VectorIndexerModel
                 categoryMaps = modelData.categoryMaps;
             }
 
-            Vector outputVector = ((Vector) input.getField(inputCol)).clone();
+            IntDoubleVector outputVector = ((IntDoubleVector) input.getField(inputCol)).clone();
             for (Map.Entry<Integer, Map<Double, Integer>> entry : categoryMaps.entrySet()) {
                 int columnId = entry.getKey();
                 Map<Double, Integer> mapping = entry.getValue();
@@ -158,7 +158,7 @@ public class VectorIndexerModel
                 if (categoricalFeature == null) {
                     return;
                 } else {
-                    outputVector.set(columnId, categoricalFeature);
+                    outputVector.set(columnId, (double) categoricalFeature);
                 }
             }
 

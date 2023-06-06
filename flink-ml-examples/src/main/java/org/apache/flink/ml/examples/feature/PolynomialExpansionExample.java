@@ -19,7 +19,7 @@
 package org.apache.flink.ml.examples.feature;
 
 import org.apache.flink.ml.feature.polynomialexpansion.PolynomialExpansion;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -56,9 +56,11 @@ public class PolynomialExpansionExample {
         for (CloseableIterator<Row> it = outputTable.execute().collect(); it.hasNext(); ) {
             Row row = it.next();
 
-            Vector inputValue = (Vector) row.getField(polynomialExpansion.getInputCol());
+            IntDoubleVector inputValue =
+                    (IntDoubleVector) row.getField(polynomialExpansion.getInputCol());
 
-            Vector outputValue = (Vector) row.getField(polynomialExpansion.getOutputCol());
+            IntDoubleVector outputValue =
+                    (IntDoubleVector) row.getField(polynomialExpansion.getOutputCol());
 
             System.out.printf("Input Value: %s \tOutput Value: %s\n", inputValue, outputValue);
         }

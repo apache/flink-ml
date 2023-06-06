@@ -35,7 +35,7 @@ import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.api.AlgoOperator;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -659,8 +659,8 @@ public class BinaryClassificationEvaluator
             double label = ((Number) value.getFieldAs(labelCol)).doubleValue();
             Object probOrigin = value.getField(rawPredictionCol);
             double prob =
-                    probOrigin instanceof Vector
-                            ? ((Vector) probOrigin).get(1)
+                    probOrigin instanceof IntDoubleVector
+                            ? ((IntDoubleVector) probOrigin).get(1)
                             : ((Number) probOrigin).doubleValue();
             double weight =
                     weightCol == null ? 1.0 : ((Number) value.getField(weightCol)).doubleValue();

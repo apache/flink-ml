@@ -19,7 +19,7 @@
 package org.apache.flink.ml.common.lossfunc;
 
 import org.apache.flink.ml.common.feature.LabeledPointWithWeight;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 
 import org.junit.Test;
@@ -33,8 +33,8 @@ public class HingeLossTest {
             new LabeledPointWithWeight(Vectors.dense(1.0, -1.0, -1.0), 1.0, 2.0);
     private static final LabeledPointWithWeight dataPoint2 =
             new LabeledPointWithWeight(Vectors.dense(1.0, -1.0, 1.0), 1.0, 2.0);
-    private static final DenseVector coefficient = Vectors.dense(1.0, 1.0, 1.0);
-    private static final DenseVector cumGradient = Vectors.dense(0.0, 0.0, 0.0);
+    private static final DenseIntDoubleVector coefficient = Vectors.dense(1.0, 1.0, 1.0);
+    private static final DenseIntDoubleVector cumGradient = Vectors.dense(0.0, 0.0, 0.0);
     private static final double TOLERANCE = 1e-7;
 
     @Test

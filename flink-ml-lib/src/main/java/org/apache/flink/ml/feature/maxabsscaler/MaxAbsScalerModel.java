@@ -24,8 +24,8 @@ import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -132,7 +132,7 @@ public class MaxAbsScalerModel
     private static class PredictOutputFunction extends RichMapFunction<Row, Row> {
         private final String inputCol;
         private final String broadcastKey;
-        private DenseVector scaleVector;
+        private DenseIntDoubleVector scaleVector;
 
         public PredictOutputFunction(String broadcastKey, String inputCol) {
             this.broadcastKey = broadcastKey;
@@ -156,8 +156,8 @@ public class MaxAbsScalerModel
                 }
             }
 
-            Vector inputVec = row.getFieldAs(inputCol);
-            Vector outputVec = inputVec.clone();
+            IntDoubleVector inputVec = row.getFieldAs(inputCol);
+            IntDoubleVector outputVec = inputVec.clone();
             BLAS.hDot(scaleVector, outputVec);
             return Row.join(row, Row.of(outputVec));
         }

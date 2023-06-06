@@ -22,7 +22,7 @@ import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Transformer;
 import org.apache.flink.ml.common.datastream.TableUtils;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -137,7 +137,7 @@ public class FeatureHasher
                 values[pos] = entry.getValue();
                 pos++;
             }
-            return Row.join(row, Row.of(new SparseVector(numFeatures, indices, values)));
+            return Row.join(row, Row.of(new SparseIntDoubleVector(numFeatures, indices, values)));
         }
     }
 

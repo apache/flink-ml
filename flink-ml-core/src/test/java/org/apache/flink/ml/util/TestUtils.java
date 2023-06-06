@@ -34,9 +34,9 @@ import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.api.Stage;
 import org.apache.flink.ml.api.Transformer;
 import org.apache.flink.ml.common.datastream.TableUtils;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vector;
-import org.apache.flink.ml.linalg.typeinfo.SparseVectorTypeInfo;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
+import org.apache.flink.ml.linalg.typeinfo.SparseIntDoubleVectorTypeInfo;
 import org.apache.flink.ml.servable.api.DataFrame;
 import org.apache.flink.ml.servable.api.TransformerServable;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -253,8 +253,8 @@ public class TestUtils {
         RowTypeInfo inputTypeInfo = TableUtils.getRowTypeInfo(table.getResolvedSchema());
         TypeInformation<?>[] fieldTypes = inputTypeInfo.getFieldTypes();
         for (int i = 0; i < fieldTypes.length; i++) {
-            if (fieldTypes[i].getTypeClass().equals(DenseVector.class)) {
-                fieldTypes[i] = SparseVectorTypeInfo.INSTANCE;
+            if (fieldTypes[i].getTypeClass().equals(DenseIntDoubleVector.class)) {
+                fieldTypes[i] = SparseIntDoubleVectorTypeInfo.INSTANCE;
             } else if (fieldTypes[i].getTypeClass().equals(Double.class)) {
                 fieldTypes[i] = Types.INT;
             }
@@ -273,8 +273,8 @@ public class TestUtils {
                                 int arity = row.getArity();
                                 for (int i = 0; i < arity; i++) {
                                     Object obj = row.getField(i);
-                                    if (obj instanceof Vector) {
-                                        row.setField(i, ((Vector) obj).toSparse());
+                                    if (obj instanceof IntDoubleVector) {
+                                        row.setField(i, ((IntDoubleVector) obj).toSparse());
                                     } else if (obj instanceof Number) {
                                         row.setField(i, ((Number) obj).intValue());
                                     }
@@ -294,8 +294,8 @@ public class TestUtils {
     }
 
     /** Note: this comparator imposes orderings that are inconsistent with equals. */
-    public static int compare(Vector first, Vector second) {
-        if (first.size() != second.size()) {
+    public static int compare(IntDoubleVector first, IntDoubleVector second) {
+        if (first.size().intValue() != second.size().intValue()) {
             return Integer.compare(first.size(), second.size());
         } else {
             for (int i = 0; i < first.size(); i++) {

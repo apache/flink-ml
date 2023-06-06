@@ -20,36 +20,36 @@ package org.apache.flink.ml.linalg;
 
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.common.typeinfo.TypeInfo;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfoFactory;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfoFactory;
 
 import java.util.Arrays;
 
-/** A dense vector of double values. */
-@TypeInfo(DenseVectorTypeInfoFactory.class)
+/** A dense vector with int as keys and double as values. */
+@TypeInfo(DenseIntDoubleVectorTypeInfoFactory.class)
 @PublicEvolving
-public class DenseVector implements Vector {
+public class DenseIntDoubleVector implements IntDoubleVector {
     public final double[] values;
 
-    public DenseVector(double[] values) {
+    public DenseIntDoubleVector(double[] values) {
         this.values = values;
     }
 
-    public DenseVector(int size) {
+    public DenseIntDoubleVector(int size) {
         this.values = new double[size];
     }
 
     @Override
-    public int size() {
+    public Integer size() {
         return values.length;
     }
 
     @Override
-    public double get(int i) {
+    public Double get(Integer i) {
         return values[i];
     }
 
     @Override
-    public void set(int i, double value) {
+    public void set(Integer i, Double value) {
         values[i] = value;
     }
 
@@ -59,12 +59,12 @@ public class DenseVector implements Vector {
     }
 
     @Override
-    public DenseVector toDense() {
+    public DenseIntDoubleVector toDense() {
         return this;
     }
 
     @Override
-    public SparseVector toSparse() {
+    public SparseIntDoubleVector toSparse() {
         int numNonZeros = 0;
         for (double value : values) {
             if (value != 0.0) {
@@ -84,7 +84,7 @@ public class DenseVector implements Vector {
             k++;
         }
 
-        return new SparseVector(size(), nonZeroIndices, numZeroValues);
+        return new SparseIntDoubleVector(size(), nonZeroIndices, numZeroValues);
     }
 
     @Override
@@ -94,10 +94,10 @@ public class DenseVector implements Vector {
 
     @Override
     public boolean equals(Object obj) {
-        if (!(obj instanceof DenseVector)) {
+        if (!(obj instanceof DenseIntDoubleVector)) {
             return false;
         }
-        return Arrays.equals(values, ((DenseVector) obj).values);
+        return Arrays.equals(values, ((DenseIntDoubleVector) obj).values);
     }
 
     @Override
@@ -106,7 +106,7 @@ public class DenseVector implements Vector {
     }
 
     @Override
-    public DenseVector clone() {
-        return new DenseVector(values.clone());
+    public DenseIntDoubleVector clone() {
+        return new DenseIntDoubleVector(values.clone());
     }
 }

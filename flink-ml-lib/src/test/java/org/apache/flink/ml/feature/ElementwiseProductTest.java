@@ -19,8 +19,8 @@
 package org.apache.flink.ml.feature;
 
 import org.apache.flink.ml.feature.elementwiseproduct.ElementwiseProduct;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -90,28 +90,30 @@ public class ElementwiseProductTest extends AbstractTestBase {
         for (Row result : results) {
             if (result.getField(0) == (Object) 0) {
                 if (isSparse) {
-                    SparseVector sparseVector = (SparseVector) result.getField(outputCol);
-                    assertEquals(EXPECTED_OUTPUT_SPARSE_VEC_SIZE_1, sparseVector.size());
+                    SparseIntDoubleVector sparseVector =
+                            (SparseIntDoubleVector) result.getField(outputCol);
+                    assertEquals(EXPECTED_OUTPUT_SPARSE_VEC_SIZE_1, sparseVector.size().intValue());
                     assertArrayEquals(EXPECTED_OUTPUT_SPARSE_VEC_INDICES_1, sparseVector.indices);
                     assertArrayEquals(
                             EXPECTED_OUTPUT_SPARSE_VEC_VALUES_1, sparseVector.values, 1.0e-5);
                 } else {
                     assertArrayEquals(
                             EXPECTED_OUTPUT_DENSE_VEC_ARRAY_1,
-                            ((DenseVector) result.getField(outputCol)).values,
+                            ((DenseIntDoubleVector) result.getField(outputCol)).values,
                             1.0e-5);
                 }
             } else if (result.getField(0) == (Object) 1) {
                 if (isSparse) {
-                    SparseVector sparseVector = (SparseVector) result.getField(outputCol);
-                    assertEquals(EXPECTED_OUTPUT_SPARSE_VEC_SIZE_2, sparseVector.size());
+                    SparseIntDoubleVector sparseVector =
+                            (SparseIntDoubleVector) result.getField(outputCol);
+                    assertEquals(EXPECTED_OUTPUT_SPARSE_VEC_SIZE_2, sparseVector.size().intValue());
                     assertArrayEquals(EXPECTED_OUTPUT_SPARSE_VEC_INDICES_2, sparseVector.indices);
                     assertArrayEquals(
                             EXPECTED_OUTPUT_SPARSE_VEC_VALUES_2, sparseVector.values, 1.0e-5);
                 } else {
                     assertArrayEquals(
                             EXPECTED_OUTPUT_DENSE_VEC_ARRAY_2,
-                            ((DenseVector) result.getField(outputCol)).values,
+                            ((DenseIntDoubleVector) result.getField(outputCol)).values,
                             1.0e-5);
                 }
             } else if (result.getField(0) == (Object) 2) {

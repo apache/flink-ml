@@ -22,7 +22,7 @@ import org.apache.flink.annotation.Internal;
 import org.apache.flink.ml.classification.linearsvc.LinearSVC;
 import org.apache.flink.ml.common.feature.LabeledPointWithWeight;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 
 /**
  * The loss function for hinge loss. See {@link LinearSVC} for example.
@@ -36,7 +36,7 @@ public class HingeLoss implements LossFunc {
     private HingeLoss() {}
 
     @Override
-    public double computeLoss(LabeledPointWithWeight dataPoint, DenseVector coefficient) {
+    public double computeLoss(LabeledPointWithWeight dataPoint, DenseIntDoubleVector coefficient) {
         double dot = BLAS.dot(dataPoint.getFeatures(), coefficient);
         double labelScaled = 2 * dataPoint.getLabel() - 1;
         return dataPoint.getWeight() * Math.max(0, 1 - labelScaled * dot);
@@ -44,7 +44,9 @@ public class HingeLoss implements LossFunc {
 
     @Override
     public void computeGradient(
-            LabeledPointWithWeight dataPoint, DenseVector coefficient, DenseVector cumGradient) {
+            LabeledPointWithWeight dataPoint,
+            DenseIntDoubleVector coefficient,
+            DenseIntDoubleVector cumGradient) {
         double dot = BLAS.dot(dataPoint.getFeatures(), coefficient);
         double labelScaled = 2 * dataPoint.getLabel() - 1;
         if (1 - labelScaled * dot > 0) {

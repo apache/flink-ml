@@ -20,7 +20,7 @@ package org.apache.flink.ml.examples.clustering;
 
 import org.apache.flink.ml.clustering.kmeans.KMeans;
 import org.apache.flink.ml.clustering.kmeans.KMeansModel;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -36,7 +36,7 @@ public class KMeansExample {
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         // Generates input data.
-        DataStream<DenseVector> inputStream =
+        DataStream<DenseIntDoubleVector> inputStream =
                 env.fromElements(
                         Vectors.dense(0.0, 0.0),
                         Vectors.dense(0.0, 0.3),
@@ -58,7 +58,8 @@ public class KMeansExample {
         // Extracts and displays the results.
         for (CloseableIterator<Row> it = outputTable.execute().collect(); it.hasNext(); ) {
             Row row = it.next();
-            DenseVector features = (DenseVector) row.getField(kmeans.getFeaturesCol());
+            DenseIntDoubleVector features =
+                    (DenseIntDoubleVector) row.getField(kmeans.getFeaturesCol());
             int clusterId = (Integer) row.getField(kmeans.getPredictionCol());
             System.out.printf("Features: %s \tCluster ID: %s\n", features, clusterId);
         }

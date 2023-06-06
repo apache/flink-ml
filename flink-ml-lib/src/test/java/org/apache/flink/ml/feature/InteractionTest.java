@@ -19,9 +19,9 @@
 package org.apache.flink.ml.feature;
 
 import org.apache.flink.ml.feature.interaction.Interaction;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -63,20 +63,20 @@ public class InteractionTest extends AbstractTestBase {
                             Vectors.sparse(17, new int[] {0, 2, 14}, new double[] {5.0, 4.0, 1.0})),
                     Row.of(3, null, null, null));
 
-    private static final List<Vector> EXPECTED_DENSE_OUTPUT =
+    private static final List<IntDoubleVector> EXPECTED_DENSE_OUTPUT =
             Arrays.asList(
-                    new DenseVector(new double[] {3.0, 4.0, 6.0, 8.0}),
-                    new DenseVector(new double[] {12.0, 16.0, 20.0, 48.0, 64.0, 80.0}));
+                    new DenseIntDoubleVector(new double[] {3.0, 4.0, 6.0, 8.0}),
+                    new DenseIntDoubleVector(new double[] {12.0, 16.0, 20.0, 48.0, 64.0, 80.0}));
 
-    private static final List<Vector> EXPECTED_SPARSE_OUTPUT =
+    private static final List<IntDoubleVector> EXPECTED_SPARSE_OUTPUT =
             Arrays.asList(
-                    new SparseVector(
+                    new SparseIntDoubleVector(
                             68,
                             new int[] {0, 3, 9, 17, 20, 26, 34, 37, 43, 51, 54, 60},
                             new double[] {
                                 3.0, 6.0, 21.0, 4.0, 8.0, 28.0, 6.0, 12.0, 42.0, 8.0, 16.0, 56.0
                             }),
-                    new SparseVector(
+                    new SparseIntDoubleVector(
                             102,
                             new int[] {
                                 0, 2, 14, 17, 19, 31, 34, 36, 48, 51, 53, 65, 68, 70, 82, 85, 87, 99
@@ -94,14 +94,14 @@ public class InteractionTest extends AbstractTestBase {
         inputDataTable = tEnv.fromDataStream(dataStream).as("f0", "f1", "f2", "f3");
     }
 
-    private void verifyOutputResult(Table output, String outputCol, List<Vector> expectedData)
-            throws Exception {
+    private void verifyOutputResult(
+            Table output, String outputCol, List<IntDoubleVector> expectedData) throws Exception {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) output).getTableEnvironment();
         DataStream<Row> stream = tEnv.toDataStream(output);
 
         List<Row> results = IteratorUtils.toList(stream.executeAndCollect());
-        List<Vector> resultVec = new ArrayList<>(results.size());
+        List<IntDoubleVector> resultVec = new ArrayList<>(results.size());
         for (Row row : results) {
             if (row.getField(outputCol) != null) {
                 resultVec.add(row.getFieldAs(outputCol));

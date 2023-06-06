@@ -21,7 +21,7 @@ package org.apache.flink.ml.examples.clustering;
 import org.apache.flink.ml.clustering.agglomerativeclustering.AgglomerativeClustering;
 import org.apache.flink.ml.clustering.agglomerativeclustering.AgglomerativeClusteringParams;
 import org.apache.flink.ml.common.distance.EuclideanDistanceMeasure;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -37,7 +37,7 @@ public class AgglomerativeClusteringExample {
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         // Generates input data.
-        DataStream<DenseVector> inputStream =
+        DataStream<DenseIntDoubleVector> inputStream =
                 env.fromElements(
                         Vectors.dense(1, 1),
                         Vectors.dense(1, 4),
@@ -61,8 +61,8 @@ public class AgglomerativeClusteringExample {
         // Extracts and displays the clustering results.
         for (CloseableIterator<Row> it = outputs[0].execute().collect(); it.hasNext(); ) {
             Row row = it.next();
-            DenseVector features =
-                    (DenseVector) row.getField(agglomerativeClustering.getFeaturesCol());
+            DenseIntDoubleVector features =
+                    (DenseIntDoubleVector) row.getField(agglomerativeClustering.getFeaturesCol());
             int clusterId = (Integer) row.getField(agglomerativeClustering.getPredictionCol());
             System.out.printf("Features: %s \tCluster ID: %s\n", features, clusterId);
         }

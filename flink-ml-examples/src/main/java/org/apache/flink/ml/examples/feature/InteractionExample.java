@@ -19,7 +19,7 @@
 package org.apache.flink.ml.examples.feature;
 
 import org.apache.flink.ml.feature.interaction.Interaction;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -58,7 +58,8 @@ public class InteractionExample {
             for (int i = 0; i < inputValues.length; i++) {
                 inputValues[i] = row.getField(interaction.getInputCols()[i]);
             }
-            Vector outputValue = (Vector) row.getField(interaction.getOutputCol());
+            IntDoubleVector outputValue =
+                    (IntDoubleVector) row.getField(interaction.getOutputCol());
             System.out.printf(
                     "Input Values: %s \tOutput Value: %s\n",
                     Arrays.toString(inputValues), outputValue);

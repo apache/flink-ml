@@ -19,7 +19,7 @@
 package org.apache.flink.ml.examples.feature;
 
 import org.apache.flink.ml.feature.vectorassembler.VectorAssembler;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -71,7 +71,8 @@ public class VectorAssemblerExample {
                 inputValues[i] = row.getField(vectorAssembler.getInputCols()[i]);
             }
 
-            Vector outputValue = (Vector) row.getField(vectorAssembler.getOutputCol());
+            IntDoubleVector outputValue =
+                    (IntDoubleVector) row.getField(vectorAssembler.getOutputCol());
 
             System.out.printf(
                     "Input Values: %s \tOutput Value: %s\n",

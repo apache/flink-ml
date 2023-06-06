@@ -28,9 +28,9 @@ import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.ml.common.datastream.TableUtils;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vector;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorSerializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
@@ -52,7 +52,7 @@ import java.util.Random;
  */
 public class KMeansModelData {
 
-    public DenseVector[] centroids;
+    public DenseIntDoubleVector[] centroids;
 
     /**
      * The weight of the centroids. It is used when updating the model data in online training
@@ -61,9 +61,9 @@ public class KMeansModelData {
      * <p>KMeansModelData objects generated during {@link KMeans#fit(Table...)} also contains this
      * field, so that it can be used as the initial model data of the online training process.
      */
-    public DenseVector weights;
+    public DenseIntDoubleVector weights;
 
-    public KMeansModelData(DenseVector[] centroids, DenseVector weights) {
+    public KMeansModelData(DenseIntDoubleVector[] centroids, DenseIntDoubleVector weights) {
         Preconditions.checkArgument(centroids.length == weights.size());
         this.centroids = centroids;
         this.weights = weights;
@@ -103,15 +103,15 @@ public class KMeansModelData {
 
         @Override
         public KMeansModelData map(Integer integer) {
-            DenseVector[] centroids = new DenseVector[k];
+            DenseIntDoubleVector[] centroids = new DenseIntDoubleVector[k];
             Random random = new Random(seed);
             for (int i = 0; i < k; i++) {
-                centroids[i] = new DenseVector(dim);
+                centroids[i] = new DenseIntDoubleVector(dim);
                 for (int j = 0; j < dim; j++) {
                     centroids[i].values[j] = random.nextDouble();
                 }
             }
-            DenseVector weights = new DenseVector(k);
+            DenseIntDoubleVector weights = new DenseIntDoubleVector(k);
             Arrays.fill(weights.values, weight);
             return new KMeansModelData(centroids, weights);
         }
@@ -130,15 +130,16 @@ public class KMeansModelData {
                 .map(
                         x ->
                                 new KMeansModelData(
-                                        Arrays.stream(((Vector[]) x.getField(0)))
-                                                .map(Vector::toDense)
-                                                .toArray(DenseVector[]::new),
-                                        ((Vector) x.getField(1)).toDense()));
+                                        Arrays.stream(((IntDoubleVector[]) x.getField(0)))
+                                                .map(IntDoubleVector::toDense)
+                                                .toArray(DenseIntDoubleVector[]::new),
+                                        ((IntDoubleVector) x.getField(1)).toDense()));
     }
 
     /** Data encoder for {@link KMeansModelData}. */
     public static class ModelDataEncoder implements Encoder<KMeansModelData> {
-        private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+        private final DenseIntDoubleVectorSerializer serializer =
+                new DenseIntDoubleVectorSerializer();
 
         @Override
         public void encode(KMeansModelData modelData, OutputStream outputStream)
@@ -146,7 +147,7 @@ public class KMeansModelData {
             DataOutputViewStreamWrapper outputViewStreamWrapper =
                     new DataOutputViewStreamWrapper(outputStream);
             IntSerializer.INSTANCE.serialize(modelData.centroids.length, outputViewStreamWrapper);
-            for (DenseVector denseVector : modelData.centroids) {
+            for (DenseIntDoubleVector denseVector : modelData.centroids) {
                 serializer.serialize(denseVector, new DataOutputViewStreamWrapper(outputStream));
             }
             serializer.serialize(modelData.weights, new DataOutputViewStreamWrapper(outputStream));
@@ -159,7 +160,8 @@ public class KMeansModelData {
         public Reader<KMeansModelData> createReader(
                 Configuration config, FSDataInputStream inputStream) {
             return new Reader<KMeansModelData>() {
-                private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+                private final DenseIntDoubleVectorSerializer serializer =
+                        new DenseIntDoubleVectorSerializer();
 
                 @Override
                 public KMeansModelData read() throws IOException {
@@ -168,11 +170,13 @@ public class KMeansModelData {
                                 new DataInputViewStreamWrapper(inputStream);
                         int numDenseVectors =
                                 IntSerializer.INSTANCE.deserialize(inputViewStreamWrapper);
-                        DenseVector[] centroids = new DenseVector[numDenseVectors];
+                        DenseIntDoubleVector[] centroids =
+                                new DenseIntDoubleVector[numDenseVectors];
                         for (int i = 0; i < numDenseVectors; i++) {
                             centroids[i] = serializer.deserialize(inputViewStreamWrapper);
                         }
-                        DenseVector weights = serializer.deserialize(inputViewStreamWrapper);
+                        DenseIntDoubleVector weights =
+                                serializer.deserialize(inputViewStreamWrapper);
                         return new KMeansModelData(centroids, weights);
                     } catch (EOFException e) {
                         return null;

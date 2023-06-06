@@ -21,7 +21,7 @@ package org.apache.flink.ml.feature;
 import org.apache.flink.ml.feature.idf.IDF;
 import org.apache.flink.ml.feature.idf.IDFModel;
 import org.apache.flink.ml.feature.idf.IDFModelData;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
@@ -54,12 +54,12 @@ public class IDFTest extends AbstractTestBase {
     private StreamTableEnvironment tEnv;
     private Table inputTable;
 
-    private static final List<DenseVector> expectedOutput =
+    private static final List<DenseIntDoubleVector> expectedOutput =
             Arrays.asList(
                     Vectors.dense(0, 0, 0, 0.5753641),
                     Vectors.dense(0, 0, 1.3862943, 0.8630462),
                     Vectors.dense(0, 0, 0, 0));
-    private static final List<DenseVector> expectedOutputMinDocFreqAsTwo =
+    private static final List<DenseIntDoubleVector> expectedOutputMinDocFreqAsTwo =
             Arrays.asList(
                     Vectors.dense(0, 0, 0, 0.5753641),
                     Vectors.dense(0, 0, 0, 0.8630462),
@@ -71,7 +71,7 @@ public class IDFTest extends AbstractTestBase {
         env = TestUtils.getExecutionEnvironment();
         tEnv = StreamTableEnvironment.create(env);
 
-        List<DenseVector> input =
+        List<DenseIntDoubleVector> input =
                 Arrays.asList(
                         Vectors.dense(0, 1, 0, 2),
                         Vectors.dense(0, 1, 2, 3),
@@ -81,11 +81,12 @@ public class IDFTest extends AbstractTestBase {
 
     @SuppressWarnings("unchecked")
     private void verifyPredictionResult(
-            List<DenseVector> expectedOutput, Table output, String predictionCol) throws Exception {
+            List<DenseIntDoubleVector> expectedOutput, Table output, String predictionCol)
+            throws Exception {
         List<Row> collectedResult =
                 IteratorUtils.toList(
                         tEnv.toDataStream(output.select($(predictionCol))).executeAndCollect());
-        List<DenseVector> actualOutputs = new ArrayList<>(expectedOutput.size());
+        List<DenseIntDoubleVector> actualOutputs = new ArrayList<>(expectedOutput.size());
         collectedResult.forEach(x -> actualOutputs.add((x.getFieldAs(0))));
 
         actualOutputs.sort(TestUtils::compare);

@@ -27,8 +27,8 @@ import org.apache.flink.api.java.typeutils.TupleTypeInfo;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -76,15 +76,16 @@ public class StandardScaler
         Preconditions.checkArgument(inputs.length == 1);
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
-        DataStream<Tuple3<DenseVector, DenseVector, Long>> sumAndSquaredSumAndWeight =
-                tEnv.toDataStream(inputs[0])
-                        .transform(
-                                "computeMeta",
-                                new TupleTypeInfo<>(
-                                        TypeInformation.of(DenseVector.class),
-                                        TypeInformation.of(DenseVector.class),
-                                        BasicTypeInfo.LONG_TYPE_INFO),
-                                new ComputeMetaOperator(getInputCol()));
+        DataStream<Tuple3<DenseIntDoubleVector, DenseIntDoubleVector, Long>>
+                sumAndSquaredSumAndWeight =
+                        tEnv.toDataStream(inputs[0])
+                                .transform(
+                                        "computeMeta",
+                                        new TupleTypeInfo<>(
+                                                TypeInformation.of(DenseIntDoubleVector.class),
+                                                TypeInformation.of(DenseIntDoubleVector.class),
+                                                BasicTypeInfo.LONG_TYPE_INFO),
+                                        new ComputeMetaOperator(getInputCol()));
 
         DataStream<StandardScalerModelData> modelData =
                 sumAndSquaredSumAndWeight
@@ -105,13 +106,14 @@ public class StandardScaler
      */
     private static class BuildModelOperator extends AbstractStreamOperator<StandardScalerModelData>
             implements OneInputStreamOperator<
-                            Tuple3<DenseVector, DenseVector, Long>, StandardScalerModelData>,
+                            Tuple3<DenseIntDoubleVector, DenseIntDoubleVector, Long>,
+                            StandardScalerModelData>,
                     BoundedOneInput {
-        private ListState<DenseVector> sumState;
-        private ListState<DenseVector> squaredSumState;
+        private ListState<DenseIntDoubleVector> sumState;
+        private ListState<DenseIntDoubleVector> squaredSumState;
         private ListState<Long> numElementsState;
-        private DenseVector sum;
-        private DenseVector squaredSum;
+        private DenseIntDoubleVector sum;
+        private DenseIntDoubleVector squaredSum;
         private long numElements;
 
         @Override
@@ -141,8 +143,9 @@ public class StandardScaler
         }
 
         @Override
-        public void processElement(StreamRecord<Tuple3<DenseVector, DenseVector, Long>> element) {
-            Tuple3<DenseVector, DenseVector, Long> value = element.getValue();
+        public void processElement(
+                StreamRecord<Tuple3<DenseIntDoubleVector, DenseIntDoubleVector, Long>> element) {
+            Tuple3<DenseIntDoubleVector, DenseIntDoubleVector, Long> value = element.getValue();
             if (numElements == 0) {
                 sum = value.f0;
                 squaredSum = value.f1;
@@ -161,13 +164,14 @@ public class StandardScaler
                     context.getOperatorStateStore()
                             .getListState(
                                     new ListStateDescriptor<>(
-                                            "sumState", TypeInformation.of(DenseVector.class)));
+                                            "sumState",
+                                            TypeInformation.of(DenseIntDoubleVector.class)));
             squaredSumState =
                     context.getOperatorStateStore()
                             .getListState(
                                     new ListStateDescriptor<>(
                                             "squaredSumState",
-                                            TypeInformation.of(DenseVector.class)));
+                                            TypeInformation.of(DenseIntDoubleVector.class)));
             numElementsState =
                     context.getOperatorStateStore()
                             .getListState(
@@ -196,14 +200,15 @@ public class StandardScaler
 
     /** Computes sum, squared sum and number of elements in each partition. */
     private static class ComputeMetaOperator
-            extends AbstractStreamOperator<Tuple3<DenseVector, DenseVector, Long>>
-            implements OneInputStreamOperator<Row, Tuple3<DenseVector, DenseVector, Long>>,
+            extends AbstractStreamOperator<Tuple3<DenseIntDoubleVector, DenseIntDoubleVector, Long>>
+            implements OneInputStreamOperator<
+                            Row, Tuple3<DenseIntDoubleVector, DenseIntDoubleVector, Long>>,
                     BoundedOneInput {
-        private ListState<DenseVector> sumState;
-        private ListState<DenseVector> squaredSumState;
+        private ListState<DenseIntDoubleVector> sumState;
+        private ListState<DenseIntDoubleVector> squaredSumState;
         private ListState<Long> numElementsState;
-        private DenseVector sum;
-        private DenseVector squaredSum;
+        private DenseIntDoubleVector sum;
+        private DenseIntDoubleVector squaredSum;
         private long numElements;
 
         private final String inputCol;
@@ -221,10 +226,10 @@ public class StandardScaler
 
         @Override
         public void processElement(StreamRecord<Row> element) {
-            Vector inputVec = (Vector) element.getValue().getField(inputCol);
+            IntDoubleVector inputVec = (IntDoubleVector) element.getValue().getField(inputCol);
             if (numElements == 0) {
-                sum = new DenseVector(inputVec.size());
-                squaredSum = new DenseVector(inputVec.size());
+                sum = new DenseIntDoubleVector(inputVec.size());
+                squaredSum = new DenseIntDoubleVector(inputVec.size());
             }
             BLAS.axpy(1, inputVec, sum);
             BLAS.hDot(inputVec, inputVec);
@@ -239,13 +244,14 @@ public class StandardScaler
                     context.getOperatorStateStore()
                             .getListState(
                                     new ListStateDescriptor<>(
-                                            "sumState", TypeInformation.of(DenseVector.class)));
+                                            "sumState",
+                                            TypeInformation.of(DenseIntDoubleVector.class)));
             squaredSumState =
                     context.getOperatorStateStore()
                             .getListState(
                                     new ListStateDescriptor<>(
                                             "squaredSumState",
-                                            TypeInformation.of(DenseVector.class)));
+                                            TypeInformation.of(DenseIntDoubleVector.class)));
             numElementsState =
                     context.getOperatorStateStore()
                             .getListState(

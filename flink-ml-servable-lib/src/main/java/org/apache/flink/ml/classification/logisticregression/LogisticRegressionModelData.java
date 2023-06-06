@@ -21,8 +21,8 @@ package org.apache.flink.ml.classification.logisticregression;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorSerializer;
 import org.apache.flink.util.Preconditions;
 
 import java.io.IOException;
@@ -33,7 +33,7 @@ import java.util.List;
 /** Model data of {@link LogisticRegressionModelServable}. */
 public class LogisticRegressionModelData {
 
-    public DenseVector coefficient;
+    public DenseIntDoubleVector coefficient;
 
     public long startIndex;
 
@@ -43,12 +43,12 @@ public class LogisticRegressionModelData {
 
     public LogisticRegressionModelData() {}
 
-    public LogisticRegressionModelData(DenseVector coefficient, long modelVersion) {
+    public LogisticRegressionModelData(DenseIntDoubleVector coefficient, long modelVersion) {
         this(coefficient, 0L, coefficient.size(), modelVersion);
     }
 
     public LogisticRegressionModelData(
-            DenseVector coefficient, long startIndex, long endIndex, long modelVersion) {
+            DenseIntDoubleVector coefficient, long startIndex, long endIndex, long modelVersion) {
         this.coefficient = coefficient;
         this.startIndex = startIndex;
         this.endIndex = endIndex;
@@ -65,7 +65,7 @@ public class LogisticRegressionModelData {
         DataOutputViewStreamWrapper dataOutputViewStreamWrapper =
                 new DataOutputViewStreamWrapper(outputStream);
 
-        DenseVectorSerializer serializer = new DenseVectorSerializer();
+        DenseIntDoubleVectorSerializer serializer = new DenseIntDoubleVectorSerializer();
         serializer.serialize(coefficient, dataOutputViewStreamWrapper);
         dataOutputViewStreamWrapper.writeLong(startIndex);
         dataOutputViewStreamWrapper.writeLong(endIndex);
@@ -82,8 +82,8 @@ public class LogisticRegressionModelData {
         DataInputViewStreamWrapper dataInputViewStreamWrapper =
                 new DataInputViewStreamWrapper(inputStream);
 
-        DenseVectorSerializer serializer = new DenseVectorSerializer();
-        DenseVector coefficient = serializer.deserialize(dataInputViewStreamWrapper);
+        DenseIntDoubleVectorSerializer serializer = new DenseIntDoubleVectorSerializer();
+        DenseIntDoubleVector coefficient = serializer.deserialize(dataInputViewStreamWrapper);
         long startIndex = dataInputViewStreamWrapper.readLong();
         long endIndex = dataInputViewStreamWrapper.readLong();
         long modelVersion = dataInputViewStreamWrapper.readLong();
@@ -103,7 +103,7 @@ public class LogisticRegressionModelData {
                 dim < Integer.MAX_VALUE,
                 "The dimension of logistic regression model is larger than INT.MAX. Please consider using distributed inference.");
         int intDim = (int) dim;
-        DenseVector mergedCoefficient = new DenseVector(intDim);
+        DenseIntDoubleVector mergedCoefficient = new DenseIntDoubleVector(intDim);
         for (LogisticRegressionModelData segment : segments) {
             int startIndex = (int) segment.startIndex;
             int endIndex = (int) segment.endIndex;

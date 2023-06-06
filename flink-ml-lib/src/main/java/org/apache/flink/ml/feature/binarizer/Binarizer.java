@@ -24,11 +24,11 @@ import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Transformer;
 import org.apache.flink.ml.common.datastream.TableUtils;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
-import org.apache.flink.ml.linalg.Vector;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
-import org.apache.flink.ml.linalg.typeinfo.SparseVectorTypeInfo;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.SparseIntDoubleVectorTypeInfo;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -72,11 +72,11 @@ public class Binarizer implements Transformer<Binarizer>, BinarizerParams<Binari
         for (int i = 0; i < inputCols.length; ++i) {
             int idx = inputTypeInfo.getFieldIndex(inputCols[i]);
             Class<?> typeClass = inputTypeInfo.getTypeAt(idx).getTypeClass();
-            if (typeClass.equals(SparseVector.class)) {
-                outputTypes[i] = SparseVectorTypeInfo.INSTANCE;
-            } else if (typeClass.equals(DenseVector.class)) {
-                outputTypes[i] = DenseVectorTypeInfo.INSTANCE;
-            } else if (typeClass.equals(Vector.class)) {
+            if (typeClass.equals(SparseIntDoubleVector.class)) {
+                outputTypes[i] = SparseIntDoubleVectorTypeInfo.INSTANCE;
+            } else if (typeClass.equals(DenseIntDoubleVector.class)) {
+                outputTypes[i] = DenseIntDoubleVectorTypeInfo.INSTANCE;
+            } else if (typeClass.equals(IntDoubleVector.class)) {
                 outputTypes[i] = VectorTypeInfo.INSTANCE;
             } else {
                 outputTypes[i] = Types.DOUBLE;
@@ -119,15 +119,15 @@ public class Binarizer implements Transformer<Binarizer>, BinarizerParams<Binari
         }
 
         private Object binarizerFunc(Object obj, double threshold) {
-            if (obj instanceof DenseVector) {
-                DenseVector inputVec = (DenseVector) obj;
-                DenseVector vec = inputVec.clone();
+            if (obj instanceof DenseIntDoubleVector) {
+                DenseIntDoubleVector inputVec = (DenseIntDoubleVector) obj;
+                DenseIntDoubleVector vec = inputVec.clone();
                 for (int i = 0; i < vec.size(); ++i) {
                     vec.values[i] = inputVec.get(i) > threshold ? 1.0 : 0.0;
                 }
                 return vec;
-            } else if (obj instanceof SparseVector) {
-                SparseVector inputVec = (SparseVector) obj;
+            } else if (obj instanceof SparseIntDoubleVector) {
+                SparseIntDoubleVector inputVec = (SparseIntDoubleVector) obj;
                 int[] newIndices = new int[inputVec.indices.length];
                 int pos = 0;
 
@@ -139,7 +139,8 @@ public class Binarizer implements Transformer<Binarizer>, BinarizerParams<Binari
 
                 double[] newValues = new double[pos];
                 Arrays.fill(newValues, 1.0);
-                return new SparseVector(inputVec.size(), Arrays.copyOf(newIndices, pos), newValues);
+                return new SparseIntDoubleVector(
+                        inputVec.size(), Arrays.copyOf(newIndices, pos), newValues);
             } else {
                 return Double.parseDouble(obj.toString()) > threshold ? 1.0 : 0.0;
             }

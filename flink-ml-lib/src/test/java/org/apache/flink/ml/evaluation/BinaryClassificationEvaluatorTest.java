@@ -20,7 +20,7 @@ package org.apache.flink.ml.evaluation;
 
 import org.apache.flink.ml.evaluation.binaryclassification.BinaryClassificationEvaluator;
 import org.apache.flink.ml.evaluation.binaryclassification.BinaryClassificationEvaluatorParams;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -191,7 +191,7 @@ public class BinaryClassificationEvaluatorTest extends AbstractTestBase {
     public void testInputTypeConversion() {
         inputDataTable = TestUtils.convertDataTypesToSparseInt(tEnv, inputDataTable);
         assertArrayEquals(
-                new Class<?>[] {Integer.class, SparseVector.class},
+                new Class<?>[] {Integer.class, SparseIntDoubleVector.class},
                 TestUtils.getColumnDataTypes(inputDataTable));
 
         BinaryClassificationEvaluator eval =

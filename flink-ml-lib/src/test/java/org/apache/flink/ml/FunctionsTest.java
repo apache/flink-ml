@@ -19,8 +19,8 @@
 package org.apache.flink.ml;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
@@ -60,10 +60,10 @@ public class FunctionsTest extends AbstractTestBase {
     private static final List<long[]> longArrays =
             Arrays.asList(new long[] {0, 0}, new long[] {0, 1});
 
-    private static final List<DenseVector> denseVectors =
+    private static final List<DenseIntDoubleVector> denseVectors =
             Arrays.asList(Vectors.dense(0.0, 0.0), Vectors.dense(0.0, 1.0));
 
-    private static final List<SparseVector> sparseVectors =
+    private static final List<SparseIntDoubleVector> sparseVectors =
             Arrays.asList(
                     Vectors.sparse(2, new int[0], new double[0]),
                     Vectors.sparse(2, new int[] {1}, new double[] {1.0}));
@@ -126,7 +126,7 @@ public class FunctionsTest extends AbstractTestBase {
 
         assertEquals(outputValues.size(), denseVectors.size());
         for (int i = 0; i < denseVectors.size(); i++) {
-            DenseVector vector = outputValues.get(i).getFieldAs("vector");
+            DenseIntDoubleVector vector = outputValues.get(i).getFieldAs("vector");
             assertEquals(denseVectors.get(i), vector);
         }
     }

@@ -19,7 +19,7 @@
 package org.apache.flink.ml.examples.feature;
 
 import org.apache.flink.ml.feature.vectorslicer.VectorSlicer;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -52,9 +52,10 @@ public class VectorSlicerExample {
         for (CloseableIterator<Row> it = outputTable.execute().collect(); it.hasNext(); ) {
             Row row = it.next();
 
-            Vector inputValue = (Vector) row.getField(vectorSlicer.getInputCol());
+            IntDoubleVector inputValue = (IntDoubleVector) row.getField(vectorSlicer.getInputCol());
 
-            Vector outputValue = (Vector) row.getField(vectorSlicer.getOutputCol());
+            IntDoubleVector outputValue =
+                    (IntDoubleVector) row.getField(vectorSlicer.getOutputCol());
 
             System.out.printf("Input Value: %s \tOutput Value: %s\n", inputValue, outputValue);
         }

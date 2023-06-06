@@ -28,10 +28,10 @@ import org.apache.flink.ml.common.window.EventTimeSessionWindows;
 import org.apache.flink.ml.common.window.EventTimeTumblingWindows;
 import org.apache.flink.ml.common.window.Windows;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -125,16 +125,17 @@ public class OnlineStandardScaler
                 Iterable<Row> iterable,
                 Collector<StandardScalerModelData> collector)
                 throws Exception {
-            ListState<DenseVector> sumState =
+            ListState<DenseIntDoubleVector> sumState =
                     context.globalState()
                             .getListState(
                                     new ListStateDescriptor<>(
-                                            "sumState", DenseVectorTypeInfo.INSTANCE));
-            ListState<DenseVector> squaredSumState =
+                                            "sumState", DenseIntDoubleVectorTypeInfo.INSTANCE));
+            ListState<DenseIntDoubleVector> squaredSumState =
                     context.globalState()
                             .getListState(
                                     new ListStateDescriptor<>(
-                                            "squaredSumState", DenseVectorTypeInfo.INSTANCE));
+                                            "squaredSumState",
+                                            DenseIntDoubleVectorTypeInfo.INSTANCE));
             ListState<Long> numElementsState =
                     context.globalState()
                             .getListState(
@@ -143,9 +144,9 @@ public class OnlineStandardScaler
                     context.globalState()
                             .getListState(
                                     new ListStateDescriptor<>("modelVersionState", Types.LONG));
-            DenseVector sum =
+            DenseIntDoubleVector sum =
                     OperatorStateUtils.getUniqueElement(sumState, "sumState").orElse(null);
-            DenseVector squaredSum =
+            DenseIntDoubleVector squaredSum =
                     OperatorStateUtils.getUniqueElement(squaredSumState, "squaredSumState")
                             .orElse(null);
             long numElements =
@@ -157,11 +158,12 @@ public class OnlineStandardScaler
 
             long numElementsBefore = numElements;
             for (Row element : iterable) {
-                Vector inputVec =
-                        ((Vector) Objects.requireNonNull(element.getField(inputCol))).clone();
+                IntDoubleVector inputVec =
+                        ((IntDoubleVector) Objects.requireNonNull(element.getField(inputCol)))
+                                .clone();
                 if (numElements == 0) {
-                    sum = new DenseVector(inputVec.size());
-                    squaredSum = new DenseVector(inputVec.size());
+                    sum = new DenseIntDoubleVector(inputVec.size());
+                    squaredSum = new DenseIntDoubleVector(inputVec.size());
                 }
                 BLAS.axpy(1, inputVec, sum);
                 BLAS.hDot(inputVec, inputVec);
@@ -190,8 +192,8 @@ public class OnlineStandardScaler
 
     private static StandardScalerModelData buildModelData(
             long numElements,
-            DenseVector sum,
-            DenseVector squaredSum,
+            DenseIntDoubleVector sum,
+            DenseIntDoubleVector squaredSum,
             long modelVersion,
             long currentTimeStamp) {
         BLAS.scal(1.0 / numElements, sum);

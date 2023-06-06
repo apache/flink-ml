@@ -18,7 +18,7 @@
 
 package org.apache.flink.ml.examples;
 
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -49,7 +49,7 @@ public class ArrayToVectorExample {
         for (CloseableIterator<Row> it = outputTable.execute().collect(); it.hasNext(); ) {
             Row row = it.next();
             Double[] doubleArray = row.getFieldAs("array");
-            Vector vector = row.getFieldAs("vector");
+            IntDoubleVector vector = row.getFieldAs("vector");
             System.out.printf(
                     "Input double array: %s\tOutput vector: %s\n",
                     Arrays.toString(doubleArray), vector);

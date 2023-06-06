@@ -57,7 +57,7 @@ A Transformer that normalizes a vector to have unit norm using the given p-norm.
 
 ```java
 import org.apache.flink.ml.feature.normalizer.Normalizer;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;

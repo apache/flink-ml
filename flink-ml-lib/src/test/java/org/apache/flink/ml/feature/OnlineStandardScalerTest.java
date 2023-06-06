@@ -32,10 +32,10 @@ import org.apache.flink.ml.common.window.ProcessingTimeTumblingWindows;
 import org.apache.flink.ml.feature.standardscaler.OnlineStandardScaler;
 import org.apache.flink.ml.feature.standardscaler.OnlineStandardScalerModel;
 import org.apache.flink.ml.feature.standardscaler.StandardScalerModelData;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -115,7 +115,10 @@ public class OnlineStandardScalerTest extends AbstractTestBase {
                                 inputStream,
                                 Schema.newBuilder()
                                         .column("f0", DataTypes.BIGINT())
-                                        .column("f1", DataTypes.RAW(DenseVectorTypeInfo.INSTANCE))
+                                        .column(
+                                                "f1",
+                                                DataTypes.RAW(
+                                                        DenseIntDoubleVectorTypeInfo.INSTANCE))
                                         .build())
                         .as("id", "input");
 
@@ -136,7 +139,7 @@ public class OnlineStandardScalerTest extends AbstractTestBase {
                                 },
                                 new RowTypeInfo(
                                         new TypeInformation[] {
-                                            Types.LONG, DenseVectorTypeInfo.INSTANCE
+                                            Types.LONG, DenseIntDoubleVectorTypeInfo.INSTANCE
                                         },
                                         new String[] {"id", "input"}))
                         .setParallelism(1);
@@ -155,7 +158,10 @@ public class OnlineStandardScalerTest extends AbstractTestBase {
                                 inputStreamWithEventTime,
                                 Schema.newBuilder()
                                         .column("f0", DataTypes.BIGINT())
-                                        .column("f1", DataTypes.RAW(DenseVectorTypeInfo.INSTANCE))
+                                        .column(
+                                                "f1",
+                                                DataTypes.RAW(
+                                                        DenseIntDoubleVectorTypeInfo.INSTANCE))
                                         .columnByMetadata("rowtime", "TIMESTAMP_LTZ(3)")
                                         .watermark("rowtime", "SOURCE_WATERMARK()")
                                         .build())
@@ -295,7 +301,7 @@ public class OnlineStandardScalerTest extends AbstractTestBase {
                         .as("input");
 
         // Tests withMean option.
-        List<DenseVector> expectedResWithMean =
+        List<DenseIntDoubleVector> expectedResWithMean =
                 Arrays.asList(
                         Vectors.dense(-2.8, 8, 1),
                         Vectors.dense(1.1, -6, 1),
@@ -304,7 +310,7 @@ public class OnlineStandardScalerTest extends AbstractTestBase {
         verifyPredictionResult(expectedResWithMean, output, standardScaler.getOutputCol());
 
         // Tests withStd option.
-        List<DenseVector> expectedResWithStd =
+        List<DenseIntDoubleVector> expectedResWithStd =
                 Arrays.asList(
                         Vectors.dense(-1.0231819, 1.2480754, 0.5773502),
                         Vectors.dense(0.5729819, -0.6933752, 0.5773503),
@@ -313,7 +319,7 @@ public class OnlineStandardScalerTest extends AbstractTestBase {
         verifyPredictionResult(expectedResWithStd, output, standardScaler.getOutputCol());
 
         // Tests withMean, withStd Option.
-        List<DenseVector> expectedResWithMeanAndStd =
+        List<DenseIntDoubleVector> expectedResWithMeanAndStd =
                 Arrays.asList(
                         Vectors.dense(-1.1459637, 1.1094004, 0.5773503),
                         Vectors.dense(0.45020003, -0.8320503, 0.5773503),
@@ -423,13 +429,14 @@ public class OnlineStandardScalerTest extends AbstractTestBase {
 
     @SuppressWarnings("unchecked")
     private void verifyPredictionResult(
-            List<DenseVector> expectedOutput, Table output, String predictionCol) throws Exception {
+            List<DenseIntDoubleVector> expectedOutput, Table output, String predictionCol)
+            throws Exception {
         List<Row> collectedResult =
                 IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect());
-        List<DenseVector> predictions = new ArrayList<>(collectedResult.size());
+        List<DenseIntDoubleVector> predictions = new ArrayList<>(collectedResult.size());
 
         for (Row r : collectedResult) {
-            Vector vec = (Vector) r.getField(predictionCol);
+            IntDoubleVector vec = (IntDoubleVector) r.getField(predictionCol);
             predictions.add(vec.toDense());
         }
 

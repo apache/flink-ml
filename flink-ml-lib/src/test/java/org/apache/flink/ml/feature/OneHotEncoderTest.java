@@ -23,7 +23,7 @@ import org.apache.flink.ml.common.param.HasHandleInvalid;
 import org.apache.flink.ml.feature.onehotencoder.OneHotEncoder;
 import org.apache.flink.ml.feature.onehotencoder.OneHotEncoderModel;
 import org.apache.flink.ml.feature.onehotencoder.OneHotEncoderModelData;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
@@ -59,7 +59,7 @@ public class OneHotEncoderTest extends AbstractTestBase {
     private StreamTableEnvironment tEnv;
     private Table trainTable;
     private Table predictTable;
-    private Map<Double, Vector>[] expectedOutput;
+    private Map<Double, IntDoubleVector>[] expectedOutput;
     private OneHotEncoder estimator;
 
     @Before
@@ -77,7 +77,7 @@ public class OneHotEncoderTest extends AbstractTestBase {
 
         expectedOutput =
                 new HashMap[] {
-                    new HashMap<Double, Vector>() {
+                    new HashMap<Double, IntDoubleVector>() {
                         {
                             put(0.0, Vectors.sparse(2, new int[] {0}, new double[] {1.0}));
                             put(1.0, Vectors.sparse(2, new int[] {1}, new double[] {1.0}));
@@ -99,9 +99,9 @@ public class OneHotEncoderTest extends AbstractTestBase {
      * @param outputCols Name of the output columns containing one-hot encoding result
      * @return An array of map containing the collected results for each input column
      */
-    private static Map<Double, Vector>[] executeAndCollect(
+    private static Map<Double, IntDoubleVector>[] executeAndCollect(
             Table table, String[] inputCols, String[] outputCols) {
-        Map<Double, Vector>[] maps = new HashMap[inputCols.length];
+        Map<Double, IntDoubleVector>[] maps = new HashMap[inputCols.length];
         for (int i = 0; i < inputCols.length; i++) {
             maps[i] = new HashMap<>();
         }
@@ -110,7 +110,7 @@ public class OneHotEncoderTest extends AbstractTestBase {
             for (int i = 0; i < inputCols.length; i++) {
                 maps[i].put(
                         ((Number) row.getField(inputCols[i])).doubleValue(),
-                        (Vector) row.getField(outputCols[i]));
+                        (IntDoubleVector) row.getField(outputCols[i]));
             }
         }
         return maps;
@@ -143,7 +143,7 @@ public class OneHotEncoderTest extends AbstractTestBase {
     public void testFitAndPredict() {
         OneHotEncoderModel model = estimator.fit(trainTable);
         Table outputTable = model.transform(predictTable)[0];
-        Map<Double, Vector>[] actualOutput =
+        Map<Double, IntDoubleVector>[] actualOutput =
                 executeAndCollect(outputTable, model.getInputCols(), model.getOutputCols());
         assertArrayEquals(expectedOutput, actualOutput);
     }
@@ -158,7 +158,7 @@ public class OneHotEncoderTest extends AbstractTestBase {
 
         OneHotEncoderModel model = estimator.fit(trainTable);
         Table outputTable = model.transform(predictTable)[0];
-        Map<Double, Vector>[] actualOutput =
+        Map<Double, IntDoubleVector>[] actualOutput =
                 executeAndCollect(outputTable, model.getInputCols(), model.getOutputCols());
         assertArrayEquals(expectedOutput, actualOutput);
     }
@@ -169,7 +169,7 @@ public class OneHotEncoderTest extends AbstractTestBase {
 
         expectedOutput =
                 new HashMap[] {
-                    new HashMap<Double, Vector>() {
+                    new HashMap<Double, IntDoubleVector>() {
                         {
                             put(0.0, Vectors.sparse(3, new int[] {0}, new double[] {1.0}));
                             put(1.0, Vectors.sparse(3, new int[] {1}, new double[] {1.0}));
@@ -180,7 +180,7 @@ public class OneHotEncoderTest extends AbstractTestBase {
 
         OneHotEncoderModel model = estimator.fit(trainTable);
         Table outputTable = model.transform(predictTable)[0];
-        Map<Double, Vector>[] actualOutput =
+        Map<Double, IntDoubleVector>[] actualOutput =
                 executeAndCollect(outputTable, model.getInputCols(), model.getOutputCols());
         assertArrayEquals(expectedOutput, actualOutput);
     }
@@ -196,7 +196,7 @@ public class OneHotEncoderTest extends AbstractTestBase {
 
         expectedOutput =
                 new HashMap[] {
-                    new HashMap<Double, Vector>() {
+                    new HashMap<Double, IntDoubleVector>() {
                         {
                             put(0.0, Vectors.sparse(2, new int[] {0}, new double[] {1.0}));
                             put(1.0, Vectors.sparse(2, new int[] {1}, new double[] {1.0}));
@@ -207,7 +207,7 @@ public class OneHotEncoderTest extends AbstractTestBase {
 
         OneHotEncoderModel model = estimator.fit(trainTable);
         Table outputTable = model.transform(predictTable)[0];
-        Map<Double, Vector>[] actualOutput =
+        Map<Double, IntDoubleVector>[] actualOutput =
                 executeAndCollect(outputTable, model.getInputCols(), model.getOutputCols());
         assertArrayEquals(expectedOutput, actualOutput);
     }
@@ -276,7 +276,7 @@ public class OneHotEncoderTest extends AbstractTestBase {
                         tempFolder.newFolder().getAbsolutePath(),
                         OneHotEncoderModel::load);
         Table outputTable = model.transform(predictTable)[0];
-        Map<Double, Vector>[] actualOutput =
+        Map<Double, IntDoubleVector>[] actualOutput =
                 executeAndCollect(outputTable, model.getInputCols(), model.getOutputCols());
         assertArrayEquals(expectedOutput, actualOutput);
     }
@@ -301,7 +301,7 @@ public class OneHotEncoderTest extends AbstractTestBase {
         ParamUtils.updateExistingParams(modelB, modelA.getParamMap());
 
         Table outputTable = modelB.transform(predictTable)[0];
-        Map<Double, Vector>[] actualOutput =
+        Map<Double, IntDoubleVector>[] actualOutput =
                 executeAndCollect(outputTable, modelB.getInputCols(), modelB.getOutputCols());
         assertArrayEquals(expectedOutput, actualOutput);
     }

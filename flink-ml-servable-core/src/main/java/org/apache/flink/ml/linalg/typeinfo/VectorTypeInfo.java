@@ -22,9 +22,10 @@ package org.apache.flink.ml.linalg.typeinfo;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
 
-/** A {@link TypeInformation} for the {@link Vector} type. */
+/** A {@link TypeInformation} for the {@link IntDoubleVector} type. */
 public class VectorTypeInfo extends TypeInformation<Vector> {
 
     public static final VectorTypeInfo INSTANCE = new VectorTypeInfo();

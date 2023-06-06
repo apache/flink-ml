@@ -22,9 +22,9 @@ import org.apache.flink.ml.clustering.kmeans.KMeans;
 import org.apache.flink.ml.clustering.kmeans.KMeansModel;
 import org.apache.flink.ml.clustering.kmeans.KMeansModelData;
 import org.apache.flink.ml.common.distance.EuclideanDistanceMeasure;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
@@ -60,7 +60,7 @@ import static org.junit.Assert.assertTrue;
 public class KMeansTest extends AbstractTestBase {
     @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
 
-    private static final List<DenseVector> DATA =
+    private static final List<DenseIntDoubleVector> DATA =
             Arrays.asList(
                     Vectors.dense(0.0, 0.0),
                     Vectors.dense(0.0, 0.3),
@@ -70,7 +70,7 @@ public class KMeansTest extends AbstractTestBase {
                     Vectors.dense(9.6, 0.0));
     private StreamExecutionEnvironment env;
     private StreamTableEnvironment tEnv;
-    private static final List<Set<DenseVector>> expectedGroups =
+    private static final List<Set<DenseIntDoubleVector>> expectedGroups =
             Arrays.asList(
                     new HashSet<>(
                             Arrays.asList(
@@ -100,11 +100,11 @@ public class KMeansTest extends AbstractTestBase {
      * @param predictionCol Name of the column in the table that contains the prediction result
      * @return A map containing the collected results
      */
-    protected static List<Set<DenseVector>> groupFeaturesByPrediction(
+    protected static List<Set<DenseIntDoubleVector>> groupFeaturesByPrediction(
             List<Row> rows, String featuresCol, String predictionCol) {
-        Map<Integer, Set<DenseVector>> map = new HashMap<>();
+        Map<Integer, Set<DenseIntDoubleVector>> map = new HashMap<>();
         for (Row row : rows) {
-            DenseVector vector = ((Vector) row.getField(featuresCol)).toDense();
+            DenseIntDoubleVector vector = ((IntDoubleVector) row.getField(featuresCol)).toDense();
             int predict = (Integer) row.getField(predictionCol);
             map.putIfAbsent(predict, new HashSet<>());
             map.get(predict).add(vector);
@@ -152,7 +152,7 @@ public class KMeansTest extends AbstractTestBase {
 
     @Test
     public void testFewerDistinctPointsThanCluster() {
-        List<DenseVector> data =
+        List<DenseIntDoubleVector> data =
                 Arrays.asList(
                         Vectors.dense(0.0, 0.1), Vectors.dense(0.0, 0.1), Vectors.dense(0.0, 0.1));
 
@@ -162,10 +162,10 @@ public class KMeansTest extends AbstractTestBase {
         KMeansModel model = kmeans.fit(input);
         Table output = model.transform(input)[0];
 
-        List<Set<DenseVector>> expectedGroups =
+        List<Set<DenseIntDoubleVector>> expectedGroups =
                 Collections.singletonList(Collections.singleton(Vectors.dense(0.0, 0.1)));
         List<Row> results = IteratorUtils.toList(output.execute().collect());
-        List<Set<DenseVector>> actualGroups =
+        List<Set<DenseIntDoubleVector>> actualGroups =
                 groupFeaturesByPrediction(
                         results, kmeans.getFeaturesCol(), kmeans.getPredictionCol());
         assertTrue(CollectionUtils.isEqualCollection(expectedGroups, actualGroups));
@@ -181,7 +181,7 @@ public class KMeansTest extends AbstractTestBase {
                 Arrays.asList("features", "prediction"),
                 output.getResolvedSchema().getColumnNames());
         List<Row> results = IteratorUtils.toList(output.execute().collect());
-        List<Set<DenseVector>> actualGroups =
+        List<Set<DenseIntDoubleVector>> actualGroups =
                 groupFeaturesByPrediction(
                         results, kmeans.getFeaturesCol(), kmeans.getPredictionCol());
         assertTrue(CollectionUtils.isEqualCollection(expectedGroups, actualGroups));
@@ -191,7 +191,8 @@ public class KMeansTest extends AbstractTestBase {
     public void testInputTypeConversion() {
         dataTable = TestUtils.convertDataTypesToSparseInt(tEnv, dataTable);
         assertArrayEquals(
-                new Class<?>[] {SparseVector.class}, TestUtils.getColumnDataTypes(dataTable));
+                new Class<?>[] {SparseIntDoubleVector.class},
+                TestUtils.getColumnDataTypes(dataTable));
 
         KMeans kmeans = new KMeans().setMaxIter(2).setK(2);
         KMeansModel model = kmeans.fit(dataTable);
@@ -201,7 +202,7 @@ public class KMeansTest extends AbstractTestBase {
                 Arrays.asList("features", "prediction"),
                 output.getResolvedSchema().getColumnNames());
         List<Row> results = IteratorUtils.toList(output.execute().collect());
-        List<Set<DenseVector>> actualGroups =
+        List<Set<DenseIntDoubleVector>> actualGroups =
                 groupFeaturesByPrediction(
                         results, kmeans.getFeaturesCol(), kmeans.getPredictionCol());
         assertTrue(CollectionUtils.isEqualCollection(expectedGroups, actualGroups));
@@ -226,7 +227,7 @@ public class KMeansTest extends AbstractTestBase {
                 output.getResolvedSchema().getColumnNames());
 
         List<Row> results = IteratorUtils.toList(output.execute().collect());
-        List<Set<DenseVector>> actualGroups =
+        List<Set<DenseIntDoubleVector>> actualGroups =
                 groupFeaturesByPrediction(
                         results, kmeans.getFeaturesCol(), kmeans.getPredictionCol());
         assertTrue(CollectionUtils.isEqualCollection(expectedGroups, actualGroups));
@@ -245,7 +246,7 @@ public class KMeansTest extends AbstractTestBase {
         List<KMeansModelData> collectedModelData =
                 IteratorUtils.toList(modelData.executeAndCollect());
         assertEquals(1, collectedModelData.size());
-        DenseVector[] centroids = collectedModelData.get(0).centroids;
+        DenseIntDoubleVector[] centroids = collectedModelData.get(0).centroids;
         assertEquals(2, centroids.length);
         Arrays.sort(centroids, Comparator.comparingDouble(vector -> vector.get(0)));
         assertArrayEquals(centroids[0].values, new double[] {0.1, 0.1}, 1e-5);
@@ -261,7 +262,7 @@ public class KMeansTest extends AbstractTestBase {
 
         Table output = modelB.transform(dataTable)[0];
         List<Row> results = IteratorUtils.toList(output.execute().collect());
-        List<Set<DenseVector>> actualGroups =
+        List<Set<DenseIntDoubleVector>> actualGroups =
                 groupFeaturesByPrediction(
                         results, kmeans.getFeaturesCol(), kmeans.getPredictionCol());
         assertTrue(CollectionUtils.isEqualCollection(expectedGroups, actualGroups));

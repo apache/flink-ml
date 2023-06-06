@@ -20,7 +20,7 @@ package org.apache.flink.ml.examples.feature;
 
 import org.apache.flink.ml.feature.countvectorizer.CountVectorizer;
 import org.apache.flink.ml.feature.countvectorizer.CountVectorizerModel;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
@@ -62,7 +62,8 @@ public class CountVectorizerExample {
         for (CloseableIterator<Row> it = outputTable.execute().collect(); it.hasNext(); ) {
             Row row = it.next();
             String[] inputValue = (String[]) row.getField(countVectorizer.getInputCol());
-            SparseVector outputValue = (SparseVector) row.getField(countVectorizer.getOutputCol());
+            SparseIntDoubleVector outputValue =
+                    (SparseIntDoubleVector) row.getField(countVectorizer.getOutputCol());
             System.out.printf(
                     "Input Value: %-15s \tOutput Value: %s\n",
                     Arrays.toString(inputValue), outputValue.toString());

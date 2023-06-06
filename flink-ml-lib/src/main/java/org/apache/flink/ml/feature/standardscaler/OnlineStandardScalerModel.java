@@ -30,8 +30,8 @@ import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.common.metrics.MLMetrics;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -135,10 +135,10 @@ public class OnlineStandardScalerModel
         /** Model data for inference. */
         private StandardScalerModelData modelData;
 
-        private DenseVector mean;
+        private DenseIntDoubleVector mean;
 
         /** Inverse of standard deviation. */
-        private DenseVector scale;
+        private DenseIntDoubleVector scale;
 
         private long modelVersion;
 
@@ -249,7 +249,7 @@ public class OnlineStandardScalerModel
             modelTimeStamp = modelData.timestamp;
             modelVersion = modelData.version;
             mean = modelData.mean;
-            DenseVector std = modelData.std;
+            DenseIntDoubleVector std = modelData.std;
 
             if (withStd) {
                 scale = std;
@@ -263,11 +263,12 @@ public class OnlineStandardScalerModel
         private void doPrediction(StreamRecord<Row> streamRecord) {
             Row dataPoint = streamRecord.getValue();
 
-            Vector outputVec =
-                    ((Vector) (Objects.requireNonNull(dataPoint.getField(inputCol)))).clone();
+            IntDoubleVector outputVec =
+                    ((IntDoubleVector) (Objects.requireNonNull(dataPoint.getField(inputCol))))
+                            .clone();
             if (withMean) {
                 outputVec = outputVec.toDense();
-                BLAS.axpy(-1, mean, (DenseVector) outputVec);
+                BLAS.axpy(-1, mean, (DenseIntDoubleVector) outputVec);
             }
             if (withStd) {
                 BLAS.hDot(scale, outputVec);

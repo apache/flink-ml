@@ -62,7 +62,7 @@ be Vector(3, 6, 4, 8).
 
 ```java
 import org.apache.flink.ml.feature.interaction.Interaction;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;

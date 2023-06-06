@@ -19,7 +19,7 @@
 package org.apache.flink.ml.examples.feature;
 
 import org.apache.flink.ml.feature.hashingtf.HashingTF;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
@@ -60,7 +60,8 @@ public class HashingTFExample {
             Row row = it.next();
 
             List<Object> inputValue = (List<Object>) row.getField(hashingTF.getInputCol());
-            SparseVector outputValue = (SparseVector) row.getField(hashingTF.getOutputCol());
+            SparseIntDoubleVector outputValue =
+                    (SparseIntDoubleVector) row.getField(hashingTF.getOutputCol());
 
             System.out.printf(
                     "Input Value: %s \tOutput Value: %s\n",

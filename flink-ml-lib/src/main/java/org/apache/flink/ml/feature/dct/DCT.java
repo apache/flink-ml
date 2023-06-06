@@ -22,10 +22,10 @@ import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Transformer;
 import org.apache.flink.ml.common.datastream.TableUtils;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -70,7 +70,8 @@ public class DCT implements Transformer<DCT>, DCTParams<DCT> {
         RowTypeInfo outputTypeInfo =
                 new RowTypeInfo(
                         ArrayUtils.addAll(
-                                inputTypeInfo.getFieldTypes(), DenseVectorTypeInfo.INSTANCE),
+                                inputTypeInfo.getFieldTypes(),
+                                DenseIntDoubleVectorTypeInfo.INSTANCE),
                         ArrayUtils.addAll(inputTypeInfo.getFieldNames(), getOutputCol()));
 
         DataStream<Row> stream =
@@ -101,7 +102,7 @@ public class DCT implements Transformer<DCT>, DCTParams<DCT> {
 
         @Override
         public Row map(Row row) throws Exception {
-            Vector vector = row.getFieldAs(inputCol);
+            IntDoubleVector vector = row.getFieldAs(inputCol);
 
             if (previousVectorSize != vector.size()) {
                 if (isInverse) {
@@ -113,7 +114,7 @@ public class DCT implements Transformer<DCT>, DCTParams<DCT> {
             }
 
             double[] array = vector.toArray();
-            if (vector instanceof DenseVector) {
+            if (vector instanceof DenseIntDoubleVector) {
                 array = array.clone();
             }
 

@@ -19,7 +19,7 @@
 package org.apache.flink.ml.feature;
 
 import org.apache.flink.ml.feature.normalizer.Normalizer;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -56,7 +56,7 @@ public class NormalizerTest extends AbstractTestBase {
                             Vectors.dense(2.3, 4.1, 1.3, 2.4, 5.1, 4.1),
                             Vectors.sparse(5, new int[] {1, 2, 4}, new double[] {0.1, 0.2, 0.3})));
 
-    private static final List<Vector> EXPECTED_DENSE_OUTPUT =
+    private static final List<IntDoubleVector> EXPECTED_DENSE_OUTPUT =
             Arrays.asList(
                     Vectors.dense(
                             0.17386300895299714,
@@ -73,7 +73,7 @@ public class NormalizerTest extends AbstractTestBase {
                             0.4608889965995767,
                             0.3705186051094636));
 
-    private static final List<Vector> EXPECTED_SPARSE_OUTPUT =
+    private static final List<IntDoubleVector> EXPECTED_SPARSE_OUTPUT =
             Arrays.asList(
                     Vectors.sparse(
                             5,
@@ -96,14 +96,14 @@ public class NormalizerTest extends AbstractTestBase {
         inputDataTable = tEnv.fromDataStream(dataStream).as("denseVec", "sparseVec");
     }
 
-    private void verifyOutputResult(Table output, String outputCol, List<Vector> expectedData)
-            throws Exception {
+    private void verifyOutputResult(
+            Table output, String outputCol, List<IntDoubleVector> expectedData) throws Exception {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) output).getTableEnvironment();
         DataStream<Row> stream = tEnv.toDataStream(output);
 
         List<Row> results = IteratorUtils.toList(stream.executeAndCollect());
-        List<Vector> resultVec = new ArrayList<>(results.size());
+        List<IntDoubleVector> resultVec = new ArrayList<>(results.size());
         for (Row row : results) {
             if (row.getField(outputCol) != null) {
                 resultVec.add(row.getFieldAs(outputCol));

@@ -19,8 +19,8 @@
 package org.apache.flink.ml.feature;
 
 import org.apache.flink.ml.feature.dct.DCT;
-import org.apache.flink.ml.linalg.SparseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -48,7 +48,7 @@ public class DCTTest extends AbstractTestBase {
     private StreamExecutionEnvironment env;
     private StreamTableEnvironment tEnv;
 
-    private static final List<Vector> inputData =
+    private static final List<IntDoubleVector> inputData =
             Arrays.asList(Vectors.dense(1.0, 1.0, 1.0, 1.0), Vectors.dense(1.0, 0.0, -1.0, 0.0));
 
     private static final List<Row> expectedForwardOutputData =
@@ -126,7 +126,8 @@ public class DCTTest extends AbstractTestBase {
     public void testInputTypeConversion() throws Exception {
         inputTable = TestUtils.convertDataTypesToSparseInt(tEnv, inputTable);
         assertArrayEquals(
-                new Class<?>[] {SparseVector.class}, TestUtils.getColumnDataTypes(inputTable));
+                new Class<?>[] {SparseIntDoubleVector.class},
+                TestUtils.getColumnDataTypes(inputTable));
 
         DCT dct = new DCT();
         Table outputTable = dct.transform(inputTable)[0];
@@ -159,21 +160,21 @@ public class DCTTest extends AbstractTestBase {
         actualOutputData.sort(
                 Comparator.comparingLong(
                         x ->
-                                ((Vector) Objects.requireNonNull(x.getField(inputCol)))
+                                ((IntDoubleVector) Objects.requireNonNull(x.getField(inputCol)))
                                         .toDense()
                                         .hashCode()));
 
         expectedOutputData.sort(
                 Comparator.comparingLong(
                         x ->
-                                ((Vector) Objects.requireNonNull(x.getField(0)))
+                                ((IntDoubleVector) Objects.requireNonNull(x.getField(0)))
                                         .toDense()
                                         .hashCode()));
 
         assertEquals(actualOutputData.size(), expectedOutputData.size());
         for (int i = 0; i < actualOutputData.size(); i++) {
-            Vector actualVector = actualOutputData.get(i).getFieldAs(outputCol);
-            Vector expectedVector = expectedOutputData.get(i).getFieldAs(1);
+            IntDoubleVector actualVector = actualOutputData.get(i).getFieldAs(outputCol);
+            IntDoubleVector expectedVector = expectedOutputData.get(i).getFieldAs(1);
             assertArrayEquals(expectedVector.toArray(), actualVector.toArray(), 1e-3);
         }
     }

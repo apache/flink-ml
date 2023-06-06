@@ -22,9 +22,9 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.ml.feature.lsh.MinHashLSH;
 import org.apache.flink.ml.feature.lsh.MinHashLSHModel;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
@@ -77,7 +77,7 @@ public class MinHashLSHExample {
                                 Types.ROW_NAMED(
                                         new String[] {"id", "vec"},
                                         Types.INT,
-                                        TypeInformation.of(SparseVector.class))));
+                                        TypeInformation.of(SparseIntDoubleVector.class))));
 
         Table dataB =
                 tEnv.fromDataStream(
@@ -104,7 +104,7 @@ public class MinHashLSHExample {
                                 Types.ROW_NAMED(
                                         new String[] {"id", "vec"},
                                         Types.INT,
-                                        TypeInformation.of(SparseVector.class))));
+                                        TypeInformation.of(SparseIntDoubleVector.class))));
 
         // Creates a MinHashLSH estimator object and initializes its parameters.
         MinHashLSH lsh =
@@ -124,14 +124,15 @@ public class MinHashLSHExample {
         List<String> fieldNames = output.getResolvedSchema().getColumnNames();
         for (Row result :
                 (List<Row>) IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect())) {
-            Vector inputValue = result.getFieldAs(fieldNames.indexOf(lsh.getInputCol()));
-            DenseVector[] outputValue = result.getFieldAs(fieldNames.indexOf(lsh.getOutputCol()));
+            IntDoubleVector inputValue = result.getFieldAs(fieldNames.indexOf(lsh.getInputCol()));
+            DenseIntDoubleVector[] outputValue =
+                    result.getFieldAs(fieldNames.indexOf(lsh.getOutputCol()));
             System.out.printf(
                     "Vector: %s \tHash values: %s\n", inputValue, Arrays.toString(outputValue));
         }
 
         // Finds approximate nearest neighbors of the key.
-        Vector key = Vectors.sparse(6, new int[] {1, 3}, new double[] {1., 1.});
+        IntDoubleVector key = Vectors.sparse(6, new int[] {1, 3}, new double[] {1., 1.});
         output = model.approxNearestNeighbors(dataA, key, 2).select($("id"), $("distCol"));
         for (Row result :
                 (List<Row>) IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect())) {

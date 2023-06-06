@@ -27,7 +27,7 @@ import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.common.param.HasHandleInvalid;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -185,14 +185,14 @@ public class VectorIndexer
         public void processElement(StreamRecord<Row> element) {
             if (doublesByColumn == null) {
                 // First record.
-                Vector vector = (Vector) element.getValue().getField(inputCol);
+                IntDoubleVector vector = (IntDoubleVector) element.getValue().getField(inputCol);
                 doublesByColumn = new HashSet[vector.size()];
                 for (int i = 0; i < doublesByColumn.length; i++) {
                     doublesByColumn[i] = new HashSet<>();
                 }
             }
 
-            Vector vector = (Vector) element.getValue().getField(inputCol);
+            IntDoubleVector vector = (IntDoubleVector) element.getValue().getField(inputCol);
             Preconditions.checkState(
                     vector.size() == doublesByColumn.length,
                     "The size of the all input vectors should be the same.");

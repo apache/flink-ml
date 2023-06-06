@@ -22,7 +22,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.benchmark.datagenerator.param.HasArraySize;
 import org.apache.flink.ml.benchmark.datagenerator.param.HasVectorDim;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.Preconditions;
 
@@ -43,9 +43,9 @@ public class DenseVectorArrayGenerator extends InputTableGenerator<DenseVectorAr
             new RowGenerator(getNumValues(), getSeed()) {
                 @Override
                 protected Row getRow() {
-                    DenseVector[] result = new DenseVector[arraySize];
+                    DenseIntDoubleVector[] result = new DenseIntDoubleVector[arraySize];
                     for (int i = 0; i < arraySize; i++) {
-                        result[i] = new DenseVector(vectorDim);
+                        result[i] = new DenseIntDoubleVector(vectorDim);
                         for (int j = 0; j < vectorDim; j++) {
                             result[i].values[j] = random.nextDouble();
                         }
@@ -58,7 +58,9 @@ public class DenseVectorArrayGenerator extends InputTableGenerator<DenseVectorAr
                 @Override
                 protected RowTypeInfo getRowTypeInfo() {
                     return new RowTypeInfo(
-                            new TypeInformation[] {TypeInformation.of(DenseVector[].class)},
+                            new TypeInformation[] {
+                                TypeInformation.of(DenseIntDoubleVector[].class)
+                            },
                             columnNames[0]);
                 }
             }

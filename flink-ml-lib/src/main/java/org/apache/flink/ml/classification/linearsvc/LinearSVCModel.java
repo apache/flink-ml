@@ -25,10 +25,10 @@ import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -75,7 +75,7 @@ public class LinearSVCModel implements Model<LinearSVCModel>, LinearSVCModelPara
                         ArrayUtils.addAll(
                                 inputTypeInfo.getFieldTypes(),
                                 BasicTypeInfo.DOUBLE_TYPE_INFO,
-                                DenseVectorTypeInfo.INSTANCE),
+                                DenseIntDoubleVectorTypeInfo.INSTANCE),
                         ArrayUtils.addAll(
                                 inputTypeInfo.getFieldNames(),
                                 getPredictionCol(),
@@ -136,7 +136,7 @@ public class LinearSVCModel implements Model<LinearSVCModel>, LinearSVCModelPara
 
         private final double threshold;
 
-        private DenseVector coefficient;
+        private DenseIntDoubleVector coefficient;
 
         public PredictLabelFunction(
                 String broadcastModelKey, String featuresCol, double threshold) {
@@ -153,7 +153,8 @@ public class LinearSVCModel implements Model<LinearSVCModel>, LinearSVCModelPara
                                 getRuntimeContext().getBroadcastVariable(broadcastModelKey).get(0);
                 coefficient = modelData.coefficient;
             }
-            DenseVector features = ((Vector) dataPoint.getField(featuresCol)).toDense();
+            DenseIntDoubleVector features =
+                    ((IntDoubleVector) dataPoint.getField(featuresCol)).toDense();
             Row predictionResult = predictOneDataPoint(features, coefficient, threshold);
             return Row.join(dataPoint, predictionResult);
         }
@@ -168,7 +169,7 @@ public class LinearSVCModel implements Model<LinearSVCModel>, LinearSVCModelPara
      * @return The prediction label and the raw predictions.
      */
     private static Row predictOneDataPoint(
-            DenseVector feature, DenseVector coefficient, double threshold) {
+            DenseIntDoubleVector feature, DenseIntDoubleVector coefficient, double threshold) {
         double dotValue = BLAS.dot(feature, coefficient);
         return Row.of(dotValue >= threshold ? 1.0 : 0.0, Vectors.dense(dotValue, -dotValue));
     }

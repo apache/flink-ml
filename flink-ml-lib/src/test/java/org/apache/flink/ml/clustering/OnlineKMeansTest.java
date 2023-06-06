@@ -31,10 +31,10 @@ import org.apache.flink.ml.clustering.kmeans.KMeansModelData;
 import org.apache.flink.ml.clustering.kmeans.OnlineKMeans;
 import org.apache.flink.ml.clustering.kmeans.OnlineKMeansModel;
 import org.apache.flink.ml.common.distance.EuclideanDistanceMeasure;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.ml.util.InMemorySinkFunction;
 import org.apache.flink.ml.util.InMemorySourceFunction;
 import org.apache.flink.ml.util.TestUtils;
@@ -77,8 +77,8 @@ import static org.junit.Assert.assertEquals;
 public class OnlineKMeansTest extends TestLogger {
     @Rule public final TemporaryFolder tempFolder = new TemporaryFolder();
 
-    private static final DenseVector[] trainData1 =
-            new DenseVector[] {
+    private static final DenseIntDoubleVector[] trainData1 =
+            new DenseIntDoubleVector[] {
                 Vectors.dense(10.0, 0.0),
                 Vectors.dense(10.0, 0.3),
                 Vectors.dense(10.3, 0.0),
@@ -86,8 +86,8 @@ public class OnlineKMeansTest extends TestLogger {
                 Vectors.dense(-10.0, 0.6),
                 Vectors.dense(-10.6, 0.0)
             };
-    private static final DenseVector[] trainData2 =
-            new DenseVector[] {
+    private static final DenseIntDoubleVector[] trainData2 =
+            new DenseIntDoubleVector[] {
                 Vectors.dense(10.0, 100.0),
                 Vectors.dense(10.0, 100.3),
                 Vectors.dense(10.3, 100.0),
@@ -95,8 +95,8 @@ public class OnlineKMeansTest extends TestLogger {
                 Vectors.dense(-10.0, -100.6),
                 Vectors.dense(-10.6, -100.0)
             };
-    private static final DenseVector[] predictData =
-            new DenseVector[] {
+    private static final DenseIntDoubleVector[] predictData =
+            new DenseIntDoubleVector[] {
                 Vectors.dense(10.0, 10.0),
                 Vectors.dense(10.3, 10.0),
                 Vectors.dense(10.0, 10.3),
@@ -104,7 +104,7 @@ public class OnlineKMeansTest extends TestLogger {
                 Vectors.dense(-10.3, 10.0),
                 Vectors.dense(-10.0, 10.3)
             };
-    private static final List<Set<DenseVector>> expectedGroups1 =
+    private static final List<Set<DenseIntDoubleVector>> expectedGroups1 =
             Arrays.asList(
                     new HashSet<>(
                             Arrays.asList(
@@ -116,7 +116,7 @@ public class OnlineKMeansTest extends TestLogger {
                                     Vectors.dense(-10.0, 10.0),
                                     Vectors.dense(-10.3, 10.0),
                                     Vectors.dense(-10.0, 10.3))));
-    private static final List<Set<DenseVector>> expectedGroups2 =
+    private static final List<Set<DenseIntDoubleVector>> expectedGroups2 =
             Collections.singletonList(
                     new HashSet<>(
                             Arrays.asList(
@@ -133,8 +133,8 @@ public class OnlineKMeansTest extends TestLogger {
 
     private int currentModelDataVersion;
 
-    private InMemorySourceFunction<DenseVector> trainSource;
-    private InMemorySourceFunction<DenseVector> predictSource;
+    private InMemorySourceFunction<DenseIntDoubleVector> trainSource;
+    private InMemorySourceFunction<DenseIntDoubleVector> predictSource;
     private InMemorySinkFunction<Row> outputSink;
     private InMemorySinkFunction<KMeansModelData> modelDataSink;
 
@@ -179,10 +179,12 @@ public class OnlineKMeansTest extends TestLogger {
 
         offlineTrainTable = tEnv.fromDataStream(env.fromElements(trainData1)).as("features");
         onlineTrainTable =
-                tEnv.fromDataStream(env.addSource(trainSource, DenseVectorTypeInfo.INSTANCE))
+                tEnv.fromDataStream(
+                                env.addSource(trainSource, DenseIntDoubleVectorTypeInfo.INSTANCE))
                         .as("features");
         onlinePredictTable =
-                tEnv.fromDataStream(env.addSource(predictSource, DenseVectorTypeInfo.INSTANCE))
+                tEnv.fromDataStream(
+                                env.addSource(predictSource, DenseIntDoubleVectorTypeInfo.INSTANCE))
                         .as("features");
     }
 
@@ -247,11 +249,13 @@ public class OnlineKMeansTest extends TestLogger {
      * @param predictionCol Name of the column in the table that contains the prediction result
      */
     private void predictAndAssert(
-            List<Set<DenseVector>> expectedGroups, String featuresCol, String predictionCol)
+            List<Set<DenseIntDoubleVector>> expectedGroups,
+            String featuresCol,
+            String predictionCol)
             throws Exception {
         predictSource.addAll(OnlineKMeansTest.predictData);
         List<Row> rawResult = outputSink.poll(OnlineKMeansTest.predictData.length);
-        List<Set<DenseVector>> actualGroups =
+        List<Set<DenseIntDoubleVector>> actualGroups =
                 groupFeaturesByPrediction(rawResult, featuresCol, predictionCol);
         Assert.assertTrue(CollectionUtils.isEqualCollection(expectedGroups, actualGroups));
     }
@@ -324,13 +328,13 @@ public class OnlineKMeansTest extends TestLogger {
         onlinePredictTable = TestUtils.convertDataTypesToSparseInt(tEnv, onlinePredictTable);
 
         assertArrayEquals(
-                new Class<?>[] {SparseVector.class},
+                new Class<?>[] {SparseIntDoubleVector.class},
                 TestUtils.getColumnDataTypes(offlineTrainTable));
         assertArrayEquals(
-                new Class<?>[] {SparseVector.class},
+                new Class<?>[] {SparseIntDoubleVector.class},
                 TestUtils.getColumnDataTypes(onlineTrainTable));
         assertArrayEquals(
-                new Class<?>[] {SparseVector.class},
+                new Class<?>[] {SparseIntDoubleVector.class},
                 TestUtils.getColumnDataTypes(onlinePredictTable));
 
         OnlineKMeans onlineKMeans =
@@ -406,7 +410,7 @@ public class OnlineKMeansTest extends TestLogger {
 
         KMeansModelData expectedModelData =
                 new KMeansModelData(
-                        new DenseVector[] {
+                        new DenseIntDoubleVector[] {
                             Vectors.dense(-10.2, -200.2 / 3), Vectors.dense(10.1, 200.3 / 3)
                         },
                         Vectors.dense(4.5, 4.5));
@@ -502,7 +506,9 @@ public class OnlineKMeansTest extends TestLogger {
 
         KMeansModelData expectedModelData =
                 new KMeansModelData(
-                        new DenseVector[] {Vectors.dense(-10.2, 0.2), Vectors.dense(10.1, 0.1)},
+                        new DenseIntDoubleVector[] {
+                            Vectors.dense(-10.2, 0.2), Vectors.dense(10.1, 0.1)
+                        },
                         Vectors.dense(3, 3));
 
         assertArrayEquals(expectedModelData.weights.values, actualModelData.weights.values, 1e-5);
@@ -520,12 +526,14 @@ public class OnlineKMeansTest extends TestLogger {
     public void testSetModelData() throws Exception {
         KMeansModelData modelData1 =
                 new KMeansModelData(
-                        new DenseVector[] {Vectors.dense(10.1, 0.1), Vectors.dense(-10.2, 0.2)},
+                        new DenseIntDoubleVector[] {
+                            Vectors.dense(10.1, 0.1), Vectors.dense(-10.2, 0.2)
+                        },
                         Vectors.dense(0.0, 0.0));
 
         KMeansModelData modelData2 =
                 new KMeansModelData(
-                        new DenseVector[] {
+                        new DenseIntDoubleVector[] {
                             Vectors.dense(10.1, 100.1), Vectors.dense(-10.2, -100.2)
                         },
                         Vectors.dense(0.0, 0.0));

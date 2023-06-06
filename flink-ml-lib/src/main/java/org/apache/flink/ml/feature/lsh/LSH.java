@@ -20,7 +20,7 @@ package org.apache.flink.ml.feature.lsh;
 
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -80,7 +80,7 @@ abstract class LSH<E extends Estimator<E, M>, M extends LSHModel<M>>
         DataStream<Integer> vectorSizes =
                 input.map(
                         d -> {
-                            Vector vec = d.getFieldAs(vectorCol);
+                            IntDoubleVector vec = d.getFieldAs(vectorCol);
                             return vec.size();
                         });
         return DataStreamUtils.reduce(

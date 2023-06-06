@@ -35,9 +35,9 @@ import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -114,9 +114,9 @@ public class OnlineLogisticRegression
                                         getFeaturesCol(), getLabelCol(), getWeightCol()),
                                 pointTypeInfo);
 
-        DataStream<DenseVector> initModelData =
+        DataStream<DenseIntDoubleVector> initModelData =
                 modelDataStream.map(
-                        (MapFunction<LogisticRegressionModelData, DenseVector>)
+                        (MapFunction<LogisticRegressionModelData, DenseIntDoubleVector>)
                                 value -> value.coefficient);
 
         initModelData.getTransformation().setParallelism(1);
@@ -189,7 +189,7 @@ public class OnlineLogisticRegression
         @Override
         public IterationBodyResult process(
                 DataStreamList variableStreams, DataStreamList dataStreams) {
-            DataStream<DenseVector> modelData = variableStreams.get(0);
+            DataStream<DenseIntDoubleVector> modelData = variableStreams.get(0);
 
             DataStream<Row> points = dataStreams.get(0);
             int parallelism = points.getParallelism();
@@ -198,17 +198,17 @@ public class OnlineLogisticRegression
                     "There are more subtasks in the training process than the number "
                             + "of elements in each batch. Some subtasks might be idling forever.");
 
-            DataStream<DenseVector[]> newGradient =
+            DataStream<DenseIntDoubleVector[]> newGradient =
                     DataStreamUtils.generateBatchData(points, parallelism, batchSize)
                             .connect(modelData.broadcast())
                             .transform(
                                     "LocalGradientCalculator",
-                                    TypeInformation.of(DenseVector[].class),
+                                    TypeInformation.of(DenseIntDoubleVector[].class),
                                     new CalculateLocalGradient())
                             .setParallelism(parallelism)
                             .countWindowAll(parallelism)
                             .reduce(
-                                    (ReduceFunction<DenseVector[]>)
+                                    (ReduceFunction<DenseIntDoubleVector[]>)
                                             (gradientInfo, newGradientInfo) -> {
                                                 BLAS.axpy(1.0, gradientInfo[0], newGradientInfo[0]);
                                                 BLAS.axpy(1.0, gradientInfo[1], newGradientInfo[1]);
@@ -217,11 +217,11 @@ public class OnlineLogisticRegression
                                                 }
                                                 return newGradientInfo;
                                             });
-            DataStream<DenseVector> feedbackModelData =
+            DataStream<DenseIntDoubleVector> feedbackModelData =
                     newGradient
                             .transform(
                                     "ModelDataUpdater",
-                                    TypeInformation.of(DenseVector.class),
+                                    TypeInformation.of(DenseIntDoubleVector.class),
                                     new UpdateModel(alpha, beta, l1, l2))
                             .setParallelism(1);
 
@@ -233,12 +233,13 @@ public class OnlineLogisticRegression
     }
 
     private static class CreateLrModelData
-            implements MapFunction<DenseVector, LogisticRegressionModelData>, CheckpointedFunction {
+            implements MapFunction<DenseIntDoubleVector, LogisticRegressionModelData>,
+                    CheckpointedFunction {
         private Long modelVersion = 1L;
         private transient ListState<Long> modelVersionState;
 
         @Override
-        public LogisticRegressionModelData map(DenseVector denseVector) throws Exception {
+        public LogisticRegressionModelData map(DenseIntDoubleVector denseVector) throws Exception {
             return new LogisticRegressionModelData(denseVector, modelVersion++);
         }
 
@@ -258,8 +259,8 @@ public class OnlineLogisticRegression
     }
 
     /** Updates model. */
-    private static class UpdateModel extends AbstractStreamOperator<DenseVector>
-            implements OneInputStreamOperator<DenseVector[], DenseVector> {
+    private static class UpdateModel extends AbstractStreamOperator<DenseIntDoubleVector>
+            implements OneInputStreamOperator<DenseIntDoubleVector[], DenseIntDoubleVector> {
         private ListState<double[]> nParamState;
         private ListState<double[]> zParamState;
         private final double alpha;
@@ -288,8 +289,9 @@ public class OnlineLogisticRegression
         }
 
         @Override
-        public void processElement(StreamRecord<DenseVector[]> streamRecord) throws Exception {
-            DenseVector[] gradientInfo = streamRecord.getValue();
+        public void processElement(StreamRecord<DenseIntDoubleVector[]> streamRecord)
+                throws Exception {
+            DenseIntDoubleVector[] gradientInfo = streamRecord.getValue();
             double[] coefficient = gradientInfo[2].values;
             double[] g = gradientInfo[0].values;
             for (int i = 0; i < g.length; ++i) {
@@ -317,13 +319,14 @@ public class OnlineLogisticRegression
                                     / ((beta + Math.sqrt(nParam[i])) / alpha + l2);
                 }
             }
-            output.collect(new StreamRecord<>(new DenseVector(coefficient)));
+            output.collect(new StreamRecord<>(new DenseIntDoubleVector(coefficient)));
         }
     }
 
-    private static class CalculateLocalGradient extends AbstractStreamOperator<DenseVector[]>
-            implements TwoInputStreamOperator<Row[], DenseVector, DenseVector[]> {
-        private ListState<DenseVector> modelDataState;
+    private static class CalculateLocalGradient
+            extends AbstractStreamOperator<DenseIntDoubleVector[]>
+            implements TwoInputStreamOperator<Row[], DenseIntDoubleVector, DenseIntDoubleVector[]> {
+        private ListState<DenseIntDoubleVector> modelDataState;
         private ListState<Row[]> localBatchDataState;
         private double[] gradient;
         private double[] weightSum;
@@ -334,7 +337,8 @@ public class OnlineLogisticRegression
             modelDataState =
                     context.getOperatorStateStore()
                             .getListState(
-                                    new ListStateDescriptor<>("modelData", DenseVector.class));
+                                    new ListStateDescriptor<>(
+                                            "modelData", DenseIntDoubleVector.class));
             TypeInformation<Row[]> type =
                     ObjectArrayTypeInfo.getInfoFor(TypeInformation.of(Row.class));
             localBatchDataState =
@@ -353,7 +357,7 @@ public class OnlineLogisticRegression
                     || !localBatchDataState.get().iterator().hasNext()) {
                 return;
             }
-            DenseVector modelData =
+            DenseIntDoubleVector modelData =
                     OperatorStateUtils.getUniqueElement(modelDataState, "modelData").get();
             modelDataState.clear();
 
@@ -362,7 +366,7 @@ public class OnlineLogisticRegression
             localBatchDataState.update(pointsList);
 
             for (Row point : points) {
-                Vector vec = point.getFieldAs(0);
+                IntDoubleVector vec = point.getFieldAs(0);
                 double label = point.getFieldAs(1);
                 double weight = point.getArity() == 2 ? 1.0 : point.getFieldAs(2);
                 if (gradient == null) {
@@ -371,14 +375,14 @@ public class OnlineLogisticRegression
                 }
                 double p = BLAS.dot(modelData, vec);
                 p = 1 / (1 + Math.exp(-p));
-                if (vec instanceof DenseVector) {
-                    DenseVector dvec = (DenseVector) vec;
+                if (vec instanceof DenseIntDoubleVector) {
+                    DenseIntDoubleVector dvec = (DenseIntDoubleVector) vec;
                     for (int i = 0; i < modelData.size(); ++i) {
                         gradient[i] += (p - label) * dvec.values[i];
                         weightSum[i] += 1.0;
                     }
                 } else {
-                    SparseVector svec = (SparseVector) vec;
+                    SparseIntDoubleVector svec = (SparseIntDoubleVector) vec;
                     for (int i = 0; i < svec.indices.length; ++i) {
                         int idx = svec.indices[i];
                         gradient[idx] += (p - label) * svec.values[i];
@@ -390,9 +394,9 @@ public class OnlineLogisticRegression
             if (points.length > 0) {
                 output.collect(
                         new StreamRecord<>(
-                                new DenseVector[] {
-                                    new DenseVector(gradient),
-                                    new DenseVector(weightSum),
+                                new DenseIntDoubleVector[] {
+                                    new DenseIntDoubleVector(gradient),
+                                    new DenseIntDoubleVector(weightSum),
                                     (getRuntimeContext().getIndexOfThisSubtask() == 0)
                                             ? modelData
                                             : null
@@ -403,7 +407,8 @@ public class OnlineLogisticRegression
         }
 
         @Override
-        public void processElement2(StreamRecord<DenseVector> modelDataRecord) throws Exception {
+        public void processElement2(StreamRecord<DenseIntDoubleVector> modelDataRecord)
+                throws Exception {
             modelDataState.add(modelDataRecord.getValue());
             calculateGradient();
         }

@@ -21,7 +21,7 @@ package org.apache.flink.ml.common.lossfunc;
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.ml.common.feature.LabeledPointWithWeight;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.regression.linearregression.LinearRegression;
 
 /** The loss function for least square loss. See {@link LinearRegression} for example. */
@@ -32,14 +32,16 @@ public class LeastSquareLoss implements LossFunc {
     private LeastSquareLoss() {}
 
     @Override
-    public double computeLoss(LabeledPointWithWeight dataPoint, DenseVector coefficient) {
+    public double computeLoss(LabeledPointWithWeight dataPoint, DenseIntDoubleVector coefficient) {
         double dot = BLAS.dot(dataPoint.getFeatures(), coefficient);
         return dataPoint.getWeight() * 0.5 * Math.pow(dot - dataPoint.getLabel(), 2);
     }
 
     @Override
     public void computeGradient(
-            LabeledPointWithWeight dataPoint, DenseVector coefficient, DenseVector cumGradient) {
+            LabeledPointWithWeight dataPoint,
+            DenseIntDoubleVector coefficient,
+            DenseIntDoubleVector cumGradient) {
         double dot = BLAS.dot(dataPoint.getFeatures(), coefficient);
         BLAS.axpy(
                 (dot - dataPoint.getLabel()) * dataPoint.getWeight(),

@@ -21,8 +21,8 @@ package org.apache.flink.ml.classification;
 import org.apache.flink.ml.classification.naivebayes.NaiveBayes;
 import org.apache.flink.ml.classification.naivebayes.NaiveBayesModel;
 import org.apache.flink.ml.classification.naivebayes.NaiveBayesModelData;
-import org.apache.flink.ml.linalg.SparseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
@@ -56,7 +56,7 @@ public class NaiveBayesTest extends AbstractTestBase {
     private StreamTableEnvironment tEnv;
     private Table trainTable;
     private Table predictTable;
-    private Map<Vector, Double> expectedOutput;
+    private Map<IntDoubleVector, Double> expectedOutput;
     private NaiveBayes estimator;
 
     @Before
@@ -82,7 +82,7 @@ public class NaiveBayesTest extends AbstractTestBase {
         predictTable = tEnv.fromDataStream(env.fromCollection(predictData)).as("features");
 
         expectedOutput =
-                new HashMap<Vector, Double>() {
+                new HashMap<IntDoubleVector, Double>() {
                     {
                         put(Vectors.dense(0, 1.), 11.0);
                         put(Vectors.dense(0, 0.), 11.0);
@@ -109,13 +109,13 @@ public class NaiveBayesTest extends AbstractTestBase {
      * @param predictionCol Name of the column in the table that contains the prediction result
      * @return A map containing the collected results
      */
-    private static Map<Vector, Double> executeAndCollect(
+    private static Map<IntDoubleVector, Double> executeAndCollect(
             Table table, String featuresCol, String predictionCol) {
-        Map<Vector, Double> map = new HashMap<>();
+        Map<IntDoubleVector, Double> map = new HashMap<>();
         for (CloseableIterator<Row> it = table.execute().collect(); it.hasNext(); ) {
             Row row = it.next();
             map.put(
-                    ((Vector) row.getField(featuresCol)).toDense(),
+                    ((IntDoubleVector) row.getField(featuresCol)).toDense(),
                     (Double) row.getField(predictionCol));
         }
 
@@ -159,7 +159,7 @@ public class NaiveBayesTest extends AbstractTestBase {
     public void testFitAndPredict() {
         NaiveBayesModel model = estimator.fit(trainTable);
         Table outputTable = model.transform(predictTable)[0];
-        Map<Vector, Double> actualOutput =
+        Map<IntDoubleVector, Double> actualOutput =
                 executeAndCollect(outputTable, model.getFeaturesCol(), model.getPredictionCol());
         assertEquals(expectedOutput, actualOutput);
     }
@@ -170,14 +170,15 @@ public class NaiveBayesTest extends AbstractTestBase {
         predictTable = TestUtils.convertDataTypesToSparseInt(tEnv, predictTable);
 
         assertArrayEquals(
-                new Class<?>[] {SparseVector.class, Integer.class},
+                new Class<?>[] {SparseIntDoubleVector.class, Integer.class},
                 TestUtils.getColumnDataTypes(trainTable));
         assertArrayEquals(
-                new Class<?>[] {SparseVector.class}, TestUtils.getColumnDataTypes(predictTable));
+                new Class<?>[] {SparseIntDoubleVector.class},
+                TestUtils.getColumnDataTypes(predictTable));
 
         NaiveBayesModel model = estimator.fit(trainTable);
         Table outputTable = model.transform(predictTable)[0];
-        Map<Vector, Double> actualOutput =
+        Map<IntDoubleVector, Double> actualOutput =
                 executeAndCollect(outputTable, model.getFeaturesCol(), model.getPredictionCol());
         assertEquals(expectedOutput, actualOutput);
     }
@@ -194,7 +195,7 @@ public class NaiveBayesTest extends AbstractTestBase {
 
         NaiveBayesModel model = estimator.fit(trainTable);
         Table outputTable = model.transform(predictTable)[0];
-        Map<Vector, Double> actualOutput =
+        Map<IntDoubleVector, Double> actualOutput =
                 executeAndCollect(outputTable, model.getFeaturesCol(), model.getPredictionCol());
         assertEquals(expectedOutput, actualOutput);
     }
@@ -282,7 +283,7 @@ public class NaiveBayesTest extends AbstractTestBase {
 
         Table outputTable = model.transform(predictTable)[0];
 
-        Map<Vector, Double> actualOutput =
+        Map<IntDoubleVector, Double> actualOutput =
                 executeAndCollect(outputTable, model.getFeaturesCol(), model.getPredictionCol());
         assertEquals(expectedOutput, actualOutput);
     }
@@ -319,7 +320,7 @@ public class NaiveBayesTest extends AbstractTestBase {
 
         Table outputTable = modelB.transform(predictTable)[0];
 
-        Map<Vector, Double> actualOutput =
+        Map<IntDoubleVector, Double> actualOutput =
                 executeAndCollect(outputTable, modelB.getFeaturesCol(), modelB.getPredictionCol());
         assertEquals(expectedOutput, actualOutput);
     }

@@ -69,7 +69,7 @@ the strategy specified by the {@link HasHandleInvalid} parameter as follows:
 
 ```java
 import org.apache.flink.ml.feature.vectorassembler.VectorAssembler;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;

@@ -21,7 +21,7 @@ package org.apache.flink.ml.feature;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.ml.feature.univariatefeatureselector.UnivariateFeatureSelector;
 import org.apache.flink.ml.feature.univariatefeatureselector.UnivariateFeatureSelectorModel;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.util.TestUtils;
@@ -512,11 +512,13 @@ public class UnivariateFeatureSelectorTest extends AbstractTestBase {
         CloseableIterator<Row> rowIterator = tEnv.toDataStream(table).executeAndCollect();
         while (rowIterator.hasNext()) {
             Row row = rowIterator.next();
-            assertEquals(expectedIndices.length, ((Vector) row.getField("output")).size());
+            assertEquals(
+                    expectedIndices.length,
+                    ((IntDoubleVector) (row.getField("output"))).size().intValue());
             for (int i = 0; i < expectedIndices.length; i++) {
                 assertEquals(
-                        ((Vector) row.getField("features")).get(expectedIndices[i]),
-                        ((Vector) row.getField("output")).get(i),
+                        ((IntDoubleVector) row.getField("features")).get(expectedIndices[i]),
+                        ((IntDoubleVector) row.getField("output")).get(i),
                         EPS);
             }
         }

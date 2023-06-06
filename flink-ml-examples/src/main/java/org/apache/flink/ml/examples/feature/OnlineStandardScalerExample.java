@@ -24,9 +24,9 @@ import org.apache.flink.api.common.time.Time;
 import org.apache.flink.ml.common.window.EventTimeTumblingWindows;
 import org.apache.flink.ml.feature.standardscaler.OnlineStandardScaler;
 import org.apache.flink.ml.feature.standardscaler.OnlineStandardScalerModel;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.DataTypes;
@@ -73,7 +73,10 @@ public class OnlineStandardScalerExample {
                                 inputStreamWithEventTime,
                                 Schema.newBuilder()
                                         .column("f0", DataTypes.BIGINT())
-                                        .column("f1", DataTypes.RAW(DenseVectorTypeInfo.INSTANCE))
+                                        .column(
+                                                "f1",
+                                                DataTypes.RAW(
+                                                        DenseIntDoubleVectorTypeInfo.INSTANCE))
                                         .columnByMetadata("rowtime", "TIMESTAMP_LTZ(3)")
                                         .watermark("rowtime", "SOURCE_WATERMARK()")
                                         .build())
@@ -94,9 +97,10 @@ public class OnlineStandardScalerExample {
         // Extracts and displays the results.
         for (CloseableIterator<Row> it = outputTable.execute().collect(); it.hasNext(); ) {
             Row row = it.next();
-            DenseVector inputValue = (DenseVector) row.getField(onlineStandardScaler.getInputCol());
-            DenseVector outputValue =
-                    (DenseVector) row.getField(onlineStandardScaler.getOutputCol());
+            DenseIntDoubleVector inputValue =
+                    (DenseIntDoubleVector) row.getField(onlineStandardScaler.getInputCol());
+            DenseIntDoubleVector outputValue =
+                    (DenseIntDoubleVector) row.getField(onlineStandardScaler.getOutputCol());
             long modelVersion = row.getFieldAs(onlineStandardScaler.getModelVersionCol());
             System.out.printf(
                     "Input Value: %s\tOutput Value: %-65s\tModel Version: %s\n",

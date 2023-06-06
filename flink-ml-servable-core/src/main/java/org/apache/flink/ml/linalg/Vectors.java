@@ -25,12 +25,12 @@ import org.apache.flink.annotation.PublicEvolving;
 public class Vectors {
 
     /** Creates a dense vector from its values. */
-    public static DenseVector dense(double... values) {
-        return new DenseVector(values);
+    public static DenseIntDoubleVector dense(double... values) {
+        return new DenseIntDoubleVector(values);
     }
 
     /** Creates a sparse vector from its values. */
-    public static SparseVector sparse(int size, int[] indices, double[] values) {
-        return new SparseVector(size, indices, values);
+    public static SparseIntDoubleVector sparse(int size, int[] indices, double[] values) {
+        return new SparseIntDoubleVector(size, indices, values);
     }
 }

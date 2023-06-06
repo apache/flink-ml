@@ -25,9 +25,9 @@ import org.apache.flink.connector.file.src.reader.SimpleStreamFormat;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vector;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorSerializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -45,9 +45,9 @@ import java.io.OutputStream;
  */
 public class LinearSVCModelData {
 
-    public DenseVector coefficient;
+    public DenseIntDoubleVector coefficient;
 
-    public LinearSVCModelData(DenseVector coefficient) {
+    public LinearSVCModelData(DenseIntDoubleVector coefficient) {
         this.coefficient = coefficient;
     }
 
@@ -63,12 +63,13 @@ public class LinearSVCModelData {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) modelData).getTableEnvironment();
         return tEnv.toDataStream(modelData)
-                .map(x -> new LinearSVCModelData(((Vector) x.getField(0)).toDense()));
+                .map(x -> new LinearSVCModelData(((IntDoubleVector) x.getField(0)).toDense()));
     }
 
     /** Data encoder for {@link LinearSVCModel}. */
     public static class ModelDataEncoder implements Encoder<LinearSVCModelData> {
-        private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+        private final DenseIntDoubleVectorSerializer serializer =
+                new DenseIntDoubleVectorSerializer();
 
         @Override
         public void encode(LinearSVCModelData modelData, OutputStream outputStream)
@@ -85,12 +86,13 @@ public class LinearSVCModelData {
         public Reader<LinearSVCModelData> createReader(
                 Configuration configuration, FSDataInputStream inputStream) {
             return new Reader<LinearSVCModelData>() {
-                private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+                private final DenseIntDoubleVectorSerializer serializer =
+                        new DenseIntDoubleVectorSerializer();
 
                 @Override
                 public LinearSVCModelData read() throws IOException {
                     try {
-                        DenseVector coefficient =
+                        DenseIntDoubleVector coefficient =
                                 serializer.deserialize(new DataInputViewStreamWrapper(inputStream));
                         return new LinearSVCModelData(coefficient);
                     } catch (EOFException e) {

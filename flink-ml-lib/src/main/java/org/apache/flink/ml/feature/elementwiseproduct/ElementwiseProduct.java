@@ -23,7 +23,7 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Transformer;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -77,16 +77,16 @@ public class ElementwiseProduct
 
     private static class ElementwiseProductFunction implements MapFunction<Row, Row> {
         private final String inputCol;
-        private final Vector scalingVec;
+        private final IntDoubleVector scalingVec;
 
-        public ElementwiseProductFunction(String inputCol, Vector scalingVec) {
+        public ElementwiseProductFunction(String inputCol, IntDoubleVector scalingVec) {
             this.inputCol = inputCol;
             this.scalingVec = scalingVec;
         }
 
         @Override
         public Row map(Row value) {
-            Vector inputVec = value.getFieldAs(inputCol);
+            IntDoubleVector inputVec = value.getFieldAs(inputCol);
             if (inputVec != null) {
                 if (scalingVec.size() != inputVec.size()) {
                     throw new IllegalArgumentException(
@@ -96,7 +96,7 @@ public class ElementwiseProduct
                                     + inputVec.size()
                                     + ").");
                 }
-                Vector retVec = inputVec.clone();
+                IntDoubleVector retVec = inputVec.clone();
                 BLAS.hDot(scalingVec, retVec);
                 return Row.join(value, Row.of(retVec));
             } else {

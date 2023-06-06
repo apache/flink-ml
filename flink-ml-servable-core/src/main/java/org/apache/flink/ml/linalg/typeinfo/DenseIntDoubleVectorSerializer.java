@@ -24,15 +24,15 @@ import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.util.Bits;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Objects;
 
-/** Specialized serializer for {@link DenseVector}. */
-public final class DenseVectorSerializer extends TypeSerializer<DenseVector> {
+/** Specialized serializer for {@link DenseIntDoubleVector}. */
+public final class DenseIntDoubleVectorSerializer extends TypeSerializer<DenseIntDoubleVector> {
 
     private static final long serialVersionUID = 1L;
 
@@ -46,22 +46,22 @@ public final class DenseVectorSerializer extends TypeSerializer<DenseVector> {
     }
 
     @Override
-    public TypeSerializer<DenseVector> duplicate() {
-        return new DenseVectorSerializer();
+    public TypeSerializer<DenseIntDoubleVector> duplicate() {
+        return new DenseIntDoubleVectorSerializer();
     }
 
     @Override
-    public DenseVector createInstance() {
-        return new DenseVector(EMPTY);
+    public DenseIntDoubleVector createInstance() {
+        return new DenseIntDoubleVector(EMPTY);
     }
 
     @Override
-    public DenseVector copy(DenseVector from) {
-        return new DenseVector(Arrays.copyOf(from.values, from.values.length));
+    public DenseIntDoubleVector copy(DenseIntDoubleVector from) {
+        return new DenseIntDoubleVector(Arrays.copyOf(from.values, from.values.length));
     }
 
     @Override
-    public DenseVector copy(DenseVector from, DenseVector reuse) {
+    public DenseIntDoubleVector copy(DenseIntDoubleVector from, DenseIntDoubleVector reuse) {
         if (from.values.length == reuse.values.length) {
             System.arraycopy(from.values, 0, reuse.values, 0, from.values.length);
             return reuse;
@@ -75,7 +75,7 @@ public final class DenseVectorSerializer extends TypeSerializer<DenseVector> {
     }
 
     @Override
-    public void serialize(DenseVector vector, DataOutputView target) throws IOException {
+    public void serialize(DenseIntDoubleVector vector, DataOutputView target) throws IOException {
         if (vector == null) {
             throw new IllegalArgumentException("The vector must not be null.");
         }
@@ -93,11 +93,11 @@ public final class DenseVectorSerializer extends TypeSerializer<DenseVector> {
     }
 
     @Override
-    public DenseVector deserialize(DataInputView source) throws IOException {
+    public DenseIntDoubleVector deserialize(DataInputView source) throws IOException {
         int len = source.readInt();
         double[] values = new double[len];
         readDoubleArray(values, source, len);
-        return new DenseVector(values);
+        return new DenseIntDoubleVector(values);
     }
 
     // Reads `len` double values from `source` into `dst`.
@@ -116,7 +116,8 @@ public final class DenseVectorSerializer extends TypeSerializer<DenseVector> {
     }
 
     @Override
-    public DenseVector deserialize(DenseVector reuse, DataInputView source) throws IOException {
+    public DenseIntDoubleVector deserialize(DenseIntDoubleVector reuse, DataInputView source)
+            throws IOException {
         int len = source.readInt();
         if (len == reuse.values.length) {
             readDoubleArray(reuse.values, source, len);
@@ -125,7 +126,7 @@ public final class DenseVectorSerializer extends TypeSerializer<DenseVector> {
 
         double[] values = new double[len];
         readDoubleArray(values, source, len);
-        return new DenseVector(values);
+        return new DenseIntDoubleVector(values);
     }
 
     @Override
@@ -137,28 +138,28 @@ public final class DenseVectorSerializer extends TypeSerializer<DenseVector> {
 
     @Override
     public boolean equals(Object o) {
-        return o instanceof DenseVectorSerializer;
+        return o instanceof DenseIntDoubleVectorSerializer;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(DenseVectorSerializer.class);
+        return Objects.hashCode(DenseIntDoubleVectorSerializer.class);
     }
 
     // ------------------------------------------------------------------------
 
     @Override
-    public TypeSerializerSnapshot<DenseVector> snapshotConfiguration() {
+    public TypeSerializerSnapshot<DenseIntDoubleVector> snapshotConfiguration() {
         return new DenseVectorSerializerSnapshot();
     }
 
     /** Serializer configuration snapshot for compatibility and format evolution. */
     @SuppressWarnings("WeakerAccess")
     public static final class DenseVectorSerializerSnapshot
-            extends SimpleTypeSerializerSnapshot<DenseVector> {
+            extends SimpleTypeSerializerSnapshot<DenseIntDoubleVector> {
 
         public DenseVectorSerializerSnapshot() {
-            super(DenseVectorSerializer::new);
+            super(DenseIntDoubleVectorSerializer::new);
         }
     }
 }

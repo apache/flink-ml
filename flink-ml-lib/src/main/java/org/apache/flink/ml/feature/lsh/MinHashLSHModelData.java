@@ -28,8 +28,8 @@ import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.util.Preconditions;
 
 import java.io.EOFException;
@@ -122,7 +122,7 @@ public class MinHashLSHModelData extends LSHModelData {
     }
 
     @Override
-    public DenseVector[] hashFunction(Vector vec) {
+    public DenseIntDoubleVector[] hashFunction(IntDoubleVector vec) {
         int[] indices = vec.toSparse().indices;
         Preconditions.checkArgument(indices.length > 0, "Must have at least 1 non zero entry.");
         double[][] hashValues = new double[numHashTables][numHashFunctionsPerTable];
@@ -139,11 +139,13 @@ public class MinHashLSHModelData extends LSHModelData {
                 hashValues[i][j] = minv;
             }
         }
-        return Arrays.stream(hashValues).map(DenseVector::new).toArray(DenseVector[]::new);
+        return Arrays.stream(hashValues)
+                .map(DenseIntDoubleVector::new)
+                .toArray(DenseIntDoubleVector[]::new);
     }
 
     @Override
-    public double keyDistance(Vector x, Vector y) {
+    public double keyDistance(IntDoubleVector x, IntDoubleVector y) {
         int[] xIndices = x.toSparse().indices;
         int[] yIndices = y.toSparse().indices;
         Preconditions.checkArgument(

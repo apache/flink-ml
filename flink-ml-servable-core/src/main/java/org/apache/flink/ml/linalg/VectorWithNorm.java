@@ -25,15 +25,15 @@ import org.apache.flink.ml.linalg.typeinfo.VectorWithNormTypeInfoFactory;
 /** A vector with its norm. */
 @TypeInfo(VectorWithNormTypeInfoFactory.class)
 public class VectorWithNorm {
-    public final Vector vector;
+    public final IntDoubleVector vector;
 
     public final double l2Norm;
 
-    public VectorWithNorm(Vector vector) {
+    public VectorWithNorm(IntDoubleVector vector) {
         this(vector, BLAS.norm2(vector));
     }
 
-    public VectorWithNorm(Vector vector, double l2Norm) {
+    public VectorWithNorm(IntDoubleVector vector, double l2Norm) {
         this.vector = vector;
         this.l2Norm = l2Norm;
     }

@@ -18,7 +18,7 @@
 
 package org.apache.flink.ml.stats;
 
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.stats.fvaluetest.FValueTest;
 import org.apache.flink.ml.util.TestUtils;
@@ -346,13 +346,13 @@ public class FValueTestTest extends AbstractTestBase {
         Row result = results.get(0);
         assertEquals(3, result.getArity());
         assertArrayEquals(
-                ((Vector) expected.getField(0)).toArray(),
-                ((Vector) result.getField(0)).toArray(),
+                ((IntDoubleVector) expected.getField(0)).toArray(),
+                ((IntDoubleVector) result.getField(0)).toArray(),
                 EPS);
         assertArrayEquals((long[]) expected.getField(1), (long[]) result.getField(1));
         assertArrayEquals(
-                ((Vector) expected.getField(2)).toArray(),
-                ((Vector) result.getField(2)).toArray(),
+                ((IntDoubleVector) expected.getField(2)).toArray(),
+                ((IntDoubleVector) result.getField(2)).toArray(),
                 EPS);
     }
 

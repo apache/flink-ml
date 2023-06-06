@@ -58,7 +58,7 @@ scaling vector, the transformer will throw an IllegalArgumentException.
 
 ```java
 import org.apache.flink.ml.feature.elementwiseproduct.ElementwiseProduct;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;

@@ -27,12 +27,12 @@ import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.DenseMatrix;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Matrix;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorSerializer;
 import org.apache.flink.ml.linalg.typeinfo.DenseMatrixSerializer;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -51,13 +51,15 @@ import java.io.OutputStream;
 public class KnnModelData {
 
     public DenseMatrix packedFeatures;
-    public DenseVector featureNormSquares;
-    public DenseVector labels;
+    public DenseIntDoubleVector featureNormSquares;
+    public DenseIntDoubleVector labels;
 
     public KnnModelData() {}
 
     public KnnModelData(
-            DenseMatrix packedFeatures, DenseVector featureNormSquares, DenseVector labels) {
+            DenseMatrix packedFeatures,
+            DenseIntDoubleVector featureNormSquares,
+            DenseIntDoubleVector labels) {
         this.packedFeatures = packedFeatures;
         this.featureNormSquares = featureNormSquares;
         this.labels = labels;
@@ -77,13 +79,14 @@ public class KnnModelData {
                         x ->
                                 new KnnModelData(
                                         ((Matrix) x.getField(0)).toDense(),
-                                        ((Vector) x.getField(1)).toDense(),
-                                        ((Vector) x.getField(2)).toDense()));
+                                        ((IntDoubleVector) x.getField(1)).toDense(),
+                                        ((IntDoubleVector) x.getField(2)).toDense()));
     }
 
     /** Encoder for {@link KnnModelData}. */
     public static class ModelDataEncoder implements Encoder<KnnModelData> {
-        private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+        private final DenseIntDoubleVectorSerializer serializer =
+                new DenseIntDoubleVectorSerializer();
 
         @Override
         public void encode(KnnModelData modelData, OutputStream outputStream) throws IOException {
@@ -102,14 +105,15 @@ public class KnnModelData {
 
                 private final DataInputView source = new DataInputViewStreamWrapper(stream);
 
-                private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+                private final DenseIntDoubleVectorSerializer serializer =
+                        new DenseIntDoubleVectorSerializer();
 
                 @Override
                 public KnnModelData read() throws IOException {
                     try {
                         DenseMatrix matrix = DenseMatrixSerializer.INSTANCE.deserialize(source);
-                        DenseVector normSquares = serializer.deserialize(source);
-                        DenseVector labels = serializer.deserialize(source);
+                        DenseIntDoubleVector normSquares = serializer.deserialize(source);
+                        DenseIntDoubleVector labels = serializer.deserialize(source);
                         return new KnnModelData(matrix, normSquares, labels);
                     } catch (EOFException e) {
                         return null;

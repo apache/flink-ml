@@ -24,8 +24,8 @@ import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.VectorWithNorm;
 
 import java.io.IOException;
@@ -50,18 +50,18 @@ public class VectorWithNormSerializer extends TypeSerializer<VectorWithNorm> {
 
     @Override
     public VectorWithNorm createInstance() {
-        return new VectorWithNorm(new DenseVector(EMPTY));
+        return new VectorWithNorm(new DenseIntDoubleVector(EMPTY));
     }
 
     @Override
     public VectorWithNorm copy(VectorWithNorm from) {
-        Vector vector = vectorSerializer.copy(from.vector);
+        IntDoubleVector vector = (IntDoubleVector) vectorSerializer.copy(from.vector);
         return new VectorWithNorm(vector, from.l2Norm);
     }
 
     @Override
     public VectorWithNorm copy(VectorWithNorm from, VectorWithNorm reuse) {
-        Vector vector = vectorSerializer.copy(from.vector, reuse.vector);
+        IntDoubleVector vector = (IntDoubleVector) vectorSerializer.copy(from.vector, reuse.vector);
         return new VectorWithNorm(vector, from.l2Norm);
     }
 
@@ -78,7 +78,7 @@ public class VectorWithNormSerializer extends TypeSerializer<VectorWithNorm> {
 
     @Override
     public VectorWithNorm deserialize(DataInputView dataInputView) throws IOException {
-        Vector vector = vectorSerializer.deserialize(dataInputView);
+        IntDoubleVector vector = (IntDoubleVector) vectorSerializer.deserialize(dataInputView);
         double l2NormSquare = dataInputView.readDouble();
         return new VectorWithNorm(vector, l2NormSquare);
     }
@@ -86,7 +86,8 @@ public class VectorWithNormSerializer extends TypeSerializer<VectorWithNorm> {
     @Override
     public VectorWithNorm deserialize(VectorWithNorm reuse, DataInputView dataInputView)
             throws IOException {
-        Vector vector = vectorSerializer.deserialize(reuse.vector, dataInputView);
+        IntDoubleVector vector =
+                (IntDoubleVector) vectorSerializer.deserialize(reuse.vector, dataInputView);
         double l2NormSquare = dataInputView.readDouble();
         return new VectorWithNorm(vector, l2NormSquare);
     }

@@ -24,8 +24,8 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -80,7 +80,7 @@ public class KBinsDiscretizerModel
                 new RowTypeInfo(
                         ArrayUtils.addAll(
                                 inputTypeInfo.getFieldTypes(),
-                                TypeInformation.of(DenseVector.class)),
+                                TypeInformation.of(DenseIntDoubleVector.class)),
                         ArrayUtils.addAll(inputTypeInfo.getFieldNames(), getOutputCol()));
 
         DataStream<Row> output =
@@ -149,8 +149,8 @@ public class KBinsDiscretizerModel
                                 getRuntimeContext().getBroadcastVariable(broadcastKey).get(0);
                 binEdges = modelData.binEdges;
             }
-            DenseVector inputVec = ((Vector) row.getField(inputCol)).toDense();
-            DenseVector outputVec = inputVec.clone();
+            DenseIntDoubleVector inputVec = ((IntDoubleVector) row.getField(inputCol)).toDense();
+            DenseIntDoubleVector outputVec = inputVec.clone();
             for (int i = 0; i < inputVec.size(); i++) {
                 double targetFeature = inputVec.get(i);
                 int index = Arrays.binarySearch(binEdges[i], targetFeature);
@@ -164,7 +164,7 @@ public class KBinsDiscretizerModel
                 index = Math.min(index, (binEdges[i].length - 2));
                 index = Math.max(index, 0);
 
-                outputVec.set(i, index);
+                outputVec.set(i, (double) index);
             }
             return Row.join(row, Row.of(outputVec));
         }

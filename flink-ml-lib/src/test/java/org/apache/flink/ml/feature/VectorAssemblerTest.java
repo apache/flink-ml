@@ -20,8 +20,8 @@ package org.apache.flink.ml.feature;
 
 import org.apache.flink.ml.common.param.HasHandleInvalid;
 import org.apache.flink.ml.feature.vectorassembler.VectorAssembler;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -111,15 +111,15 @@ public class VectorAssemblerTest extends AbstractTestBase {
                             Vectors.sparse(
                                     5, new int[] {4, 2, 3, 1}, new double[] {4.0, 2.0, 3.0, 1.0})));
 
-    private static final SparseVector EXPECTED_OUTPUT_DATA_1 =
+    private static final SparseIntDoubleVector EXPECTED_OUTPUT_DATA_1 =
             Vectors.sparse(8, new int[] {0, 1, 2, 6}, new double[] {2.1, 3.1, 1.0, 1.0});
-    private static final DenseVector EXPECTED_OUTPUT_DATA_2 =
+    private static final DenseIntDoubleVector EXPECTED_OUTPUT_DATA_2 =
             Vectors.dense(2.1, 3.1, 1.0, 0.0, 1.0, 2.0, 3.0, 4.0);
-    private static final DenseVector EXPECTED_OUTPUT_DATA_3 =
+    private static final DenseIntDoubleVector EXPECTED_OUTPUT_DATA_3 =
             Vectors.dense(2.0, 2.1, 1.0, 0.0, 1.0, 2.0, 3.0, 4.0);
-    private static final DenseVector EXPECTED_OUTPUT_DATA_4 =
+    private static final DenseIntDoubleVector EXPECTED_OUTPUT_DATA_4 =
             Vectors.dense(Double.NaN, Double.NaN, 1.0, 0.0, 1.0, 2.0, 3.0, 4.0);
-    private static final DenseVector EXPECTED_OUTPUT_DATA_5 =
+    private static final DenseIntDoubleVector EXPECTED_OUTPUT_DATA_5 =
             Vectors.dense(2.0, 2.1, Double.NaN, 0.0, 1.0, 2.0, 3.0, 4.0);
 
     @Before
@@ -373,7 +373,10 @@ public class VectorAssemblerTest extends AbstractTestBase {
         inputDataTable = TestUtils.convertDataTypesToSparseInt(tEnv, inputDataTable);
         assertArrayEquals(
                 new Class<?>[] {
-                    Integer.class, SparseVector.class, Integer.class, SparseVector.class
+                    Integer.class,
+                    SparseIntDoubleVector.class,
+                    Integer.class,
+                    SparseIntDoubleVector.class
                 },
                 TestUtils.getColumnDataTypes(inputDataTable));
 
@@ -409,7 +412,8 @@ public class VectorAssemblerTest extends AbstractTestBase {
         List<Row> results = IteratorUtils.toList(dataStream.executeAndCollect());
         for (Row result : results) {
             if (result.getField(2) != null) {
-                assertEquals(result.getField(2), ((DenseVector) result.getField(4)).values[0]);
+                assertEquals(
+                        result.getField(2), ((DenseIntDoubleVector) result.getField(4)).values[0]);
             }
         }
     }

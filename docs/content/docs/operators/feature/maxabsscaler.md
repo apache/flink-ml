@@ -59,7 +59,7 @@ It does not shift/center the data and thus does not destroy any sparsity.
 ```java
 import org.apache.flink.ml.feature.maxabsscaler.MaxAbsScaler;
 import org.apache.flink.ml.feature.maxabsscaler.MaxAbsScalerModel;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;

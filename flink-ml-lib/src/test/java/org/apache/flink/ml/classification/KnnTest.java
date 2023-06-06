@@ -23,9 +23,9 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.classification.knn.Knn;
 import org.apache.flink.ml.classification.knn.KnnModel;
 import org.apache.flink.ml.classification.knn.KnnModelData;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.DenseMatrix;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
@@ -96,7 +96,7 @@ public class KnnTest extends AbstractTestBase {
         tEnv = StreamTableEnvironment.create(env);
         Schema schema =
                 Schema.newBuilder()
-                        .column("f0", DataTypes.of(DenseVector.class))
+                        .column("f0", DataTypes.of(DenseIntDoubleVector.class))
                         .column("f1", DataTypes.DOUBLE())
                         .build();
         DataStream<Row> dataStream = env.fromCollection(trainRows);
@@ -179,10 +179,10 @@ public class KnnTest extends AbstractTestBase {
         trainData = TestUtils.convertDataTypesToSparseInt(tEnv, trainData);
         predictData = TestUtils.convertDataTypesToSparseInt(tEnv, predictData);
         assertArrayEquals(
-                new Class<?>[] {SparseVector.class, Integer.class},
+                new Class<?>[] {SparseIntDoubleVector.class, Integer.class},
                 TestUtils.getColumnDataTypes(trainData));
         assertArrayEquals(
-                new Class<?>[] {SparseVector.class, Integer.class},
+                new Class<?>[] {SparseIntDoubleVector.class, Integer.class},
                 TestUtils.getColumnDataTypes(predictData));
 
         Knn knn = new Knn();
@@ -232,12 +232,12 @@ public class KnnTest extends AbstractTestBase {
         KnnModelData data =
                 new KnnModelData(
                         (DenseMatrix) modelRows.get(0).getField(0),
-                        (DenseVector) modelRows.get(0).getField(1),
-                        (DenseVector) modelRows.get(0).getField(2));
+                        (DenseIntDoubleVector) modelRows.get(0).getField(1),
+                        (DenseIntDoubleVector) modelRows.get(0).getField(2));
         Assert.assertNotNull(data);
         assertEquals(2, data.packedFeatures.numRows());
-        assertEquals(data.packedFeatures.numCols(), data.labels.size());
-        assertEquals(data.featureNormSquares.size(), data.labels.size());
+        assertEquals(data.packedFeatures.numCols(), data.labels.size().intValue());
+        assertEquals(data.featureNormSquares.size().intValue(), data.labels.size().intValue());
     }
 
     @Test

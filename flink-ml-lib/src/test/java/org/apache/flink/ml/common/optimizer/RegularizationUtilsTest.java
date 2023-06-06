@@ -18,7 +18,7 @@
 
 package org.apache.flink.ml.common.optimizer;
 
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 
 import org.apache.commons.lang3.RandomUtils;
 import org.junit.Test;
@@ -29,7 +29,8 @@ import static org.junit.Assert.assertArrayEquals;
 public class RegularizationUtilsTest {
     private static final double learningRate = 0.1;
     private static final double TOLERANCE = 1e-7;
-    private static final DenseVector coefficient = new DenseVector(new double[] {1.0, -2.0, 0});
+    private static final DenseIntDoubleVector coefficient =
+            new DenseIntDoubleVector(new double[] {1.0, -2.0, 0});
 
     @Test
     public void testRegularization() {
@@ -40,7 +41,7 @@ public class RegularizationUtilsTest {
     }
 
     private void checkRegularization(double reg, double elasticNet, double[] expectedCoefficient) {
-        DenseVector clonedCoefficient = coefficient.clone();
+        DenseIntDoubleVector clonedCoefficient = coefficient.clone();
         RegularizationUtils.regularize(clonedCoefficient, reg, elasticNet, learningRate);
         assertArrayEquals(expectedCoefficient, clonedCoefficient.values, TOLERANCE);
     }

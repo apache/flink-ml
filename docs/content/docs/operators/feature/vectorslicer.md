@@ -61,7 +61,7 @@ it throws an IllegalArgumentException.
 
 ```java
 import org.apache.flink.ml.feature.vectorslicer.VectorSlicer;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;

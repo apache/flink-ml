@@ -27,8 +27,8 @@ import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.ml.api.AlgoOperator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.common.param.HasFlatten;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -93,16 +93,16 @@ public class ANOVATest implements AlgoOperator<ANOVATest>, ANOVATestParams<ANOVA
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
 
-        DataStream<Tuple2<Vector, Double>> inputData =
+        DataStream<Tuple2<IntDoubleVector, Double>> inputData =
                 tEnv.toDataStream(inputs[0])
                         .map(
-                                (MapFunction<Row, Tuple2<Vector, Double>>)
+                                (MapFunction<Row, Tuple2<IntDoubleVector, Double>>)
                                         row -> {
                                             Number number = (Number) row.getField(labelCol);
                                             Preconditions.checkNotNull(
                                                     number, "Input data must contain label value.");
                                             return new Tuple2<>(
-                                                    ((Vector) row.getField(featuresCol)),
+                                                    ((IntDoubleVector) row.getField(featuresCol)),
                                                     number.doubleValue());
                                         },
                                 Types.TUPLE(VectorTypeInfo.INSTANCE, Types.DOUBLE));
@@ -125,7 +125,7 @@ public class ANOVATest implements AlgoOperator<ANOVATest>, ANOVATestParams<ANOVA
     @SuppressWarnings("unchecked")
     private static class ANOVAAggregator
             implements AggregateFunction<
-                    Tuple2<Vector, Double>,
+                    Tuple2<IntDoubleVector, Double>,
                     Tuple3<Double, Double, HashMap<Double, Tuple2<Double, Long>>>[],
                     List<Row>> {
         @Override
@@ -135,9 +135,9 @@ public class ANOVATest implements AlgoOperator<ANOVATest>, ANOVATestParams<ANOVA
 
         @Override
         public Tuple3<Double, Double, HashMap<Double, Tuple2<Double, Long>>>[] add(
-                Tuple2<Vector, Double> featuresAndLabel,
+                Tuple2<IntDoubleVector, Double> featuresAndLabel,
                 Tuple3<Double, Double, HashMap<Double, Tuple2<Double, Long>>>[] acc) {
-            Vector features = featuresAndLabel.f0;
+            IntDoubleVector features = featuresAndLabel.f0;
             double label = featuresAndLabel.f1;
             int numOfFeatures = features.size();
             if (acc.length == 0) {
@@ -257,15 +257,19 @@ public class ANOVATest implements AlgoOperator<ANOVATest>, ANOVATestParams<ANOVA
             return tEnv.fromDataStream(output)
                     .as("featureIndex", "pValue", "degreeOfFreedom", "fValue");
         } else {
-            DataStream<Tuple3<DenseVector, long[], DenseVector>> output =
+            DataStream<Tuple3<DenseIntDoubleVector, long[], DenseIntDoubleVector>> output =
                     datastream.map(
-                            new MapFunction<List<Row>, Tuple3<DenseVector, long[], DenseVector>>() {
+                            new MapFunction<
+                                    List<Row>,
+                                    Tuple3<DenseIntDoubleVector, long[], DenseIntDoubleVector>>() {
                                 @Override
-                                public Tuple3<DenseVector, long[], DenseVector> map(
-                                        List<Row> rows) {
+                                public Tuple3<DenseIntDoubleVector, long[], DenseIntDoubleVector>
+                                        map(List<Row> rows) {
                                     int numOfFeatures = rows.size();
-                                    DenseVector pValues = new DenseVector(numOfFeatures);
-                                    DenseVector fValues = new DenseVector(numOfFeatures);
+                                    DenseIntDoubleVector pValues =
+                                            new DenseIntDoubleVector(numOfFeatures);
+                                    DenseIntDoubleVector fValues =
+                                            new DenseIntDoubleVector(numOfFeatures);
                                     long[] degrees = new long[numOfFeatures];
 
                                     for (int i = 0; i < numOfFeatures; i++) {

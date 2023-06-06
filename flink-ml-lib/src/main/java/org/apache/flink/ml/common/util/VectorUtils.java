@@ -18,22 +18,22 @@
 
 package org.apache.flink.ml.common.util;
 
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 
 import java.util.ArrayList;
 import java.util.List;
 
-/** Provides utility functions for {@link Vector}. */
+/** Provides utility functions for {@link IntDoubleVector}. */
 public class VectorUtils {
     /**
      * Selects a subset of the vector base on the indices. Note that the input indices must be
      * sorted in ascending order.
      */
-    public static Vector selectByIndices(Vector vector, int[] sortedIndices) {
-        if (vector instanceof DenseVector) {
-            DenseVector resultVec = new DenseVector(sortedIndices.length);
+    public static IntDoubleVector selectByIndices(IntDoubleVector vector, int[] sortedIndices) {
+        if (vector instanceof DenseIntDoubleVector) {
+            DenseIntDoubleVector resultVec = new DenseIntDoubleVector(sortedIndices.length);
             for (int i = 0; i < sortedIndices.length; i++) {
                 resultVec.set(i, vector.get(sortedIndices[i]));
             }
@@ -42,18 +42,18 @@ public class VectorUtils {
             List<Integer> resultIndices = new ArrayList<>();
             List<Double> resultValues = new ArrayList<>();
 
-            int[] indices = ((SparseVector) vector).indices;
+            int[] indices = ((SparseIntDoubleVector) vector).indices;
             for (int i = 0, j = 0; i < indices.length && j < sortedIndices.length; ) {
                 if (indices[i] == sortedIndices[j]) {
                     resultIndices.add(j++);
-                    resultValues.add(((SparseVector) vector).values[i++]);
+                    resultValues.add(((SparseIntDoubleVector) vector).values[i++]);
                 } else if (indices[i] > sortedIndices[j]) {
                     j++;
                 } else {
                     i++;
                 }
             }
-            return new SparseVector(
+            return new SparseIntDoubleVector(
                     sortedIndices.length,
                     resultIndices.stream().mapToInt(Integer::intValue).toArray(),
                     resultValues.stream().mapToDouble(Double::doubleValue).toArray());

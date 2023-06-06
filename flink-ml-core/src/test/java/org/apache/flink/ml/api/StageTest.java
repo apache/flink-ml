@@ -26,7 +26,7 @@ import org.apache.flink.ml.common.window.GlobalWindows;
 import org.apache.flink.ml.common.window.ProcessingTimeSessionWindows;
 import org.apache.flink.ml.common.window.ProcessingTimeTumblingWindows;
 import org.apache.flink.ml.common.window.Windows;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.param.BooleanParam;
 import org.apache.flink.ml.param.DoubleArrayArrayParam;
@@ -138,7 +138,7 @@ public class StageTest {
                         "Description",
                         new Double[][] {new Double[] {14.0, 15.0}, new Double[] {16.0, 17.0}});
 
-        Param<Vector> VECTOR_PARAM =
+        Param<IntDoubleVector> VECTOR_PARAM =
                 new VectorParam("vectorParam", "Description", Vectors.dense(1.0, 2.0, 3.0));
 
         Param<Windows> WINDOWS_PARAM =

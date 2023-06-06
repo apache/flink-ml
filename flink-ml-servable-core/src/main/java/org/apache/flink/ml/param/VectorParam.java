@@ -18,30 +18,30 @@
 
 package org.apache.flink.ml.param;
 
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 
 import java.util.List;
 import java.util.Map;
 
 /** Class for the Vector parameter. */
-public class VectorParam extends Param<Vector> {
+public class VectorParam extends Param<IntDoubleVector> {
 
     public VectorParam(
             String name,
             String description,
-            Vector defaultValue,
-            ParamValidator<Vector> validator) {
-        super(name, Vector.class, description, defaultValue, validator);
+            IntDoubleVector defaultValue,
+            ParamValidator<IntDoubleVector> validator) {
+        super(name, IntDoubleVector.class, description, defaultValue, validator);
     }
 
-    public VectorParam(String name, String description, Vector defaultValue) {
+    public VectorParam(String name, String description, IntDoubleVector defaultValue) {
         this(name, description, defaultValue, ParamValidators.alwaysTrue());
     }
 
     @Override
-    public Vector jsonDecode(Object object) {
+    public IntDoubleVector jsonDecode(Object object) {
         Map<String, Object> vecValues = (Map) object;
         if (vecValues.size() == 1) {
             List<Double> list = (List<Double>) vecValues.get("values");
@@ -49,7 +49,7 @@ public class VectorParam extends Param<Vector> {
             for (int i = 0; i < values.length; ++i) {
                 values[i] = list.get(i);
             }
-            return new DenseVector(values);
+            return new DenseIntDoubleVector(values);
         } else if (vecValues.size() == 3) {
             List<Double> valuesList = (List<Double>) vecValues.get("values");
             List<Integer> indicesList = (List<Integer>) vecValues.get("indices");
@@ -60,7 +60,7 @@ public class VectorParam extends Param<Vector> {
                 values[i] = valuesList.get(i);
                 indices[i] = indicesList.get(i);
             }
-            return new SparseVector(n, indices, values);
+            return new SparseIntDoubleVector(n, indices, values);
         } else {
             throw new UnsupportedOperationException("Vector parameter is invalid.");
         }

@@ -91,9 +91,9 @@ import org.apache.flink.api.common.time.Time;
 import org.apache.flink.ml.common.window.EventTimeTumblingWindows;
 import org.apache.flink.ml.feature.standardscaler.OnlineStandardScaler;
 import org.apache.flink.ml.feature.standardscaler.OnlineStandardScalerModel;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.DataTypes;
@@ -202,13 +202,13 @@ t_env = StreamTableEnvironment.create(env)
 
 # Generates input data.
 dense_vector_serializer = get_gateway().jvm.org.apache.flink.table.types.logical.RawType(
-    get_gateway().jvm.org.apache.flink.ml.linalg.DenseVector(0).getClass(),
-    get_gateway().jvm.org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer()
+    get_gateway().jvm.org.apache.flink.ml.linalg.DenseIntDoubleVector(0).getClass(),
+    get_gateway().jvm.org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorSerializer()
 ).getSerializerString()
 
 schema = Schema.new_builder()
     .column("ts", "TIMESTAMP_LTZ(3)")
-    .column("input", "RAW('org.apache.flink.ml.linalg.DenseVector', '{serializer}')"
+    .column("input", "RAW('org.apache.flink.ml.linalg.DenseIntDoubleVector', '{serializer}')"
             .format(serializer=dense_vector_serializer))
     .watermark("ts", "ts - INTERVAL '1' SECOND")
     .build()

@@ -25,7 +25,7 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.file.src.reader.SimpleStreamFormat;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.ml.common.datastream.TableUtils;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
@@ -70,7 +70,7 @@ public class LogisticRegressionModelDataUtil {
 
         @Override
         public LogisticRegressionModelData map(Integer integer) throws Exception {
-            DenseVector vector = new DenseVector(dim);
+            DenseIntDoubleVector vector = new DenseIntDoubleVector(dim);
             Random random = new Random(seed);
             for (int j = 0; j < dim; j++) {
                 vector.values[j] = random.nextDouble();

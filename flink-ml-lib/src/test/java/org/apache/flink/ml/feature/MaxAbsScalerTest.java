@@ -21,7 +21,8 @@ package org.apache.flink.ml.feature;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.ml.feature.maxabsscaler.MaxAbsScaler;
 import org.apache.flink.ml.feature.maxabsscaler.MaxAbsScalerModel;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
@@ -94,14 +95,14 @@ public class MaxAbsScalerTest {
                             Row.of(Vectors.sparse(4, new int[] {}, new double[] {})),
                             Row.of(Vectors.sparse(4, new int[] {1, 3}, new double[] {1.0, 2.0}))));
 
-    private static final List<Vector> EXPECTED_DATA =
+    private static final List<IntDoubleVector> EXPECTED_DATA =
             new ArrayList<>(
                     Arrays.asList(
                             Vectors.dense(0.25, 0.1, 1.0),
                             Vectors.dense(0.5, 0.125, 0.5),
                             Vectors.dense(0.75, 0.225, 1.0)));
 
-    private static final List<Vector> EXPECTED_SPARSE_DATA =
+    private static final List<IntDoubleVector> EXPECTED_SPARSE_DATA =
             new ArrayList<>(
                     Arrays.asList(
                             Vectors.sparse(4, new int[] {0, 1}, new double[] {1.0, 0.5}),
@@ -124,7 +125,7 @@ public class MaxAbsScalerTest {
     }
 
     private static void verifyPredictionResult(
-            Table output, String outputCol, List<Vector> expectedData) throws Exception {
+            Table output, String outputCol, List<IntDoubleVector> expectedData) throws Exception {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) output).getTableEnvironment();
 
@@ -134,7 +135,7 @@ public class MaxAbsScalerTest {
                                 (MapFunction<Row, Vector>) row -> row.getFieldAs(outputCol),
                                 VectorTypeInfo.INSTANCE);
 
-        List<Vector> result = IteratorUtils.toList(stream.executeAndCollect());
+        List<IntDoubleVector> result = IteratorUtils.toList(stream.executeAndCollect());
         compareResultCollections(expectedData, result, TestUtils::compare);
     }
 
@@ -237,7 +238,8 @@ public class MaxAbsScalerTest {
         DataStream<Row> output = tEnv.toDataStream(modelData);
         List<Row> modelRows = IteratorUtils.toList(output.executeAndCollect());
         assertEquals(
-                new DenseVector(new double[] {200.0, 400.0, 0.0}), modelRows.get(0).getField(0));
+                new DenseIntDoubleVector(new double[] {200.0, 400.0, 0.0}),
+                modelRows.get(0).getField(0));
     }
 
     @Test

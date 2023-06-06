@@ -24,29 +24,29 @@ import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfoFactory;
 
 import java.io.Serializable;
 
-/** A vector of double values. */
+/** A vector representation of numbers. */
 @TypeInfo(VectorTypeInfoFactory.class)
 @PublicEvolving
-public interface Vector extends Serializable {
+public interface Vector<K extends Number & Comparable<K>, V extends Number> extends Serializable {
 
     /** Gets the size of the vector. */
-    int size();
+    K size();
 
     /** Gets the value of the ith element. */
-    double get(int i);
+    V get(K i);
 
     /** Sets the value of the ith element. */
-    void set(int i, double value);
+    void set(K i, V value);
 
-    /** Converts the instance to a double array. */
-    double[] toArray();
+    /** Converts the instance to a primitive array. */
+    Object toArray();
 
     /** Converts the instance to a dense vector. */
-    DenseVector toDense();
+    Vector<K, V> toDense();
 
     /** Converts the instance to a sparse vector. */
-    SparseVector toSparse();
+    Vector<K, V> toSparse();
 
     /** Makes a deep copy of the vector. */
-    Vector clone();
+    Vector<K, V> clone();
 }

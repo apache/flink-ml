@@ -20,7 +20,7 @@ package org.apache.flink.ml.feature.elementwiseproduct;
 
 import org.apache.flink.ml.common.param.HasInputCol;
 import org.apache.flink.ml.common.param.HasOutputCol;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.param.ParamValidators;
 import org.apache.flink.ml.param.VectorParam;
@@ -32,18 +32,18 @@ import org.apache.flink.ml.param.VectorParam;
  */
 public interface ElementwiseProductParams<T> extends HasInputCol<T>, HasOutputCol<T> {
 
-    Param<Vector> SCALING_VEC =
+    Param<IntDoubleVector> SCALING_VEC =
             new VectorParam(
                     "scalingVec",
                     "The scaling vector to multiply with input vectors using hadamard product.",
                     null,
                     ParamValidators.notNull());
 
-    default Vector getScalingVec() {
+    default IntDoubleVector getScalingVec() {
         return get(SCALING_VEC);
     }
 
-    default T setScalingVec(Vector value) {
+    default T setScalingVec(IntDoubleVector value) {
         set(SCALING_VEC, value);
         return (T) this;
     }

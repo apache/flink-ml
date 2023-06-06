@@ -63,7 +63,7 @@ http://en.wikipedia.org/wiki/Polynomial_expansion.
 
 ```java
 import org.apache.flink.ml.feature.polynomialexpansion.PolynomialExpansion;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;

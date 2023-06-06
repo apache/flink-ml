@@ -69,7 +69,7 @@ For the hashing trick, see https://en.wikipedia.org/wiki/Feature_hashing for det
 
 ```java
 import org.apache.flink.ml.feature.featurehasher.FeatureHasher;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;

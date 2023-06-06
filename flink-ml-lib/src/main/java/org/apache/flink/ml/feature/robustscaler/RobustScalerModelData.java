@@ -25,8 +25,8 @@ import org.apache.flink.connector.file.src.reader.SimpleStreamFormat;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorSerializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -43,13 +43,13 @@ import java.io.OutputStream;
  * classes to save/load model data.
  */
 public class RobustScalerModelData {
-    public DenseVector medians;
+    public DenseIntDoubleVector medians;
 
-    public DenseVector ranges;
+    public DenseIntDoubleVector ranges;
 
     public RobustScalerModelData() {}
 
-    public RobustScalerModelData(DenseVector medians, DenseVector ranges) {
+    public RobustScalerModelData(DenseIntDoubleVector medians, DenseIntDoubleVector ranges) {
         this.medians = medians;
         this.ranges = ranges;
     }
@@ -67,13 +67,14 @@ public class RobustScalerModelData {
                 .map(
                         x ->
                                 new RobustScalerModelData(
-                                        (DenseVector) x.getField("medians"),
-                                        (DenseVector) x.getField("ranges")));
+                                        (DenseIntDoubleVector) x.getField("medians"),
+                                        (DenseIntDoubleVector) x.getField("ranges")));
     }
 
     /** Data encoder for the {@link RobustScalerModel} model data. */
     public static class ModelDataEncoder implements Encoder<RobustScalerModelData> {
-        private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+        private final DenseIntDoubleVectorSerializer serializer =
+                new DenseIntDoubleVectorSerializer();
 
         @Override
         public void encode(RobustScalerModelData modelData, OutputStream outputStream)
@@ -92,15 +93,18 @@ public class RobustScalerModelData {
         public Reader<RobustScalerModelData> createReader(
                 Configuration configuration, FSDataInputStream inputStream) throws IOException {
             return new Reader<RobustScalerModelData>() {
-                private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+                private final DenseIntDoubleVectorSerializer serializer =
+                        new DenseIntDoubleVectorSerializer();
 
                 @Override
                 public RobustScalerModelData read() throws IOException {
                     DataInputViewStreamWrapper inputViewStreamWrapper =
                             new DataInputViewStreamWrapper(inputStream);
                     try {
-                        DenseVector medians = serializer.deserialize(inputViewStreamWrapper);
-                        DenseVector ranges = serializer.deserialize(inputViewStreamWrapper);
+                        DenseIntDoubleVector medians =
+                                serializer.deserialize(inputViewStreamWrapper);
+                        DenseIntDoubleVector ranges =
+                                serializer.deserialize(inputViewStreamWrapper);
                         return new RobustScalerModelData(medians, ranges);
                     } catch (EOFException e) {
                         return null;

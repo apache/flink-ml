@@ -19,7 +19,7 @@
 package org.apache.flink.ml.examples.feature;
 
 import org.apache.flink.ml.feature.elementwiseproduct.ElementwiseProduct;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -56,8 +56,10 @@ public class ElementwiseProductExample {
         // Extracts and displays the results.
         for (CloseableIterator<Row> it = outputTable.execute().collect(); it.hasNext(); ) {
             Row row = it.next();
-            Vector inputValue = (Vector) row.getField(elementwiseProduct.getInputCol());
-            Vector outputValue = (Vector) row.getField(elementwiseProduct.getOutputCol());
+            IntDoubleVector inputValue =
+                    (IntDoubleVector) row.getField(elementwiseProduct.getInputCol());
+            IntDoubleVector outputValue =
+                    (IntDoubleVector) row.getField(elementwiseProduct.getOutputCol());
             System.out.printf("Input Value: %s \tOutput Value: %s\n", inputValue, outputValue);
         }
     }

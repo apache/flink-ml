@@ -19,7 +19,7 @@
 package org.apache.flink.ml.feature;
 
 import org.apache.flink.ml.feature.binarizer.Binarizer;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -65,11 +65,11 @@ public class BinarizerTest extends AbstractTestBase {
 
     private static final Double[] EXPECTED_VALUE_OUTPUT = new Double[] {0.0, 1.0, 1.0};
 
-    private static final List<Vector> EXPECTED_DENSE_OUTPUT =
+    private static final List<IntDoubleVector> EXPECTED_DENSE_OUTPUT =
             Arrays.asList(
                     Vectors.dense(0.0, 1.0), Vectors.dense(1.0, 0.0), Vectors.dense(1.0, 1.0));
 
-    private static final List<Vector> EXPECTED_SPARSE_OUTPUT =
+    private static final List<IntDoubleVector> EXPECTED_SPARSE_OUTPUT =
             Arrays.asList(
                     Vectors.sparse(17, new int[] {9}, new double[] {1.0}),
                     Vectors.sparse(17, new int[] {0, 2}, new double[] {1.0, 1.0}),
@@ -90,8 +90,8 @@ public class BinarizerTest extends AbstractTestBase {
 
         List<Row> results = IteratorUtils.toList(stream.executeAndCollect());
         List<Double> doubleValues = new ArrayList<>(results.size());
-        List<Vector> sparseVectorValues = new ArrayList<>(results.size());
-        List<Vector> denseVectorValues = new ArrayList<>(results.size());
+        List<IntDoubleVector> sparseVectorValues = new ArrayList<>(results.size());
+        List<IntDoubleVector> denseVectorValues = new ArrayList<>(results.size());
         for (Row row : results) {
             doubleValues.add(row.getFieldAs(outputCols[0]));
             denseVectorValues.add(row.getFieldAs(outputCols[1]));

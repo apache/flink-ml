@@ -27,9 +27,9 @@ import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -74,10 +74,10 @@ public class NaiveBayes
 
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
-        DataStream<Tuple2<Vector, Double>> input =
+        DataStream<Tuple2<IntDoubleVector, Double>> input =
                 tEnv.toDataStream(inputs[0])
                         .map(
-                                (MapFunction<Row, Tuple2<Vector, Double>>)
+                                (MapFunction<Row, Tuple2<IntDoubleVector, Double>>)
                                         row -> {
                                             Number number = (Number) row.getField(labelCol);
                                             Preconditions.checkNotNull(
@@ -87,7 +87,7 @@ public class NaiveBayes
                                                     number.intValue() == number.doubleValue(),
                                                     "Label value should be indexed number.");
                                             return new Tuple2<>(
-                                                    (Vector) row.getField(featuresCol),
+                                                    (IntDoubleVector) row.getField(featuresCol),
                                                     number.doubleValue());
                                         },
                                 Types.TUPLE(VectorTypeInfo.INSTANCE, Types.DOUBLE));
@@ -129,8 +129,8 @@ public class NaiveBayes
                                         DataTypes.ARRAY(
                                                 DataTypes.MAP(
                                                         DataTypes.DOUBLE(), DataTypes.DOUBLE()))))
-                        .column("piArray", DataTypes.of(DenseVectorTypeInfo.INSTANCE))
-                        .column("labels", DataTypes.of(DenseVectorTypeInfo.INSTANCE))
+                        .column("piArray", DataTypes.of(DenseIntDoubleVectorTypeInfo.INSTANCE))
+                        .column("labels", DataTypes.of(DenseIntDoubleVectorTypeInfo.INSTANCE))
                         .build();
 
         NaiveBayesModel model =
@@ -165,10 +165,11 @@ public class NaiveBayes
      * </ul>
      */
     private static class ExtractFeatureFunction
-            implements FlatMapFunction<Tuple2<Vector, Double>, Tuple3<Double, Integer, Double>> {
+            implements FlatMapFunction<
+                    Tuple2<IntDoubleVector, Double>, Tuple3<Double, Integer, Double>> {
         @Override
         public void flatMap(
-                Tuple2<Vector, Double> value,
+                Tuple2<IntDoubleVector, Double> value,
                 Collector<Tuple3<Double, Integer, Double>> collector) {
             Preconditions.checkNotNull(value.f1);
             for (int i = 0; i < value.f0.size(); i++) {

@@ -29,10 +29,10 @@ import org.apache.flink.connector.file.src.reader.SimpleStreamFormat;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vector;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorSerializer;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -60,8 +60,8 @@ public class NaiveBayesModelData {
         fields.put(
                 "theta",
                 Types.OBJECT_ARRAY(Types.OBJECT_ARRAY(Types.MAP(Types.DOUBLE, Types.DOUBLE))));
-        fields.put("piArray", DenseVectorTypeInfo.INSTANCE);
-        fields.put("labels", DenseVectorTypeInfo.INSTANCE);
+        fields.put("piArray", DenseIntDoubleVectorTypeInfo.INSTANCE);
+        fields.put("labels", DenseIntDoubleVectorTypeInfo.INSTANCE);
     }
 
     public static final TypeInformation<NaiveBayesModelData> TYPE_INFO =
@@ -74,13 +74,15 @@ public class NaiveBayesModelData {
     public Map<Double, Double>[][] theta;
 
     /** Log of class priors, whose dimension is C (number of classes). */
-    public DenseVector piArray;
+    public DenseIntDoubleVector piArray;
 
     /** Value of labels. */
-    public DenseVector labels;
+    public DenseIntDoubleVector labels;
 
     public NaiveBayesModelData(
-            Map<Double, Double>[][] theta, DenseVector piArray, DenseVector labels) {
+            Map<Double, Double>[][] theta,
+            DenseIntDoubleVector piArray,
+            DenseIntDoubleVector labels) {
         this.theta = theta;
         this.piArray = piArray;
         this.labels = labels;
@@ -103,14 +105,15 @@ public class NaiveBayesModelData {
                                 row ->
                                         new NaiveBayesModelData(
                                                 (Map<Double, Double>[][]) row.getField(0),
-                                                ((Vector) row.getField(1)).toDense(),
-                                                ((Vector) row.getField(2)).toDense()),
+                                                ((IntDoubleVector) row.getField(1)).toDense(),
+                                                ((IntDoubleVector) row.getField(2)).toDense()),
                         TYPE_INFO);
     }
 
     /** Data encoder for the {@link NaiveBayesModelData}. */
     public static class ModelDataEncoder implements Encoder<NaiveBayesModelData> {
-        private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+        private final DenseIntDoubleVectorSerializer serializer =
+                new DenseIntDoubleVectorSerializer();
 
         @Override
         public void encode(NaiveBayesModelData modelData, OutputStream outputStream)
@@ -141,7 +144,8 @@ public class NaiveBayesModelData {
         public Reader<NaiveBayesModelData> createReader(
                 Configuration config, FSDataInputStream inputStream) {
             return new Reader<NaiveBayesModelData>() {
-                private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+                private final DenseIntDoubleVectorSerializer serializer =
+                        new DenseIntDoubleVectorSerializer();
 
                 @Override
                 public NaiveBayesModelData read() throws IOException {
@@ -152,9 +156,11 @@ public class NaiveBayesModelData {
                                 new MapSerializer<>(
                                         DoubleSerializer.INSTANCE, DoubleSerializer.INSTANCE);
 
-                        DenseVector labels = serializer.deserialize(inputViewStreamWrapper);
+                        DenseIntDoubleVector labels =
+                                serializer.deserialize(inputViewStreamWrapper);
 
-                        DenseVector piArray = serializer.deserialize(inputViewStreamWrapper);
+                        DenseIntDoubleVector piArray =
+                                serializer.deserialize(inputViewStreamWrapper);
 
                         int featureSize = inputViewStreamWrapper.readInt();
                         int numLabels = inputViewStreamWrapper.readInt();

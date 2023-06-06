@@ -25,8 +25,8 @@ import org.apache.flink.ml.common.feature.LabeledPointWithWeight;
 import org.apache.flink.ml.common.lossfunc.BinaryLogisticLoss;
 import org.apache.flink.ml.common.optimizer.Optimizer;
 import org.apache.flink.ml.common.optimizer.SGD;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -85,12 +85,13 @@ public class LogisticRegression
                                         throw new RuntimeException(
                                                 "Multinomial classification is not supported yet. Supported options: [auto, binomial].");
                                     }
-                                    Vector features =
-                                            ((Vector) dataPoint.getField(getFeaturesCol()));
+                                    IntDoubleVector features =
+                                            ((IntDoubleVector)
+                                                    dataPoint.getField(getFeaturesCol()));
                                     return new LabeledPointWithWeight(features, label, weight);
                                 });
 
-        DataStream<DenseVector> initModelData =
+        DataStream<DenseIntDoubleVector> initModelData =
                 DataStreamUtils.reduce(
                                 trainData.map(x -> x.getFeatures().size()),
                                 (ReduceFunction<Integer>)
@@ -100,7 +101,7 @@ public class LogisticRegression
                                                     "The training data should all have same dimensions.");
                                             return t0;
                                         })
-                        .map(DenseVector::new);
+                        .map(DenseIntDoubleVector::new);
 
         Optimizer optimizer =
                 new SGD(
@@ -110,7 +111,7 @@ public class LogisticRegression
                         getTol(),
                         getReg(),
                         getElasticNet());
-        DataStream<DenseVector> rawModelData =
+        DataStream<DenseIntDoubleVector> rawModelData =
                 optimizer.optimize(initModelData, trainData, BinaryLogisticLoss.INSTANCE);
 
         DataStream<LogisticRegressionModelData> modelData =
