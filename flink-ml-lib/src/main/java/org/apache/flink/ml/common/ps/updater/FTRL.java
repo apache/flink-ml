@@ -43,8 +43,6 @@ public class FTRL implements ModelUpdater {
     private final double lambda1;
     private final double lambda2;
 
-    private final int numWorkers;
-
     // ------ Model data of FTRL optimizer. -----
     private long startIndex;
     private long endIndex;
@@ -56,12 +54,11 @@ public class FTRL implements ModelUpdater {
     private ListState<Long> boundaryState;
     private ListState<double[]> modelDataState;
 
-    public FTRL(double alpha, double beta, double lambda1, double lambda2, int numWorkers) {
+    public FTRL(double alpha, double beta, double lambda1, double lambda2) {
         this.alpha = alpha;
         this.beta = beta;
         this.lambda1 = lambda1;
         this.lambda2 = lambda2;
-        this.numWorkers = numWorkers;
     }
 
     @Override
@@ -79,7 +76,7 @@ public class FTRL implements ModelUpdater {
     public void handlePush(long[] keys, double[] values) {
         for (int i = 0; i < keys.length; i++) {
             int index = (int) (keys[i] - startIndex);
-            double gi = values[i] / numWorkers;
+            double gi = values[i];
             updateModelOnOneDim(gi, index, weight);
         }
     }

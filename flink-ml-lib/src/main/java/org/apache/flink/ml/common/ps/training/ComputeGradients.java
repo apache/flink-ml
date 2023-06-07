@@ -42,14 +42,18 @@ public class ComputeGradients extends ProcessStage<MiniBatchMLSession<LabeledPoi
     public void process(MiniBatchMLSession<LabeledPointWithWeight> session) throws IOException {
         long[] indices = ComputeIndices.getSortedIndices(session.batchData);
         double[] modelValues = session.pulledValues;
-        double[] gradients = computeGradient(session.batchData, Tuple2.of(indices, modelValues));
+        double[] gradients =
+                computeGradient(
+                        session.batchData, Tuple2.of(indices, modelValues), session.numWorkers);
 
         session.pushIndices = indices;
         session.pushValues = gradients;
     }
 
     private double[] computeGradient(
-            List<LabeledPointWithWeight> batchData, Tuple2<long[], double[]> modelData) {
+            List<LabeledPointWithWeight> batchData,
+            Tuple2<long[], double[]> modelData,
+            int numWorkers) {
         long[] modelIndices = modelData.f0;
         double[] modelValues = modelData.f1;
         Long2DoubleOpenHashMap modelInMap = new Long2DoubleOpenHashMap(modelIndices.length);
@@ -76,7 +80,7 @@ public class ComputeGradients extends ProcessStage<MiniBatchMLSession<LabeledPoi
         for (int i = 0; i < modelIndices.length; i++) {
             cumGradientValues[i] = cumGradients.get(modelIndices[i]);
         }
-        BLAS.scal(1.0 / batchData.size(), Vectors.dense(cumGradientValues));
+        BLAS.scal(1.0 / batchData.size() / numWorkers, Vectors.dense(cumGradientValues));
         return cumGradientValues;
     }
 

@@ -155,13 +155,7 @@ public class LogisticRegressionWithFtrl
                 .setTerminationCriteria(
                         (SerializableFunction<MiniBatchMLSession<LabeledPointWithWeight>, Boolean>)
                                 o -> o.iterationId >= getMaxIter());
-        FTRL ftrl =
-                new FTRL(
-                        getAlpha(),
-                        getBeta(),
-                        getReg(),
-                        getElasticNet(),
-                        trainData.getParallelism());
+        FTRL ftrl = new FTRL(getAlpha(), getBeta(), getReg(), getElasticNet());
 
         DataStream<Tuple3<Long, Long, double[]>> rawModelData =
                 TrainingUtils.train(modelDim, trainData, ftrl, iterationStages, getNumServers());
