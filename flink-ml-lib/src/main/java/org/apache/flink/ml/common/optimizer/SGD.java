@@ -277,7 +277,7 @@ public class SGD implements Optimizer {
                 for (LabeledPointWithWeight dataPoint : miniBatchData) {
                     totalLoss += lossFunc.computeLoss(dataPoint, coefficient);
                     lossFunc.computeGradient(dataPoint, coefficient, cumGradientsWrapper);
-                    totalWeight += dataPoint.getWeight();
+                    totalWeight += dataPoint.weight;
                 }
                 setTotalLoss(totalLoss);
                 setTotalWeight(totalWeight);

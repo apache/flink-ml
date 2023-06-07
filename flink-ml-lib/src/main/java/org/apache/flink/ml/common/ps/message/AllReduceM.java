@@ -21,6 +21,12 @@ package org.apache.flink.ml.common.ps.message;
 import org.apache.flink.ml.util.Bits;
 import org.apache.flink.util.Preconditions;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.util.function.BiFunction;
+
 import static org.apache.flink.ml.common.ps.message.MessageType.ALL_REDUCE_VALUE;
 
 /** The message to apply all-reduce among workers. */
@@ -28,11 +34,17 @@ public class AllReduceM implements Message {
     public final int serverId;
     public final int workerId;
     public final double[] values;
+    public final BiFunction<double[], double[], double[]> aggregator;
 
-    public AllReduceM(int serverId, int workerId, double[] values) {
+    public AllReduceM(
+            int serverId,
+            int workerId,
+            double[] values,
+            BiFunction<double[], double[], double[]> aggregator) {
         this.serverId = serverId;
         this.workerId = workerId;
         this.values = values;
+        this.aggregator = aggregator;
     }
 
     public static AllReduceM fromBytes(byte[] bytes) {
@@ -46,16 +58,21 @@ public class AllReduceM implements Message {
         int workerId = Bits.getInt(bytes, offset);
         offset += Integer.BYTES;
         double[] values = MessageUtils.getDoubleArray(bytes, offset);
-        return new AllReduceM(psId, workerId, values);
+        offset += MessageUtils.getDoubleArraySizeInBytes(values);
+
+        BiFunction<double[], double[], double[]> aggregator = deserializeFunction(bytes, offset);
+        return new AllReduceM(psId, workerId, values, aggregator);
     }
 
     @Override
     public byte[] toBytes() {
+        byte[] serializedFunctionInBytes = serializeFunction(aggregator);
         int numBytes =
                 Character.BYTES
                         + Integer.BYTES
                         + Integer.BYTES
-                        + MessageUtils.getDoubleArraySizeInBytes(values);
+                        + MessageUtils.getDoubleArraySizeInBytes(values)
+                        + serializedFunctionInBytes.length;
         byte[] buffer = new byte[numBytes];
         int offset = 0;
         Bits.putChar(buffer, offset, ALL_REDUCE_VALUE.type);
@@ -66,7 +83,34 @@ public class AllReduceM implements Message {
         Bits.putInt(buffer, offset, this.workerId);
         offset += Integer.BYTES;
         MessageUtils.putDoubleArray(values, buffer, offset);
+        offset += MessageUtils.getDoubleArraySizeInBytes(values);
+        System.arraycopy(
+                serializedFunctionInBytes, 0, buffer, offset, serializedFunctionInBytes.length);
 
         return buffer;
+    }
+
+    private static byte[] serializeFunction(BiFunction<double[], double[], double[]> aggregator) {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try {
+            ObjectOutputStream oos = new ObjectOutputStream(baos);
+            oos.writeObject(aggregator);
+            oos.flush();
+        } catch (Throwable e) {
+            return null;
+        }
+        return baos.toByteArray();
+    }
+
+    private static BiFunction<double[], double[], double[]> deserializeFunction(
+            byte[] bytes, int offset) {
+        ByteArrayInputStream bais = new ByteArrayInputStream(bytes, offset, bytes.length - offset);
+        try {
+            ObjectInputStream ois = new ObjectInputStream(bais);
+            return (BiFunction<double[], double[], double[]>) ois.readObject();
+        } catch (Exception e) {
+            System.out.println("wrong deserialization");
+            return null;
+        }
     }
 }

@@ -32,6 +32,7 @@ import org.apache.flink.ml.common.ps.message.MessageUtils;
 import org.apache.flink.ml.common.ps.message.PullIndexM;
 import org.apache.flink.ml.common.ps.message.PulledValueM;
 import org.apache.flink.ml.common.ps.message.PushKvM;
+import org.apache.flink.ml.common.ps.training.IterationStageList;
 import org.apache.flink.ml.common.ps.updater.ModelUpdater;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
@@ -81,6 +82,8 @@ import java.util.concurrent.Future;
 public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[]>>
         implements OneInputStreamOperator<Tuple2<Integer, byte[]>, Tuple2<Integer, byte[]>>,
                 IterationListener<Tuple2<Integer, byte[]>> {
+    /** Iteration stage list. */
+    private final IterationStageList<?> iterationStageList;
     /** Number of workers to communicate with. */
     private final int numWorkers;
     /** The logic to answer push/pull request from workers. */
@@ -104,9 +107,11 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
     private ListState<byte[]> pendingPulls;
 
     public ServerOperator(
+            IterationStageList<?> iterationStageList,
             int numWorkers,
             ModelUpdater modelUpdater,
             OutputTag<Tuple3<Long, Long, double[]>> modelOutputTag) {
+        this.iterationStageList = iterationStageList;
         this.numWorkers = numWorkers;
         this.modelUpdater = modelUpdater;
         this.modelOutputTag = modelOutputTag;
@@ -383,9 +388,7 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
                 reducedResult = receivedValues;
             } else {
                 Preconditions.checkArgument(reducedResult.length == receivedValues.length);
-                for (int i = 0; i < reducedResult.length; i++) {
-                    reducedResult[i] += receivedValues[i];
-                }
+                reducedResult = allReduceM.aggregator.apply(receivedValues, reducedResult);
             }
         }
 

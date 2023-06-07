@@ -23,6 +23,7 @@ import org.apache.flink.ml.classification.logisticregression.LogisticRegression;
 import org.apache.flink.ml.common.feature.LabeledPointWithWeight;
 import org.apache.flink.ml.linalg.BLAS;
 import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 
 /** The loss function for binary logistic loss. See {@link LogisticRegression} for example. */
 @Internal
@@ -33,9 +34,9 @@ public class BinaryLogisticLoss implements LossFunc {
 
     @Override
     public double computeLoss(LabeledPointWithWeight dataPoint, DenseIntDoubleVector coefficient) {
-        double dot = BLAS.dot(dataPoint.getFeatures(), coefficient);
-        double labelScaled = 2 * dataPoint.getLabel() - 1;
-        return dataPoint.getWeight() * Math.log(1 + Math.exp(-dot * labelScaled));
+        double dot = BLAS.dot((IntDoubleVector) dataPoint.features, coefficient);
+        double labelScaled = 2 * dataPoint.label - 1;
+        return dataPoint.weight * Math.log(1 + Math.exp(-dot * labelScaled));
     }
 
     @Override
@@ -43,11 +44,11 @@ public class BinaryLogisticLoss implements LossFunc {
             LabeledPointWithWeight dataPoint,
             DenseIntDoubleVector coefficient,
             DenseIntDoubleVector cumGradient) {
-        double dot = BLAS.dot(dataPoint.getFeatures(), coefficient);
-        double labelScaled = 2 * dataPoint.getLabel() - 1;
-        double multiplier =
-                dataPoint.getWeight() * (-labelScaled / (Math.exp(dot * labelScaled) + 1));
-        BLAS.axpy(multiplier, dataPoint.getFeatures(), cumGradient, dataPoint.getFeatures().size());
+        IntDoubleVector feature = (IntDoubleVector) dataPoint.features;
+        double dot = BLAS.dot(feature, coefficient);
+        double labelScaled = 2 * dataPoint.label - 1;
+        double multiplier = dataPoint.weight * (-labelScaled / (Math.exp(dot * labelScaled) + 1));
+        BLAS.axpy(multiplier, feature, cumGradient, feature.size());
     }
 
     @Override

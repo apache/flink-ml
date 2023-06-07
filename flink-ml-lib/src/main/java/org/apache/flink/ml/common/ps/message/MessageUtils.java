@@ -18,11 +18,24 @@
 
 package org.apache.flink.ml.common.ps.message;
 
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.util.Bits;
 
 /** Utility functions for processing messages. */
 public class MessageUtils {
+
+    public static <V> TypeInformation getKeyType(V key) {
+        if (key instanceof Integer) {
+            return Types.INT;
+        } else if (key instanceof Long) {
+            return Types.LONG;
+        } else {
+            throw new UnsupportedOperationException(
+                    String.format("Unsupported key type: %s.", key.getClass().getSimpleName()));
+        }
+    }
 
     /** Retrieves the message type from the byte array. */
     public static MessageType getMessageType(byte[] bytes) {

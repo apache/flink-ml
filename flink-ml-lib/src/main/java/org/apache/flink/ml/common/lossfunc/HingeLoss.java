@@ -23,6 +23,7 @@ import org.apache.flink.ml.classification.linearsvc.LinearSVC;
 import org.apache.flink.ml.common.feature.LabeledPointWithWeight;
 import org.apache.flink.ml.linalg.BLAS;
 import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.IntDoubleVector;
 
 /**
  * The loss function for hinge loss. See {@link LinearSVC} for example.
@@ -37,9 +38,9 @@ public class HingeLoss implements LossFunc {
 
     @Override
     public double computeLoss(LabeledPointWithWeight dataPoint, DenseIntDoubleVector coefficient) {
-        double dot = BLAS.dot(dataPoint.getFeatures(), coefficient);
-        double labelScaled = 2 * dataPoint.getLabel() - 1;
-        return dataPoint.getWeight() * Math.max(0, 1 - labelScaled * dot);
+        double dot = BLAS.dot((IntDoubleVector) dataPoint.features, coefficient);
+        double labelScaled = 2 * dataPoint.label - 1;
+        return dataPoint.weight * Math.max(0, 1 - labelScaled * dot);
     }
 
     @Override
@@ -47,14 +48,11 @@ public class HingeLoss implements LossFunc {
             LabeledPointWithWeight dataPoint,
             DenseIntDoubleVector coefficient,
             DenseIntDoubleVector cumGradient) {
-        double dot = BLAS.dot(dataPoint.getFeatures(), coefficient);
-        double labelScaled = 2 * dataPoint.getLabel() - 1;
+        IntDoubleVector feature = (IntDoubleVector) dataPoint.features;
+        double dot = BLAS.dot(feature, coefficient);
+        double labelScaled = 2 * dataPoint.label - 1;
         if (1 - labelScaled * dot > 0) {
-            BLAS.axpy(
-                    -labelScaled * dataPoint.getWeight(),
-                    dataPoint.getFeatures(),
-                    cumGradient,
-                    dataPoint.getFeatures().size());
+            BLAS.axpy(-labelScaled * dataPoint.weight, feature, cumGradient, feature.size());
         }
     }
 }

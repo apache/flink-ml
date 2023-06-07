@@ -18,7 +18,8 @@
 
 package org.apache.flink.ml.common.ps.training;
 
-import org.apache.flink.ml.common.feature.LabeledLargePointWithWeight;
+import org.apache.flink.ml.common.feature.LabeledPointWithWeight;
+import org.apache.flink.ml.linalg.SparseLongDoubleVector;
 
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
@@ -30,18 +31,19 @@ import java.util.List;
  * An iteration stage that samples a batch of training data and computes the indices needed to
  * compute gradients.
  */
-public class ComputeIndices extends ProcessStage<MiniBatchMLSession<LabeledLargePointWithWeight>> {
+public class ComputeIndices extends ProcessStage<MiniBatchMLSession<LabeledPointWithWeight>> {
 
     @Override
-    public void process(MiniBatchMLSession<LabeledLargePointWithWeight> context) throws Exception {
+    public void process(MiniBatchMLSession<LabeledPointWithWeight> context) throws Exception {
         context.readInNextBatchData();
         context.pullIndices = getSortedIndices(context.batchData);
     }
 
-    public static long[] getSortedIndices(List<LabeledLargePointWithWeight> dataPoints) {
+    public static long[] getSortedIndices(List<LabeledPointWithWeight> dataPoints) {
         LongOpenHashSet indices = new LongOpenHashSet();
-        for (LabeledLargePointWithWeight dataPoint : dataPoints) {
-            long[] notZeros = dataPoint.features.f0;
+        for (LabeledPointWithWeight dataPoint : dataPoints) {
+            SparseLongDoubleVector feature = (SparseLongDoubleVector) dataPoint.features;
+            long[] notZeros = feature.indices;
             for (long index : notZeros) {
                 indices.add(index);
             }

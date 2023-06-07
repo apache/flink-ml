@@ -18,6 +18,8 @@
 
 package org.apache.flink.ml.common.ps.message;
 
+import java.io.IOException;
+
 /**
  * The message to be passed between worker node and server node.
  *
@@ -31,5 +33,5 @@ public interface Message {
      *
      * <p>Note that the first two bytes of the result buffer is reserved for {@link MessageType}.
      */
-    byte[] toBytes();
+    byte[] toBytes() throws IOException;
 }

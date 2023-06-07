@@ -85,7 +85,7 @@ public class LinearSVC implements Estimator<LinearSVC, LinearSVCModel>, LinearSV
 
         DataStream<DenseIntDoubleVector> initModelData =
                 DataStreamUtils.reduce(
-                                trainData.map(x -> x.getFeatures().size()),
+                                trainData.map(x -> (Integer) x.features.size()),
                                 (ReduceFunction<Integer>)
                                         (t0, t1) -> {
                                             Preconditions.checkState(

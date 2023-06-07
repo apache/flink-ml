@@ -269,7 +269,8 @@ public class WorkerOperator<DT, SessionT extends MLSession>
                 // We are not incrementing nextStageToExecute here, since we will need to pull
                 // values from servers.
                 AllReduceStage allReduceStage = (AllReduceStage) stage;
-                serverAgent.allReducePush(allReduceStage.valuesSupplier.get());
+                serverAgent.allReducePush(
+                        allReduceStage.valuesSupplier.get(), allReduceStage.valuesAggregator);
                 return nextStageToExecute;
             } else if (stage instanceof PushStage) {
                 PushStage pushStage = (PushStage) stage;

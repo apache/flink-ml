@@ -19,9 +19,10 @@
 package org.apache.flink.ml.common.ps.training;
 
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.ml.common.feature.LabeledLargePointWithWeight;
+import org.apache.flink.ml.common.feature.LabeledPointWithWeight;
 import org.apache.flink.ml.common.lossfunc.LossFunc;
 import org.apache.flink.ml.linalg.BLAS;
+import org.apache.flink.ml.linalg.SparseLongDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 
 import it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap;
@@ -30,8 +31,7 @@ import java.io.IOException;
 import java.util.List;
 
 /** An iteration stage that uses the pulled model values and batch data to compute the gradients. */
-public class ComputeGradients
-        extends ProcessStage<MiniBatchMLSession<LabeledLargePointWithWeight>> {
+public class ComputeGradients extends ProcessStage<MiniBatchMLSession<LabeledPointWithWeight>> {
     private final LossFunc lossFunc;
 
     public ComputeGradients(LossFunc lossFunc) {
@@ -39,8 +39,7 @@ public class ComputeGradients
     }
 
     @Override
-    public void process(MiniBatchMLSession<LabeledLargePointWithWeight> session)
-            throws IOException {
+    public void process(MiniBatchMLSession<LabeledPointWithWeight> session) throws IOException {
         long[] indices = ComputeIndices.getSortedIndices(session.batchData);
         double[] modelValues = session.pulledValues;
         double[] gradients = computeGradient(session.batchData, Tuple2.of(indices, modelValues));
@@ -50,7 +49,7 @@ public class ComputeGradients
     }
 
     private double[] computeGradient(
-            List<LabeledLargePointWithWeight> batchData, Tuple2<long[], double[]> modelData) {
+            List<LabeledPointWithWeight> batchData, Tuple2<long[], double[]> modelData) {
         long[] modelIndices = modelData.f0;
         double[] modelValues = modelData.f1;
         Long2DoubleOpenHashMap modelInMap = new Long2DoubleOpenHashMap(modelIndices.length);
@@ -59,12 +58,13 @@ public class ComputeGradients
         }
         Long2DoubleOpenHashMap cumGradients = new Long2DoubleOpenHashMap(modelIndices.length);
 
-        for (LabeledLargePointWithWeight dataPoint : batchData) {
-            double dot = dot(dataPoint.features, modelInMap);
+        for (LabeledPointWithWeight dataPoint : batchData) {
+            SparseLongDoubleVector feature = (SparseLongDoubleVector) dataPoint.features;
+            double dot = dot(feature, modelInMap);
             double multiplier = lossFunc.computeGradient(dataPoint.label, dot) * dataPoint.weight;
 
-            long[] featureIndices = dataPoint.features.f0;
-            double[] featureValues = dataPoint.features.f1;
+            long[] featureIndices = feature.indices;
+            double[] featureValues = feature.values;
             double z;
             for (int i = 0; i < featureIndices.length; i++) {
                 long currentIndex = featureIndices[i];
@@ -80,11 +80,10 @@ public class ComputeGradients
         return cumGradientValues;
     }
 
-    private static double dot(
-            Tuple2<long[], double[]> features, Long2DoubleOpenHashMap coefficient) {
+    private static double dot(SparseLongDoubleVector feature, Long2DoubleOpenHashMap coefficient) {
         double dot = 0;
-        for (int i = 0; i < features.f0.length; i++) {
-            dot += features.f1[i] * coefficient.get(features.f0[i]);
+        for (int i = 0; i < feature.indices.length; i++) {
+            dot += feature.values[i] * coefficient.get(feature.indices[i]);
         }
         return dot;
     }

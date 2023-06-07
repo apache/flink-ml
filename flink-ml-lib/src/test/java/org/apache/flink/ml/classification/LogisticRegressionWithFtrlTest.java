@@ -18,12 +18,13 @@
 
 package org.apache.flink.ml.classification;
 
-import org.apache.flink.api.common.typeinfo.PrimitiveArrayTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
-import org.apache.flink.api.java.typeutils.TupleTypeInfo;
+import org.apache.flink.core.memory.DataInputView;
+import org.apache.flink.core.memory.DataInputViewStreamWrapper;
+import org.apache.flink.core.memory.DataOutputView;
+import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModel;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelData;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelDataUtil;
@@ -31,11 +32,14 @@ import org.apache.flink.ml.classification.logisticregression.LogisticRegressionM
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionWithFtrl;
 import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.IntDoubleVector;
+import org.apache.flink.ml.linalg.SparseLongDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.SparseIntDoubleVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.SparseLongDoubleVectorTypeInfo;
 import org.apache.flink.ml.servable.api.DataFrame;
 import org.apache.flink.ml.servable.types.BasicType;
 import org.apache.flink.ml.servable.types.DataTypes;
+import org.apache.flink.ml.util.Bits;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -50,6 +54,8 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.SequenceInputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -75,16 +81,46 @@ public class LogisticRegressionWithFtrlTest {
 
     private static final List<Row> trainRows =
             Arrays.asList(
-                    Row.of(Tuple2.of(new long[] {0, 1}, new double[] {1, 2}), 0., 1.),
-                    Row.of(Tuple2.of(new long[] {0, 2}, new double[] {2, 3}), 0., 2.),
-                    Row.of(Tuple2.of(new long[] {0, 3}, new double[] {3, 4}), 0., 3.),
-                    Row.of(Tuple2.of(new long[] {0, 2}, new double[] {4, 4}), 0., 4.),
-                    Row.of(Tuple2.of(new long[] {0, 1}, new double[] {5, 4}), 0., 5.),
-                    Row.of(Tuple2.of(new long[] {0, 2}, new double[] {11, 3}), 1., 1.),
-                    Row.of(Tuple2.of(new long[] {0, 3}, new double[] {12, 4}), 1., 2.),
-                    Row.of(Tuple2.of(new long[] {0, 1}, new double[] {13, 2}), 1., 3.),
-                    Row.of(Tuple2.of(new long[] {0, 3}, new double[] {14, 4}), 1., 4.),
-                    Row.of(Tuple2.of(new long[] {0, 2}, new double[] {15, 4}), 1., 5.));
+                    Row.of(
+                            new SparseLongDoubleVector(4, new long[] {0, 1}, new double[] {1, 2}),
+                            0.,
+                            1.),
+                    Row.of(
+                            new SparseLongDoubleVector(4, new long[] {0, 2}, new double[] {2, 3}),
+                            0.,
+                            2.),
+                    Row.of(
+                            new SparseLongDoubleVector(4, new long[] {0, 3}, new double[] {3, 4}),
+                            0.,
+                            3.),
+                    Row.of(
+                            new SparseLongDoubleVector(4, new long[] {0, 2}, new double[] {4, 4}),
+                            0.,
+                            4.),
+                    Row.of(
+                            new SparseLongDoubleVector(4, new long[] {0, 1}, new double[] {5, 4}),
+                            0.,
+                            5.),
+                    Row.of(
+                            new SparseLongDoubleVector(4, new long[] {0, 2}, new double[] {11, 3}),
+                            1.,
+                            1.),
+                    Row.of(
+                            new SparseLongDoubleVector(4, new long[] {0, 3}, new double[] {12, 4}),
+                            1.,
+                            2.),
+                    Row.of(
+                            new SparseLongDoubleVector(4, new long[] {0, 1}, new double[] {13, 2}),
+                            1.,
+                            3.),
+                    Row.of(
+                            new SparseLongDoubleVector(4, new long[] {0, 3}, new double[] {14, 4}),
+                            1.,
+                            4.),
+                    Row.of(
+                            new SparseLongDoubleVector(4, new long[] {0, 2}, new double[] {15, 4}),
+                            1.,
+                            5.));
 
     private static final List<Row> testRows =
             Arrays.asList(
@@ -116,11 +152,7 @@ public class LogisticRegressionWithFtrlTest {
                                 trainRows,
                                 new RowTypeInfo(
                                         new TypeInformation[] {
-                                            new TupleTypeInfo<>(
-                                                    PrimitiveArrayTypeInfo
-                                                            .LONG_PRIMITIVE_ARRAY_TYPE_INFO,
-                                                    PrimitiveArrayTypeInfo
-                                                            .DOUBLE_PRIMITIVE_ARRAY_TYPE_INFO),
+                                            SparseLongDoubleVectorTypeInfo.INSTANCE,
                                             Types.DOUBLE,
                                             Types.DOUBLE
                                         },
@@ -394,5 +426,27 @@ public class LogisticRegressionWithFtrlTest {
                 assertTrue(rawPrediction.get(0) < 0.5);
             }
         }
+    }
+
+    @Test
+    public void testGetGenericType() throws IOException {
+        TypeInformation t = getType(128);
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(4);
+        DataOutputView d = new DataOutputViewStreamWrapper(byteArrayOutputStream);
+        t.createSerializer(null).serialize(128, d);
+        byte[] serialized = byteArrayOutputStream.toByteArray();
+        System.out.println(Bits.getInt(serialized, 0));
+
+        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(serialized);
+        DataInputView inputView = new DataInputViewStreamWrapper(byteArrayInputStream);
+        int deserializedInt = (Integer) t.createSerializer(null).deserialize(inputView);
+        System.out.println(deserializedInt);
+    }
+
+    <V> TypeInformation getType(V v) {
+        if (v instanceof Integer) {
+            return Types.INT;
+        }
+        return null;
     }
 }

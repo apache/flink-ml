@@ -29,6 +29,7 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.function.BiFunction;
 
 /** ServerAgent resides on each worker. It serves as an agent for workers to talk with servers. */
 public class ServerAgent {
@@ -88,7 +89,7 @@ public class ServerAgent {
      * <p>Note that the values pushed by this function are not going to update the model, but just
      * perform an all reduce operation.
      */
-    void allReducePush(double[] values) {
+    void allReducePush(double[] values, BiFunction<double[], double[], double[]> aggregator) {
         final int MIN_MESSAGE_SIZE = 1024;
         int numServers = partitioner.numServers;
         int messageSize = Math.max(MIN_MESSAGE_SIZE, values.length / numServers + 1);
@@ -101,7 +102,7 @@ public class ServerAgent {
             } else {
                 segment = Arrays.copyOfRange(values, s, e);
             }
-            AllReduceM allReduceM = new AllReduceM(serverId, workerId, segment);
+            AllReduceM allReduceM = new AllReduceM(serverId, workerId, segment, aggregator);
             output.collect(new StreamRecord<>(Tuple2.of(serverId, allReduceM.toBytes())));
         }
     }

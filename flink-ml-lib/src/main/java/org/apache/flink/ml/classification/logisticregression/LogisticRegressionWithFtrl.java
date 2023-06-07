@@ -21,11 +21,10 @@ package org.apache.flink.ml.classification.logisticregression;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
-import org.apache.flink.ml.common.feature.LabeledLargePointWithWeight;
+import org.apache.flink.ml.common.feature.LabeledPointWithWeight;
 import org.apache.flink.ml.common.lossfunc.BinaryLogisticLoss;
 import org.apache.flink.ml.common.ps.training.ComputeGradients;
 import org.apache.flink.ml.common.ps.training.ComputeIndices;
@@ -36,6 +35,9 @@ import org.apache.flink.ml.common.ps.training.PushStage;
 import org.apache.flink.ml.common.ps.training.SerializableConsumer;
 import org.apache.flink.ml.common.ps.training.TrainingUtils;
 import org.apache.flink.ml.common.ps.updater.FTRL;
+import org.apache.flink.ml.linalg.IntDoubleVector;
+import org.apache.flink.ml.linalg.LongDoubleVector;
+import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -78,10 +80,10 @@ public class LogisticRegressionWithFtrl
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
 
-        DataStream<LabeledLargePointWithWeight> trainData =
+        DataStream<LabeledPointWithWeight> trainData =
                 tEnv.toDataStream(inputs[0])
                         .map(
-                                (MapFunction<Row, LabeledLargePointWithWeight>)
+                                (MapFunction<Row, LabeledPointWithWeight>)
                                         dataPoint -> {
                                             double weight =
                                                     getWeightCol() == null
@@ -100,9 +102,9 @@ public class LogisticRegressionWithFtrl
                                                 throw new RuntimeException(
                                                         "Multinomial classification is not supported yet. Supported options: [auto, binomial].");
                                             }
-                                            Tuple2<long[], double[]> features =
+                                            Vector features =
                                                     dataPoint.getFieldAs(getFeaturesCol());
-                                            return new LabeledLargePointWithWeight(
+                                            return new LabeledPointWithWeight(
                                                     features, label, weight);
                                         });
 
@@ -112,17 +114,32 @@ public class LogisticRegressionWithFtrl
         } else {
             modelDim =
                     DataStreamUtils.reduce(
-                                    trainData.map(x -> x.features.f0[x.features.f0.length - 1]),
+                                    trainData.map(
+                                            x -> {
+                                                Vector feature = x.features;
+                                                long dim;
+                                                if (feature instanceof IntDoubleVector) {
+                                                    dim =
+                                                            ((IntDoubleVector) feature)
+                                                                    .size()
+                                                                    .intValue();
+                                                } else {
+                                                    dim =
+                                                            ((LongDoubleVector) feature)
+                                                                    .size()
+                                                                    .longValue();
+                                                }
+                                                return dim;
+                                            }),
                                     (ReduceFunction<Long>) Math::max)
-                            .map((MapFunction<Long, Long>) value -> value + 1);
+                            .map((MapFunction<Long, Long>) value -> value);
         }
 
-        MiniBatchMLSession<LabeledLargePointWithWeight> mlSession =
+        MiniBatchMLSession<LabeledPointWithWeight> mlSession =
                 new MiniBatchMLSession<>(
-                        getGlobalBatchSize(),
-                        TypeInformation.of(LabeledLargePointWithWeight.class));
+                        getGlobalBatchSize(), TypeInformation.of(LabeledPointWithWeight.class));
 
-        IterationStageList<MiniBatchMLSession<LabeledLargePointWithWeight>> iterationStages =
+        IterationStageList<MiniBatchMLSession<LabeledPointWithWeight>> iterationStages =
                 new IterationStageList<>(mlSession);
         iterationStages
                 .addStage(new ComputeIndices())
@@ -136,8 +153,7 @@ public class LogisticRegressionWithFtrl
                                 (SerializableSupplier<long[]>) () -> mlSession.pushIndices,
                                 (SerializableSupplier<double[]>) () -> mlSession.pushValues))
                 .setTerminationCriteria(
-                        (SerializableFunction<
-                                        MiniBatchMLSession<LabeledLargePointWithWeight>, Boolean>)
+                        (SerializableFunction<MiniBatchMLSession<LabeledPointWithWeight>, Boolean>)
                                 o -> o.iterationId >= getMaxIter());
         FTRL ftrl =
                 new FTRL(

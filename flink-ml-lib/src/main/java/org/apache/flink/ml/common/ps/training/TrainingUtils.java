@@ -32,7 +32,7 @@ import org.apache.flink.iteration.IterationBodyResult;
 import org.apache.flink.iteration.IterationConfig;
 import org.apache.flink.iteration.Iterations;
 import org.apache.flink.iteration.ReplayableDataStreamList;
-import org.apache.flink.ml.common.feature.LabeledLargePointWithWeight;
+import org.apache.flink.ml.common.feature.LabeledPointWithWeight;
 import org.apache.flink.ml.common.ps.MirrorWorkerOperator;
 import org.apache.flink.ml.common.ps.ServerOperator;
 import org.apache.flink.ml.common.ps.WorkerOperator;
@@ -105,7 +105,7 @@ public final class TrainingUtils {
         public IterationBodyResult process(
                 DataStreamList variableStreams, DataStreamList dataStreams) {
             DataStream<byte[]> variableStream = variableStreams.get(0);
-            DataStream<LabeledLargePointWithWeight> trainData = dataStreams.get(0);
+            DataStream<LabeledPointWithWeight> trainData = dataStreams.get(0);
             final OutputTag<Tuple3<Long, Long, double[]>> modelDataOutputTag =
                     new OutputTag<Tuple3<Long, Long, double[]>>("MODEL_OUTPUT") {};
 
@@ -134,7 +134,10 @@ public final class TrainingUtils {
                                             Types.INT,
                                             PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO),
                                     new ServerOperator(
-                                            numWorkers, modelUpdater, modelDataOutputTag));
+                                            iterationStages,
+                                            numWorkers,
+                                            modelUpdater,
+                                            modelDataOutputTag));
             messageToWorker.setParallelism(numServers);
 
             DataStream<byte[]> combinedMessageToWorker =

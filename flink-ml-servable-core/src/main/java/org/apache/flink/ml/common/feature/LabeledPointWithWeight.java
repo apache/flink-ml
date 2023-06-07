@@ -18,46 +18,23 @@
 
 package org.apache.flink.ml.common.feature;
 
-import org.apache.flink.ml.linalg.IntDoubleVector;
+import org.apache.flink.ml.linalg.Vector;
 
 /** Utility class to represent a data point that contains features, label and weight. */
 public class LabeledPointWithWeight {
 
-    private IntDoubleVector features;
+    public Vector features;
 
-    private double label;
+    public double label;
 
-    private double weight;
+    public double weight;
 
-    public LabeledPointWithWeight(IntDoubleVector features, double label, double weight) {
+    public LabeledPointWithWeight(Vector features, double label, double weight) {
         this.features = features;
         this.label = label;
         this.weight = weight;
     }
 
+    /** Makes it as pojo. */
     public LabeledPointWithWeight() {}
-
-    public IntDoubleVector getFeatures() {
-        return features;
-    }
-
-    public void setFeatures(IntDoubleVector features) {
-        this.features = features;
-    }
-
-    public double getLabel() {
-        return label;
-    }
-
-    public void setLabel(double label) {
-        this.label = label;
-    }
-
-    public double getWeight() {
-        return weight;
-    }
-
-    public void setWeight(double weight) {
-        this.weight = weight;
-    }
 }
