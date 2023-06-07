@@ -33,7 +33,7 @@ import org.apache.flink.iteration.IterationConfig;
 import org.apache.flink.iteration.Iterations;
 import org.apache.flink.iteration.ReplayableDataStreamList;
 import org.apache.flink.ml.common.feature.LabeledPointWithWeight;
-import org.apache.flink.ml.common.ps.MirrorWorkerOperator;
+import org.apache.flink.ml.common.ps.ResponseAssemblerOperator;
 import org.apache.flink.ml.common.ps.ServerOperator;
 import org.apache.flink.ml.common.ps.WorkerOperator;
 import org.apache.flink.ml.common.ps.updater.ModelUpdater;
@@ -150,7 +150,7 @@ public final class TrainingUtils {
                             .transform(
                                     "MirrorWorkerOp",
                                     PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO,
-                                    new MirrorWorkerOperator(numServers))
+                                    new ResponseAssemblerOperator(numServers))
                             .setParallelism(numWorkers);
 
             return new IterationBodyResult(

@@ -18,38 +18,27 @@
 
 package org.apache.flink.ml.common.ps.training;
 
-import org.apache.flink.util.Preconditions;
+import org.apache.flink.api.common.functions.ReduceFunction;
+import org.apache.flink.api.common.typeutils.TypeSerializer;
 
-import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-/** A communication stage that conducts all-reduce on the given double array. */
-public final class AllReduceStage implements IterationStage {
-    public final Supplier<double[]> valuesSupplier;
-    public final Consumer<double[]> valuesConsumer;
-    public final BiFunction<double[], double[], double[]> valuesAggregator;
+/** A communication stage that conducts all-reduce on the given array. */
+public final class AllReduceStage<V> implements IterationStage {
+    public final Supplier<V[]> valuesSupplier;
+    public final Consumer<V[]> valuesConsumer;
+    public final ReduceFunction<V[]> reducer;
+    public final TypeSerializer<V> typeSerializer;
 
     public AllReduceStage(
-            Supplier<double[]> valuesSupplier,
-            Consumer<double[]> valuesConsumer,
-            BiFunction<double[], double[], double[]> valuesAggregator) {
+            Supplier<V[]> valuesSupplier,
+            Consumer<V[]> valuesConsumer,
+            ReduceFunction<V[]> reducer,
+            TypeSerializer<V> typeSerializer) {
         this.valuesSupplier = valuesSupplier;
         this.valuesConsumer = valuesConsumer;
-        this.valuesAggregator = valuesAggregator;
-    }
-
-    public AllReduceStage(Supplier<double[]> valuesSupplier, Consumer<double[]> valuesConsumer) {
-        this(
-                valuesSupplier,
-                valuesConsumer,
-                (SerializableBiFunction<double[], double[], double[]>)
-                        (array1, array2) -> {
-                            Preconditions.checkState(array1.length == array2.length);
-                            for (int i = 0; i < array1.length; i++) {
-                                array2[i] += array1[i];
-                            }
-                            return array2;
-                        });
+        this.reducer = reducer;
+        this.typeSerializer = typeSerializer;
     }
 }

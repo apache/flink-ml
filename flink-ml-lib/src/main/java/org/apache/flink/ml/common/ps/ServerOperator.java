@@ -18,6 +18,7 @@
 
 package org.apache.flink.ml.common.ps;
 
+import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.PrimitiveArrayTypeInfo;
@@ -25,15 +26,14 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
-import org.apache.flink.ml.common.ps.message.AllReduceM;
-import org.apache.flink.ml.common.ps.message.InitializeModel;
+import org.apache.flink.ml.common.ps.message.Message;
 import org.apache.flink.ml.common.ps.message.MessageType;
-import org.apache.flink.ml.common.ps.message.MessageUtils;
-import org.apache.flink.ml.common.ps.message.PullIndexM;
-import org.apache.flink.ml.common.ps.message.PulledValueM;
-import org.apache.flink.ml.common.ps.message.PushKvM;
+import org.apache.flink.ml.common.ps.training.AllReduceStage;
+import org.apache.flink.ml.common.ps.training.IterationStage;
 import org.apache.flink.ml.common.ps.training.IterationStageList;
+import org.apache.flink.ml.common.ps.training.PullStage;
 import org.apache.flink.ml.common.ps.updater.ModelUpdater;
+import org.apache.flink.ml.util.Bits;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
@@ -57,15 +57,15 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 /**
- * The server operator maintains the shared parameters. It receives push/pull requests from {@link
- * WorkerOperator} and sends the answer request to {@link MirrorWorkerOperator}. It works closely
- * with {@link ModelUpdater} in the following way:
+ * The server operator maintains the shared parameters. It receives push/pull/allreduce requests
+ * from {@link WorkerOperator} and sends the answer request to {@link ResponseAssemblerOperator}. It
+ * works closely with {@link ModelUpdater} in the following way:
  *
  * <ul>
- *   <li>The server operator deals with the message from workers and decide when to process the
+ *   <li>The server operator deals with the message from workers and decides when to process the
  *       received message.
- *   <li>The server operator calls {@link ModelUpdater#handlePush(long[], double[])} and {@link
- *       ModelUpdater#handlePull(long[])} to process the messages in detail.
+ *   <li>The server operator calls {@link ModelUpdater#update(long[], double[])} and {@link
+ *       ModelUpdater#get(long[])} to process the messages in detail.
  *   <li>The server operator triggers checkpoint for {@link ModelUpdater}.
  *   <li>The server operator outputs the final output parameters by calling {@link
  *       ModelUpdater#getModelSegments()}.
@@ -76,19 +76,17 @@ import java.util.concurrent.Future;
  * ModelUpdater}.
  *
  * <p>TODO: Add support for asynchronous operations on servers.
- *
- * <p>TODO: Add support for maintaining multiple parameters on servers.
  */
 public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[]>>
         implements OneInputStreamOperator<Tuple2<Integer, byte[]>, Tuple2<Integer, byte[]>>,
                 IterationListener<Tuple2<Integer, byte[]>> {
-    /** Iteration stage list. */
-    private final IterationStageList<?> iterationStageList;
+    /** The iterationStage list that asks responses from servers. */
+    private final List<IterationStage> stageList;
     /** Number of workers to communicate with. */
     private final int numWorkers;
     /** The logic to answer push/pull request from workers. */
     private final ModelUpdater modelUpdater;
-    /** Format of model data: start index, end index, dense double array. */
+    /** Format of model data: start key index, end key index, dense double array. */
     private final OutputTag<Tuple3<Long, Long, double[]>> modelOutputTag;
     /** Index of the server task. */
     private int serverId = -1;
@@ -101,22 +99,27 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
     private final List<Future<?>> futuresInEpoch = new ArrayList<>();
     /** The merger for push requests. */
     private final PushRequestMerger pushRequestMerger;
-    /** The merger for all reduce requests. */
-    private final AllReduceMerger allReduceMerger;
     /** The pending pull requests. */
     private ListState<byte[]> pendingPulls;
+
+    /** The pending allreduce requests. */
+    private ListState<byte[]> pendingAllReduces;
 
     public ServerOperator(
             IterationStageList<?> iterationStageList,
             int numWorkers,
             ModelUpdater modelUpdater,
             OutputTag<Tuple3<Long, Long, double[]>> modelOutputTag) {
-        this.iterationStageList = iterationStageList;
+        this.stageList = new ArrayList<>();
+        for (IterationStage stage : iterationStageList.stageList) {
+            if (stage instanceof PullStage || stage instanceof AllReduceStage) {
+                stageList.add(stage);
+            }
+        }
         this.numWorkers = numWorkers;
         this.modelUpdater = modelUpdater;
         this.modelOutputTag = modelOutputTag;
         this.pushRequestMerger = new PushRequestMerger();
-        this.allReduceMerger = new AllReduceMerger();
     }
 
     @Override
@@ -129,30 +132,26 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
     @Override
     public void processElement(StreamRecord<Tuple2<Integer, byte[]>> element) throws Exception {
         byte[] request = element.getValue().f1;
-        MessageType type = MessageUtils.getMessageType(request);
+        Message message = new Message(element.getValue().f1);
+        MessageType type = message.getMessageType();
         switch (type) {
-            case PULL_INDEX:
-                pendingPulls.add(request);
-                break;
-            case INITIALIZE_MODEL_AS_ZERO:
-                InitializeModel initializeModelAsZeroM = InitializeModel.fromBytes(request);
-                Preconditions.checkState(serverId == initializeModelAsZeroM.serverId);
-
-                long start = initializeModelAsZeroM.startIndex;
-                long end = initializeModelAsZeroM.endIndex;
-                if (initializeModelAsZeroM.workerId == 0) {
-                    modelUpdater.open(start, end);
+            case INITIALIZE:
+                long[] indices = message.getKeys();
+                Preconditions.checkState(serverId == message.getServerId() && indices.length == 2);
+                if (message.getWorkerId() == 0) {
+                    modelUpdater.open(indices[0], indices[1]);
                 }
                 break;
-            case PUSH_KV:
+            case PUSH:
                 futuresInEpoch.add(
                         singleThreadExecutor.submit(
-                                () -> pushRequestMerger.processPushRequest(request)));
+                                () -> pushRequestMerger.processPushRequest(message)));
                 break;
-            case ALL_REDUCE_VALUE:
-                futuresInEpoch.add(
-                        singleThreadExecutor.submit(
-                                () -> allReduceMerger.processAllReduceRequest(request)));
+            case PULL:
+                pendingPulls.add(request);
+                break;
+            case ALL_REDUCE:
+                pendingAllReduces.add(request);
                 break;
             default:
                 throw new UnsupportedOperationException("Unsupported message type: " + type + ".");
@@ -175,7 +174,7 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
         pushRequestMerger.accumulatedKvsForVector.clear();
         if (kvs.f0.length > 0) {
             // There are pushes at this epoch.
-            modelUpdater.handlePush(kvs.f0, kvs.f1);
+            modelUpdater.update(kvs.f0, kvs.f1);
         }
 
         Iterator<byte[]> pullsIterator = pendingPulls.get().iterator();
@@ -183,32 +182,46 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
             // This is a pull stage.
             while (pullsIterator.hasNext()) {
                 byte[] pull = pullsIterator.next();
-                futuresInEpoch.add(singleThreadExecutor.submit(() -> processPullRequest(pull)));
-            }
-        }
-        if (allReduceMerger.reducedResult != null) {
-            // This is an all reduce stage.
-            PulledValueM pulledValueM =
-                    new PulledValueM(serverId, -1, allReduceMerger.reducedResult);
-            for (int workerId = 0; workerId < numWorkers; workerId++) {
-                int finalWorkerId = workerId;
-                pulledValueM.workerId = finalWorkerId;
                 futuresInEpoch.add(
-                        singleThreadExecutor.submit(
-                                () ->
-                                        output.collect(
-                                                new StreamRecord<>(
-                                                        Tuple2.of(
-                                                                finalWorkerId,
-                                                                pulledValueM.toBytes())))));
+                        singleThreadExecutor.submit(() -> processPullRequest(new Message(pull))));
             }
         }
+        Iterator<byte[]> allreduceIterator = pendingAllReduces.get().iterator();
+        if (allreduceIterator.hasNext()) {
+            int stageId = epochWatermark % stageList.size();
+            AllReduceStage<?> allReduceStage = (AllReduceStage<?>) stageList.get(stageId);
+            Message reducedResult = processAllReduceRequest(allReduceStage, allreduceIterator);
+            for (int workerId = 0; workerId < numWorkers; workerId++) {
+                reducedResult.setWorkerId(workerId);
+                output.collect(new StreamRecord<>(Tuple2.of(workerId, reducedResult.bytes)));
+            }
+        }
+
         for (Future<?> future : futuresInEpoch) {
             future.get();
         }
         pendingPulls.clear();
-        allReduceMerger.reducedResult = null;
+        pendingAllReduces.clear();
         futuresInEpoch.clear();
+    }
+
+    private <V> Message processAllReduceRequest(AllReduceStage<V> stage, Iterator<byte[]> requests)
+            throws Exception {
+        ReduceFunction<V[]> reduceFunction = stage.reducer;
+        V[] reducedResult = null;
+        while (requests.hasNext()) {
+            byte[] allreduceRequest = requests.next();
+            Message message = new Message(allreduceRequest);
+            V[] receivedResult = message.getValues(stage.typeSerializer);
+            if (reducedResult == null) {
+                reducedResult = receivedResult;
+            } else {
+                reducedResult = reduceFunction.reduce(receivedResult, reducedResult);
+            }
+        }
+
+        return new Message(
+                -1, -1, MessageType.ALL_REDUCE, new long[0], reducedResult, stage.typeSerializer);
     }
 
     @Override
@@ -230,9 +243,14 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
                                 new ListStateDescriptor<>(
                                         "pendingPulls",
                                         PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO));
+        pendingAllReduces =
+                context.getOperatorStateStore()
+                        .getListState(
+                                new ListStateDescriptor<>(
+                                        "pendingAllReduces",
+                                        PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO));
         modelUpdater.initializeState(context);
         pushRequestMerger.initializeState(context);
-        allReduceMerger.initializeState(context);
     }
 
     @Override
@@ -246,18 +264,16 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
         futuresInEpoch.clear();
         modelUpdater.snapshotState(context);
         pushRequestMerger.snapshotState(context);
-        allReduceMerger.snapshotState(context);
     }
 
-    private Object processPullRequest(byte[] bytesData) {
-        PullIndexM pullIndexM = PullIndexM.fromBytes(bytesData);
-        Preconditions.checkState(serverId == pullIndexM.serverId);
-        int workerId = pullIndexM.workerId;
-        long[] indices = pullIndexM.indices;
-        double[] pulledValues = modelUpdater.handlePull(indices);
-        PulledValueM pulledValueM = new PulledValueM(serverId, workerId, pulledValues);
+    private Object processPullRequest(Message message) {
+        Preconditions.checkState(serverId == message.getServerId());
+        int workerId = message.getWorkerId();
+        double[] pulledValues = modelUpdater.get(message.getKeys());
+        Message pulledMessage =
+                new Message(serverId, workerId, MessageType.PULL, new long[0], pulledValues);
         StreamRecord<Tuple2<Integer, byte[]>> record =
-                new StreamRecord<>(Tuple2.of(workerId, pulledValueM.toBytes()));
+                new StreamRecord<>(Tuple2.of(workerId, pulledMessage.bytes));
 
         output.collect(record);
         return new Object();
@@ -277,11 +293,9 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
             this.accumulatedKvsForMatrix = new HashMap<>();
         }
 
-        private Object processPushRequest(byte[] pushKv) {
-            PushKvM pushKvM = PushKvM.fromBytes(pushKv);
-            Tuple2<long[], double[]> pushKvs = pushKvM.kvs;
-            long[] keys = pushKvs.f0;
-            double[] values = pushKvs.f1;
+        private Object processPushRequest(Message message) {
+            long[] keys = message.getKeys();
+            double[] values = message.getValuesInDoubleArray();
 
             if (values.length == keys.length) {
                 for (int i = 0; i < keys.length; i++) {
@@ -343,8 +357,7 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
                             .orElse(null);
 
             if (accumulatedKvsInBytes != null) {
-                Tuple2<long[], double[]> kvs =
-                        MessageUtils.getLongDoubleArray(accumulatedKvsInBytes, 0);
+                Tuple2<long[], double[]> kvs = Bits.getLongDoubleArray(accumulatedKvsInBytes, 0);
                 long[] keys = kvs.f0;
                 double[] values = kvs.f1;
                 int numValuesPerKey = values.length / keys.length;
@@ -369,45 +382,9 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
             Tuple2<long[], double[]> kvs = toKvArrays();
             accumulatedKvsState.clear();
             if (kvs.f0.length > 0) {
-                byte[] bytes = new byte[MessageUtils.getLongDoubleArraySizeInBytes(kvs)];
-                MessageUtils.putLongDoubleArray(kvs, bytes, 0);
+                byte[] bytes = new byte[Bits.getLongDoubleArraySizeInBytes(kvs)];
+                Bits.putLongDoubleArray(kvs, bytes, 0);
                 accumulatedKvsState.add(bytes);
-            }
-        }
-    }
-
-    private static class AllReduceMerger implements Serializable {
-        private double[] reducedResult;
-        private ListState<double[]> reducedResultState;
-
-        private void processAllReduceRequest(byte[] request) {
-            AllReduceM allReduceM = AllReduceM.fromBytes(request);
-            double[] receivedValues = allReduceM.values;
-            if (reducedResult == null) {
-                reducedResult = receivedValues;
-            } else {
-                Preconditions.checkArgument(reducedResult.length == receivedValues.length);
-                reducedResult = allReduceM.aggregator.apply(receivedValues, reducedResult);
-            }
-        }
-
-        private void initializeState(StateInitializationContext context) throws Exception {
-            reducedResultState =
-                    context.getOperatorStateStore()
-                            .getListState(
-                                    new ListStateDescriptor<double[]>(
-                                            "reducedResultState",
-                                            PrimitiveArrayTypeInfo
-                                                    .DOUBLE_PRIMITIVE_ARRAY_TYPE_INFO));
-            reducedResult =
-                    OperatorStateUtils.getUniqueElement(reducedResultState, "reducedResultState")
-                            .orElse(null);
-        }
-
-        private void snapshotState(StateSnapshotContext context) throws Exception {
-            reducedResultState.clear();
-            if (reducedResult != null) {
-                reducedResultState.add(reducedResult);
             }
         }
     }

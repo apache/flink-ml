@@ -21,8 +21,10 @@ package org.apache.flink.ml.common.ps;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.PrimitiveArrayTypeInfo;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.ml.common.ps.message.PulledValueM;
+import org.apache.flink.iteration.operator.OperatorStateUtils;
+import org.apache.flink.ml.common.ps.message.Message;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
@@ -30,28 +32,24 @@ import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.util.Preconditions;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.Iterator;
-import java.util.List;
-
 /**
- * Merges the message from different servers for one pull request.
+ * Assembles the responses from different servers for one pull request.
  *
  * <p>Note that for each single-thread worker, there are at exactly #numServers segments for each
- * pull request in the feedback edge.
+ * pull request in the responses.
  */
-public class MirrorWorkerOperator extends AbstractStreamOperator<byte[]>
+public class ResponseAssemblerOperator extends AbstractStreamOperator<byte[]>
         implements OneInputStreamOperator<Tuple2<Integer, byte[]>, byte[]> {
     private final int numServers;
+
     private int workerId;
 
-    /** The received messages from servers for the current pull request. */
-    private List<PulledValueM> messageReceived;
+    private int numResponsesReceived = 0;
+    private ListState<Integer> numResponsesReceivedState;
 
-    private ListState<byte[]> messageReceivedState;
+    private ListState<byte[]> responsesReceived;
 
-    public MirrorWorkerOperator(int numServers) {
+    public ResponseAssemblerOperator(int numServers) {
         this.numServers = numServers;
     }
 
@@ -64,59 +62,43 @@ public class MirrorWorkerOperator extends AbstractStreamOperator<byte[]>
     @Override
     public void processElement(StreamRecord<Tuple2<Integer, byte[]>> element) throws Exception {
         Preconditions.checkState(element.getValue().f0 == workerId);
-        PulledValueM pulledValueM = PulledValueM.fromBytes(element.getValue().f1);
-        messageReceived.add(pulledValueM);
-        trySendingPulls(numServers);
-    }
+        responsesReceived.add(element.getValue().f1);
+        numResponsesReceived++;
 
-    private void trySendingPulls(int numSegments) {
-        if (messageReceived.size() == numSegments) {
-            Comparator<PulledValueM> comparator = Comparator.comparingInt(o -> o.serverId);
-            messageReceived.sort(comparator);
-            int size = 0;
-            for (PulledValueM pulledValueM : messageReceived) {
-                size += pulledValueM.values.length;
-            }
-            double[] answer = new double[size];
-            int offset = 0;
-            for (PulledValueM pulledValueM : messageReceived) {
-                double[] values = pulledValueM.values;
-                System.arraycopy(values, 0, answer, offset, values.length);
-                offset += values.length;
-            }
-            PulledValueM pulledValueM = new PulledValueM(-1, workerId, answer);
-            output.collect(new StreamRecord<>(pulledValueM.toBytes()));
-            messageReceived.clear();
+        if (numResponsesReceived == numServers) {
+            Message message = Message.assembleMessages(responsesReceived.get().iterator());
+            output.collect(new StreamRecord<>(message.bytes));
+            responsesReceived.clear();
+            numResponsesReceived = 0;
         }
     }
 
     @Override
     public void initializeState(StateInitializationContext context) throws Exception {
         super.initializeState(context);
-        messageReceivedState =
+        responsesReceived =
                 context.getOperatorStateStore()
                         .getListState(
                                 new ListStateDescriptor<>(
-                                        "messageReceivedState",
+                                        "responsesReceivedState",
                                         PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO));
-        messageReceived = new ArrayList<>();
-
-        Iterator<byte[]> iterator = messageReceivedState.get().iterator();
-        if (iterator.hasNext()) {
-            while (iterator.hasNext()) {
-                messageReceived.add(PulledValueM.fromBytes(iterator.next()));
-            }
-        }
+        numResponsesReceivedState =
+                context.getOperatorStateStore()
+                        .getListState(
+                                new ListStateDescriptor<>("numResponsesReceivedState", Types.INT));
+        numResponsesReceived =
+                OperatorStateUtils.getUniqueElement(
+                                numResponsesReceivedState, "numResponsesReceived")
+                        .orElse(0);
     }
 
     @Override
     public void snapshotState(StateSnapshotContext context) throws Exception {
         super.snapshotState(context);
-        messageReceivedState.clear();
-        if (messageReceived.size() > 0) {
-            for (PulledValueM valuesPulled : messageReceived) {
-                messageReceivedState.add(valuesPulled.toBytes());
-            }
+        responsesReceived.clear();
+        if (numResponsesReceived > 0) {
+            numResponsesReceivedState.clear();
+            numResponsesReceivedState.add(numResponsesReceived);
         }
     }
 }

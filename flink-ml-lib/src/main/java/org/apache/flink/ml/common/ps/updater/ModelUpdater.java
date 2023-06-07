@@ -26,7 +26,7 @@ import java.io.Serializable;
 import java.util.Iterator;
 
 /**
- * A model updater that could be used to handle push/pull request from workers.
+ * A model updater that could be used to update and retrieve model data.
  *
  * <p>Note that model updater should also ensure that model data is robust to failures, by writing
  * model data to snapshots.
@@ -34,18 +34,18 @@ import java.util.Iterator;
 public interface ModelUpdater extends Serializable {
 
     /** Initializes the model data. */
-    void open(long startFeatureIndex, long endFeatureIndex);
+    void open(long startKeyIndex, long endKeyIndex);
 
     /** Applies the push to update the model data, e.g., using gradient to update model. */
-    void handlePush(long[] keys, double[] values);
+    void update(long[] keys, double[] values);
 
-    /** Applies the pull and return the retrieved model data. */
-    double[] handlePull(long[] keys);
+    /** Retrieves the model data of the given keys. */
+    double[] get(long[] keys);
 
     /**
-     * Returns model segments with the format of (startFeatureIdx, endFeatureIdx, modelValues). The
-     * model segments are continuously updated/retrieved by push/pull(i.e., `handlePush` and
-     * `handlePull`).
+     * Returns model segments with the format of (startKeyIdx, endKeyIdx, modelValues). The model
+     * segments are continuously updated/retrieved by push/pull(i.e., {@link
+     * ModelUpdater#update(long[], double[])} and {@link ModelUpdater#get(long[])}).
      */
     Iterator<Tuple3<Long, Long, double[]>> getModelSegments();
 

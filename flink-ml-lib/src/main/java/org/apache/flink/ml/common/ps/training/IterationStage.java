@@ -23,7 +23,7 @@ import java.io.Serializable;
 /**
  * Iterative machine learning training usually incurs local computation step (e.g., computing
  * gradients) and global communication step (e.g., all-reduce and parameter servers to aggregate the
- * gradients).
+ * updates from workers).
  *
  * <p>To describe the above iteration training process, we model the training process as a sequence
  * of iteration stages. An iteration stage could be either local computation or global

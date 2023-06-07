@@ -31,11 +31,11 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
- * FTRL (Follow-the-regularized-leader) is an optimization algorithm which is widely deployed by
- * online learning.
+ * The FTRL (Follow-the-Regularized-Leader) algorithm is an optimization algorithm used for
+ * large-scale linear models. It aims to minimize the sum of a loss function over all training
+ * examples, subject to a regularization constraint.
  *
- * <p>See <a href="https://doi.org/10.1145/2487575.2488200">H. Brendan McMahan et al., Ad click *
- * prediction: a view from the trenches.</a>
+ * <p>FTRL is well-suited for sparse data and can handle problems with billions of features.
  */
 public class FTRL implements ModelUpdater {
     private final double alpha;
@@ -62,9 +62,9 @@ public class FTRL implements ModelUpdater {
     }
 
     @Override
-    public void open(long startFeatureIndex, long endFeatureIndex) {
-        this.startIndex = startFeatureIndex;
-        this.endIndex = endFeatureIndex;
+    public void open(long startKeyIndex, long endKeyIndex) {
+        this.startIndex = startKeyIndex;
+        this.endIndex = endKeyIndex;
         int modelShardSize = (int) (endIndex - startIndex);
         weight = new double[modelShardSize];
         sigma = new double[modelShardSize];
@@ -73,7 +73,7 @@ public class FTRL implements ModelUpdater {
     }
 
     @Override
-    public void handlePush(long[] keys, double[] values) {
+    public void update(long[] keys, double[] values) {
         for (int i = 0; i < keys.length; i++) {
             int index = (int) (keys[i] - startIndex);
             double gi = values[i];
@@ -97,7 +97,7 @@ public class FTRL implements ModelUpdater {
     }
 
     @Override
-    public double[] handlePull(long[] keys) {
+    public double[] get(long[] keys) {
         double[] values = new double[keys.length];
         for (int i = 0; i < keys.length; i++) {
             values[i] = weight[(int) (keys[i] - startIndex)];
