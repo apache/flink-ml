@@ -26,7 +26,7 @@ import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.common.ps.message.AllReduceM;
-import org.apache.flink.ml.common.ps.message.InitializeModelAsZeroM;
+import org.apache.flink.ml.common.ps.message.InitializeModel;
 import org.apache.flink.ml.common.ps.message.MessageType;
 import org.apache.flink.ml.common.ps.message.MessageUtils;
 import org.apache.flink.ml.common.ps.message.PullIndexM;
@@ -135,8 +135,7 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
                 pendingPulls.add(request);
                 break;
             case INITIALIZE_MODEL_AS_ZERO:
-                InitializeModelAsZeroM initializeModelAsZeroM =
-                        InitializeModelAsZeroM.fromBytes(request);
+                InitializeModel initializeModelAsZeroM = InitializeModel.fromBytes(request);
                 Preconditions.checkState(serverId == initializeModelAsZeroM.serverId);
 
                 long start = initializeModelAsZeroM.startIndex;

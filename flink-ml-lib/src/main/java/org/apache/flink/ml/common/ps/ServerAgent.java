@@ -21,7 +21,7 @@ package org.apache.flink.ml.common.ps;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.ml.common.ps.message.AllReduceM;
-import org.apache.flink.ml.common.ps.message.InitializeModelAsZeroM;
+import org.apache.flink.ml.common.ps.message.InitializeModel;
 import org.apache.flink.ml.common.ps.message.PullIndexM;
 import org.apache.flink.ml.common.ps.message.PushKvM;
 import org.apache.flink.streaming.api.operators.Output;
@@ -49,15 +49,13 @@ public class ServerAgent {
         this.partitioner = partitioner;
     }
 
-    /** Sends a request to servers to initialize the values stored as zeros. */
+    /** Sends a request to servers to initialize key range on each server. */
     void initializeModelAsZeros() {
         for (int serverId = 0; serverId < partitioner.numServers; serverId++) {
             long start = partitioner.ranges[serverId];
             long end = partitioner.ranges[serverId + 1];
-            InitializeModelAsZeroM initializeModelAsZeroM =
-                    new InitializeModelAsZeroM(workerId, serverId, start, end);
-            output.collect(
-                    new StreamRecord<>(Tuple2.of(serverId, initializeModelAsZeroM.toBytes())));
+            InitializeModel initializeModel = new InitializeModel(workerId, serverId, start, end);
+            output.collect(new StreamRecord<>(Tuple2.of(serverId, initializeModel.toBytes())));
         }
     }
 
