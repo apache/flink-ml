@@ -47,13 +47,13 @@ public class LogisticRegressionModelServable
 
     private final Map<Param<?>, Object> paramMap = new HashMap<>();
 
-    private LogisticRegressionModelData modelData;
+    private LogisticRegressionModelDataSegment modelData;
 
     public LogisticRegressionModelServable() {
         ParamUtils.initializeMapWithDefaultValues(paramMap, this);
     }
 
-    LogisticRegressionModelServable(LogisticRegressionModelData modelData) {
+    LogisticRegressionModelServable(LogisticRegressionModelDataSegment modelData) {
         this();
         this.modelData = modelData;
     }
@@ -81,11 +81,11 @@ public class LogisticRegressionModelServable
     public LogisticRegressionModelServable setModelData(InputStream... modelDataInputs)
             throws IOException {
         Preconditions.checkArgument(modelDataInputs.length == 1);
-        List<LogisticRegressionModelData> modelSegments = new ArrayList<>();
+        List<LogisticRegressionModelDataSegment> modelSegments = new ArrayList<>();
         while (true) {
             try {
-                LogisticRegressionModelData segment =
-                        LogisticRegressionModelData.decode(modelDataInputs[0]);
+                LogisticRegressionModelDataSegment segment =
+                        LogisticRegressionModelDataSegment.decode(modelDataInputs[0]);
                 modelSegments.add(segment);
             } catch (IOException e) {
                 // Reached the end of model stream.
@@ -93,7 +93,7 @@ public class LogisticRegressionModelServable
             }
         }
 
-        modelData = LogisticRegressionModelData.mergeSegments(modelSegments);
+        modelData = LogisticRegressionModelDataSegment.mergeSegments(modelSegments);
         return this;
     }
 

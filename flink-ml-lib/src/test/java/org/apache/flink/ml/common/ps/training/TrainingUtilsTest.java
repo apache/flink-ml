@@ -332,6 +332,7 @@ public class TrainingUtilsTest {
         }
     }
 
+    /** Mock pojo class to test all reduce. */
     public static class MockPojo {
         public int i;
         public int j;

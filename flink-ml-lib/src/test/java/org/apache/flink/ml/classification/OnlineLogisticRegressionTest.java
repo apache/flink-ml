@@ -29,7 +29,7 @@ import org.apache.flink.configuration.RestOptions;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegression;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModel;
-import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelData;
+import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelDataSegment;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelDataUtil;
 import org.apache.flink.ml.classification.logisticregression.OnlineLogisticRegression;
 import org.apache.flink.ml.classification.logisticregression.OnlineLogisticRegressionModel;
@@ -153,7 +153,7 @@ public class OnlineLogisticRegressionTest extends TestLogger {
     private InMemorySourceFunction<Row> trainSparseSource;
     private InMemorySourceFunction<Row> predictSparseSource;
     private InMemorySinkFunction<Row> outputSink;
-    private InMemorySinkFunction<LogisticRegressionModelData> modelDataSink;
+    private InMemorySinkFunction<LogisticRegressionModelDataSegment> modelDataSink;
 
     private static InMemoryReporter reporter;
     private static MiniCluster miniCluster;
@@ -671,10 +671,10 @@ public class OnlineLogisticRegressionTest extends TestLogger {
 
         submitJob(env.getStreamGraph().getJobGraph());
         trainDenseSource.addAll(TRAIN_DENSE_ROWS_1);
-        LogisticRegressionModelData actualModelData = modelDataSink.poll();
+        LogisticRegressionModelDataSegment actualModelData = modelDataSink.poll();
 
-        LogisticRegressionModelData expectedModelData =
-                new LogisticRegressionModelData(
+        LogisticRegressionModelDataSegment expectedModelData =
+                new LogisticRegressionModelDataSegment(
                         new DenseIntDoubleVector(
                                 new double[] {0.2994527071464283, -0.1412541067743284}),
                         1L);
@@ -685,12 +685,12 @@ public class OnlineLogisticRegressionTest extends TestLogger {
 
     @Test
     public void testSetModelData() throws Exception {
-        LogisticRegressionModelData modelData1 =
-                new LogisticRegressionModelData(
+        LogisticRegressionModelDataSegment modelData1 =
+                new LogisticRegressionModelDataSegment(
                         new DenseIntDoubleVector(new double[] {0.085, -0.22}), 1L);
 
-        LogisticRegressionModelData modelData2 =
-                new LogisticRegressionModelData(
+        LogisticRegressionModelDataSegment modelData2 =
+                new LogisticRegressionModelDataSegment(
                         new DenseIntDoubleVector(new double[] {0.075, -0.28}), 2L);
 
         final List<DenseIntDoubleVector> expectedRawInfo1 =
@@ -706,13 +706,13 @@ public class OnlineLogisticRegressionTest extends TestLogger {
                         new DenseIntDoubleVector(
                                 new double[] {0.8779865510655934, 0.12201344893440658}));
 
-        InMemorySourceFunction<LogisticRegressionModelData> modelDataSource =
+        InMemorySourceFunction<LogisticRegressionModelDataSegment> modelDataSource =
                 new InMemorySourceFunction<>();
         Table modelDataTable =
                 tEnv.fromDataStream(
                         env.addSource(
                                 modelDataSource,
-                                TypeInformation.of(LogisticRegressionModelData.class)));
+                                TypeInformation.of(LogisticRegressionModelDataSegment.class)));
 
         OnlineLogisticRegressionModel onlineModel =
                 new OnlineLogisticRegressionModel()

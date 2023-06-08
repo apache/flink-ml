@@ -45,8 +45,8 @@ import java.util.Random;
 public class LogisticRegressionModelDataUtil {
 
     /**
-     * Generates a Table containing a {@link LogisticRegressionModelData} instance with randomly
-     * generated coefficient.
+     * Generates a Table containing a {@link LogisticRegressionModelDataSegment} instance with
+     * randomly generated coefficient.
      *
      * @param tEnv The environment where to create the table.
      * @param dim The size of generated coefficient.
@@ -59,7 +59,7 @@ public class LogisticRegressionModelDataUtil {
     }
 
     private static class RandomModelDataGenerator
-            implements MapFunction<Integer, LogisticRegressionModelData> {
+            implements MapFunction<Integer, LogisticRegressionModelDataSegment> {
         private final int dim;
         private final int seed;
 
@@ -69,13 +69,13 @@ public class LogisticRegressionModelDataUtil {
         }
 
         @Override
-        public LogisticRegressionModelData map(Integer integer) throws Exception {
+        public LogisticRegressionModelDataSegment map(Integer integer) throws Exception {
             DenseIntDoubleVector vector = new DenseIntDoubleVector(dim);
             Random random = new Random(seed);
             for (int j = 0; j < dim; j++) {
                 vector.values[j] = random.nextDouble();
             }
-            return new LogisticRegressionModelData(vector, 0L);
+            return new LogisticRegressionModelDataSegment(vector, 0L);
         }
     }
 
@@ -85,13 +85,14 @@ public class LogisticRegressionModelDataUtil {
      * @param modelData The table model data.
      * @return The data stream model data.
      */
-    public static DataStream<LogisticRegressionModelData> getModelDataStream(Table modelData) {
+    public static DataStream<LogisticRegressionModelDataSegment> getModelDataStream(
+            Table modelData) {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) modelData).getTableEnvironment();
         return tEnv.toDataStream(modelData)
                 .map(
                         x ->
-                                new LogisticRegressionModelData(
+                                new LogisticRegressionModelDataSegment(
                                         x.getFieldAs(0),
                                         x.getFieldAs(1),
                                         x.getFieldAs(2),
@@ -111,8 +112,8 @@ public class LogisticRegressionModelDataUtil {
         return tEnv.toDataStream(modelDataTable)
                 .map(
                         x -> {
-                            LogisticRegressionModelData modelData =
-                                    new LogisticRegressionModelData(
+                            LogisticRegressionModelDataSegment modelData =
+                                    new LogisticRegressionModelDataSegment(
                                             x.getFieldAs(0),
                                             x.getFieldAs(1),
                                             x.getFieldAs(2),
@@ -125,26 +126,27 @@ public class LogisticRegressionModelDataUtil {
     }
 
     /** Data encoder for {@link LogisticRegression} and {@link OnlineLogisticRegression}. */
-    public static class ModelDataEncoder implements Encoder<LogisticRegressionModelData> {
+    public static class ModelDataEncoder implements Encoder<LogisticRegressionModelDataSegment> {
 
         @Override
-        public void encode(LogisticRegressionModelData modelData, OutputStream outputStream)
+        public void encode(LogisticRegressionModelDataSegment modelData, OutputStream outputStream)
                 throws IOException {
             modelData.encode(outputStream);
         }
     }
 
     /** Data decoder for {@link LogisticRegression} and {@link OnlineLogisticRegression}. */
-    public static class ModelDataDecoder extends SimpleStreamFormat<LogisticRegressionModelData> {
+    public static class ModelDataDecoder
+            extends SimpleStreamFormat<LogisticRegressionModelDataSegment> {
 
         @Override
-        public Reader<LogisticRegressionModelData> createReader(
+        public Reader<LogisticRegressionModelDataSegment> createReader(
                 Configuration configuration, FSDataInputStream inputStream) {
-            return new Reader<LogisticRegressionModelData>() {
+            return new Reader<LogisticRegressionModelDataSegment>() {
                 @Override
-                public LogisticRegressionModelData read() throws IOException {
+                public LogisticRegressionModelDataSegment read() throws IOException {
                     try {
-                        return LogisticRegressionModelData.decode(inputStream);
+                        return LogisticRegressionModelDataSegment.decode(inputStream);
                     } catch (EOFException e) {
                         return null;
                     }
@@ -158,8 +160,8 @@ public class LogisticRegressionModelDataUtil {
         }
 
         @Override
-        public TypeInformation<LogisticRegressionModelData> getProducedType() {
-            return TypeInformation.of(LogisticRegressionModelData.class);
+        public TypeInformation<LogisticRegressionModelDataSegment> getProducedType() {
+            return TypeInformation.of(LogisticRegressionModelDataSegment.class);
         }
     }
 }

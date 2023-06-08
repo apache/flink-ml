@@ -30,8 +30,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
 
-/** Model data of {@link LogisticRegressionModelServable}. */
-public class LogisticRegressionModelData {
+/** Segment model data of {@link LogisticRegressionModelServable}. */
+public class LogisticRegressionModelDataSegment {
 
     public DenseIntDoubleVector coefficient;
 
@@ -41,13 +41,13 @@ public class LogisticRegressionModelData {
 
     public long modelVersion;
 
-    public LogisticRegressionModelData() {}
+    public LogisticRegressionModelDataSegment() {}
 
-    public LogisticRegressionModelData(DenseIntDoubleVector coefficient, long modelVersion) {
+    public LogisticRegressionModelDataSegment(DenseIntDoubleVector coefficient, long modelVersion) {
         this(coefficient, 0L, coefficient.size(), modelVersion);
     }
 
-    public LogisticRegressionModelData(
+    public LogisticRegressionModelDataSegment(
             DenseIntDoubleVector coefficient, long startIndex, long endIndex, long modelVersion) {
         this.coefficient = coefficient;
         this.startIndex = startIndex;
@@ -78,7 +78,7 @@ public class LogisticRegressionModelData {
      * @param inputStream The stream to read from.
      * @return The model data instance.
      */
-    static LogisticRegressionModelData decode(InputStream inputStream) throws IOException {
+    static LogisticRegressionModelDataSegment decode(InputStream inputStream) throws IOException {
         DataInputViewStreamWrapper dataInputViewStreamWrapper =
                 new DataInputViewStreamWrapper(inputStream);
 
@@ -88,23 +88,23 @@ public class LogisticRegressionModelData {
         long endIndex = dataInputViewStreamWrapper.readLong();
         long modelVersion = dataInputViewStreamWrapper.readLong();
 
-        return new LogisticRegressionModelData(coefficient, startIndex, endIndex, modelVersion);
+        return new LogisticRegressionModelDataSegment(
+                coefficient, startIndex, endIndex, modelVersion);
     }
 
     @VisibleForTesting
-    public static LogisticRegressionModelData mergeSegments(
-            List<LogisticRegressionModelData> segments) {
+    public static LogisticRegressionModelDataSegment mergeSegments(
+            List<LogisticRegressionModelDataSegment> segments) {
         long dim = 0;
-        for (LogisticRegressionModelData segment : segments) {
+        for (LogisticRegressionModelDataSegment segment : segments) {
             dim = Math.max(dim, segment.endIndex);
         }
-        // TODO: Add distributed inference for very large models.
         Preconditions.checkState(
                 dim < Integer.MAX_VALUE,
                 "The dimension of logistic regression model is larger than INT.MAX. Please consider using distributed inference.");
         int intDim = (int) dim;
         DenseIntDoubleVector mergedCoefficient = new DenseIntDoubleVector(intDim);
-        for (LogisticRegressionModelData segment : segments) {
+        for (LogisticRegressionModelDataSegment segment : segments) {
             int startIndex = (int) segment.startIndex;
             int endIndex = (int) segment.endIndex;
             System.arraycopy(
@@ -114,7 +114,7 @@ public class LogisticRegressionModelData {
                     startIndex,
                     endIndex - startIndex);
         }
-        return new LogisticRegressionModelData(
+        return new LogisticRegressionModelDataSegment(
                 mergedCoefficient, 0, mergedCoefficient.size(), segments.get(0).modelVersion);
     }
 }

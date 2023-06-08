@@ -88,7 +88,7 @@ public class OnlineLogisticRegression
 
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
-        DataStream<LogisticRegressionModelData> modelDataStream =
+        DataStream<LogisticRegressionModelDataSegment> modelDataStream =
                 LogisticRegressionModelDataUtil.getModelDataStream(initModelDataTable);
 
         RowTypeInfo inputTypeInfo = TableUtils.getRowTypeInfo(inputs[0].getResolvedSchema());
@@ -116,7 +116,7 @@ public class OnlineLogisticRegression
 
         DataStream<DenseIntDoubleVector> initModelData =
                 modelDataStream.map(
-                        (MapFunction<LogisticRegressionModelData, DenseIntDoubleVector>)
+                        (MapFunction<LogisticRegressionModelDataSegment, DenseIntDoubleVector>)
                                 value -> value.coefficient);
 
         initModelData.getTransformation().setParallelism(1);
@@ -125,7 +125,7 @@ public class OnlineLogisticRegression
                 new FtrlIterationBody(
                         getGlobalBatchSize(), getAlpha(), getBeta(), getReg(), getElasticNet());
 
-        DataStream<LogisticRegressionModelData> onlineModelData =
+        DataStream<LogisticRegressionModelDataSegment> onlineModelData =
                 Iterations.iterateUnboundedStreams(
                                 DataStreamList.of(initModelData), DataStreamList.of(points), body)
                         .get(0);
@@ -225,7 +225,7 @@ public class OnlineLogisticRegression
                                     new UpdateModel(alpha, beta, l1, l2))
                             .setParallelism(1);
 
-            DataStream<LogisticRegressionModelData> outputModelData =
+            DataStream<LogisticRegressionModelDataSegment> outputModelData =
                     feedbackModelData.map(new CreateLrModelData()).setParallelism(1);
             return new IterationBodyResult(
                     DataStreamList.of(feedbackModelData), DataStreamList.of(outputModelData));
@@ -233,14 +233,15 @@ public class OnlineLogisticRegression
     }
 
     private static class CreateLrModelData
-            implements MapFunction<DenseIntDoubleVector, LogisticRegressionModelData>,
+            implements MapFunction<DenseIntDoubleVector, LogisticRegressionModelDataSegment>,
                     CheckpointedFunction {
         private Long modelVersion = 1L;
         private transient ListState<Long> modelVersionState;
 
         @Override
-        public LogisticRegressionModelData map(DenseIntDoubleVector denseVector) throws Exception {
-            return new LogisticRegressionModelData(denseVector, modelVersion++);
+        public LogisticRegressionModelDataSegment map(DenseIntDoubleVector denseVector)
+                throws Exception {
+            return new LogisticRegressionModelDataSegment(denseVector, modelVersion++);
         }
 
         @Override

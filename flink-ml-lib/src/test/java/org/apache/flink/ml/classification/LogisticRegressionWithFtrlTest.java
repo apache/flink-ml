@@ -22,7 +22,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModel;
-import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelData;
+import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelDataSegment;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelDataUtil;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelServable;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionWithFtrl;
@@ -256,7 +256,7 @@ public class LogisticRegressionWithFtrlTest {
         LogisticRegressionWithFtrl logisticRegressionWithFtrl =
                 new LogisticRegressionWithFtrl().setMaxIter(MAX_ITER).setNumServers(NUM_SERVERS);
         LogisticRegressionModel model = logisticRegressionWithFtrl.fit(trainTable);
-        List<LogisticRegressionModelData> modelData =
+        List<LogisticRegressionModelDataSegment> modelData =
                 IteratorUtils.toList(
                         LogisticRegressionModelDataUtil.getModelDataStream(model.getModelData()[0])
                                 .executeAndCollect());
@@ -266,7 +266,7 @@ public class LogisticRegressionWithFtrlTest {
         modelData.sort(Comparator.comparingLong(o -> o.startIndex));
 
         double[] collectedCoefficient = new double[4];
-        for (LogisticRegressionModelData modelSegment : modelData) {
+        for (LogisticRegressionModelDataSegment modelSegment : modelData) {
             int startIndex = (int) modelSegment.startIndex;
             double[] segment = modelSegment.coefficient.values;
             System.arraycopy(segment, 0, collectedCoefficient, startIndex, segment.length);

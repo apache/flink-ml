@@ -23,7 +23,7 @@ import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegression;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModel;
-import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelData;
+import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelDataSegment;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelDataUtil;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelServable;
 import org.apache.flink.ml.linalg.DenseIntDoubleVector;
@@ -339,7 +339,7 @@ public class LogisticRegressionTest extends AbstractTestBase {
     public void testGetModelData() throws Exception {
         LogisticRegression logisticRegression = new LogisticRegression().setWeightCol("weight");
         LogisticRegressionModel model = logisticRegression.fit(binomialDataTable);
-        List<LogisticRegressionModelData> modelData =
+        List<LogisticRegressionModelDataSegment> modelData =
                 IteratorUtils.toList(
                         LogisticRegressionModelDataUtil.getModelDataStream(model.getModelData()[0])
                                 .executeAndCollect());
@@ -352,7 +352,7 @@ public class LogisticRegressionTest extends AbstractTestBase {
     public void testGetModelDataFromSparseInput() throws Exception {
         LogisticRegression logisticRegression = new LogisticRegression().setWeightCol("weight");
         LogisticRegressionModel model = logisticRegression.fit(binomialSparseDataTable);
-        List<LogisticRegressionModelData> modelData =
+        List<LogisticRegressionModelDataSegment> modelData =
                 IteratorUtils.toList(
                         LogisticRegressionModelDataUtil.getModelDataStream(model.getModelData()[0])
                                 .executeAndCollect());
@@ -476,7 +476,7 @@ public class LogisticRegressionTest extends AbstractTestBase {
                         .setReg(reg)
                         .setElasticNet(elasticNet)
                         .fit(binomialDataTable);
-        List<LogisticRegressionModelData> modelData =
+        List<LogisticRegressionModelDataSegment> modelData =
                 IteratorUtils.toList(
                         LogisticRegressionModelDataUtil.getModelDataStream(model.getModelData()[0])
                                 .executeAndCollect());

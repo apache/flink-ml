@@ -99,7 +99,7 @@ public class OnlineLogisticRegressionModel
 
     /** A utility operator used for prediction. */
     private static class PredictLabelOperator extends AbstractStreamOperator<Row>
-            implements TwoInputStreamOperator<Row, LogisticRegressionModelData, Row> {
+            implements TwoInputStreamOperator<Row, LogisticRegressionModelDataSegment, Row> {
         private final RowTypeInfo inputTypeInfo;
 
         private final Map<Param<?>, Object> params;
@@ -139,9 +139,9 @@ public class OnlineLogisticRegressionModel
         }
 
         @Override
-        public void processElement2(StreamRecord<LogisticRegressionModelData> streamRecord)
+        public void processElement2(StreamRecord<LogisticRegressionModelDataSegment> streamRecord)
                 throws Exception {
-            LogisticRegressionModelData modelData = streamRecord.getValue();
+            LogisticRegressionModelDataSegment modelData = streamRecord.getValue();
             coefficient = modelData.coefficient;
             modelDataVersion = modelData.modelVersion;
             for (Row dataPoint : bufferedPointsState.get()) {
@@ -159,7 +159,7 @@ public class OnlineLogisticRegressionModel
             if (servable == null) {
                 servable =
                         new LogisticRegressionModelServable(
-                                new LogisticRegressionModelData(coefficient, 0L));
+                                new LogisticRegressionModelDataSegment(coefficient, 0L));
                 ParamUtils.updateExistingParams(servable, params);
             }
             IntDoubleVector features =

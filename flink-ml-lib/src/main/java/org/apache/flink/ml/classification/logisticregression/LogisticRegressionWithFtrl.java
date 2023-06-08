@@ -174,10 +174,10 @@ public class LogisticRegressionWithFtrl
 
         final long modelVersion = 0L;
 
-        DataStream<LogisticRegressionModelData> modelData =
+        DataStream<LogisticRegressionModelDataSegment> modelData =
                 rawModelData.map(
                         tuple3 ->
-                                new LogisticRegressionModelData(
+                                new LogisticRegressionModelDataSegment(
                                         Vectors.dense(tuple3.f2),
                                         tuple3.f0,
                                         tuple3.f1,

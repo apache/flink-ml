@@ -139,6 +139,7 @@ public class Message {
     public void setWorkerId(int workerId) {
         Bits.putInt(bytes, WORKER_ID_OFFSET, workerId);
     }
+
     /** Retrieves the server id. */
     public int getServerId() {
         return Bits.getInt(bytes, SERVER_ID_OFFSET);
