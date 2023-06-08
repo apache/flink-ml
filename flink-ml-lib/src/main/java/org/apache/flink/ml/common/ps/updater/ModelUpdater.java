@@ -18,7 +18,6 @@
 
 package org.apache.flink.ml.common.ps.updater;
 
-import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 
@@ -30,8 +29,10 @@ import java.util.Iterator;
  *
  * <p>Note that model updater should also ensure that model data is robust to failures, by writing
  * model data to snapshots.
+ *
+ * @param <MT> data type of model.
  */
-public interface ModelUpdater extends Serializable {
+public interface ModelUpdater<MT> extends Serializable {
 
     /** Initializes the model data. */
     void open(long startKeyIndex, long endKeyIndex);
@@ -43,11 +44,11 @@ public interface ModelUpdater extends Serializable {
     double[] get(long[] keys);
 
     /**
-     * Returns model segments with the format of (startKeyIdx, endKeyIdx, modelValues). The model
-     * segments are continuously updated/retrieved by push/pull(i.e., {@link
-     * ModelUpdater#update(long[], double[])} and {@link ModelUpdater#get(long[])}).
+     * Returns model segments. The model segments are continuously updated/retrieved by
+     * push/pull(i.e., {@link ModelUpdater#update(long[], double[])} and {@link
+     * ModelUpdater#get(long[])}).
      */
-    Iterator<Tuple3<Long, Long, double[]>> getModelSegments();
+    Iterator<MT> getModelSegments();
 
     /** Recovers the model data from state. */
     void initializeState(StateInitializationContext context) throws Exception;

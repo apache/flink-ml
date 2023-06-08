@@ -23,7 +23,6 @@ import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.PrimitiveArrayTypeInfo;
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.common.ps.message.Message;
@@ -57,9 +56,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 /**
- * The server operator maintains the shared parameters. It receives push/pull/allreduce requests
- * from {@link WorkerOperator} and sends the answer request to {@link ResponseAssemblerOperator}. It
- * works closely with {@link ModelUpdater} in the following way:
+ * The server operator maintains the shared parameters. The shared parameters can be modeled as a
+ * collection of {key:value} pairs. By default, the keys are evenly distributed across servers
+ * through range partitioning. For example, if there are two servers and the keys are {1,2,3,4,5,6},
+ * then server-0 maintains keys {1,2,3} and server-1 maintains keys {4,5,6}.
+ *
+ * <p>The server receives push/pull/allreduce requests from {@link WorkerOperator} and sends the
+ * answer request to {@link ResponseAssemblerOperator}. It works closely with {@link ModelUpdater}
+ * in the following way:
  *
  * <ul>
  *   <li>The server operator deals with the message from workers and decides when to process the
@@ -76,8 +80,10 @@ import java.util.concurrent.Future;
  * ModelUpdater}.
  *
  * <p>TODO: Add support for asynchronous operations on servers.
+ *
+ * @param <MT> output format of model data.
  */
-public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[]>>
+public class ServerOperator<MT> extends AbstractStreamOperator<Tuple2<Integer, byte[]>>
         implements OneInputStreamOperator<Tuple2<Integer, byte[]>, Tuple2<Integer, byte[]>>,
                 IterationListener<Tuple2<Integer, byte[]>> {
     /** The iterationStage list that asks responses from servers. */
@@ -85,9 +91,9 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
     /** Number of workers to communicate with. */
     private final int numWorkers;
     /** The logic to answer push/pull request from workers. */
-    private final ModelUpdater modelUpdater;
-    /** Format of model data: start key index, end key index, dense double array. */
-    private final OutputTag<Tuple3<Long, Long, double[]>> modelOutputTag;
+    private final ModelUpdater<MT> modelUpdater;
+    /** Format of model data. */
+    private final OutputTag<MT> modelOutputTag;
     /** Index of the server task. */
     private int serverId = -1;
     /**
@@ -108,8 +114,8 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
     public ServerOperator(
             IterationStageList<?> iterationStageList,
             int numWorkers,
-            ModelUpdater modelUpdater,
-            OutputTag<Tuple3<Long, Long, double[]>> modelOutputTag) {
+            ModelUpdater<MT> modelUpdater,
+            OutputTag<MT> modelOutputTag) {
         this.stageList = new ArrayList<>();
         for (IterationStage stage : iterationStageList.stageList) {
             if (stage instanceof PullStage || stage instanceof AllReduceStage) {
@@ -227,9 +233,9 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
     @Override
     public void onIterationTerminated(
             Context context, Collector<Tuple2<Integer, byte[]>> collector) {
-        Iterator<Tuple3<Long, Long, double[]>> modelSegments = modelUpdater.getModelSegments();
+        Iterator<MT> modelSegments = modelUpdater.getModelSegments();
         while (modelSegments.hasNext()) {
-            Tuple3<Long, Long, double[]> modelSegment = modelSegments.next();
+            MT modelSegment = modelSegments.next();
             output.collect(modelOutputTag, new StreamRecord<>(modelSegment));
         }
     }
@@ -281,7 +287,10 @@ public class ServerOperator extends AbstractStreamOperator<Tuple2<Integer, byte[
 
     /** Utility class to merge the push request from different workers. */
     private static class PushRequestMerger implements Serializable {
-        /** The accumulated kv if the push request is for a vector. */
+        /**
+         * The accumulated kv if the push request is for a vector. If the value is a double, we use
+         * {@link Long2DoubleOpenHashMap} for better efficiency.
+         */
         private final Long2DoubleOpenHashMap accumulatedKvsForVector;
         /** The accumulated kv if the push request is for a matrix. */
         private final Map<Long, double[]> accumulatedKvsForMatrix;

@@ -21,10 +21,6 @@ package org.apache.flink.ml.classification;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
-import org.apache.flink.core.memory.DataInputView;
-import org.apache.flink.core.memory.DataInputViewStreamWrapper;
-import org.apache.flink.core.memory.DataOutputView;
-import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModel;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelData;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelDataUtil;
@@ -39,7 +35,6 @@ import org.apache.flink.ml.linalg.typeinfo.SparseLongDoubleVectorTypeInfo;
 import org.apache.flink.ml.servable.api.DataFrame;
 import org.apache.flink.ml.servable.types.BasicType;
 import org.apache.flink.ml.servable.types.DataTypes;
-import org.apache.flink.ml.util.Bits;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -54,8 +49,6 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.SequenceInputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -426,27 +419,5 @@ public class LogisticRegressionWithFtrlTest {
                 assertTrue(rawPrediction.get(0) < 0.5);
             }
         }
-    }
-
-    @Test
-    public void testGetGenericType() throws IOException {
-        TypeInformation t = getType(128);
-        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(4);
-        DataOutputView d = new DataOutputViewStreamWrapper(byteArrayOutputStream);
-        t.createSerializer(null).serialize(128, d);
-        byte[] serialized = byteArrayOutputStream.toByteArray();
-        System.out.println(Bits.getInt(serialized, 0));
-
-        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(serialized);
-        DataInputView inputView = new DataInputViewStreamWrapper(byteArrayInputStream);
-        int deserializedInt = (Integer) t.createSerializer(null).deserialize(inputView);
-        System.out.println(deserializedInt);
-    }
-
-    <V> TypeInformation getType(V v) {
-        if (v instanceof Integer) {
-            return Types.INT;
-        }
-        return null;
     }
 }

@@ -40,8 +40,10 @@ public class IterationStageList<T extends MLSession> implements Serializable {
     }
 
     /** Sets the criteria of termination. */
-    public void setTerminationCriteria(SerializableFunction<T, Boolean> shouldTerminate) {
+    public IterationStageList<T> setTerminationCriteria(
+            SerializableFunction<T, Boolean> shouldTerminate) {
         this.shouldTerminate = shouldTerminate;
+        return this;
     }
 
     /** Adds an iteration stage into the stage list. */

@@ -37,7 +37,7 @@ import java.util.List;
  *
  * <p>FTRL is well-suited for sparse data and can handle problems with billions of features.
  */
-public class FTRL implements ModelUpdater {
+public class FTRL implements ModelUpdater<Tuple3<Long, Long, double[]>> {
     private final double alpha;
     private final double beta;
     private final double lambda1;

@@ -19,6 +19,9 @@
 package org.apache.flink.ml.common.ps.training;
 
 import org.apache.flink.runtime.util.ResettableIterator;
+import org.apache.flink.util.OutputTag;
+
+import java.util.List;
 
 /**
  * The default implementation of {@link MLSession}.
@@ -34,6 +37,21 @@ public class MLSessionImpl<DT> implements MLSession {
     public int numWorkers;
     /** The input data. */
     public ResettableIterator<DT> inputData;
+
+    public List<OutputTag<?>> outputTags;
+
+    /** Constructs an instance with side outputs. */
+    public MLSessionImpl(List<OutputTag<?>> outputTags) {
+        this.outputTags = outputTags;
+    }
+
+    /** Constructs an instance without side outputs. */
+    public MLSessionImpl() {}
+
+    @Override
+    public List<OutputTag<?>> getOutputTags() {
+        return outputTags;
+    }
 
     @Override
     public void setIterationId(int iterationId) {

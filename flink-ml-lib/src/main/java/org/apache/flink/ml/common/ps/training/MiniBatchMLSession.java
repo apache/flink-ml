@@ -23,6 +23,7 @@ import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
+import org.apache.flink.util.OutputTag;
 
 import org.apache.commons.collections.IteratorUtils;
 
@@ -55,6 +56,15 @@ public class MiniBatchMLSession<DT> extends MLSessionImpl<DT> {
     private final TypeInformation<DT> typeInformation;
 
     public MiniBatchMLSession(int globalBatchSize, TypeInformation<DT> typeInformation) {
+        this.globalBatchSize = globalBatchSize;
+        this.typeInformation = typeInformation;
+    }
+
+    public MiniBatchMLSession(
+            int globalBatchSize,
+            TypeInformation<DT> typeInformation,
+            List<OutputTag<?>> outputTags) {
+        super(outputTags);
         this.globalBatchSize = globalBatchSize;
         this.typeInformation = typeInformation;
     }

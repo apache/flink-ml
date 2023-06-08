@@ -49,8 +49,10 @@ public class Message {
     private static final int MESSAGE_TYPE_OFFSET = Integer.BYTES + SERVER_ID_OFFSET;
     private static final int KVS_OFFSET = Integer.BYTES + MESSAGE_TYPE_OFFSET;
 
+    /** The storage of message in bytes. */
     public final byte[] bytes;
 
+    /** Constructs a message instance from the bytes. */
     public Message(byte[] bytes) {
         this.bytes = bytes;
     }
@@ -117,7 +119,12 @@ public class Message {
         return result;
     }
 
-    /** Retrieves the values in double array format. */
+    /**
+     * Retrieves the values in double array format.
+     *
+     * <p>Note that getting double array in this function using {@link Bits#getDoubleArray(byte[],
+     * int)} is faster than {@link Message#getValues} by up to 2.3X.
+     */
     public double[] getValuesInDoubleArray() {
         int offset = KVS_OFFSET + Bits.getInt(bytes, KVS_OFFSET) * Long.BYTES + Integer.BYTES;
         return Bits.getDoubleArray(bytes, offset);
@@ -128,14 +135,13 @@ public class Message {
         return Bits.getInt(bytes, WORKER_ID_OFFSET);
     }
 
-    /** Retrieves the server id. */
-    public int getServerId() {
-        return Bits.getInt(bytes, SERVER_ID_OFFSET);
-    }
-
     /** Sets the worker id. */
     public void setWorkerId(int workerId) {
         Bits.putInt(bytes, WORKER_ID_OFFSET, workerId);
+    }
+    /** Retrieves the server id. */
+    public int getServerId() {
+        return Bits.getInt(bytes, SERVER_ID_OFFSET);
     }
 
     /** Sets the server id. */

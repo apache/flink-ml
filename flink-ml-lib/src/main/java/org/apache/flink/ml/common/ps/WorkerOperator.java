@@ -32,6 +32,7 @@ import org.apache.flink.ml.common.ps.training.IterationStage;
 import org.apache.flink.ml.common.ps.training.IterationStageList;
 import org.apache.flink.ml.common.ps.training.MLSession;
 import org.apache.flink.ml.common.ps.training.ProcessStage;
+import org.apache.flink.ml.common.ps.training.ProxySideOutput;
 import org.apache.flink.ml.common.ps.training.PullStage;
 import org.apache.flink.ml.common.ps.training.PushStage;
 import org.apache.flink.ml.util.Bits;
@@ -112,6 +113,7 @@ public class WorkerOperator<DT, SessionT extends MLSession>
         int workerId = getRuntimeContext().getIndexOfThisSubtask();
         this.serverAgent = new ServerAgent(workerId, output);
         iterationStages.session.setWorldInfo(workerId, numTasks);
+        iterationStages.session.setOutput(new ProxySideOutput(output));
     }
 
     @Override
@@ -121,7 +123,7 @@ public class WorkerOperator<DT, SessionT extends MLSession>
         if (epochWatermark == 0) {
             modelDim = Bits.getLong(feedback, 0);
             serverAgent.open(numServers, modelDim - 1);
-            serverAgent.initializeModel();
+            serverAgent.initialize();
             iterationStages.session.setInputData(new ResettableTrainDataIterator<>(trainDataState));
             nextStageToExecute = processIterationStages(nextStageToExecute, iterationStages);
         }
@@ -263,7 +265,7 @@ public class WorkerOperator<DT, SessionT extends MLSession>
 
             } else if (stage instanceof AllReduceStage) {
                 AllReduceStage<V> allReduceStage = (AllReduceStage<V>) stage;
-                serverAgent.allReducePush(
+                serverAgent.allReduce(
                         allReduceStage.valuesSupplier.get(), allReduceStage.typeSerializer);
                 return nextStageToExecute;
 

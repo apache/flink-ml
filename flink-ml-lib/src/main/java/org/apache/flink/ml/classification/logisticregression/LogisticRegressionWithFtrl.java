@@ -20,8 +20,12 @@ package org.apache.flink.ml.classification.logisticregression;
 
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
+import org.apache.flink.api.common.typeinfo.PrimitiveArrayTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.api.java.typeutils.TupleTypeInfo;
+import org.apache.flink.iteration.DataStreamList;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.common.feature.LabeledPointWithWeight;
@@ -108,31 +112,25 @@ public class LogisticRegressionWithFtrl
                                                     features, label, weight);
                                         });
 
-        DataStream<Long> modelDim;
+        DataStream<Long> maxKey;
         if (getModelDim() > 0) {
-            modelDim = trainData.getExecutionEnvironment().fromElements(getModelDim());
+            maxKey = trainData.getExecutionEnvironment().fromElements(getModelDim() - 1);
         } else {
-            modelDim =
+            maxKey =
                     DataStreamUtils.reduce(
                                     trainData.map(
                                             x -> {
                                                 Vector feature = x.features;
                                                 long dim;
                                                 if (feature instanceof IntDoubleVector) {
-                                                    dim =
-                                                            ((IntDoubleVector) feature)
-                                                                    .size()
-                                                                    .intValue();
+                                                    dim = ((IntDoubleVector) feature).size();
                                                 } else {
-                                                    dim =
-                                                            ((LongDoubleVector) feature)
-                                                                    .size()
-                                                                    .longValue();
+                                                    dim = ((LongDoubleVector) feature).size();
                                                 }
                                                 return dim;
                                             }),
                                     (ReduceFunction<Long>) Math::max)
-                            .map((MapFunction<Long, Long>) value -> value);
+                            .map((MapFunction<Long, Long>) value -> value - 1);
         }
 
         MiniBatchMLSession<LabeledPointWithWeight> mlSession =
@@ -140,25 +138,39 @@ public class LogisticRegressionWithFtrl
                         getGlobalBatchSize(), TypeInformation.of(LabeledPointWithWeight.class));
 
         IterationStageList<MiniBatchMLSession<LabeledPointWithWeight>> iterationStages =
-                new IterationStageList<>(mlSession);
-        iterationStages
-                .addStage(new ComputeIndices())
-                .addStage(
-                        new PullStage(
-                                (SerializableSupplier<long[]>) () -> mlSession.pullIndices,
-                                (SerializableConsumer<double[]>) x -> mlSession.pulledValues = x))
-                .addStage(new ComputeGradients(BinaryLogisticLoss.INSTANCE))
-                .addStage(
-                        new PushStage(
-                                (SerializableSupplier<long[]>) () -> mlSession.pushIndices,
-                                (SerializableSupplier<double[]>) () -> mlSession.pushValues))
-                .setTerminationCriteria(
-                        (SerializableFunction<MiniBatchMLSession<LabeledPointWithWeight>, Boolean>)
-                                o -> o.iterationId >= getMaxIter());
+                new IterationStageList<>(mlSession)
+                        .addStage(new ComputeIndices())
+                        .addStage(
+                                new PullStage(
+                                        (SerializableSupplier<long[]>) () -> mlSession.pullIndices,
+                                        (SerializableConsumer<double[]>)
+                                                x -> mlSession.pulledValues = x))
+                        .addStage(new ComputeGradients(BinaryLogisticLoss.INSTANCE))
+                        .addStage(
+                                new PushStage(
+                                        (SerializableSupplier<long[]>) () -> mlSession.pushIndices,
+                                        (SerializableSupplier<double[]>)
+                                                () -> mlSession.pushValues))
+                        .setTerminationCriteria(
+                                (SerializableFunction<
+                                                MiniBatchMLSession<LabeledPointWithWeight>,
+                                                Boolean>)
+                                        o -> o.iterationId >= getMaxIter());
         FTRL ftrl = new FTRL(getAlpha(), getBeta(), getReg(), getElasticNet());
 
-        DataStream<Tuple3<Long, Long, double[]>> rawModelData =
-                TrainingUtils.train(modelDim, trainData, ftrl, iterationStages, getNumServers());
+        DataStreamList resultList =
+                TrainingUtils.train(
+                        trainData,
+                        iterationStages,
+                        maxKey,
+                        new TupleTypeInfo<>(
+                                Types.LONG,
+                                Types.LONG,
+                                PrimitiveArrayTypeInfo.DOUBLE_PRIMITIVE_ARRAY_TYPE_INFO),
+                        ftrl,
+                        getNumServers());
+
+        DataStream<Tuple3<Long, Long, double[]>> rawModelData = resultList.get(0);
 
         final long modelVersion = 0L;
 

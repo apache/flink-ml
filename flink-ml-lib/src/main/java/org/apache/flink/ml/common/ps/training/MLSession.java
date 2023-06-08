@@ -18,19 +18,23 @@
 
 package org.apache.flink.ml.common.ps.training;
 
+import org.apache.flink.ml.common.ps.WorkerOperator;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.runtime.util.ResettableIterator;
+import org.apache.flink.util.OutputTag;
 
 import java.io.Serializable;
+import java.util.List;
 
 /**
- * Stores the session information that is alive during the training process. Note that the session
- * information will be updated by each {@link IterationStage}.
+ * Stores the session information that is alive during the training process on {@link
+ * WorkerOperator}. Note that the session information will be updated by each {@link
+ * IterationStage}.
  *
  * <p>Note that subclasses should take care of the snapshot of object stored in {@link MLSession} if
- * the object satisfies that: the write-process is followed by an {@link PullStage}, which is later
- * again read by other stages.
+ * the object satisfies that: the write-process is followed by a {@link PullStage} or a {@link
+ * AllReduceStage}, which is later again read by other stages.
  */
 public interface MLSession extends Serializable {
     /** Sets the current iteration ID. */
@@ -42,7 +46,18 @@ public interface MLSession extends Serializable {
     /** Sets the training data. */
     default void setInputData(ResettableIterator<?> inputData) {}
 
-    /** Recover from state. */
+    /** Sets the collector that users can output records to downstream tasks. */
+    default void setOutput(ProxySideOutput collector) {}
+
+    /**
+     * Retrieves the output tags from the {@link MLSession} which can be used to output records from
+     * the worker operator.
+     */
+    default List<OutputTag<?>> getOutputTags() {
+        return null;
+    }
+
+    /** Recovers from state. */
     default void initializeState(StateInitializationContext context) throws Exception {}
 
     /** Snapshots to state. */

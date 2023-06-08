@@ -21,10 +21,10 @@ package org.apache.flink.ml.common.ps.training;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.Partitioner;
 import org.apache.flink.api.common.typeinfo.PrimitiveArrayTypeInfo;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.typeutils.TupleTypeInfo;
 import org.apache.flink.iteration.DataStreamList;
 import org.apache.flink.iteration.IterationBody;
@@ -42,60 +42,70 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.util.OutputTag;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /** Utility function to describe iterative training process. */
 public final class TrainingUtils {
-
     /**
      * Executes the training logic described in {@link IterationStageList} and returns the fitted
-     * model data.
+     * model data as well as the outputs from worker operator. The outputs from worker operator are
+     * specified via {@link MLSession#getOutputTags()}.
      *
-     * @param modelDim dimension of the input model.
-     * @param trainData the training data.
-     * @param iterationStages the iterative training logic.
+     * @param inputData the input data.
+     * @param iterationStages the iterative processing logic.
+     * @param maxKey max value of the key. For example, the maxKey should be the max feature index
+     *     in LogisticRegression.
+     * @param modelDataType output type information of model data.
      * @param modelUpdater the logic to update model on servers.
      * @param numServers number of servers.
-     * @return the fitted model data.
+     * @return the fitted model data as well as the outputs from worker operator. The orders are
+     *     {modelData, sideOutputs from workers}. Note that the outputs from workers shares the same
+     *     order with the {@link MLSession#getOutputTags()}.
+     * @param <DT> type information of input data.
+     * @param <MT> type information of the output model data.
      */
-    public static <T> DataStream<Tuple3<Long, Long, double[]>> train(
-            DataStream<Long> modelDim,
-            DataStream<T> trainData,
-            ModelUpdater modelUpdater,
+    public static <DT, MT> DataStreamList train(
+            DataStream<DT> inputData,
             IterationStageList<? extends MLSession> iterationStages,
+            DataStream<Long> maxKey,
+            TypeInformation<MT> modelDataType,
+            ModelUpdater<MT> modelUpdater,
             int numServers) {
-        // TODO: Support incremental training for multiple models.
+        // TODO: Support incremental training.
 
         DataStream<byte[]> variableStream =
-                modelDim.broadcast()
+                maxKey.broadcast()
                         .map(
                                 (MapFunction<Long, byte[]>)
                                         value -> {
                                             byte[] buffer = new byte[Long.BYTES];
-                                            Bits.putLong(buffer, 0, value);
+                                            Bits.putLong(buffer, 0, value + 1);
                                             return buffer;
                                         });
 
-        DataStreamList resultList =
-                Iterations.iterateBoundedStreamsUntilTermination(
-                        DataStreamList.of(variableStream),
-                        ReplayableDataStreamList.notReplay(
-                                trainData.rebalance().map(x -> x, trainData.getType())),
-                        IterationConfig.newBuilder().build(),
-                        new TrainIterationBody(modelUpdater, iterationStages, numServers));
-
-        return resultList.get(0);
+        return Iterations.iterateBoundedStreamsUntilTermination(
+                DataStreamList.of(variableStream),
+                ReplayableDataStreamList.notReplay(inputData),
+                IterationConfig.newBuilder().build(),
+                new TrainIterationBody<>(modelUpdater, modelDataType, iterationStages, numServers));
     }
 
     /** The iteration implementation for training process. */
-    private static class TrainIterationBody implements IterationBody {
-        private final ModelUpdater modelUpdater;
+    private static class TrainIterationBody<MT> implements IterationBody {
+        private final ModelUpdater<MT> modelUpdater;
+
+        private final TypeInformation<MT> modelType;
         private final IterationStageList<? extends MLSession> iterationStages;
         private final int numServers;
 
         public TrainIterationBody(
-                ModelUpdater modelUpdater,
+                ModelUpdater<MT> modelUpdater,
+                TypeInformation<MT> modelType,
                 IterationStageList<? extends MLSession> iterationStages,
                 int numServers) {
             this.iterationStages = iterationStages;
+            this.modelType = modelType;
             this.modelUpdater = modelUpdater;
             this.numServers = numServers;
         }
@@ -106,8 +116,7 @@ public final class TrainingUtils {
                 DataStreamList variableStreams, DataStreamList dataStreams) {
             DataStream<byte[]> variableStream = variableStreams.get(0);
             DataStream<LabeledPointWithWeight> trainData = dataStreams.get(0);
-            final OutputTag<Tuple3<Long, Long, double[]>> modelDataOutputTag =
-                    new OutputTag<Tuple3<Long, Long, double[]>>("MODEL_OUTPUT") {};
+            final OutputTag<MT> modelDataOutputTag = new OutputTag<>("MODEL_OUTPUT", modelType);
 
             SingleOutputStreamOperator<Tuple2<Integer, byte[]>> messageToServer =
                     trainData
@@ -133,7 +142,7 @@ public final class TrainingUtils {
                                     new TupleTypeInfo<>(
                                             Types.INT,
                                             PrimitiveArrayTypeInfo.BYTE_PRIMITIVE_ARRAY_TYPE_INFO),
-                                    new ServerOperator(
+                                    new ServerOperator<>(
                                             iterationStages,
                                             numWorkers,
                                             modelUpdater,
@@ -153,10 +162,20 @@ public final class TrainingUtils {
                                     new ResponseAssemblerOperator(numServers))
                             .setParallelism(numWorkers);
 
+            DataStream<MT> model = messageToWorker.getSideOutput(modelDataOutputTag);
+
+            List<DataStream<?>> result = new ArrayList<>();
+            result.add(model);
+
+            List<OutputTag<?>> sideOutputTags = iterationStages.session.getOutputTags();
+            if (sideOutputTags != null) {
+                for (OutputTag<?> outputTag : sideOutputTags) {
+                    result.add(messageToServer.getSideOutput(outputTag));
+                }
+            }
+
             return new IterationBodyResult(
-                    DataStreamList.of(combinedMessageToWorker),
-                    DataStreamList.of(messageToWorker.getSideOutput(modelDataOutputTag)),
-                    null);
+                    DataStreamList.of(combinedMessageToWorker), new DataStreamList(result), null);
         }
     }
 }

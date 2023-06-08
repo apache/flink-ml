@@ -61,7 +61,7 @@ public class ServerAgent {
     }
 
     /** Sends a request to servers to initialize key range on each server. */
-    void initializeModel() {
+    void initialize() {
         for (int serverId = 0; serverId < numServers; serverId++) {
             long start = ranges[serverId];
             long end = ranges[serverId + 1];
@@ -104,18 +104,12 @@ public class ServerAgent {
      * <p>Note that the values pushed by this function are not going to update the model, but just
      * perform an all reduce operation.
      */
-    <V> void allReducePush(V[] values, TypeSerializer<V> typeSerializer) throws IOException {
-        final int MIN_MESSAGE_SIZE = 1024;
-        int messageSize = Math.max(MIN_MESSAGE_SIZE, values.length / numServers + 1);
+    <V> void allReduce(V[] values, TypeSerializer<V> typeSerializer) throws IOException {
+        int messageSize = values.length / numServers + 1;
         for (int serverId = 0; serverId < numServers; serverId++) {
             int s = Math.min(serverId * messageSize, values.length);
             int e = Math.min(s + messageSize, values.length);
-            V[] segment;
-            if (s == e) {
-                segment = (V[]) new Object[0];
-            } else {
-                segment = Arrays.copyOfRange(values, s, e);
-            }
+            V[] segment = Arrays.copyOfRange(values, s, e);
             Message message =
                     new Message(
                             workerId,
