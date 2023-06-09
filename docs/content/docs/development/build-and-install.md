@@ -54,6 +54,13 @@ mvn clean install -DskipTests
 This instructs [Maven](http://maven.apache.org/) (`mvn`) to first remove all
 existing builds (`clean`) and then create a new Flink ML binary (`install`).
 
+Optionally, you can also specify the Flink version used by Flink ML with maven
+profile. Currently, Flink ML supports running on Flink 1.15, 1.16, and 1.17.
+For example, you can build Flink ML with Flink 1.16 by running:
+```bash
+mvn clean install -DskipTests -Pflink-1.16
+```
+
 After the build finishes, you can acquire the build result in the following path
 from the root directory of Flink ML:
 
@@ -75,10 +82,10 @@ repository. There is no additional step required for installation.
    installation, you must first build the Java SDK, as described in the section
    above.
 
-2. Python version(3.6, 3.7, or 3.8) is required
+2. Python version(3.7, or 3.8) is required
    ```shell
    $ python --version
-   # the version printed here must be 3.6, 3.7 or 3.8
+   # the version printed here must be 3.7 or 3.8
    ```
 
 3. Install the dependencies with the following command:

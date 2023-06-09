@@ -25,7 +25,7 @@ under the License.
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>flink-ml-python</artifactId>
+    <artifactId>flink-ml-python-${flink.main.version}</artifactId>
 
     <packaging>jar</packaging>
 
@@ -39,7 +39,7 @@ under the License.
 
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-python</artifactId>
+            <artifactId>${flink.python.artifact}</artifactId>
             <version>${flink.version}</version>
             <scope>provided</scope>
         </dependency>

@@ -31,6 +31,7 @@ jobs:
     strategy:
       matrix:
         stage: ['core', 'lib', 'tests', 'misc']
+        flink-version: ['1.15', '1.16', '1.17']
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -39,4 +40,4 @@ jobs:
         with:
           java-version: 1.8
       - name: Build and test
-        run: ./tools/ci/java_test_controller.sh "${{ matrix.stage }}"
+        run: ./tools/ci/java_test_controller.sh "${{ matrix.stage }}" "${{ matrix.flink-version }}"
