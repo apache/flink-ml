@@ -35,9 +35,9 @@ under the License.
 
             <includes>
                 <include>org.apache.flink:statefun-flink-core</include>
-                <include>org.apache.flink:flink-ml-uber</include>
-                <include>org.apache.flink:flink-ml-examples</include>
-                <include>org.apache.flink:flink-ml-python</include>
+                <include>org.apache.flink:flink-ml-uber-${flink.main.version}</include>
+                <include>org.apache.flink:flink-ml-examples-${flink.main.version}</include>
+                <include>org.apache.flink:flink-ml-python-${flink.main.version}</include>
             </includes>
         </dependencySet>
     </dependencySets>

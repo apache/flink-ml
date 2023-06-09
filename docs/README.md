@@ -88,15 +88,15 @@ the page:
 Flink uses [shortcodes](https://gohugo.io/content-management/shortcodes/) to add
 custom functionality to its documentation markdown. For example:
 
-    {{< artifact flink-ml-core withTestScope >}}
+    {{< artifact flink-ml-core-1.17 withTestScope >}}
 
-This will be replaced by the maven artifact for flink-ml-core that users
+This will be replaced by the maven artifact for flink-ml-core-1.17 that users
 should copy into their pom.xml file. It will render out to:
 
 ```xml
 <dependency>
     <groupdId>org.apache.flink</groupId>
-    <artifactId>flink-ml-core</artifactId>
+    <artifactId>flink-ml-core-1.17</artifactId>
     <version><!-- current flink version --></version>
     <scope>test</scope>
 </dependency>

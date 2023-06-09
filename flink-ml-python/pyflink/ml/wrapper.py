@@ -24,7 +24,7 @@ from pyflink.common import typeinfo, Time, Row, RowKind
 from pyflink.common.typeinfo import _from_java_type, TypeInformation, _is_instance_of, Types, \
     ExternalTypeInfo, RowTypeInfo, TupleTypeInfo
 from pyflink.datastream import utils
-from pyflink.datastream.utils import pickled_bytes_to_python_converter
+from pyflink.datastream.utils import pickled_bytes_to_python_obj
 from pyflink.java_gateway import get_gateway
 from pyflink.table import Table, StreamTableEnvironment, Expression
 from pyflink.util.java_utils import to_jarray
@@ -78,13 +78,13 @@ def convert_to_python_obj_wrapper(data, type_info):
                 if len(data) == 0:
                     fields.append(None)
                 else:
-                    fields.append(pickled_bytes_to_python_converter(data, field_type))
+                    fields.append(pickled_bytes_to_python_obj(data, field_type))
             if isinstance(type_info, RowTypeInfo):
                 return Row.of_kind(RowKind(int.from_bytes(pickle_bytes[0], 'little')), *fields)
             else:
                 return tuple(fields)
         else:
-            return pickled_bytes_to_python_converter(pickle_bytes, type_info)
+            return pickled_bytes_to_python_obj(pickle_bytes, type_info)
 
 
 utils.convert_to_python_obj = convert_to_python_obj_wrapper

@@ -26,7 +26,7 @@ under the License.
         <version>2.3-SNAPSHOT</version>
     </parent>
 
-    <artifactId>flink-ml-dist</artifactId>
+    <artifactId>flink-ml-dist-${flink.main.version}</artifactId>
     <name>Flink ML : Dist</name>
     <packaging>jar</packaging>
 
@@ -36,19 +36,19 @@ under the License.
 
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-ml-uber</artifactId>
+            <artifactId>flink-ml-uber-${flink.main.version}</artifactId>
             <version>${project.version}</version>
         </dependency>
 
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-ml-examples</artifactId>
+            <artifactId>flink-ml-examples-${flink.main.version}</artifactId>
             <version>${project.version}</version>
         </dependency>
 
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-ml-python</artifactId>
+            <artifactId>flink-ml-python-${flink.main.version}</artifactId>
             <version>${project.version}</version>
         </dependency>
 

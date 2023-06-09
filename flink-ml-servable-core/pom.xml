@@ -28,7 +28,7 @@ under the License.
     <version>2.3-SNAPSHOT</version>
   </parent>
 
-  <artifactId>flink-ml-servable-core</artifactId>
+  <artifactId>flink-ml-servable-core-${flink.main.version}</artifactId>
   <name>Flink ML : Servable : Core</name>
 
   <dependencies>

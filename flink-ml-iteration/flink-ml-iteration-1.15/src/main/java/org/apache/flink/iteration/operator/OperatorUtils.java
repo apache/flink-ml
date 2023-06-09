@@ -47,6 +47,7 @@ import java.util.Arrays;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.stream.Stream;
 
 import static org.apache.flink.util.Preconditions.checkState;
 
@@ -135,20 +136,31 @@ public class OperatorUtils {
         wrappedConfig.setTypeSerializerOut(
                 ((IterationRecordSerializer<?>) typeSerializerOut).getInnerSerializer());
 
-        config.getChainedOutputs(cl)
+        Stream.concat(
+                        config.getChainedOutputs(cl).stream(),
+                        config.getNonChainedOutputs(cl).stream())
                 .forEach(
-                        chainedOutput -> {
-                            OutputTag<?> outputTag = chainedOutput.getOutputTag();
-                            setTypeSerializerSideOut(outputTag, config, wrappedConfig, cl);
-                        });
-        config.getOperatorNonChainedOutputs(cl)
-                .forEach(
-                        nonChainedOutput -> {
-                            OutputTag<?> outputTag = nonChainedOutput.getOutputTag();
-                            setTypeSerializerSideOut(outputTag, config, wrappedConfig, cl);
+                        edge -> {
+                            OutputTag<?> outputTag = edge.getOutputTag();
+                            if (outputTag != null) {
+                                TypeSerializer<?> typeSerializerSideOut =
+                                        config.getTypeSerializerSideOut(outputTag, cl);
+                                checkState(
+                                        typeSerializerSideOut instanceof IterationRecordSerializer,
+                                        "The serializer of side output with tag[%s] should be IterationRecordSerializer but it is %s.",
+                                        outputTag,
+                                        typeSerializerSideOut);
+                                wrappedConfig.setTypeSerializerSideOut(
+                                        new OutputTag<>(
+                                                outputTag.getId(),
+                                                ((IterationRecordTypeInfo<?>)
+                                                                outputTag.getTypeInfo())
+                                                        .getInnerTypeInfo()),
+                                        ((IterationRecordSerializer) typeSerializerSideOut)
+                                                .getInnerSerializer());
+                            }
                         });
 
-        wrappedConfig.serializeAllConfigs();
         return wrappedConfig;
     }
 
@@ -172,26 +184,5 @@ public class OperatorUtils {
                                 fileTypeName,
                                 operatorId,
                                 UUID.randomUUID().toString()));
-    }
-
-    private static void setTypeSerializerSideOut(
-            OutputTag<?> outputTag,
-            StreamConfig config,
-            StreamConfig wrappedConfig,
-            ClassLoader cl) {
-        if (outputTag == null) {
-            return;
-        }
-        TypeSerializer<?> typeSerializerSideOut = config.getTypeSerializerSideOut(outputTag, cl);
-        checkState(
-                typeSerializerSideOut instanceof IterationRecordSerializer,
-                "The serializer of side output with tag[%s] should be IterationRecordSerializer but it is %s.",
-                outputTag,
-                typeSerializerSideOut);
-        wrappedConfig.setTypeSerializerSideOut(
-                new OutputTag<>(
-                        outputTag.getId(),
-                        ((IterationRecordTypeInfo<?>) outputTag.getTypeInfo()).getInnerTypeInfo()),
-                ((IterationRecordSerializer) typeSerializerSideOut).getInnerSerializer());
     }
 }

@@ -26,34 +26,34 @@ under the License.
     <version>2.3-SNAPSHOT</version>
   </parent>
 
-  <artifactId>flink-ml-lib</artifactId>
+  <artifactId>flink-ml-lib-${flink.main.version}</artifactId>
   <name>Flink ML : Lib</name>
 
   <dependencies>
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-ml-servable-core</artifactId>
+      <artifactId>flink-ml-servable-core-${flink.main.version}</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
 
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-ml-servable-lib</artifactId>
+      <artifactId>flink-ml-servable-lib-${flink.main.version}</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
 
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-ml-core</artifactId>
+      <artifactId>flink-ml-core-${flink.main.version}</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
 
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-ml-iteration</artifactId>
+      <artifactId>flink-ml-iteration-${flink.main.version}</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
@@ -119,21 +119,21 @@ under the License.
     </dependency>
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-ml-core</artifactId>
+      <artifactId>flink-ml-core-${flink.main.version}</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
       <type>test-jar</type>
     </dependency>
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-ml-servable-core</artifactId>
+      <artifactId>flink-ml-servable-core-${flink.main.version}</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
       <type>test-jar</type>
     </dependency>
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-ml-servable-lib</artifactId>
+      <artifactId>flink-ml-servable-lib-${flink.main.version}</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
       <type>test-jar</type>

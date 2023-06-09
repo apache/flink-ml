@@ -611,10 +611,6 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
                     .entrySet()
                     .removeIf(entry -> entry.getKey().startsWith(roundPrefix));
             ReflectionUtils.<Map<String, ?>>getFieldValue(
-                            keyedStateBackend, HeapKeyedStateBackend.class, "createdKVStates")
-                    .entrySet()
-                    .removeIf(entry -> entry.getKey().startsWith(roundPrefix));
-            ReflectionUtils.<Map<String, ?>>getFieldValue(
                             keyedStateBackend,
                             AbstractKeyedStateBackend.class,
                             "keyValueStatesByName")
@@ -644,17 +640,12 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
                             });
             kvStateInformation.entrySet().removeIf(entry -> entry.getKey().startsWith(roundPrefix));
 
-            ReflectionUtils.<Map<String, ?>>getFieldValue(
-                            keyedStateBackend, RocksDBKeyedStateBackend.class, "createdKVStates")
-                    .entrySet()
-                    .removeIf(entry -> entry.getKey().startsWith(roundPrefix));
-            ReflectionUtils.<Map<String, ?>>getFieldValue(
+            Map<String, ?> field =
+                    ReflectionUtils.getFieldValue(
                             keyedStateBackend,
                             AbstractKeyedStateBackend.class,
-                            "keyValueStatesByName")
-                    .entrySet()
-                    .removeIf(entry -> entry.getKey().startsWith(roundPrefix));
-
+                            "keyValueStatesByName");
+            field.entrySet().removeIf(entry -> entry.getKey().startsWith(roundPrefix));
         } else {
             LOG.warn("Unable to cleanup the keyed state {}", keyedStateBackend);
         }

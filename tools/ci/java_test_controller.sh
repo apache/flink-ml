@@ -31,9 +31,15 @@ source "${HERE}/controller_utils.sh"
 source "${HERE}/stage.sh"
 
 STAGE=$1
+FLINK_VERSION=$2
 
 if [ -z "${STAGE:-}" ] ; then
 	echo "ERROR: Environment variable 'STAGE' is not set but expected by java_test_controller.sh. The variable refers to the stage being executed."
+	exit 1
+fi
+
+if [ -z "${FLINK_VERSION:-}" ] ; then
+	echo "ERROR: Environment variable 'FLINK_VERSION' is not set but expected by java_test_controller.sh. The variable refers to the Flink version running with."
 	exit 1
 fi
 
@@ -43,10 +49,11 @@ fi
 
 MVN_COMMON_OPTIONS="--no-transfer-progress"
 MVN_COMPILE_OPTIONS="-DskipTests"
+MVN_PROFILE_OPTIONS="-Pflink-${FLINK_VERSION}"
 MVN_COMPILE_MODULES=$(get_compile_modules_for_stage ${STAGE})
 exit_if_error $? "Error: Unexpected STAGE value ${STAGE}"
 
-mvn clean install $MVN_COMMON_OPTIONS $MVN_COMPILE_OPTIONS $MVN_COMPILE_MODULES
+mvn clean install $MVN_COMMON_OPTIONS $MVN_COMPILE_OPTIONS $MVN_PROFILE_OPTIONS $MVN_COMPILE_MODULES
 exit_if_error $? "Compilation failure detected, skipping test execution."
 
 # =============================================================================
@@ -56,4 +63,4 @@ exit_if_error $? "Compilation failure detected, skipping test execution."
 MVN_TEST_MODULES=$(get_test_modules_for_stage ${STAGE})
 exit_if_error $? "Error: Unexpected STAGE value ${STAGE}"
 
-mvn verify $MVN_COMMON_OPTIONS $MVN_TEST_MODULES
+mvn verify $MVN_COMMON_OPTIONS $MVN_PROFILE_OPTIONS $MVN_TEST_MODULES
