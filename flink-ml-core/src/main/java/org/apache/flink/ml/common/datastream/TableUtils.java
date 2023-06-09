@@ -60,6 +60,7 @@ public class TableUtils {
         LOGICAL_TYPE_ROOTS_USING_EXTERNAL_TYPE_INFO.add(LogicalTypeRoot.MAP);
         LOGICAL_TYPE_ROOTS_USING_EXTERNAL_TYPE_INFO.add(LogicalTypeRoot.MULTISET);
         LOGICAL_TYPE_ROOTS_USING_EXTERNAL_TYPE_INFO.add(LogicalTypeRoot.ROW);
+        LOGICAL_TYPE_ROOTS_USING_EXTERNAL_TYPE_INFO.add(LogicalTypeRoot.STRUCTURED_TYPE);
     }
 
     // Constructs a RowTypeInfo from the given schema. Currently, this function does not support
