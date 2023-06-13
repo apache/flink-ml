@@ -346,13 +346,13 @@ public class FValueTestTest extends AbstractTestBase {
         Row result = results.get(0);
         assertEquals(3, result.getArity());
         assertArrayEquals(
-                ((Vector) expected.getField(0)).toArray(),
-                ((Vector) result.getField(0)).toArray(),
+                (((Vector<Integer, Double, int[], double[]>) expected.getField(0))).toArray(),
+                ((((Vector<Integer, Double, int[], double[]>) result.getField(0)))).toArray(),
                 EPS);
         assertArrayEquals((long[]) expected.getField(1), (long[]) result.getField(1));
         assertArrayEquals(
-                ((Vector) expected.getField(2)).toArray(),
-                ((Vector) result.getField(2)).toArray(),
+                (((Vector<Integer, Double, int[], double[]>) expected.getField(2))).toArray(),
+                (((Vector<Integer, Double, int[], double[]>) result.getField(2))).toArray(),
                 EPS);
     }
 

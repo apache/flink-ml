@@ -132,7 +132,7 @@ public class PolynomialExpansion
             }
             Vector outputVec;
             if (vec instanceof DenseVector) {
-                int size = vec.size();
+                int size = (int) vec.size();
                 double[] retVals = new double[getResultVectorSize(size, degree) - 1];
                 expandDenseVector(((DenseVector) vec).values, size - 1, degree, 1.0, retVals, -1);
                 outputVec = new DenseVector(retVals);
@@ -140,7 +140,7 @@ public class PolynomialExpansion
                 SparseVector sparseVec = (SparseVector) vec;
                 int[] indices = sparseVec.indices;
                 double[] values = sparseVec.values;
-                int size = sparseVec.size();
+                int size = (int) sparseVec.size();
                 int nnz = sparseVec.values.length;
                 int nnzPolySize = getResultVectorSize(nnz, degree);
 

@@ -80,8 +80,8 @@ abstract class LSH<E extends Estimator<E, M>, M extends LSHModel<M>>
         DataStream<Integer> vectorSizes =
                 input.map(
                         d -> {
-                            Vector vec = d.getFieldAs(vectorCol);
-                            return vec.size();
+                            Vector<Integer, Double, int[], double[]> vec = d.getFieldAs(vectorCol);
+                            return (int) vec.size();
                         });
         return DataStreamUtils.reduce(
                 vectorSizes,

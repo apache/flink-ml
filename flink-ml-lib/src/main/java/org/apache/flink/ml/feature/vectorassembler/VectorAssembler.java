@@ -140,12 +140,12 @@ public class VectorAssembler
                         vectorSize += 1;
                         nnz += 1;
                     } else if (object instanceof SparseVector) {
-                        int localSize = ((SparseVector) object).size();
+                        int localSize = (int) ((SparseVector) object).size();
                         checkSize(inputSizes[i], localSize);
                         nnz += ((SparseVector) object).indices.length;
                         vectorSize += localSize;
                     } else if (object instanceof DenseVector) {
-                        int localSize = ((DenseVector) object).size();
+                        int localSize = (int) ((DenseVector) object).size();
                         checkSize(inputSizes[i], localSize);
                         vectorSize += localSize;
                         nnz += ((DenseVector) object).size();
@@ -222,7 +222,8 @@ public class VectorAssembler
 
             } else {
                 DenseVector denseVector = (DenseVector) object;
-                System.arraycopy(denseVector.values, 0, values, currentOffset, denseVector.size());
+                System.arraycopy(
+                        denseVector.values, 0, values, currentOffset, (int) denseVector.size());
 
                 currentOffset += denseVector.size();
             }

@@ -104,7 +104,8 @@ public class LinearSVCTest extends AbstractTestBase {
             throws Exception {
         List<Row> predResult = IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect());
         for (Row predictionRow : predResult) {
-            DenseVector feature = ((Vector) predictionRow.getField(featuresCol)).toDense();
+            DenseVector feature =
+                    (DenseVector) ((Vector) predictionRow.getField(featuresCol)).toDense();
             double prediction = (Double) predictionRow.getField(predictionCol);
             DenseVector rawPrediction = (DenseVector) predictionRow.getField(rawPredictionCol);
             if (feature.get(0) <= 5) {

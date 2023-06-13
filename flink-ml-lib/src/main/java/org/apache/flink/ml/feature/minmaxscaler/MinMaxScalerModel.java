@@ -150,8 +150,8 @@ public class MinMaxScalerModel
                                 getRuntimeContext().getBroadcastVariable(broadcastKey).get(0);
                 DenseVector minVector = minMaxScalerModelData.minVector;
                 DenseVector maxVector = minMaxScalerModelData.maxVector;
-                scaleVector = new DenseVector(minVector.size());
-                offsetVector = new DenseVector(minVector.size());
+                scaleVector = new DenseVector((int) minVector.size());
+                offsetVector = new DenseVector((int) minVector.size());
                 for (int i = 0; i < maxVector.size(); ++i) {
                     if (Math.abs(minVector.values[i] - maxVector.values[i]) < 1.0e-5) {
                         scaleVector.values[i] = 0.0;
@@ -165,8 +165,11 @@ public class MinMaxScalerModel
                     }
                 }
             }
-            DenseVector inputVec = ((Vector) row.getField(inputCol)).toDense();
-            DenseVector outputVec = new DenseVector(scaleVector.size());
+            DenseVector inputVec =
+                    (DenseVector)
+                            ((Vector<Integer, Double, int[], double[]>) row.getField(inputCol))
+                                    .toDense();
+            DenseVector outputVec = new DenseVector((int) scaleVector.size());
             for (int i = 0; i < scaleVector.size(); ++i) {
                 outputVec.values[i] =
                         inputVec.values[i] * scaleVector.values[i] + offsetVector.values[i];

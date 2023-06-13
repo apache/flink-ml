@@ -660,7 +660,7 @@ public class BinaryClassificationEvaluator
             Object probOrigin = value.getField(rawPredictionCol);
             double prob =
                     probOrigin instanceof Vector
-                            ? ((Vector) probOrigin).get(1)
+                            ? (Double) ((Vector) probOrigin).get(1)
                             : ((Number) probOrigin).doubleValue();
             double weight =
                     weightCol == null ? 1.0 : ((Number) value.getField(weightCol)).doubleValue();

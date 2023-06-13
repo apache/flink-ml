@@ -97,7 +97,10 @@ public class KBinsDiscretizer
                 tEnv.toDataStream(inputs[0])
                         .map(
                                 (MapFunction<Row, DenseVector>)
-                                        value -> ((Vector) value.getField(inputCol)).toDense());
+                                        value ->
+                                                (DenseVector)
+                                                        ((Vector) value.getField(inputCol))
+                                                                .toDense());
 
         DataStream<DenseVector> preprocessedData;
         if (strategy.equals(UNIFORM)) {
@@ -183,7 +186,7 @@ public class KBinsDiscretizer
             List<DenseVector> input, int numBins) {
         DenseVector minVector = input.get(0);
         DenseVector maxVector = input.get(1);
-        int numColumns = minVector.size();
+        int numColumns = (int) minVector.size();
         double[][] binEdges = new double[numColumns][];
 
         for (int columnId = 0; columnId < numColumns; columnId++) {
@@ -207,7 +210,7 @@ public class KBinsDiscretizer
 
     private static double[][] findBinEdgesWithQuantileStrategy(
             List<DenseVector> input, int numBins) {
-        int numColumns = input.get(0).size();
+        int numColumns = (int) input.get(0).size();
         int numData = input.size();
         double[][] binEdges = new double[numColumns][];
         double[] features = new double[numData];
@@ -272,7 +275,7 @@ public class KBinsDiscretizer
     }
 
     private static double[][] findBinEdgesWithKMeansStrategy(List<DenseVector> input, int numBins) {
-        int numColumns = input.get(0).size();
+        int numColumns = (int) input.get(0).size();
         int numData = input.size();
         double[][] binEdges = new double[numColumns][numBins + 1];
         double[] features = new double[numData];

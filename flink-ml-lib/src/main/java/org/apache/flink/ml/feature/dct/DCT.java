@@ -101,7 +101,7 @@ public class DCT implements Transformer<DCT>, DCTParams<DCT> {
 
         @Override
         public Row map(Row row) throws Exception {
-            Vector vector = row.getFieldAs(inputCol);
+            Vector<Integer, Double, int[], double[]> vector = row.getFieldAs(inputCol);
 
             if (previousVectorSize != vector.size()) {
                 if (isInverse) {

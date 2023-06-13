@@ -172,7 +172,7 @@ public class NaiveBayes
                 Collector<Tuple3<Double, Integer, Double>> collector) {
             Preconditions.checkNotNull(value.f1);
             for (int i = 0; i < value.f0.size(); i++) {
-                collector.collect(new Tuple3<>(value.f1, i, value.f0.get(i)));
+                collector.collect(new Tuple3<>(value.f1, i, (Double) value.f0.get(i)));
             }
         }
     }

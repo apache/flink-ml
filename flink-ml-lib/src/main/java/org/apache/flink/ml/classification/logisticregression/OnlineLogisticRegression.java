@@ -362,11 +362,11 @@ public class OnlineLogisticRegression
             localBatchDataState.update(pointsList);
 
             for (Row point : points) {
-                Vector vec = point.getFieldAs(0);
+                Vector<Integer, Double, int[], double[]> vec = point.getFieldAs(0);
                 double label = point.getFieldAs(1);
                 double weight = point.getArity() == 2 ? 1.0 : point.getFieldAs(2);
                 if (gradient == null) {
-                    gradient = new double[vec.size()];
+                    gradient = new double[(int) vec.size()];
                     weightSum = new double[gradient.length];
                 }
                 double p = BLAS.dot(modelData, vec);

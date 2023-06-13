@@ -28,27 +28,30 @@ public class BLAS {
 
     /** \sum_i |x_i| . */
     public static double asum(DenseVector x) {
-        return JAVA_BLAS.dasum(x.size(), x.values, 0, 1);
+        return JAVA_BLAS.dasum((int) x.size(), x.values, 0, 1);
     }
 
     /** y += a * x . */
-    public static void axpy(double a, Vector x, DenseVector y) {
+    public static void axpy(double a, Vector<Integer, Double, int[], double[]> x, DenseVector y) {
         Preconditions.checkArgument(x.size() == y.size(), "Vector size mismatched.");
-        axpy(a, x, y, x.size());
+        axpy(a, x, y, (int) x.size());
     }
 
     /** y += a * x for the first k dimensions, with the other dimensions unchanged. */
-    public static void axpy(double a, Vector x, DenseVector y, int k) {
+    public static void axpy(
+            double a, Vector<Integer, Double, int[], double[]> x, DenseVector y, int k) {
         Preconditions.checkArgument(x.size() >= k && y.size() >= k);
         if (x instanceof SparseVector) {
             axpy(a, (SparseVector) x, y, k);
-        } else {
+        } else if (x instanceof DenseVector) {
             axpy(a, (DenseVector) x, y, k);
         }
     }
 
     /** Computes the hadamard product of the two vectors (y = y \hdot x). */
-    public static void hDot(Vector x, Vector y) {
+    public static void hDot(
+            Vector<Integer, Double, int[], double[]> x,
+            Vector<Integer, Double, int[], double[]> y) {
         Preconditions.checkArgument(x.size() == y.size(), "Vector size mismatched.");
         if (x instanceof SparseVector) {
             if (y instanceof SparseVector) {
@@ -66,7 +69,9 @@ public class BLAS {
     }
 
     /** Computes the dot of the two vectors (y \dot x). */
-    public static double dot(Vector x, Vector y) {
+    public static double dot(
+            Vector<Integer, Double, int[], double[]> x,
+            Vector<Integer, Double, int[], double[]> y) {
         Preconditions.checkArgument(x.size() == y.size(), "Vector size mismatched.");
         if (x instanceof SparseVector) {
             if (y instanceof SparseVector) {
@@ -84,7 +89,7 @@ public class BLAS {
     }
 
     private static double dot(DenseVector x, DenseVector y) {
-        return JAVA_BLAS.ddot(x.size(), x.values, 1, y.values, 1);
+        return JAVA_BLAS.ddot((int) x.size(), x.values, 1, y.values, 1);
     }
 
     private static double dot(DenseVector x, SparseVector y) {
@@ -114,7 +119,7 @@ public class BLAS {
     }
 
     /** \sqrt(\sum_i x_i * x_i) . */
-    public static double norm2(Vector x) {
+    public static double norm2(Vector<Integer, Double, int[], double[]> x) {
         if (x instanceof DenseVector) {
             return norm2((DenseVector) x);
         }
@@ -122,7 +127,7 @@ public class BLAS {
     }
 
     private static double norm2(DenseVector x) {
-        return JAVA_BLAS.dnrm2(x.size(), x.values, 1);
+        return JAVA_BLAS.dnrm2((int) x.size(), x.values, 1);
     }
 
     private static double norm2(SparseVector x) {
@@ -130,7 +135,7 @@ public class BLAS {
     }
 
     /** Calculates the p-norm of the vector x. */
-    public static double norm(Vector x, double p) {
+    public static double norm(Vector<Integer, Double, int[], double[]> x, double p) {
         Preconditions.checkArgument(p >= 1.0, "p value must >= 1.0, but the current p is : " + p);
         double norm = 0.0;
         double[] data =
@@ -157,9 +162,9 @@ public class BLAS {
     }
 
     /** x = x * a . */
-    public static void scal(double a, Vector x) {
+    public static void scal(double a, Vector<Integer, Double, int[], double[]> x) {
         if (x instanceof DenseVector) {
-            JAVA_BLAS.dscal(x.size(), a, ((DenseVector) x).values, 1);
+            JAVA_BLAS.dscal((int) x.size(), a, ((DenseVector) x).values, 1);
         } else {
             double[] values = ((SparseVector) x).values;
             JAVA_BLAS.dscal(values.length, a, values, 1);

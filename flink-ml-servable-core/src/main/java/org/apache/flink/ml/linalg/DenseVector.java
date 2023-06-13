@@ -21,13 +21,14 @@ package org.apache.flink.ml.linalg;
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.common.typeinfo.TypeInfo;
 import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfoFactory;
+import org.apache.flink.util.Preconditions;
 
 import java.util.Arrays;
 
-/** A dense vector of double values. */
+/** A dense vector of int indices and double values. */
 @TypeInfo(DenseVectorTypeInfoFactory.class)
 @PublicEvolving
-public class DenseVector implements Vector {
+public class DenseVector implements DenseVectorInterface<Integer, Double, int[], double[]> {
     public final double[] values;
 
     public DenseVector(double[] values) {
@@ -38,17 +39,33 @@ public class DenseVector implements Vector {
         this.values = new double[size];
     }
 
+    public DenseVector(long size) {
+        Preconditions.checkArgument(
+                size < Integer.MAX_VALUE, "Size of dense vector exceeds INT.MAX.");
+        this.values = new double[(int) size];
+    }
+
     @Override
-    public int size() {
+    public long size() {
         return values.length;
     }
 
     @Override
+    public Double get(Integer index) {
+        return values[index];
+    }
+
+    /** Avoids auto-boxing for better performance. */
     public double get(int i) {
         return values[i];
     }
 
     @Override
+    public void set(Integer index, Double value) {
+        values[index] = value;
+    }
+
+    /** Avoids auto-boxing for better performance. */
     public void set(int i, double value) {
         values[i] = value;
     }
@@ -85,6 +102,11 @@ public class DenseVector implements Vector {
         }
 
         return new SparseVector(size(), nonZeroIndices, numZeroValues);
+    }
+
+    @Override
+    public double[] getValues() {
+        return values;
     }
 
     @Override

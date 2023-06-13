@@ -99,14 +99,14 @@ public class StandardScalerTest extends AbstractTestBase {
 
         for (Row r : collectedResult) {
             Vector vec = (Vector) r.getField(predictionCol);
-            predictions.add(vec.toDense());
+            predictions.add((DenseVector) (vec.toDense()));
         }
 
         assertEquals(expectedOutput.size(), predictions.size());
 
         predictions.sort(
                 (vec1, vec2) -> {
-                    int size = Math.min(vec1.size(), vec2.size());
+                    int size = (int) Math.min(vec1.size(), vec2.size());
                     for (int i = 0; i < size; i++) {
                         int cmp = Double.compare(vec1.get(i), vec2.get(i));
                         if (cmp != 0) {

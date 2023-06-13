@@ -104,7 +104,7 @@ public class KMeansTest extends AbstractTestBase {
             List<Row> rows, String featuresCol, String predictionCol) {
         Map<Integer, Set<DenseVector>> map = new HashMap<>();
         for (Row row : rows) {
-            DenseVector vector = ((Vector) row.getField(featuresCol)).toDense();
+            DenseVector vector = (DenseVector) (((Vector) row.getField(featuresCol)).toDense());
             int predict = (Integer) row.getField(predictionCol);
             map.putIfAbsent(predict, new HashSet<>());
             map.get(predict).add(vector);

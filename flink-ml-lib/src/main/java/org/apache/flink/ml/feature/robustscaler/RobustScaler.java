@@ -77,7 +77,10 @@ public class RobustScaler
                 tEnv.toDataStream(inputs[0])
                         .map(
                                 (MapFunction<Row, DenseVector>)
-                                        value -> ((Vector) value.getField(inputCol)).toDense());
+                                        value ->
+                                                (DenseVector)
+                                                        ((Vector) value.getField(inputCol))
+                                                                .toDense());
         DataStream<RobustScalerModelData> modelData =
                 DataStreamUtils.aggregate(
                         inputData,
@@ -113,7 +116,7 @@ public class RobustScaler
         @Override
         public QuantileSummary[] add(DenseVector denseVector, QuantileSummary[] quantileSummaries) {
             if (quantileSummaries.length == 0) {
-                quantileSummaries = new QuantileSummary[denseVector.size()];
+                quantileSummaries = new QuantileSummary[(int) denseVector.size()];
                 for (int i = 0; i < denseVector.size(); i++) {
                     quantileSummaries[i] = new QuantileSummary(relativeError);
                 }

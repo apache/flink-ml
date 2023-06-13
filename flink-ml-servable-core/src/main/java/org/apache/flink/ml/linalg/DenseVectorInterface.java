@@ -18,24 +18,10 @@
 
 package org.apache.flink.ml.linalg;
 
-import org.apache.flink.annotation.PublicEvolving;
+/** A dense vector of numerical values. */
+public interface DenseVectorInterface<I extends Number, V extends Number, IArray, VArray>
+        extends Vector<I, V, IArray, VArray> {
 
-/** Utility methods for instantiating Vector. */
-@PublicEvolving
-public class Vectors {
-
-    /** Creates a dense vector with int-index and double-value from its values. */
-    public static DenseVector dense(double... values) {
-        return new DenseVector(values);
-    }
-
-    /** Creates a sparse vector with int-index and double-value from its values. */
-    public static SparseVector sparse(long size, int[] indices, double[] values) {
-        return new SparseVector(size, indices, values);
-    }
-
-    /** Creates a sparse vector with long-index and double-value from its values. */
-    public static SparseLongDoubleVector sparse(long size, long[] indices, double[] values) {
-        return new SparseLongDoubleVector(size, indices, values);
-    }
+    /** Gets the values of this vector. */
+    VArray getValues();
 }

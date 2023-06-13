@@ -157,11 +157,13 @@ public class OnlineStandardScaler
 
             long numElementsBefore = numElements;
             for (Row element : iterable) {
-                Vector inputVec =
-                        ((Vector) Objects.requireNonNull(element.getField(inputCol))).clone();
+                Vector<Integer, Double, int[], double[]> inputVec =
+                        ((Vector<Integer, Double, int[], double[]>)
+                                        Objects.requireNonNull(element.getField(inputCol)))
+                                .clone();
                 if (numElements == 0) {
-                    sum = new DenseVector(inputVec.size());
-                    squaredSum = new DenseVector(inputVec.size());
+                    sum = new DenseVector((int) inputVec.size());
+                    squaredSum = new DenseVector((int) inputVec.size());
                 }
                 BLAS.axpy(1, inputVec, sum);
                 BLAS.hDot(inputVec, inputVec);

@@ -27,26 +27,26 @@ import java.io.Serializable;
 /** A vector of double values. */
 @TypeInfo(VectorTypeInfoFactory.class)
 @PublicEvolving
-public interface Vector extends Serializable {
+public interface Vector<I extends Number, V extends Number, IArray, VArray> extends Serializable {
 
     /** Gets the size of the vector. */
-    int size();
+    long size();
 
     /** Gets the value of the ith element. */
-    double get(int i);
+    V get(I i);
 
     /** Sets the value of the ith element. */
-    void set(int i, double value);
+    void set(I i, V value);
 
     /** Converts the instance to a double array. */
-    double[] toArray();
+    VArray toArray();
 
     /** Converts the instance to a dense vector. */
-    DenseVector toDense();
+    DenseVectorInterface<I, V, IArray, VArray> toDense();
 
     /** Converts the instance to a sparse vector. */
-    SparseVector toSparse();
+    SparseVectorInterface<I, V, IArray, VArray> toSparse();
 
     /** Makes a deep copy of the vector. */
-    Vector clone();
+    Vector<I, V, IArray, VArray> clone();
 }

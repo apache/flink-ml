@@ -17,24 +17,24 @@
  * under the License.
  */
 
-package org.apache.flink.ml.linalg;
+package org.apache.flink.ml.linalg.typeinfo;
 
-import org.apache.flink.api.common.typeinfo.TypeInfo;
-import org.apache.flink.ml.linalg.typeinfo.VectorWithNormTypeInfoFactory;
+import org.apache.flink.api.common.typeinfo.TypeInfoFactory;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.java.typeutils.TypeExtractor;
+import org.apache.flink.ml.linalg.SparseLongDoubleVector;
 
-/** A vector with its norm. */
-@TypeInfo(VectorWithNormTypeInfoFactory.class)
-public class VectorWithNorm {
-    public final Vector<Integer, Double, int[], double[]> vector;
+import java.lang.reflect.Type;
+import java.util.Map;
 
-    public final double l2Norm;
-
-    public VectorWithNorm(Vector<Integer, Double, int[], double[]> vector) {
-        this(vector, BLAS.norm2(vector));
-    }
-
-    public VectorWithNorm(Vector<Integer, Double, int[], double[]> vector, double l2Norm) {
-        this.vector = vector;
-        this.l2Norm = l2Norm;
+/**
+ * Used by {@link TypeExtractor} to create a {@link TypeInformation} for implementations of {@link
+ * SparseLongDoubleVector}.
+ */
+public class SparseLongDoubleVectorTypeInfoFactory extends TypeInfoFactory<SparseLongDoubleVector> {
+    @Override
+    public TypeInformation<SparseLongDoubleVector> createTypeInfo(
+            Type type, Map<String, TypeInformation<?>> map) {
+        return new SparseLongDoubleVectorTypeInfo();
     }
 }

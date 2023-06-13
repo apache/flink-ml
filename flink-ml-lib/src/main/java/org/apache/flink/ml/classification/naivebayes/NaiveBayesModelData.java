@@ -103,8 +103,14 @@ public class NaiveBayesModelData {
                                 row ->
                                         new NaiveBayesModelData(
                                                 (Map<Double, Double>[][]) row.getField(0),
-                                                ((Vector) row.getField(1)).toDense(),
-                                                ((Vector) row.getField(2)).toDense()),
+                                                (DenseVector)
+                                                        (((Vector<Integer, Double, int[], double[]>)
+                                                                        row.getField(1))
+                                                                .toDense()),
+                                                (DenseVector)
+                                                        (((Vector<Integer, Double, int[], double[]>)
+                                                                        row.getField(2))
+                                                                .toDense())),
                         TYPE_INFO);
     }
 

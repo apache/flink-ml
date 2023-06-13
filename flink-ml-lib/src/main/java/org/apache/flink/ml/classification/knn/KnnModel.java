@@ -146,7 +146,10 @@ public class KnnModel implements Model<KnnModel>, KnnModelParams<KnnModel> {
                                 getRuntimeContext().getBroadcastVariable(broadcastKey).get(0);
                 distanceVector = new DenseVector(knnModelData.labels.size());
             }
-            DenseVector feature = ((Vector) row.getField(featureCol)).toDense();
+            DenseVector feature =
+                    (DenseVector)
+                            (((Vector<Integer, Double, int[], double[]>) row.getField(featureCol))
+                                    .toDense());
             double prediction = predictLabel(feature);
             return Row.join(row, Row.of(prediction));
         }

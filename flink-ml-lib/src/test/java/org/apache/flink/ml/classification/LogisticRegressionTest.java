@@ -149,7 +149,8 @@ public class LogisticRegressionTest extends AbstractTestBase {
             throws Exception {
         List<Row> predResult = IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect());
         for (Row predictionRow : predResult) {
-            DenseVector feature = ((Vector) predictionRow.getField(featuresCol)).toDense();
+            DenseVector feature =
+                    (DenseVector) (((Vector) predictionRow.getField(featuresCol)).toDense());
             double prediction = (double) predictionRow.getField(predictionCol);
             DenseVector rawPrediction = (DenseVector) predictionRow.getField(rawPredictionCol);
             if (feature.get(0) <= 5) {
@@ -169,7 +170,8 @@ public class LogisticRegressionTest extends AbstractTestBase {
         int rawPredictionColIndex = output.getIndex(rawPredictionCol);
 
         for (org.apache.flink.ml.servable.api.Row predictionRow : output.collect()) {
-            DenseVector feature = ((Vector) predictionRow.get(featuresColIndex)).toDense();
+            DenseVector feature =
+                    (DenseVector) (((Vector) predictionRow.get(featuresColIndex)).toDense());
             double prediction = (double) predictionRow.get(predictionColIndex);
             DenseVector rawPrediction = (DenseVector) predictionRow.get(rawPredictionColIndex);
             if (feature.get(0) <= 5) {

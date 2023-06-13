@@ -142,7 +142,8 @@ public class LinearRegressionModel
                                 getRuntimeContext().getBroadcastVariable(broadcastModelKey).get(0);
                 coefficient = modelData.coefficient;
             }
-            DenseVector features = ((Vector) dataPoint.getField(featuresCol)).toDense();
+            DenseVector features =
+                    (DenseVector) ((Vector) dataPoint.getField(featuresCol)).toDense();
             Row predictionResult = predictOneDataPoint(features, coefficient);
             return Row.join(dataPoint, predictionResult);
         }

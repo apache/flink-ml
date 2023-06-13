@@ -248,8 +248,8 @@ public class SGD implements Optimizer {
                 throws Exception {
             if (epochWatermark == 0) {
                 coefficient = new DenseVector(feedbackArray);
-                coefficientDim = coefficient.size();
-                feedbackArray = new double[coefficient.size() + 2];
+                coefficientDim = (int) coefficient.size();
+                feedbackArray = new double[coefficientDim + 2];
             } else {
                 updateModel();
             }
@@ -315,7 +315,7 @@ public class SGD implements Optimizer {
             OperatorStateUtils.getUniqueElement(coefficientState, "coefficientState")
                     .ifPresent(x -> coefficient = x);
             if (coefficient != null) {
-                coefficientDim = coefficient.size();
+                coefficientDim = (int) coefficient.size();
             }
 
             feedbackArrayState =

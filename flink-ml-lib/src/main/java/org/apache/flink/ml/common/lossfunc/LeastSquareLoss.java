@@ -45,6 +45,6 @@ public class LeastSquareLoss implements LossFunc {
                 (dot - dataPoint.getLabel()) * dataPoint.getWeight(),
                 dataPoint.getFeatures(),
                 cumGradient,
-                dataPoint.getFeatures().size());
+                (int) dataPoint.getFeatures().size());
     }
 }

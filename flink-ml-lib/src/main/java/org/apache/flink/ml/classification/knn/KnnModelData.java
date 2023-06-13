@@ -77,8 +77,14 @@ public class KnnModelData {
                         x ->
                                 new KnnModelData(
                                         ((Matrix) x.getField(0)).toDense(),
-                                        ((Vector) x.getField(1)).toDense(),
-                                        ((Vector) x.getField(2)).toDense()));
+                                        (DenseVector)
+                                                (((Vector<Integer, Double, int[], double[]>)
+                                                                x.getField(1))
+                                                        .toDense()),
+                                        (DenseVector)
+                                                (((Vector<Integer, Double, int[], double[]>)
+                                                                x.getField(2))
+                                                        .toDense())));
     }
 
     /** Encoder for {@link KnnModelData}. */

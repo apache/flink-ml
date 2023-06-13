@@ -33,7 +33,7 @@ abstract class LSHModelData {
      * @param vec input vector.
      * @return the mapping of LSH functions.
      */
-    public abstract DenseVector[] hashFunction(Vector vec);
+    public abstract DenseVector[] hashFunction(Vector<Integer, Double, int[], double[]> vec);
 
     /**
      * Calculates the distance between two different feature vectors using the corresponding
@@ -43,5 +43,6 @@ abstract class LSHModelData {
      * @param y One input vector in the metric space.
      * @return The distance between x and y.
      */
-    public abstract double keyDistance(Vector x, Vector y);
+    public abstract double keyDistance(
+            Vector<Integer, Double, int[], double[]> x, Vector<Integer, Double, int[], double[]> y);
 }

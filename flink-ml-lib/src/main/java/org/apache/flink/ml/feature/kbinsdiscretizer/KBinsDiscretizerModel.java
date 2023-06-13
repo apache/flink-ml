@@ -149,7 +149,7 @@ public class KBinsDiscretizerModel
                                 getRuntimeContext().getBroadcastVariable(broadcastKey).get(0);
                 binEdges = modelData.binEdges;
             }
-            DenseVector inputVec = ((Vector) row.getField(inputCol)).toDense();
+            DenseVector inputVec = (DenseVector) (((Vector) row.getField(inputCol)).toDense());
             DenseVector outputVec = inputVec.clone();
             for (int i = 0; i < inputVec.size(); i++) {
                 double targetFeature = inputVec.get(i);

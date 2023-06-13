@@ -121,7 +121,7 @@ public class VarianceThresholdSelector
             numAndSums.f0 += 1L;
             BLAS.axpy(1.0, vector, numAndSums.f1);
             for (int i = 0; i < vector.size(); i++) {
-                numAndSums.f2.values[i] += vector.get(i) * vector.get(i);
+                numAndSums.f2.values[i] += (Double) vector.get(i) * (Double) vector.get(i);
             }
             return numAndSums;
         }
@@ -135,7 +135,7 @@ public class VarianceThresholdSelector
             Preconditions.checkState(numRows > 0, "The training set is empty.");
 
             int[] indices =
-                    IntStream.range(0, sumVector.size())
+                    IntStream.range(0, (int) sumVector.size())
                             .filter(
                                     i ->
                                             squareSumVector.values[i] / numRows
@@ -145,7 +145,7 @@ public class VarianceThresholdSelector
                                                     > varianceThreshold)
                             .toArray();
 
-            return new VarianceThresholdSelectorModelData(sumVector.size(), indices);
+            return new VarianceThresholdSelectorModelData((int) sumVector.size(), indices);
         }
 
         @Override

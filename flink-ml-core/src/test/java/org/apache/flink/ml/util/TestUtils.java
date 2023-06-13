@@ -294,9 +294,11 @@ public class TestUtils {
     }
 
     /** Note: this comparator imposes orderings that are inconsistent with equals. */
-    public static int compare(Vector first, Vector second) {
+    public static int compare(
+            Vector<Integer, Double, int[], double[]> first,
+            Vector<Integer, Double, int[], double[]> second) {
         if (first.size() != second.size()) {
-            return Integer.compare(first.size(), second.size());
+            return Long.compare(first.size(), second.size());
         } else {
             for (int i = 0; i < first.size(); i++) {
                 int cmp = Double.compare(first.get(i), second.get(i));

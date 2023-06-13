@@ -91,7 +91,12 @@ public class KMeans implements Estimator<KMeans, KMeansModel>, KMeansParams<KMea
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
         DataStream<DenseVector> points =
                 tEnv.toDataStream(inputs[0])
-                        .map(row -> ((Vector) row.getField(getFeaturesCol())).toDense());
+                        .map(
+                                row ->
+                                        (DenseVector)
+                                                (((Vector<Integer, Double, int[], double[]>)
+                                                                row.getField(getFeaturesCol()))
+                                                        .toDense()));
 
         DataStream<DenseVector[]> initCentroids = selectRandomCentroids(points, getK(), getSeed());
 

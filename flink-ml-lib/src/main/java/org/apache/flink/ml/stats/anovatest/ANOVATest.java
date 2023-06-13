@@ -137,11 +137,11 @@ public class ANOVATest implements AlgoOperator<ANOVATest>, ANOVATestParams<ANOVA
         public Tuple3<Double, Double, HashMap<Double, Tuple2<Double, Long>>>[] add(
                 Tuple2<Vector, Double> featuresAndLabel,
                 Tuple3<Double, Double, HashMap<Double, Tuple2<Double, Long>>>[] acc) {
-            Vector features = featuresAndLabel.f0;
+            Vector<Integer, Double, int[], double[]> features = featuresAndLabel.f0;
             double label = featuresAndLabel.f1;
-            int numOfFeatures = features.size();
+            int numOfFeatures = (int) features.size();
             if (acc.length == 0) {
-                acc = new Tuple3[features.size()];
+                acc = new Tuple3[(int) features.size()];
                 for (int i = 0; i < numOfFeatures; i++) {
                     acc[i] = Tuple3.of(0.0, 0.0, new HashMap<>());
                 }

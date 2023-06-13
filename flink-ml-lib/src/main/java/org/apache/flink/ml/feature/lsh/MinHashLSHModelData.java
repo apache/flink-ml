@@ -122,8 +122,8 @@ public class MinHashLSHModelData extends LSHModelData {
     }
 
     @Override
-    public DenseVector[] hashFunction(Vector vec) {
-        int[] indices = vec.toSparse().indices;
+    public DenseVector[] hashFunction(Vector<Integer, Double, int[], double[]> vec) {
+        int[] indices = vec.toSparse().getIndices();
         Preconditions.checkArgument(indices.length > 0, "Must have at least 1 non zero entry.");
         double[][] hashValues = new double[numHashTables][numHashFunctionsPerTable];
         for (int i = 0; i < numHashTables; i += 1) {
@@ -143,9 +143,11 @@ public class MinHashLSHModelData extends LSHModelData {
     }
 
     @Override
-    public double keyDistance(Vector x, Vector y) {
-        int[] xIndices = x.toSparse().indices;
-        int[] yIndices = y.toSparse().indices;
+    public double keyDistance(
+            Vector<Integer, Double, int[], double[]> x,
+            Vector<Integer, Double, int[], double[]> y) {
+        int[] xIndices = x.toSparse().getIndices();
+        int[] yIndices = y.toSparse().getIndices();
         Preconditions.checkArgument(
                 xIndices.length + yIndices.length > 0,
                 "The union of two input sets must have at least 1 elements");

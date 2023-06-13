@@ -152,9 +152,9 @@ public class NaiveBayesModel
         }
     }
 
-    private static double findMaxProbLabel(DenseVector prob, Vector label) {
+    private static double findMaxProbLabel(DenseVector prob, DenseVector label) {
         double result = 0.;
-        int probSize = prob.size();
+        int probSize = (int) prob.size();
         double maxVal = Double.NEGATIVE_INFINITY;
         for (int i = 0; i < probSize; ++i) {
             if (maxVal < prob.values[i]) {
@@ -168,7 +168,7 @@ public class NaiveBayesModel
 
     /** Calculate probability of the input data. */
     private static DenseVector calculateProb(NaiveBayesModelData modelData, Vector data) {
-        int labelSize = modelData.labels.size();
+        int labelSize = (int) modelData.labels.size();
         DenseVector probs = new DenseVector(new double[labelSize]);
         for (int i = 0; i < labelSize; i++) {
             Map<Double, Double>[] labelData = modelData.theta[i];

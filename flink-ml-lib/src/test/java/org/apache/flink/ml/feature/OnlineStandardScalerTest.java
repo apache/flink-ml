@@ -430,7 +430,7 @@ public class OnlineStandardScalerTest extends AbstractTestBase {
 
         for (Row r : collectedResult) {
             Vector vec = (Vector) r.getField(predictionCol);
-            predictions.add(vec.toDense());
+            predictions.add((DenseVector) (vec.toDense()));
         }
 
         assertEquals(expectedOutput.size(), predictions.size());

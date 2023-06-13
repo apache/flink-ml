@@ -137,7 +137,11 @@ public class KMeansModel implements Model<KMeansModel>, KMeansModelParams<KMeans
                     centroids[i] = new VectorWithNorm(modelData.centroids[i]);
                 }
             }
-            DenseVector point = ((Vector) dataPoint.getField(featuresCol)).toDense();
+            DenseVector point =
+                    (DenseVector)
+                            (((Vector<Integer, Double, int[], double[]>)
+                                            dataPoint.getField(featuresCol))
+                                    .toDense());
             int closestCentroidId =
                     distanceMeasure.findClosest(centroids, new VectorWithNorm(point));
             return Row.join(dataPoint, Row.of(closestCentroidId));

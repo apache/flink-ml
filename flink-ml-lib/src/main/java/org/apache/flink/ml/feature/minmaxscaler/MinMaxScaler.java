@@ -82,7 +82,10 @@ public class MinMaxScaler
                 tEnv.toDataStream(inputs[0])
                         .map(
                                 (MapFunction<Row, DenseVector>)
-                                        value -> ((Vector) value.getField(inputCol)).toDense());
+                                        value ->
+                                                (DenseVector)
+                                                        ((Vector) value.getField(inputCol))
+                                                                .toDense());
         DataStream<DenseVector> minMaxValues =
                 inputData
                         .transform(
@@ -139,7 +142,7 @@ public class MinMaxScaler
         public void processElement(StreamRecord<DenseVector> streamRecord) {
             DenseVector currentValue = streamRecord.getValue();
             if (minVector == null) {
-                int vecSize = currentValue.size();
+                int vecSize = (int) currentValue.size();
                 minVector = new DenseVector(vecSize);
                 maxVector = new DenseVector(vecSize);
                 System.arraycopy(currentValue.values, 0, minVector.values, 0, vecSize);

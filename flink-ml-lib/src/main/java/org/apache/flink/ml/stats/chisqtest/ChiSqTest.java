@@ -236,7 +236,7 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
 
             Double label = ((Number) row.getFieldAs(labelCol)).doubleValue();
 
-            Vector features = row.getFieldAs(featuresCol);
+            Vector<Integer, Double, int[], double[]> features = row.getFieldAs(featuresCol);
             for (int i = 0; i < features.size(); i++) {
                 collector.collect(Tuple3.of(i, features.get(i), label));
             }

@@ -52,7 +52,7 @@ public class HingeLoss implements LossFunc {
                     -labelScaled * dataPoint.getWeight(),
                     dataPoint.getFeatures(),
                     cumGradient,
-                    dataPoint.getFeatures().size());
+                    (int) dataPoint.getFeatures().size());
         }
     }
 }

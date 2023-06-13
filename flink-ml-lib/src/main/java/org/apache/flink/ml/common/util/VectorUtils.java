@@ -31,11 +31,12 @@ public class VectorUtils {
      * Selects a subset of the vector base on the indices. Note that the input indices must be
      * sorted in ascending order.
      */
-    public static Vector selectByIndices(Vector vector, int[] sortedIndices) {
+    public static Vector<Integer, Double, int[], double[]> selectByIndices(
+            Vector<Integer, Double, int[], double[]> vector, int[] sortedIndices) {
         if (vector instanceof DenseVector) {
             DenseVector resultVec = new DenseVector(sortedIndices.length);
             for (int i = 0; i < sortedIndices.length; i++) {
-                resultVec.set(i, vector.get(sortedIndices[i]));
+                resultVec.set(i, vector.get(sortedIndices[i]).doubleValue());
             }
             return resultVec;
         } else {

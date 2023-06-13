@@ -125,7 +125,8 @@ public class RobustScalerModel
                                         .map(range -> range == 0 ? 0 : 1 / range)
                                         .toArray());
             }
-            DenseVector outputVec = ((Vector) row.getField(inputCol)).clone().toDense();
+            DenseVector outputVec =
+                    (DenseVector) ((Vector) row.getField(inputCol)).clone().toDense();
             Preconditions.checkState(
                     medians.size() == outputVec.size(),
                     "Number of features must be %s but got %s.",

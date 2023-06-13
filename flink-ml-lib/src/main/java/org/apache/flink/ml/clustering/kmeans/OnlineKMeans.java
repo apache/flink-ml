@@ -194,7 +194,7 @@ public class OnlineKMeans
             DenseVector[] newCentroids = newModelData.centroids;
 
             int k = newCentroids.length;
-            int dim = newCentroids[0].size();
+            int dim = (int) newCentroids[0].size();
 
             for (int i = 0; i < k; i++) {
                 for (int j = 0; j < dim; j++) {
@@ -289,7 +289,7 @@ public class OnlineKMeans
             DenseVector[] points = pointsList.remove(0);
             localBatchDataState.update(pointsList);
 
-            int dim = centroids[0].size();
+            int dim = (int) centroids[0].size();
             int parallelism = getRuntimeContext().getNumberOfParallelSubtasks();
 
             // Computes new centroids.
@@ -334,7 +334,7 @@ public class OnlineKMeans
 
         @Override
         public DenseVector map(Row row) {
-            return ((Vector) row.getField(featuresCol)).toDense();
+            return (DenseVector) (((Vector) row.getField(featuresCol)).toDense());
         }
     }
 

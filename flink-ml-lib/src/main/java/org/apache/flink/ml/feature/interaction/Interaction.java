@@ -105,7 +105,7 @@ public class Interaction implements Transformer<Interaction>, InteractionParams<
                 }
 
                 if (obj instanceof DenseVector) {
-                    featureSize[i] = ((Vector) obj).size();
+                    featureSize[i] = (int) ((Vector) obj).size();
                     if (featureIndices[i] == null || featureIndices[i].length != featureSize[i]) {
                         featureIndices[i] = new int[featureSize[i]];
                         for (int j = 0; j < featureSize[i]; ++j) {
@@ -116,7 +116,7 @@ public class Interaction implements Transformer<Interaction>, InteractionParams<
                     featureValues[i] = ((DenseVector) obj).values;
                     nnz *= featureSize[i];
                 } else if (obj instanceof SparseVector) {
-                    featureSize[i] = ((Vector) obj).size();
+                    featureSize[i] = (int) ((Vector) obj).size();
                     featureIndices[i] = ((SparseVector) obj).indices;
                     featureValues[i] = ((SparseVector) obj).values;
                     nnz *= ((SparseVector) obj).values.length;

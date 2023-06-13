@@ -111,7 +111,7 @@ public class Knn implements Estimator<Knn, KnnModel>, KnnParams<Knn> {
                                 for (Tuple3<DenseVector, Double, Double> dataPoint : dataPoints) {
                                     bufferedDataPoints.add(dataPoint);
                                 }
-                                int featureDim = bufferedDataPoints.get(0).f0.size();
+                                int featureDim = (int) bufferedDataPoints.get(0).f0.size();
                                 DenseMatrix packedFeatures =
                                         new DenseMatrix(featureDim, bufferedDataPoints.size());
                                 DenseVector normSquares =
@@ -149,7 +149,11 @@ public class Knn implements Estimator<Knn, KnnModel>, KnnParams<Knn> {
                     @Override
                     public Tuple3<DenseVector, Double, Double> map(Row value) {
                         Double label = ((Number) value.getField(getLabelCol())).doubleValue();
-                        DenseVector feature = ((Vector) value.getField(getFeaturesCol())).toDense();
+                        DenseVector feature =
+                                (DenseVector)
+                                        (((Vector<Integer, Double, int[], double[]>)
+                                                        value.getField(getFeaturesCol()))
+                                                .toDense());
                         return Tuple3.of(feature, label, Math.pow(BLAS.norm2(feature), 2));
                     }
                 });

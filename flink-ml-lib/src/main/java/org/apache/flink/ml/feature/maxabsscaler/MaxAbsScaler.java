@@ -119,7 +119,9 @@ public class MaxAbsScaler
             Vector currentValue = streamRecord.getValue();
 
             maxAbsVector =
-                    maxAbsVector == null ? new DenseVector(currentValue.size()) : maxAbsVector;
+                    maxAbsVector == null
+                            ? new DenseVector((int) currentValue.size())
+                            : maxAbsVector;
             Preconditions.checkArgument(
                     currentValue.size() == maxAbsVector.size(),
                     "The training data should all have same dimensions.");

@@ -139,7 +139,7 @@ public class IDF implements Estimator<IDF, IDFModel>, IDFParams<IDF> {
             DenseVector docFreq = numDocsAndDocFreq.f1;
             Preconditions.checkState(numDocs > 0, "The training set is empty.");
 
-            long[] filteredDocFreq = new long[docFreq.size()];
+            long[] filteredDocFreq = new long[(int) docFreq.size()];
             double[] df = docFreq.values;
             double[] idf = new double[df.length];
             for (int i = 0; i < idf.length; i++) {

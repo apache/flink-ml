@@ -149,7 +149,8 @@ public class VectorIndexerModel
                 categoryMaps = modelData.categoryMaps;
             }
 
-            Vector outputVector = ((Vector) input.getField(inputCol)).clone();
+            Vector<Integer, Double, int[], double[]> outputVector =
+                    ((Vector<Integer, Double, int[], double[]>) input.getField(inputCol)).clone();
             for (Map.Entry<Integer, Map<Double, Integer>> entry : categoryMaps.entrySet()) {
                 int columnId = entry.getKey();
                 Map<Double, Integer> mapping = entry.getValue();
@@ -158,7 +159,7 @@ public class VectorIndexerModel
                 if (categoricalFeature == null) {
                     return;
                 } else {
-                    outputVector.set(columnId, categoricalFeature);
+                    outputVector.set(columnId, categoricalFeature.doubleValue());
                 }
             }
 

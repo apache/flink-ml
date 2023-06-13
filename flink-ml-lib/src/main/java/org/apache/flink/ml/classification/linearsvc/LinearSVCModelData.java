@@ -63,7 +63,13 @@ public class LinearSVCModelData {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) modelData).getTableEnvironment();
         return tEnv.toDataStream(modelData)
-                .map(x -> new LinearSVCModelData(((Vector) x.getField(0)).toDense()));
+                .map(
+                        x ->
+                                new LinearSVCModelData(
+                                        (DenseVector)
+                                                (((Vector<Integer, Double, int[], double[]>)
+                                                                x.getField(0))
+                                                        .toDense())));
     }
 
     /** Data encoder for {@link LinearSVCModel}. */

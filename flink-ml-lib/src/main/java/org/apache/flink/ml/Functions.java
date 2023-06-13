@@ -47,7 +47,7 @@ public class Functions {
      * arrays.
      */
     public static class VectorToArrayFunction extends ScalarFunction {
-        public double[] eval(Vector vector) {
+        public double[] eval(Vector<Integer, Double, int[], double[]> vector) {
             return vector.toArray();
         }
 

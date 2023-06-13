@@ -173,7 +173,7 @@ public class OnlineKMeansModel
                 bufferedPointsState.add(dataPoint);
                 return;
             }
-            DenseVector point = ((Vector) dataPoint.getField(featuresCol)).toDense();
+            DenseVector point = (DenseVector) ((Vector) dataPoint.getField(featuresCol)).toDense();
             int closestCentroidId =
                     distanceMeasure.findClosest(centroids, new VectorWithNorm(point));
             output.collect(new StreamRecord<>(Row.join(dataPoint, Row.of(closestCentroidId))));

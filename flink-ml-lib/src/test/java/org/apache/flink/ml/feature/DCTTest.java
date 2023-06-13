@@ -172,8 +172,10 @@ public class DCTTest extends AbstractTestBase {
 
         assertEquals(actualOutputData.size(), expectedOutputData.size());
         for (int i = 0; i < actualOutputData.size(); i++) {
-            Vector actualVector = actualOutputData.get(i).getFieldAs(outputCol);
-            Vector expectedVector = expectedOutputData.get(i).getFieldAs(1);
+            Vector<Integer, Double, int[], double[]> actualVector =
+                    actualOutputData.get(i).getFieldAs(outputCol);
+            Vector<Integer, Double, int[], double[]> expectedVector =
+                    expectedOutputData.get(i).getFieldAs(1);
             assertArrayEquals(expectedVector.toArray(), actualVector.toArray(), 1e-3);
         }
     }

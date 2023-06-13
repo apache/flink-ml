@@ -177,9 +177,9 @@ public class FValueTest implements AlgoOperator<FValueTest>, FValueTestParams<FV
 
                                     for (int i = 0; i < numOfFeatures; i++) {
                                         Tuple4<Integer, Double, Long, Double> tuple = rows.get(i);
-                                        pValues.set(i, tuple.f1);
+                                        pValues.set(i, tuple.f1.doubleValue());
                                         degrees[i] = tuple.f2;
-                                        fValues.set(i, tuple.f3);
+                                        fValues.set(i, tuple.f3.doubleValue());
                                     }
                                     collector.collect(Tuple3.of(pValues, degrees, fValues));
                                 }
@@ -205,7 +205,7 @@ public class FValueTest implements AlgoOperator<FValueTest>, FValueTestParams<FV
                     (Tuple5<Long, Double, Double, DenseVector, DenseVector>)
                             getRuntimeContext().getBroadcastVariable(broadcastKey).get(0);
 
-            int expectedNumOfFeatures = summaries.f3.size();
+            int expectedNumOfFeatures = (int) summaries.f3.size();
             DenseVector sumVector = new DenseVector(expectedNumOfFeatures);
             for (Tuple2<Vector, Double> featuresAndLabel : iterable) {
                 Preconditions.checkArgument(
@@ -215,10 +215,10 @@ public class FValueTest implements AlgoOperator<FValueTest>, FValueTestParams<FV
                         expectedNumOfFeatures);
 
                 double yDiff = featuresAndLabel.f1 - summaries.f1;
+                Vector<Integer, Double, int[], double[]> features = featuresAndLabel.f0;
                 if (yDiff != 0) {
                     for (int i = 0; i < expectedNumOfFeatures; i++) {
-                        sumVector.values[i] +=
-                                yDiff * (featuresAndLabel.f0.get(i) - summaries.f3.get(i));
+                        sumVector.values[i] += yDiff * (features.get(i) - summaries.f3.get(i));
                     }
                 }
             }
@@ -245,7 +245,7 @@ public class FValueTest implements AlgoOperator<FValueTest>, FValueTestParams<FV
             Tuple5<Long, Double, Double, DenseVector, DenseVector> summaries =
                     (Tuple5<Long, Double, Double, DenseVector, DenseVector>)
                             getRuntimeContext().getBroadcastVariable(broadcastKey).get(0);
-            int expectedNumOfFeatures = summaries.f4.size();
+            int expectedNumOfFeatures = (int) summaries.f4.size();
 
             if (iterable.iterator().hasNext()) {
                 sumVector = iterable.iterator().next();
@@ -287,12 +287,12 @@ public class FValueTest implements AlgoOperator<FValueTest>, FValueTestParams<FV
         public Tuple5<Long, Double, Double, DenseVector, DenseVector> add(
                 Tuple2<Vector, Double> featuresAndLabel,
                 Tuple5<Long, Double, Double, DenseVector, DenseVector> summary) {
-            Vector features = featuresAndLabel.f0;
+            Vector<Integer, Double, int[], double[]> features = featuresAndLabel.f0;
             double label = featuresAndLabel.f1;
 
             if (summary.f0 == 0) {
-                summary.f3 = new DenseVector(features.size());
-                summary.f4 = new DenseVector(features.size());
+                summary.f3 = new DenseVector((int) features.size());
+                summary.f4 = new DenseVector((int) features.size());
             }
             summary.f0 += 1L;
             summary.f1 += label;
@@ -310,7 +310,7 @@ public class FValueTest implements AlgoOperator<FValueTest>, FValueTestParams<FV
                 Tuple5<Long, Double, Double, DenseVector, DenseVector> summary) {
             final long numRows = summary.f0;
             Preconditions.checkState(numRows > 0, "The training set is empty.");
-            int numOfFeatures = summary.f3.size();
+            int numOfFeatures = (int) summary.f3.size();
 
             double labelMean = summary.f1 / numRows;
             Tuple5<Long, Double, Double, DenseVector, DenseVector> result =

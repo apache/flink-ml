@@ -515,8 +515,8 @@ public class UnivariateFeatureSelectorTest extends AbstractTestBase {
             assertEquals(expectedIndices.length, ((Vector) row.getField("output")).size());
             for (int i = 0; i < expectedIndices.length; i++) {
                 assertEquals(
-                        ((Vector) row.getField("features")).get(expectedIndices[i]),
-                        ((Vector) row.getField("output")).get(i),
+                        (Double) ((Vector) row.getField("features")).get(expectedIndices[i]),
+                        (Double) ((Vector) row.getField("output")).get(i),
                         EPS);
             }
         }

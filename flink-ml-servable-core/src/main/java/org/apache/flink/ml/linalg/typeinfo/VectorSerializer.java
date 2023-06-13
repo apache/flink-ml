@@ -25,6 +25,7 @@ import org.apache.flink.api.common.typeutils.base.TypeSerializerSingleton;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.SparseLongDoubleVector;
 import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vector;
 
@@ -42,6 +43,9 @@ public final class VectorSerializer extends TypeSerializerSingleton<Vector> {
     private static final SparseVectorSerializer SPARSE_VECTOR_SERIALIZER =
             SparseVectorSerializer.INSTANCE;
 
+    private static final SparseLongDoubleVectorSerializer SPARSE_LONG_DOUBLE_VECTOR_SERIALIZER =
+            SparseLongDoubleVectorSerializer.INSTANCE;
+
     @Override
     public boolean isImmutableType() {
         return false;
@@ -56,8 +60,10 @@ public final class VectorSerializer extends TypeSerializerSingleton<Vector> {
     public Vector copy(Vector from) {
         if (from instanceof DenseVector) {
             return denseVectorSerializer.copy((DenseVector) from);
-        } else {
+        } else if (from instanceof SparseVector) {
             return SPARSE_VECTOR_SERIALIZER.copy((SparseVector) from);
+        } else {
+            return SPARSE_LONG_DOUBLE_VECTOR_SERIALIZER.copy((SparseLongDoubleVector) from);
         }
     }
 
@@ -66,8 +72,11 @@ public final class VectorSerializer extends TypeSerializerSingleton<Vector> {
         assert from.getClass() == reuse.getClass();
         if (from instanceof DenseVector) {
             return denseVectorSerializer.copy((DenseVector) from, (DenseVector) reuse);
-        } else {
+        } else if (from instanceof SparseVector) {
             return SPARSE_VECTOR_SERIALIZER.copy((SparseVector) from, (SparseVector) reuse);
+        } else {
+            return SPARSE_LONG_DOUBLE_VECTOR_SERIALIZER.copy(
+                    (SparseLongDoubleVector) from, (SparseLongDoubleVector) reuse);
         }
     }
 
@@ -81,9 +90,12 @@ public final class VectorSerializer extends TypeSerializerSingleton<Vector> {
         if (vector instanceof DenseVector) {
             target.writeByte(0);
             denseVectorSerializer.serialize((DenseVector) vector, target);
-        } else {
+        } else if (vector instanceof SparseVector) {
             target.writeByte(1);
             SPARSE_VECTOR_SERIALIZER.serialize((SparseVector) vector, target);
+        } else {
+            target.writeByte(2);
+            SPARSE_LONG_DOUBLE_VECTOR_SERIALIZER.serialize((SparseLongDoubleVector) vector, target);
         }
     }
 
@@ -92,8 +104,10 @@ public final class VectorSerializer extends TypeSerializerSingleton<Vector> {
         byte type = source.readByte();
         if (type == 0) {
             return denseVectorSerializer.deserialize(source);
-        } else {
+        } else if (type == 1) {
             return SPARSE_VECTOR_SERIALIZER.deserialize(source);
+        } else {
+            return SPARSE_LONG_DOUBLE_VECTOR_SERIALIZER.deserialize(source);
         }
     }
 
@@ -101,11 +115,14 @@ public final class VectorSerializer extends TypeSerializerSingleton<Vector> {
     public Vector deserialize(Vector reuse, DataInputView source) throws IOException {
         byte type = source.readByte();
         assert type == 0 && reuse instanceof DenseVector
-                || type == 1 && reuse instanceof SparseVector;
+                || type == 1 && reuse instanceof SparseVector
+                || type == 2 && reuse instanceof SparseLongDoubleVector;
         if (type == 0) {
             return denseVectorSerializer.deserialize(source);
-        } else {
+        } else if (type == 1) {
             return SPARSE_VECTOR_SERIALIZER.deserialize(source);
+        } else {
+            return SPARSE_LONG_DOUBLE_VECTOR_SERIALIZER.deserialize(source);
         }
     }
 

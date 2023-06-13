@@ -79,7 +79,7 @@ public final class SparseVectorSerializer extends TypeSerializerSingleton<Sparse
             throw new IllegalArgumentException("The vector must not be null.");
         }
 
-        target.writeInt(vector.n);
+        target.writeLong(vector.n);
         final int len = vector.values.length;
         target.writeInt(len);
         // TODO: optimize the serialization/deserialization process of SparseVectorSerializer.
@@ -101,7 +101,7 @@ public final class SparseVectorSerializer extends TypeSerializerSingleton<Sparse
 
     @Override
     public SparseVector deserialize(DataInputView source) throws IOException {
-        int n = source.readInt();
+        long n = source.readLong();
         int len = source.readInt();
         int[] indices = new int[len];
         double[] values = new double[len];
@@ -111,7 +111,7 @@ public final class SparseVectorSerializer extends TypeSerializerSingleton<Sparse
 
     @Override
     public SparseVector deserialize(SparseVector reuse, DataInputView source) throws IOException {
-        int n = source.readInt();
+        long n = source.readLong();
         int len = source.readInt();
         if (reuse.n == n && reuse.values.length == len) {
             readSparseVectorArrays(reuse.indices, reuse.values, source, len);

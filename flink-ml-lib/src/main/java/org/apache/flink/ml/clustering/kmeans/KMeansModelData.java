@@ -133,7 +133,7 @@ public class KMeansModelData {
                                         Arrays.stream(((Vector[]) x.getField(0)))
                                                 .map(Vector::toDense)
                                                 .toArray(DenseVector[]::new),
-                                        ((Vector) x.getField(1)).toDense()));
+                                        (DenseVector) (((Vector) x.getField(1)).toDense())));
     }
 
     /** Data encoder for {@link KMeansModelData}. */
