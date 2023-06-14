@@ -32,9 +32,9 @@ import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.api.AlgoOperator;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.param.HasFlatten;
-import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vector;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.Vectors;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -191,9 +191,9 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
             outputTypeInfo =
                     new RowTypeInfo(
                             new TypeInformation[] {
-                                DenseVectorTypeInfo.INSTANCE,
+                                DenseIntDoubleVectorTypeInfo.INSTANCE,
                                 Types.PRIMITIVE_ARRAY(Types.INT),
-                                DenseVectorTypeInfo.INSTANCE
+                                DenseIntDoubleVectorTypeInfo.INSTANCE
                             },
                             new String[] {"pValues", "degreesOfFreedom", "statistics"});
         }
@@ -650,8 +650,8 @@ public class ChiSqTest implements AlgoOperator<ChiSqTest>, ChiSqTestParams<ChiSq
 
         private void endInputWithoutFlatten() {
             int size = index2Statistic.size();
-            Vector pValueScaledVector = new DenseVector(size);
-            Vector statisticScaledVector = new DenseVector(size);
+            Vector pValueScaledVector = Vectors.dense(size);
+            Vector statisticScaledVector = Vectors.dense(size);
             int[] dofArray = new int[size];
 
             for (Map.Entry<Integer, Tuple2<Double, Integer>> entry : index2Statistic.entrySet()) {

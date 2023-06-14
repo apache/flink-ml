@@ -26,7 +26,7 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -74,7 +74,7 @@ public class LogisticRegressionModel
                         ArrayUtils.addAll(
                                 inputTypeInfo.getFieldTypes(),
                                 BasicTypeInfo.DOUBLE_TYPE_INFO,
-                                TypeInformation.of(DenseVector.class)),
+                                TypeInformation.of(DenseIntDoubleVector.class)),
                         ArrayUtils.addAll(
                                 inputTypeInfo.getFieldNames(),
                                 getPredictionCol(),
@@ -155,7 +155,7 @@ public class LogisticRegressionModel
             }
             Vector features = (Vector) dataPoint.getField(servable.getFeaturesCol());
 
-            Tuple2<Double, DenseVector> predictionResult = servable.transform(features);
+            Tuple2<Double, DenseIntDoubleVector> predictionResult = servable.transform(features);
 
             return Row.join(dataPoint, Row.of(predictionResult.f0, predictionResult.f1));
         }

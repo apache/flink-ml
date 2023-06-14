@@ -30,7 +30,7 @@ import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.common.metrics.MLMetrics;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
@@ -135,10 +135,10 @@ public class OnlineStandardScalerModel
         /** Model data for inference. */
         private StandardScalerModelData modelData;
 
-        private DenseVector mean;
+        private DenseIntDoubleVector mean;
 
         /** Inverse of standard deviation. */
-        private DenseVector scale;
+        private DenseIntDoubleVector scale;
 
         private long modelVersion;
 
@@ -249,11 +249,11 @@ public class OnlineStandardScalerModel
             modelTimeStamp = modelData.timestamp;
             modelVersion = modelData.version;
             mean = modelData.mean;
-            DenseVector std = modelData.std;
+            DenseIntDoubleVector std = modelData.std;
 
             if (withStd) {
                 scale = std;
-                double[] scaleValues = scale.values;
+                double[] scaleValues = scale.getValues();
                 for (int i = 0; i < scaleValues.length; i++) {
                     scaleValues[i] = scaleValues[i] == 0 ? 0 : 1 / scaleValues[i];
                 }
@@ -267,7 +267,7 @@ public class OnlineStandardScalerModel
                     ((Vector) (Objects.requireNonNull(dataPoint.getField(inputCol)))).clone();
             if (withMean) {
                 outputVec = outputVec.toDense();
-                BLAS.axpy(-1, mean, (DenseVector) outputVec);
+                BLAS.axpy(-1, mean, (DenseIntDoubleVector) outputVec);
             }
             if (withStd) {
                 BLAS.hDot(scale, outputVec);

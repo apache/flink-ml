@@ -24,9 +24,9 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.classification.logisticregression.OnlineLogisticRegression;
 import org.apache.flink.ml.classification.logisticregression.OnlineLogisticRegressionModel;
 import org.apache.flink.ml.examples.util.PeriodicSourceFunction;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
@@ -81,7 +81,7 @@ public class OnlineLogisticRegressionExample {
 
         RowTypeInfo typeInfo =
                 new RowTypeInfo(
-                        new TypeInformation[] {DenseVectorTypeInfo.INSTANCE, Types.DOUBLE},
+                        new TypeInformation[] {DenseIntDoubleVectorTypeInfo.INSTANCE, Types.DOUBLE},
                         new String[] {"features", "label"});
 
         SourceFunction<Row> trainSource =
@@ -119,10 +119,12 @@ public class OnlineLogisticRegressionExample {
         // would change over time.
         for (CloseableIterator<Row> it = outputTable.execute().collect(); it.hasNext(); ) {
             Row row = it.next();
-            DenseVector features = (DenseVector) row.getField(olr.getFeaturesCol());
+            DenseIntDoubleVector features =
+                    (DenseIntDoubleVector) row.getField(olr.getFeaturesCol());
             Double expectedResult = (Double) row.getField(olr.getLabelCol());
             Double predictionResult = (Double) row.getField(olr.getPredictionCol());
-            DenseVector rawPredictionResult = (DenseVector) row.getField(olr.getRawPredictionCol());
+            DenseIntDoubleVector rawPredictionResult =
+                    (DenseIntDoubleVector) row.getField(olr.getRawPredictionCol());
             System.out.printf(
                     "Features: %-25s \tExpected Result: %s \tPrediction Result: %s \tRaw Prediction Result: %s\n",
                     features, expectedResult, predictionResult, rawPredictionResult);

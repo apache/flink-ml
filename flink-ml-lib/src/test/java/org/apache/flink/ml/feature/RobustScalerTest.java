@@ -21,8 +21,8 @@ package org.apache.flink.ml.feature;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.ml.feature.robustscaler.RobustScaler;
 import org.apache.flink.ml.feature.robustscaler.RobustScalerModel;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -80,7 +80,7 @@ public class RobustScalerTest extends AbstractTestBase {
                             Row.of(Vectors.dense(99.0, -99.0))));
     private static final double EPS = 1.0e-5;
 
-    private static final List<DenseVector> EXPECTED_OUTPUT =
+    private static final List<DenseIntDoubleVector> EXPECTED_OUTPUT =
             new ArrayList<>(
                     Arrays.asList(
                             Vectors.dense(0.75, -0.75),
@@ -96,15 +96,15 @@ public class RobustScalerTest extends AbstractTestBase {
     }
 
     private static void verifyPredictionResult(
-            Table output, String outputCol, List<DenseVector> expected) throws Exception {
+            Table output, String outputCol, List<DenseIntDoubleVector> expected) throws Exception {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) output).getTableEnvironment();
-        DataStream<DenseVector> stream =
+        DataStream<DenseIntDoubleVector> stream =
                 tEnv.toDataStream(output)
                         .map(
-                                (MapFunction<Row, DenseVector>)
-                                        row -> (DenseVector) row.getField(outputCol));
-        List<DenseVector> result = IteratorUtils.toList(stream.executeAndCollect());
+                                (MapFunction<Row, DenseIntDoubleVector>)
+                                        row -> (DenseIntDoubleVector) row.getField(outputCol));
+        List<DenseIntDoubleVector> result = IteratorUtils.toList(stream.executeAndCollect());
         TestBaseUtils.compareResultCollections(expected, result, TestUtils::compare);
     }
 
@@ -163,9 +163,10 @@ public class RobustScalerTest extends AbstractTestBase {
                         tEnv, trainDataTable.select(Expressions.$("input")));
         predictDataTable = TestUtils.convertDataTypesToSparseInt(tEnv, predictDataTable);
         assertArrayEquals(
-                new Class<?>[] {SparseVector.class}, TestUtils.getColumnDataTypes(trainDataTable));
+                new Class<?>[] {SparseIntDoubleVector.class},
+                TestUtils.getColumnDataTypes(trainDataTable));
         assertArrayEquals(
-                new Class<?>[] {SparseVector.class},
+                new Class<?>[] {SparseIntDoubleVector.class},
                 TestUtils.getColumnDataTypes(predictDataTable));
 
         RobustScaler robustScaler = new RobustScaler();
@@ -218,7 +219,7 @@ public class RobustScalerTest extends AbstractTestBase {
         RobustScaler robustScaler = new RobustScaler().setWithCentering(true);
         RobustScalerModel model = robustScaler.fit(trainDataTable);
         Table output = model.transform(predictDataTable)[0];
-        List<DenseVector> expectedOutput =
+        List<DenseIntDoubleVector> expectedOutput =
                 new ArrayList<>(
                         Arrays.asList(
                                 Vectors.dense(-0.25, 0.25),
@@ -232,7 +233,7 @@ public class RobustScalerTest extends AbstractTestBase {
         RobustScaler robustScaler = new RobustScaler().setWithCentering(true).setWithScaling(false);
         RobustScalerModel model = robustScaler.fit(trainDataTable);
         Table output = model.transform(predictDataTable)[0];
-        List<DenseVector> expectedOutput =
+        List<DenseIntDoubleVector> expectedOutput =
                 new ArrayList<>(
                         Arrays.asList(
                                 Vectors.dense(-1, 1),
@@ -274,7 +275,7 @@ public class RobustScalerTest extends AbstractTestBase {
                                 Row.of(2, Vectors.dense(1.0, 1.0)),
                                 Row.of(3, Vectors.dense(1.0, 1.0)),
                                 Row.of(4, Vectors.dense(4.0, 4.0))));
-        List<DenseVector> expectedOutput =
+        List<DenseIntDoubleVector> expectedOutput =
                 new ArrayList<>(
                         Arrays.asList(
                                 Vectors.dense(0.0, -0.0),
@@ -298,7 +299,7 @@ public class RobustScalerTest extends AbstractTestBase {
                                 Row.of(3, Vectors.dense(2.0, -2.0)),
                                 Row.of(4, Vectors.dense(3.0, -3.0)),
                                 Row.of(5, Vectors.dense(4.0, -4.0))));
-        List<DenseVector> expectedOutput =
+        List<DenseIntDoubleVector> expectedOutput =
                 new ArrayList<>(
                         Arrays.asList(
                                 Vectors.dense(0.0, Double.NaN),
@@ -323,11 +324,11 @@ public class RobustScalerTest extends AbstractTestBase {
                 Arrays.asList("medians", "ranges"), modelData.getResolvedSchema().getColumnNames());
         DataStream<Row> output = tEnv.toDataStream(modelData);
         List<Row> modelRows = IteratorUtils.toList(output.executeAndCollect());
-        DenseVector medians = (DenseVector) modelRows.get(0).getField(0);
-        DenseVector ranges = (DenseVector) modelRows.get(0).getField(1);
+        DenseIntDoubleVector medians = (DenseIntDoubleVector) modelRows.get(0).getField(0);
+        DenseIntDoubleVector ranges = (DenseIntDoubleVector) modelRows.get(0).getField(1);
 
-        DenseVector expectedMedians = Vectors.dense(4.0, -4.0);
-        DenseVector expectedRanges = Vectors.dense(4.0, 4.0);
+        DenseIntDoubleVector expectedMedians = Vectors.dense(4.0, -4.0);
+        DenseIntDoubleVector expectedRanges = Vectors.dense(4.0, 4.0);
         assertEquals(expectedMedians, medians);
         assertEquals(expectedRanges, ranges);
     }

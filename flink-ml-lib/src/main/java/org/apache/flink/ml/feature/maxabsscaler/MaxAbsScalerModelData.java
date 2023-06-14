@@ -27,8 +27,8 @@ import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorSerializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -45,11 +45,11 @@ import java.io.OutputStream;
  * classes to save/load model data.
  */
 public class MaxAbsScalerModelData {
-    public DenseVector maxVector;
+    public DenseIntDoubleVector maxVector;
 
     public MaxAbsScalerModelData() {}
 
-    public MaxAbsScalerModelData(DenseVector maxVector) {
+    public MaxAbsScalerModelData(DenseIntDoubleVector maxVector) {
         this.maxVector = maxVector;
     }
 
@@ -63,12 +63,13 @@ public class MaxAbsScalerModelData {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) modelDataTable).getTableEnvironment();
         return tEnv.toDataStream(modelDataTable)
-                .map(x -> new MaxAbsScalerModelData((DenseVector) x.getField(0)));
+                .map(x -> new MaxAbsScalerModelData((DenseIntDoubleVector) x.getField(0)));
     }
 
     /** Encoder for {@link MaxAbsScalerModelData}. */
     public static class ModelDataEncoder implements Encoder<MaxAbsScalerModelData> {
-        private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+        private final DenseIntDoubleVectorSerializer serializer =
+                new DenseIntDoubleVectorSerializer();
 
         @Override
         public void encode(MaxAbsScalerModelData modelData, OutputStream outputStream)
@@ -84,13 +85,14 @@ public class MaxAbsScalerModelData {
         public Reader<MaxAbsScalerModelData> createReader(
                 Configuration config, FSDataInputStream stream) {
             return new Reader<MaxAbsScalerModelData>() {
-                private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+                private final DenseIntDoubleVectorSerializer serializer =
+                        new DenseIntDoubleVectorSerializer();
 
                 @Override
                 public MaxAbsScalerModelData read() throws IOException {
                     DataInputView source = new DataInputViewStreamWrapper(stream);
                     try {
-                        DenseVector maxVector = serializer.deserialize(source);
+                        DenseIntDoubleVector maxVector = serializer.deserialize(source);
                         return new MaxAbsScalerModelData(maxVector);
                     } catch (EOFException e) {
                         return null;

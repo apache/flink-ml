@@ -21,9 +21,9 @@ package org.apache.flink.ml.regression;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.ml.regression.linearregression.LinearRegression;
 import org.apache.flink.ml.regression.linearregression.LinearRegressionModel;
 import org.apache.flink.ml.regression.linearregression.LinearRegressionModelData;
@@ -93,7 +93,9 @@ public class LinearRegressionTest extends AbstractTestBase {
                                 trainData,
                                 new RowTypeInfo(
                                         new TypeInformation[] {
-                                            DenseVectorTypeInfo.INSTANCE, Types.DOUBLE, Types.DOUBLE
+                                            DenseIntDoubleVectorTypeInfo.INSTANCE,
+                                            Types.DOUBLE,
+                                            Types.DOUBLE
                                         },
                                         new String[] {"features", "label", "weight"})));
     }
@@ -173,7 +175,7 @@ public class LinearRegressionTest extends AbstractTestBase {
     public void testInputTypeConversion() throws Exception {
         trainDataTable = TestUtils.convertDataTypesToSparseInt(tEnv, trainDataTable);
         assertArrayEquals(
-                new Class<?>[] {SparseVector.class, Integer.class, Integer.class},
+                new Class<?>[] {SparseIntDoubleVector.class, Integer.class, Integer.class},
                 TestUtils.getColumnDataTypes(trainDataTable));
 
         LinearRegression linearRegression = new LinearRegression().setWeightCol("weight");
@@ -217,7 +219,9 @@ public class LinearRegressionTest extends AbstractTestBase {
         assertNotNull(modelData);
         assertEquals(1, modelData.size());
         assertArrayEquals(
-                expectedCoefficient, modelData.get(0).coefficient.values, COEFFICIENT_TOLERANCE);
+                expectedCoefficient,
+                modelData.get(0).coefficient.getValues(),
+                COEFFICIENT_TOLERANCE);
     }
 
     @Test
@@ -246,7 +250,9 @@ public class LinearRegressionTest extends AbstractTestBase {
                                 trainData,
                                 new RowTypeInfo(
                                         new TypeInformation[] {
-                                            DenseVectorTypeInfo.INSTANCE, Types.DOUBLE, Types.DOUBLE
+                                            DenseIntDoubleVectorTypeInfo.INSTANCE,
+                                            Types.DOUBLE,
+                                            Types.DOUBLE
                                         },
                                         new String[] {"features", "label", "weight"})));
 
@@ -279,6 +285,6 @@ public class LinearRegressionTest extends AbstractTestBase {
                         LinearRegressionModelData.getModelDataStream(model.getModelData()[0])
                                 .executeAndCollect());
         final double errorTol = 1e-3;
-        assertArrayEquals(expectedCoefficient, modelData.get(0).coefficient.values, errorTol);
+        assertArrayEquals(expectedCoefficient, modelData.get(0).coefficient.getValues(), errorTol);
     }
 }

@@ -21,7 +21,7 @@ package org.apache.flink.ml.feature;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.ml.feature.countvectorizer.CountVectorizer;
 import org.apache.flink.ml.feature.countvectorizer.CountVectorizerModel;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -69,7 +69,7 @@ public class CountVectorizerTest extends AbstractTestBase {
                             Row.of((Object) new String[] {"e", "f"}),
                             Row.of((Object) new String[] {"a", "c", "a"})));
 
-    private static final List<SparseVector> EXPECTED_OUTPUT =
+    private static final List<SparseIntDoubleVector> EXPECTED_OUTPUT =
             new ArrayList<>(
                     Arrays.asList(
                             Vectors.sparse(
@@ -102,15 +102,15 @@ public class CountVectorizerTest extends AbstractTestBase {
     }
 
     private static void verifyPredictionResult(
-            Table output, String outputCol, List<SparseVector> expected) throws Exception {
+            Table output, String outputCol, List<SparseIntDoubleVector> expected) throws Exception {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) output).getTableEnvironment();
-        DataStream<SparseVector> stream =
+        DataStream<SparseIntDoubleVector> stream =
                 tEnv.toDataStream(output)
                         .map(
-                                (MapFunction<Row, SparseVector>)
-                                        row -> (SparseVector) row.getField(outputCol));
-        List<SparseVector> result = IteratorUtils.toList(stream.executeAndCollect());
+                                (MapFunction<Row, SparseIntDoubleVector>)
+                                        row -> (SparseIntDoubleVector) row.getField(outputCol));
+        List<SparseIntDoubleVector> result = IteratorUtils.toList(stream.executeAndCollect());
         TestBaseUtils.compareResultCollections(expected, result, TestUtils::compare);
     }
 
@@ -245,7 +245,7 @@ public class CountVectorizerTest extends AbstractTestBase {
 
     @Test
     public void testMinMaxDF() throws Exception {
-        List<SparseVector> expectedOutput =
+        List<SparseIntDoubleVector> expectedOutput =
                 new ArrayList<>(
                         Arrays.asList(
                                 Vectors.sparse(
@@ -281,7 +281,7 @@ public class CountVectorizerTest extends AbstractTestBase {
 
     @Test
     public void testMinTF() throws Exception {
-        List<SparseVector> expectedOutput =
+        List<SparseIntDoubleVector> expectedOutput =
                 new ArrayList<>(
                         Arrays.asList(
                                 Vectors.sparse(
@@ -306,7 +306,7 @@ public class CountVectorizerTest extends AbstractTestBase {
 
     @Test
     public void testBinary() throws Exception {
-        List<SparseVector> expectedOutput =
+        List<SparseIntDoubleVector> expectedOutput =
                 new ArrayList<>(
                         Arrays.asList(
                                 Vectors.sparse(
@@ -337,7 +337,7 @@ public class CountVectorizerTest extends AbstractTestBase {
 
     @Test
     public void testVocabularySize() throws Exception {
-        List<SparseVector> expectedOutput =
+        List<SparseIntDoubleVector> expectedOutput =
                 new ArrayList<>(
                         Arrays.asList(
                                 Vectors.sparse(

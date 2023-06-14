@@ -27,8 +27,8 @@ import org.apache.flink.connector.file.src.reader.SimpleStreamFormat;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorSerializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -47,9 +47,9 @@ import java.io.OutputStream;
  */
 public class StandardScalerModelData {
     /** Mean of each dimension. */
-    public DenseVector mean;
+    public DenseIntDoubleVector mean;
     /** Standard deviation of each dimension. */
-    public DenseVector std;
+    public DenseIntDoubleVector std;
     /** Model version. */
     public long version;
     /** Model timestamp. */
@@ -57,12 +57,12 @@ public class StandardScalerModelData {
 
     public StandardScalerModelData() {}
 
-    public StandardScalerModelData(DenseVector mean, DenseVector std) {
+    public StandardScalerModelData(DenseIntDoubleVector mean, DenseIntDoubleVector std) {
         this(mean, std, 0, Long.MAX_VALUE);
     }
 
     public StandardScalerModelData(
-            DenseVector mean, DenseVector std, long version, long timestamp) {
+            DenseIntDoubleVector mean, DenseIntDoubleVector std, long version, long timestamp) {
         this.mean = mean;
         this.std = std;
         this.version = version;
@@ -93,7 +93,8 @@ public class StandardScalerModelData {
 
     /** Data encoder for the {@link StandardScalerModel} model data. */
     public static class ModelDataEncoder implements Encoder<StandardScalerModelData> {
-        private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+        private final DenseIntDoubleVectorSerializer serializer =
+                new DenseIntDoubleVectorSerializer();
 
         @Override
         public void encode(StandardScalerModelData modelData, OutputStream outputStream)
@@ -114,7 +115,8 @@ public class StandardScalerModelData {
         public Reader<StandardScalerModelData> createReader(
                 Configuration configuration, FSDataInputStream inputStream) {
             return new Reader<StandardScalerModelData>() {
-                private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+                private final DenseIntDoubleVectorSerializer serializer =
+                        new DenseIntDoubleVectorSerializer();
 
                 @Override
                 public StandardScalerModelData read() throws IOException {
@@ -122,8 +124,8 @@ public class StandardScalerModelData {
                             new DataInputViewStreamWrapper(inputStream);
 
                     try {
-                        DenseVector mean = serializer.deserialize(inputViewStreamWrapper);
-                        DenseVector std = serializer.deserialize(inputViewStreamWrapper);
+                        DenseIntDoubleVector mean = serializer.deserialize(inputViewStreamWrapper);
+                        DenseIntDoubleVector std = serializer.deserialize(inputViewStreamWrapper);
                         long version = LongSerializer.INSTANCE.deserialize(inputViewStreamWrapper);
                         long timestamp =
                                 LongSerializer.INSTANCE.deserialize(inputViewStreamWrapper);

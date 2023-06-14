@@ -20,7 +20,7 @@ package org.apache.flink.ml.examples.classification;
 
 import org.apache.flink.ml.classification.naivebayes.NaiveBayes;
 import org.apache.flink.ml.classification.naivebayes.NaiveBayesModel;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -69,7 +69,8 @@ public class NaiveBayesExample {
         // Extracts and displays the results.
         for (CloseableIterator<Row> it = outputTable.execute().collect(); it.hasNext(); ) {
             Row row = it.next();
-            DenseVector features = (DenseVector) row.getField(naiveBayes.getFeaturesCol());
+            DenseIntDoubleVector features =
+                    (DenseIntDoubleVector) row.getField(naiveBayes.getFeaturesCol());
             double predictionResult = (Double) row.getField(naiveBayes.getPredictionCol());
             System.out.printf("Features: %s \tPrediction Result: %s\n", features, predictionResult);
         }

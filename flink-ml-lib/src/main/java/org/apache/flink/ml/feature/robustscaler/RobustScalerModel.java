@@ -24,8 +24,9 @@ import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -98,8 +99,8 @@ public class RobustScalerModel
         private final boolean withCentering;
         private final boolean withScaling;
 
-        private DenseVector medians;
-        private DenseVector scales;
+        private DenseIntDoubleVector medians;
+        private DenseIntDoubleVector scales;
 
         public PredictOutputFunction(
                 String broadcastModelKey,
@@ -120,13 +121,13 @@ public class RobustScalerModel
                                 getRuntimeContext().getBroadcastVariable(broadcastModelKey).get(0);
                 medians = modelData.medians;
                 scales =
-                        new DenseVector(
-                                Arrays.stream(modelData.ranges.values)
+                        Vectors.dense(
+                                Arrays.stream(modelData.ranges.getValues())
                                         .map(range -> range == 0 ? 0 : 1 / range)
                                         .toArray());
             }
-            DenseVector outputVec =
-                    (DenseVector) ((Vector) row.getField(inputCol)).clone().toDense();
+            DenseIntDoubleVector outputVec =
+                    (DenseIntDoubleVector) ((Vector) row.getField(inputCol)).clone().toDense();
             Preconditions.checkState(
                     medians.size() == outputVec.size(),
                     "Number of features must be %s but got %s.",

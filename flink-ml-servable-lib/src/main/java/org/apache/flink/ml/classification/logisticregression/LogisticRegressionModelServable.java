@@ -20,7 +20,7 @@ package org.apache.flink.ml.classification.logisticregression;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.param.Param;
@@ -61,12 +61,12 @@ public class LogisticRegressionModelServable
     @Override
     public DataFrame transform(DataFrame input) {
         List<Double> predictionResults = new ArrayList<>();
-        List<DenseVector> rawPredictionResults = new ArrayList<>();
+        List<DenseIntDoubleVector> rawPredictionResults = new ArrayList<>();
 
         int featuresColIndex = input.getIndex(getFeaturesCol());
         for (Row row : input.collect()) {
             Vector features = (Vector) row.get(featuresColIndex);
-            Tuple2<Double, DenseVector> dataPoint = transform(features);
+            Tuple2<Double, DenseIntDoubleVector> dataPoint = transform(features);
             predictionResults.add(dataPoint.f0);
             rawPredictionResults.add(dataPoint.f1);
         }
@@ -103,7 +103,7 @@ public class LogisticRegressionModelServable
      * @param feature The input feature.
      * @return The prediction label and the raw probabilities.
      */
-    protected Tuple2<Double, DenseVector> transform(Vector feature) {
+    protected Tuple2<Double, DenseIntDoubleVector> transform(Vector feature) {
         double dotValue = BLAS.dot(feature, modelData.coefficient);
         double prob = 1 - 1.0 / (1.0 + Math.exp(dotValue));
         return Tuple2.of(dotValue >= 0 ? 1. : 0., Vectors.dense(1 - prob, prob));

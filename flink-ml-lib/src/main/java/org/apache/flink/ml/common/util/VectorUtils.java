@@ -21,6 +21,7 @@ package org.apache.flink.ml.common.util;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.Vectors;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,27 +35,29 @@ public class VectorUtils {
     public static Vector<Integer, Double, int[], double[]> selectByIndices(
             Vector<Integer, Double, int[], double[]> vector, int[] sortedIndices) {
         if (vector instanceof DenseVector) {
-            DenseVector resultVec = new DenseVector(sortedIndices.length);
+            DenseVector<Integer, Double, int[], double[]> resultVec =
+                    Vectors.dense(sortedIndices.length);
             for (int i = 0; i < sortedIndices.length; i++) {
-                resultVec.set(i, vector.get(sortedIndices[i]).doubleValue());
+                resultVec.set(i, vector.get(sortedIndices[i]));
             }
             return resultVec;
         } else {
             List<Integer> resultIndices = new ArrayList<>();
             List<Double> resultValues = new ArrayList<>();
 
-            int[] indices = ((SparseVector) vector).indices;
+            int[] indices = ((SparseVector<Integer, Double, int[], double[]>) vector).getIndices();
+            double[] values = ((SparseVector<Integer, Double, int[], double[]>) vector).getValues();
             for (int i = 0, j = 0; i < indices.length && j < sortedIndices.length; ) {
                 if (indices[i] == sortedIndices[j]) {
                     resultIndices.add(j++);
-                    resultValues.add(((SparseVector) vector).values[i++]);
+                    resultValues.add(values[i++]);
                 } else if (indices[i] > sortedIndices[j]) {
                     j++;
                 } else {
                     i++;
                 }
             }
-            return new SparseVector(
+            return Vectors.sparse(
                     sortedIndices.length,
                     resultIndices.stream().mapToInt(Integer::intValue).toArray(),
                     resultValues.stream().mapToDouble(Double::doubleValue).toArray());

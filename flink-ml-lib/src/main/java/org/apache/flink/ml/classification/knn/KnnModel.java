@@ -26,8 +26,9 @@ import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -130,7 +131,7 @@ public class KnnModel implements Model<KnnModel>, KnnModelParams<KnnModel> {
         private KnnModelData knnModelData;
         private final int k;
         private final String broadcastKey;
-        private DenseVector distanceVector;
+        private DenseIntDoubleVector distanceVector;
 
         public PredictLabelFunction(String broadcastKey, int k, String featureCol) {
             this.k = k;
@@ -144,31 +145,32 @@ public class KnnModel implements Model<KnnModel>, KnnModelParams<KnnModel> {
                 knnModelData =
                         (KnnModelData)
                                 getRuntimeContext().getBroadcastVariable(broadcastKey).get(0);
-                distanceVector = new DenseVector(knnModelData.labels.size());
+                distanceVector = Vectors.dense(knnModelData.labels.size());
             }
-            DenseVector feature =
-                    (DenseVector)
+            DenseIntDoubleVector feature =
+                    (DenseIntDoubleVector)
                             (((Vector<Integer, Double, int[], double[]>) row.getField(featureCol))
                                     .toDense());
             double prediction = predictLabel(feature);
             return Row.join(row, Row.of(prediction));
         }
 
-        private double predictLabel(DenseVector feature) {
+        private double predictLabel(DenseIntDoubleVector feature) {
             double normSquare = Math.pow(BLAS.norm2(feature), 2);
             BLAS.gemv(-2.0, knnModelData.packedFeatures, true, feature, 0.0, distanceVector);
+            double[] distanceValues = distanceVector.getValues();
             for (int i = 0; i < distanceVector.size(); i++) {
-                distanceVector.values[i] =
+                distanceValues[i] =
                         Math.sqrt(
                                 Math.abs(
-                                        distanceVector.values[i]
+                                        distanceValues[i]
                                                 + normSquare
-                                                + knnModelData.featureNormSquares.values[i]));
+                                                + knnModelData.featureNormSquares.get(i)));
             }
             PriorityQueue<Tuple2<Double, Double>> nearestKNeighbors =
                     new PriorityQueue<>(
                             Comparator.comparingDouble(distanceAndLabel -> -distanceAndLabel.f0));
-            double[] labelValues = knnModelData.labels.values;
+            double[] labelValues = knnModelData.labels.getValues();
             for (int i = 0; i < labelValues.length; ++i) {
                 if (nearestKNeighbors.size() < k) {
                     nearestKNeighbors.add(Tuple2.of(distanceVector.get(i), labelValues[i]));

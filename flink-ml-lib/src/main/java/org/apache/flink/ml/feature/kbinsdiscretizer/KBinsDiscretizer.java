@@ -23,7 +23,7 @@ import org.apache.flink.api.common.functions.MapPartitionFunction;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.feature.minmaxscaler.MinMaxScaler.MinMaxReduceFunctionOperator;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -93,16 +93,16 @@ public class KBinsDiscretizer
         String strategy = getStrategy();
         int numBins = getNumBins();
 
-        DataStream<DenseVector> inputData =
+        DataStream<DenseIntDoubleVector> inputData =
                 tEnv.toDataStream(inputs[0])
                         .map(
-                                (MapFunction<Row, DenseVector>)
+                                (MapFunction<Row, DenseIntDoubleVector>)
                                         value ->
-                                                (DenseVector)
+                                                (DenseIntDoubleVector)
                                                         ((Vector) value.getField(inputCol))
                                                                 .toDense());
 
-        DataStream<DenseVector> preprocessedData;
+        DataStream<DenseIntDoubleVector> preprocessedData;
         if (strategy.equals(UNIFORM)) {
             preprocessedData =
                     inputData
@@ -124,12 +124,13 @@ public class KBinsDiscretizer
         DataStream<KBinsDiscretizerModelData> modelData =
                 DataStreamUtils.mapPartition(
                         preprocessedData,
-                        new MapPartitionFunction<DenseVector, KBinsDiscretizerModelData>() {
+                        new MapPartitionFunction<
+                                DenseIntDoubleVector, KBinsDiscretizerModelData>() {
                             @Override
                             public void mapPartition(
-                                    Iterable<DenseVector> iterable,
+                                    Iterable<DenseIntDoubleVector> iterable,
                                     Collector<KBinsDiscretizerModelData> collector) {
-                                List<DenseVector> list = new ArrayList<>();
+                                List<DenseIntDoubleVector> list = new ArrayList<>();
                                 iterable.iterator().forEachRemaining(list::add);
 
                                 if (list.size() == 0) {
@@ -183,9 +184,9 @@ public class KBinsDiscretizer
     }
 
     private static double[][] findBinEdgesWithUniformStrategy(
-            List<DenseVector> input, int numBins) {
-        DenseVector minVector = input.get(0);
-        DenseVector maxVector = input.get(1);
+            List<DenseIntDoubleVector> input, int numBins) {
+        DenseIntDoubleVector minVector = input.get(0);
+        DenseIntDoubleVector maxVector = input.get(1);
         int numColumns = (int) minVector.size();
         double[][] binEdges = new double[numColumns][];
 
@@ -209,7 +210,7 @@ public class KBinsDiscretizer
     }
 
     private static double[][] findBinEdgesWithQuantileStrategy(
-            List<DenseVector> input, int numBins) {
+            List<DenseIntDoubleVector> input, int numBins) {
         int numColumns = (int) input.get(0).size();
         int numData = input.size();
         double[][] binEdges = new double[numColumns][];
@@ -274,7 +275,8 @@ public class KBinsDiscretizer
         return binEdges;
     }
 
-    private static double[][] findBinEdgesWithKMeansStrategy(List<DenseVector> input, int numBins) {
+    private static double[][] findBinEdgesWithKMeansStrategy(
+            List<DenseIntDoubleVector> input, int numBins) {
         int numColumns = (int) input.get(0).size();
         int numData = input.size();
         double[][] binEdges = new double[numColumns][numBins + 1];

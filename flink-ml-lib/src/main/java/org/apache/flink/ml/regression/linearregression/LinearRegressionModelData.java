@@ -25,8 +25,8 @@ import org.apache.flink.connector.file.src.reader.SimpleStreamFormat;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorSerializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -44,9 +44,9 @@ import java.io.OutputStream;
  */
 public class LinearRegressionModelData {
 
-    public DenseVector coefficient;
+    public DenseIntDoubleVector coefficient;
 
-    public LinearRegressionModelData(DenseVector coefficient) {
+    public LinearRegressionModelData(DenseIntDoubleVector coefficient) {
         this.coefficient = coefficient;
     }
 
@@ -62,12 +62,13 @@ public class LinearRegressionModelData {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) modelData).getTableEnvironment();
         return tEnv.toDataStream(modelData)
-                .map(x -> new LinearRegressionModelData((DenseVector) x.getField(0)));
+                .map(x -> new LinearRegressionModelData((DenseIntDoubleVector) x.getField(0)));
     }
 
     /** Data encoder for {@link LinearRegressionModel}. */
     public static class ModelDataEncoder implements Encoder<LinearRegressionModelData> {
-        private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+        private final DenseIntDoubleVectorSerializer serializer =
+                new DenseIntDoubleVectorSerializer();
 
         @Override
         public void encode(LinearRegressionModelData modelData, OutputStream outputStream)
@@ -84,12 +85,13 @@ public class LinearRegressionModelData {
         public Reader<LinearRegressionModelData> createReader(
                 Configuration configuration, FSDataInputStream inputStream) {
             return new Reader<LinearRegressionModelData>() {
-                private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+                private final DenseIntDoubleVectorSerializer serializer =
+                        new DenseIntDoubleVectorSerializer();
 
                 @Override
                 public LinearRegressionModelData read() throws IOException {
                     try {
-                        DenseVector coefficient =
+                        DenseIntDoubleVector coefficient =
                                 serializer.deserialize(new DataInputViewStreamWrapper(inputStream));
                         return new LinearRegressionModelData(coefficient);
                     } catch (EOFException e) {

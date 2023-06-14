@@ -26,8 +26,9 @@ import org.apache.flink.ml.classification.naivebayes.NaiveBayesModelData.ModelDa
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -152,13 +153,14 @@ public class NaiveBayesModel
         }
     }
 
-    private static double findMaxProbLabel(DenseVector prob, DenseVector label) {
+    private static double findMaxProbLabel(DenseIntDoubleVector prob, DenseIntDoubleVector label) {
         double result = 0.;
         int probSize = (int) prob.size();
         double maxVal = Double.NEGATIVE_INFINITY;
         for (int i = 0; i < probSize; ++i) {
-            if (maxVal < prob.values[i]) {
-                maxVal = prob.values[i];
+            double vi = prob.get(i);
+            if (maxVal < vi) {
+                maxVal = vi;
                 result = label.get(i);
             }
         }
@@ -167,13 +169,15 @@ public class NaiveBayesModel
     }
 
     /** Calculate probability of the input data. */
-    private static DenseVector calculateProb(NaiveBayesModelData modelData, Vector data) {
+    private static DenseIntDoubleVector calculateProb(NaiveBayesModelData modelData, Vector data) {
         int labelSize = (int) modelData.labels.size();
-        DenseVector probs = new DenseVector(new double[labelSize]);
+        DenseIntDoubleVector probs = Vectors.dense(new double[labelSize]);
+
+        double[] probValues = probs.getValues();
         for (int i = 0; i < labelSize; i++) {
             Map<Double, Double>[] labelData = modelData.theta[i];
             for (int j = 0; j < data.size(); j++) {
-                probs.values[i] += labelData[j].get(data.get(j));
+                probValues[i] += labelData[j].get(data.get(j));
             }
         }
         BLAS.axpy(1, modelData.piArray, probs);

@@ -42,7 +42,7 @@ public class SparseLongDoubleVectorTest {
         long[] indices = new long[] {0, 2, 3};
         double[] values = new double[] {0.1, 0.3, 0.4};
 
-        SparseLongDoubleVector vector = Vectors.sparse(n, indices, values);
+        SparseVector<Long, Double, long[], double[]> vector = Vectors.sparse(n, indices, values);
         assertEquals(n, vector.size());
         assertArrayEquals(indices, vector.getIndices());
         assertArrayEquals(values, vector.getValues(), 1e-5);
@@ -67,13 +67,14 @@ public class SparseLongDoubleVectorTest {
     @Test
     public void testAllZeroVector() {
         long n = 4;
-        SparseLongDoubleVector vector = Vectors.sparse(n, new long[0], new double[0]);
+        SparseVector<Long, Double, long[], double[]> vector =
+                Vectors.sparse(n, new long[0], new double[0]);
         assertArrayEquals(vector.toArray(), new double[(int) n], 1e-5);
     }
 
     @Test
     public void testUnsortedIndex() {
-        SparseLongDoubleVector vector;
+        SparseVector<Long, Double, long[], double[]> vector;
 
         vector = Vectors.sparse(4, new long[] {2}, new double[] {0.3});
         assertEquals(4, vector.size());
@@ -135,14 +136,14 @@ public class SparseLongDoubleVectorTest {
 
     @Test
     public void testClone() {
-        SparseLongDoubleVector sparseVec =
+        SparseVector<Long, Double, long[], double[]> sparseVec =
                 Vectors.sparse(3, new long[] {0, 2}, new double[] {1, 3});
-        SparseLongDoubleVector clonedSparseVec = sparseVec.clone();
+        SparseVector<Long, Double, long[], double[]> clonedSparseVec = sparseVec.clone();
         assertEquals(3, clonedSparseVec.size());
         assertArrayEquals(clonedSparseVec.getIndices(), new long[] {0, 2});
         assertArrayEquals(clonedSparseVec.getValues(), new double[] {1, 3}, TOLERANCE);
 
-        clonedSparseVec.set(0, -1);
+        clonedSparseVec.set(0L, -1.0);
         assertEquals(sparseVec.size(), clonedSparseVec.size());
         assertArrayEquals(sparseVec.getIndices(), new long[] {0, 2});
         assertArrayEquals(sparseVec.getValues(), new double[] {1, 3}, TOLERANCE);
@@ -152,14 +153,15 @@ public class SparseLongDoubleVectorTest {
 
     @Test
     public void testGetAndSet() {
-        SparseLongDoubleVector sparseVec = Vectors.sparse(4, new long[] {2}, new double[] {0.3});
-        assertEquals(0, sparseVec.get(0), TOLERANCE);
-        assertEquals(0.3, sparseVec.get(2), TOLERANCE);
+        SparseVector<Long, Double, long[], double[]> sparseVec =
+                Vectors.sparse(4, new long[] {2}, new double[] {0.3});
+        assertEquals(0, sparseVec.get(0L), TOLERANCE);
+        assertEquals(0.3, sparseVec.get(2L), TOLERANCE);
 
-        sparseVec.set(2, 0.5);
-        assertEquals(0.5, sparseVec.get(2), TOLERANCE);
+        sparseVec.set(2L, 0.5);
+        assertEquals(0.5, sparseVec.get(2L), TOLERANCE);
 
-        sparseVec.set(0, 0.1);
-        assertEquals(0.1, sparseVec.get(0), TOLERANCE);
+        sparseVec.set(0L, 0.1);
+        assertEquals(0.1, sparseVec.get(0L), TOLERANCE);
     }
 }

@@ -24,7 +24,7 @@ import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
@@ -96,8 +96,8 @@ public class StandardScalerModel
         private final String inputCol;
         private final boolean withMean;
         private final boolean withStd;
-        private DenseVector mean;
-        private DenseVector scale;
+        private DenseIntDoubleVector mean;
+        private DenseIntDoubleVector scale;
 
         public PredictOutputFunction(
                 String broadcastModelKey, String inputCol, boolean withMean, boolean withStd) {
@@ -114,11 +114,11 @@ public class StandardScalerModel
                         (StandardScalerModelData)
                                 getRuntimeContext().getBroadcastVariable(broadcastModelKey).get(0);
                 mean = modelData.mean;
-                DenseVector std = modelData.std;
+                DenseIntDoubleVector std = modelData.std;
 
                 if (withStd) {
                     scale = std;
-                    double[] scaleValues = scale.values;
+                    double[] scaleValues = scale.getValues();
                     for (int i = 0; i < scaleValues.length; i++) {
                         scaleValues[i] = scaleValues[i] == 0 ? 0 : 1 / scaleValues[i];
                     }
@@ -128,7 +128,7 @@ public class StandardScalerModel
             Vector outputVec = ((Vector) (dataPoint.getField(inputCol))).clone();
             if (withMean) {
                 outputVec = outputVec.toDense();
-                BLAS.axpy(-1, mean, (DenseVector) outputVec);
+                BLAS.axpy(-1, mean, (DenseIntDoubleVector) outputVec);
             }
             if (withStd) {
                 BLAS.hDot(scale, outputVec);

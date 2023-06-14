@@ -21,8 +21,8 @@ package org.apache.flink.ml.feature;
 import org.apache.flink.ml.feature.standardscaler.StandardScaler;
 import org.apache.flink.ml.feature.standardscaler.StandardScalerModel;
 import org.apache.flink.ml.feature.standardscaler.StandardScalerModelData;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.ParamUtils;
@@ -61,19 +61,19 @@ public class StandardScalerTest extends AbstractTestBase {
                     Row.of(Vectors.dense(1.4, -5, 1)),
                     Row.of(Vectors.dense(2, -1, -2)));
 
-    private final List<DenseVector> expectedResWithMean =
+    private final List<DenseIntDoubleVector> expectedResWithMean =
             Arrays.asList(
                     Vectors.dense(-2.8, 8, 1),
                     Vectors.dense(1.1, -6, 1),
                     Vectors.dense(1.7, -2, -2));
 
-    private final List<DenseVector> expectedResWithStd =
+    private final List<DenseIntDoubleVector> expectedResWithStd =
             Arrays.asList(
                     Vectors.dense(-1.0231819, 1.2480754, 0.5773502),
                     Vectors.dense(0.5729819, -0.6933752, 0.5773503),
                     Vectors.dense(0.8185455, -0.1386750, -1.1547005));
 
-    private final List<DenseVector> expectedResWithMeanAndStd =
+    private final List<DenseIntDoubleVector> expectedResWithMeanAndStd =
             Arrays.asList(
                     Vectors.dense(-1.1459637, 1.1094004, 0.5773503),
                     Vectors.dense(0.45020003, -0.8320503, 0.5773503),
@@ -92,14 +92,15 @@ public class StandardScalerTest extends AbstractTestBase {
 
     @SuppressWarnings("unchecked")
     private void verifyPredictionResult(
-            List<DenseVector> expectedOutput, Table output, String predictionCol) throws Exception {
+            List<DenseIntDoubleVector> expectedOutput, Table output, String predictionCol)
+            throws Exception {
         List<Row> collectedResult =
                 IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect());
-        List<DenseVector> predictions = new ArrayList<>(collectedResult.size());
+        List<DenseIntDoubleVector> predictions = new ArrayList<>(collectedResult.size());
 
         for (Row r : collectedResult) {
             Vector vec = (Vector) r.getField(predictionCol);
-            predictions.add((DenseVector) (vec.toDense()));
+            predictions.add((DenseIntDoubleVector) (vec.toDense()));
         }
 
         assertEquals(expectedOutput.size(), predictions.size());
@@ -117,7 +118,8 @@ public class StandardScalerTest extends AbstractTestBase {
                 });
 
         for (int i = 0; i < predictions.size(); i++) {
-            assertArrayEquals(expectedOutput.get(i).values, predictions.get(i).values, TOLERANCE);
+            assertArrayEquals(
+                    expectedOutput.get(i).getValues(), predictions.get(i).getValues(), TOLERANCE);
         }
     }
 
@@ -179,7 +181,8 @@ public class StandardScalerTest extends AbstractTestBase {
     public void testInputTypeConversion() throws Exception {
         denseTable = TestUtils.convertDataTypesToSparseInt(tEnv, denseTable);
         assertArrayEquals(
-                new Class<?>[] {SparseVector.class}, TestUtils.getColumnDataTypes(denseTable));
+                new Class<?>[] {SparseIntDoubleVector.class},
+                TestUtils.getColumnDataTypes(denseTable));
 
         StandardScaler standardScaler = new StandardScaler().setWithMean(true);
         Table output = standardScaler.fit(denseTable).transform(denseTable)[0];
@@ -231,8 +234,8 @@ public class StandardScalerTest extends AbstractTestBase {
         assertEquals(1, collectedModelData.size());
 
         StandardScalerModelData modelData = collectedModelData.get(0);
-        assertArrayEquals(expectedMean, modelData.mean.values, TOLERANCE);
-        assertArrayEquals(expectedStd, modelData.std.values, TOLERANCE);
+        assertArrayEquals(expectedMean, modelData.mean.getValues(), TOLERANCE);
+        assertArrayEquals(expectedStd, modelData.std.getValues(), TOLERANCE);
     }
 
     @Test
@@ -257,7 +260,7 @@ public class StandardScalerTest extends AbstractTestBase {
                         Row.of(Vectors.sparse(3, new int[] {0, 2}, new double[] {1.4, 1})));
         Table sparseTable = tEnv.fromDataStream(env.fromCollection(sparseInput)).as("input");
 
-        final List<DenseVector> expectedResWithStd =
+        final List<DenseIntDoubleVector> expectedResWithStd =
                 Arrays.asList(
                         Vectors.dense(-1.2653836, 1, 0),
                         Vectors.dense(0, 2, -1.30930734),

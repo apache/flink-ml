@@ -21,7 +21,6 @@ package org.apache.flink.ml.feature;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.ml.feature.maxabsscaler.MaxAbsScaler;
 import org.apache.flink.ml.feature.maxabsscaler.MaxAbsScalerModel;
-import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
@@ -236,8 +235,7 @@ public class MaxAbsScalerTest {
 
         DataStream<Row> output = tEnv.toDataStream(modelData);
         List<Row> modelRows = IteratorUtils.toList(output.executeAndCollect());
-        assertEquals(
-                new DenseVector(new double[] {200.0, 400.0, 0.0}), modelRows.get(0).getField(0));
+        assertEquals(Vectors.dense(new double[] {200.0, 400.0, 0.0}), modelRows.get(0).getField(0));
     }
 
     @Test

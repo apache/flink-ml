@@ -33,10 +33,11 @@ import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.common.distance.DistanceMeasure;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.VectorWithNorm;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.Vectors;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -89,7 +90,7 @@ public class OnlineKMeans
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
 
-        DataStream<DenseVector> points =
+        DataStream<DenseIntDoubleVector> points =
                 tEnv.toDataStream(inputs[0]).map(new FeaturesExtractor(getFeaturesCol()));
 
         DataStream<KMeansModelData> initModelData =
@@ -156,7 +157,7 @@ public class OnlineKMeans
         public IterationBodyResult process(
                 DataStreamList variableStreams, DataStreamList dataStreams) {
             DataStream<KMeansModelData> modelData = variableStreams.get(0);
-            DataStream<DenseVector> points = dataStreams.get(0);
+            DataStream<DenseIntDoubleVector> points = dataStreams.get(0);
 
             int parallelism = points.getParallelism();
 
@@ -188,22 +189,23 @@ public class OnlineKMeans
     private static class ModelDataGlobalReducer implements ReduceFunction<KMeansModelData> {
         @Override
         public KMeansModelData reduce(KMeansModelData modelData, KMeansModelData newModelData) {
-            DenseVector weights = modelData.weights;
-            DenseVector[] centroids = modelData.centroids;
-            DenseVector newWeights = newModelData.weights;
-            DenseVector[] newCentroids = newModelData.centroids;
+            DenseIntDoubleVector weights = modelData.weights;
+            DenseIntDoubleVector[] centroids = modelData.centroids;
+            DenseIntDoubleVector newWeights = newModelData.weights;
+            DenseIntDoubleVector[] newCentroids = newModelData.centroids;
 
             int k = newCentroids.length;
             int dim = (int) newCentroids[0].size();
 
             for (int i = 0; i < k; i++) {
+                double[] ci = centroids[i].getValues();
+                double[] wv = weights.getValues();
+                double[] nci = newCentroids[i].getValues();
+                double[] nwv = newWeights.getValues();
                 for (int j = 0; j < dim; j++) {
-                    centroids[i].values[j] =
-                            (centroids[i].values[j] * weights.values[i]
-                                            + newCentroids[i].values[j] * newWeights.values[i])
-                                    / Math.max(weights.values[i] + newWeights.values[i], 1e-16);
+                    ci[j] = (ci[j] * wv[i] + nci[j] * nwv[i]) / Math.max(wv[i] + nwv[i], 1e-16);
                 }
-                weights.values[i] += newWeights.values[i];
+                wv[i] += nwv[i];
             }
 
             return new KMeansModelData(centroids, weights);
@@ -225,11 +227,12 @@ public class OnlineKMeans
      * </ul>
      */
     private static class ModelDataLocalUpdater extends AbstractStreamOperator<KMeansModelData>
-            implements TwoInputStreamOperator<DenseVector[], KMeansModelData, KMeansModelData> {
+            implements TwoInputStreamOperator<
+                    DenseIntDoubleVector[], KMeansModelData, KMeansModelData> {
         private final DistanceMeasure distanceMeasure;
         private final int k;
         private final double decayFactor;
-        private ListState<DenseVector[]> localBatchDataState;
+        private ListState<DenseIntDoubleVector[]> localBatchDataState;
         private ListState<KMeansModelData> modelDataState;
 
         private ModelDataLocalUpdater(DistanceMeasure distanceMeasure, int k, double decayFactor) {
@@ -242,8 +245,8 @@ public class OnlineKMeans
         public void initializeState(StateInitializationContext context) throws Exception {
             super.initializeState(context);
 
-            TypeInformation<DenseVector[]> type =
-                    ObjectArrayTypeInfo.getInfoFor(DenseVectorTypeInfo.INSTANCE);
+            TypeInformation<DenseIntDoubleVector[]> type =
+                    ObjectArrayTypeInfo.getInfoFor(DenseIntDoubleVectorTypeInfo.INSTANCE);
             localBatchDataState =
                     context.getOperatorStateStore()
                             .getListState(new ListStateDescriptor<>("localBatch", type));
@@ -255,7 +258,8 @@ public class OnlineKMeans
         }
 
         @Override
-        public void processElement1(StreamRecord<DenseVector[]> pointsRecord) throws Exception {
+        public void processElement1(StreamRecord<DenseIntDoubleVector[]> pointsRecord)
+                throws Exception {
             localBatchDataState.add(pointsRecord.getValue());
             alignAndComputeModelData();
         }
@@ -276,30 +280,30 @@ public class OnlineKMeans
 
             KMeansModelData modelData =
                     OperatorStateUtils.getUniqueElement(modelDataState, "modelData").get();
-            DenseVector[] centroids = modelData.centroids;
+            DenseIntDoubleVector[] centroids = modelData.centroids;
             VectorWithNorm[] centroidsWithNorm = new VectorWithNorm[modelData.centroids.length];
             for (int i = 0; i < centroidsWithNorm.length; i++) {
                 centroidsWithNorm[i] = new VectorWithNorm(modelData.centroids[i]);
             }
-            DenseVector weights = modelData.weights;
+            DenseIntDoubleVector weights = modelData.weights;
             modelDataState.clear();
 
-            List<DenseVector[]> pointsList =
+            List<DenseIntDoubleVector[]> pointsList =
                     IteratorUtils.toList(localBatchDataState.get().iterator());
-            DenseVector[] points = pointsList.remove(0);
+            DenseIntDoubleVector[] points = pointsList.remove(0);
             localBatchDataState.update(pointsList);
 
             int dim = (int) centroids[0].size();
             int parallelism = getRuntimeContext().getNumberOfParallelSubtasks();
 
             // Computes new centroids.
-            DenseVector[] sums = new DenseVector[k];
+            DenseIntDoubleVector[] sums = new DenseIntDoubleVector[k];
             int[] counts = new int[k];
 
             for (int i = 0; i < k; i++) {
-                sums[i] = new DenseVector(dim);
+                sums[i] = Vectors.dense(dim);
             }
-            for (DenseVector point : points) {
+            for (DenseIntDoubleVector point : points) {
                 int closestCentroidId =
                         distanceMeasure.findClosest(centroidsWithNorm, new VectorWithNorm(point));
                 counts[closestCentroidId]++;
@@ -308,14 +312,15 @@ public class OnlineKMeans
 
             // Considers weight and decay factor when updating centroids.
             BLAS.scal(decayFactor / parallelism, weights);
+            double[] weightValues = weights.getValues();
             for (int i = 0; i < k; i++) {
                 if (counts[i] == 0) {
                     continue;
                 }
 
-                DenseVector centroid = centroids[i];
-                weights.values[i] = weights.values[i] + counts[i];
-                double lambda = counts[i] / weights.values[i];
+                DenseIntDoubleVector centroid = centroids[i];
+                weightValues[i] += counts[i];
+                double lambda = counts[i] / weightValues[i];
 
                 BLAS.scal(1.0 - lambda, centroid);
                 BLAS.axpy(lambda / counts[i], sums[i], centroid);
@@ -325,7 +330,7 @@ public class OnlineKMeans
         }
     }
 
-    private static class FeaturesExtractor implements MapFunction<Row, DenseVector> {
+    private static class FeaturesExtractor implements MapFunction<Row, DenseIntDoubleVector> {
         private final String featuresCol;
 
         private FeaturesExtractor(String featuresCol) {
@@ -333,8 +338,8 @@ public class OnlineKMeans
         }
 
         @Override
-        public DenseVector map(Row row) {
-            return (DenseVector) (((Vector) row.getField(featuresCol)).toDense());
+        public DenseIntDoubleVector map(Row row) {
+            return (DenseIntDoubleVector) (((Vector) row.getField(featuresCol)).toDense());
         }
     }
 

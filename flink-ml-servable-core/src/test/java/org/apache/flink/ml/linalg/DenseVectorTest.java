@@ -23,28 +23,28 @@ import org.junit.Test;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
-/** Tests the behavior of {@link DenseVector}. */
+/** Tests the behavior of {@link DenseIntDoubleVector}. */
 public class DenseVectorTest {
 
     private static final double TOLERANCE = 1e-7;
 
     @Test
     public void testClone() {
-        DenseVector denseVec = Vectors.dense(1, 2, 3);
-        DenseVector clonedDenseVec = denseVec.clone();
-        assertArrayEquals(clonedDenseVec.values, new double[] {1, 2, 3}, TOLERANCE);
+        DenseVector<Integer, Double, int[], double[]> denseVec = Vectors.dense(1, 2, 3);
+        DenseVector<Integer, Double, int[], double[]> clonedDenseVec = denseVec.clone();
+        assertArrayEquals(clonedDenseVec.getValues(), new double[] {1, 2, 3}, TOLERANCE);
 
-        clonedDenseVec.values[0] = -1;
-        assertArrayEquals(denseVec.values, new double[] {1, 2, 3}, TOLERANCE);
-        assertArrayEquals(clonedDenseVec.values, new double[] {-1, 2, 3}, TOLERANCE);
+        clonedDenseVec.set(0, -1.0);
+        assertArrayEquals(denseVec.getValues(), new double[] {1, 2, 3}, TOLERANCE);
+        assertArrayEquals(clonedDenseVec.getValues(), new double[] {-1, 2, 3}, TOLERANCE);
     }
 
     @Test
     public void testGetAndSet() {
-        DenseVector denseVec = Vectors.dense(1, 2, 3);
+        DenseVector<Integer, Double, int[], double[]> denseVec = Vectors.dense(1, 2, 3);
         assertEquals(1, denseVec.get(0), TOLERANCE);
 
-        denseVec.set(0, 2);
+        denseVec.set(0, 2.0);
         assertEquals(2, denseVec.get(0), TOLERANCE);
     }
 }

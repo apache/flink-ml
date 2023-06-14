@@ -69,7 +69,7 @@ Below are the parameters required by `VarianceThresholdSelectorModel`.
 ```java
 import org.apache.flink.ml.feature.variancethresholdselector.VarianceThresholdSelector;
 import org.apache.flink.ml.feature.variancethresholdselector.VarianceThresholdSelectorModel;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;

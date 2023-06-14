@@ -72,7 +72,7 @@ Below are the parameters required by `CountVectorizerModel`.
 ```java
 import org.apache.flink.ml.feature.countvectorizer.CountVectorizer;
 import org.apache.flink.ml.feature.countvectorizer.CountVectorizerModel;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;

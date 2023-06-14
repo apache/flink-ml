@@ -20,7 +20,7 @@ package org.apache.flink.ml.examples.feature;
 
 import org.apache.flink.ml.feature.univariatefeatureselector.UnivariateFeatureSelector;
 import org.apache.flink.ml.feature.univariatefeatureselector.UnivariateFeatureSelectorModel;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -67,10 +67,10 @@ public class UnivariateFeatureSelectorExample {
         // Extracts and displays the results.
         for (CloseableIterator<Row> it = outputTable.execute().collect(); it.hasNext(); ) {
             Row row = it.next();
-            DenseVector inputValue =
-                    (DenseVector) row.getField(univariateFeatureSelector.getFeaturesCol());
-            DenseVector outputValue =
-                    (DenseVector) row.getField(univariateFeatureSelector.getOutputCol());
+            DenseIntDoubleVector inputValue =
+                    (DenseIntDoubleVector) row.getField(univariateFeatureSelector.getFeaturesCol());
+            DenseIntDoubleVector outputValue =
+                    (DenseIntDoubleVector) row.getField(univariateFeatureSelector.getOutputCol());
             System.out.printf("Input Value: %-15s\tOutput Value: %s\n", inputValue, outputValue);
         }
     }

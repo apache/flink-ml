@@ -27,8 +27,9 @@ import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.ml.api.AlgoOperator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.common.param.HasFlatten;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -257,15 +258,17 @@ public class ANOVATest implements AlgoOperator<ANOVATest>, ANOVATestParams<ANOVA
             return tEnv.fromDataStream(output)
                     .as("featureIndex", "pValue", "degreeOfFreedom", "fValue");
         } else {
-            DataStream<Tuple3<DenseVector, long[], DenseVector>> output =
+            DataStream<Tuple3<DenseIntDoubleVector, long[], DenseIntDoubleVector>> output =
                     datastream.map(
-                            new MapFunction<List<Row>, Tuple3<DenseVector, long[], DenseVector>>() {
+                            new MapFunction<
+                                    List<Row>,
+                                    Tuple3<DenseIntDoubleVector, long[], DenseIntDoubleVector>>() {
                                 @Override
-                                public Tuple3<DenseVector, long[], DenseVector> map(
-                                        List<Row> rows) {
+                                public Tuple3<DenseIntDoubleVector, long[], DenseIntDoubleVector>
+                                        map(List<Row> rows) {
                                     int numOfFeatures = rows.size();
-                                    DenseVector pValues = new DenseVector(numOfFeatures);
-                                    DenseVector fValues = new DenseVector(numOfFeatures);
+                                    DenseIntDoubleVector pValues = Vectors.dense(numOfFeatures);
+                                    DenseIntDoubleVector fValues = Vectors.dense(numOfFeatures);
                                     long[] degrees = new long[numOfFeatures];
 
                                     for (int i = 0; i < numOfFeatures; i++) {

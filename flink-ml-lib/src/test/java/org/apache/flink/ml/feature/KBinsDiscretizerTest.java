@@ -22,7 +22,7 @@ import org.apache.flink.ml.feature.kbinsdiscretizer.KBinsDiscretizer;
 import org.apache.flink.ml.feature.kbinsdiscretizer.KBinsDiscretizerModel;
 import org.apache.flink.ml.feature.kbinsdiscretizer.KBinsDiscretizerModelData;
 import org.apache.flink.ml.feature.kbinsdiscretizer.KBinsDiscretizerParams;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
@@ -139,7 +139,8 @@ public class KBinsDiscretizerTest extends AbstractTestBase {
                 collectedResult,
                 (o1, o2) ->
                         TestUtils.compare(
-                                (DenseVector) o1.getField(0), (DenseVector) o2.getField(0)));
+                                (DenseIntDoubleVector) o1.getField(0),
+                                (DenseIntDoubleVector) o2.getField(0)));
     }
 
     @Test

@@ -33,8 +33,8 @@ import org.apache.flink.ml.classification.logisticregression.LogisticRegressionM
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelDataUtil;
 import org.apache.flink.ml.classification.logisticregression.OnlineLogisticRegression;
 import org.apache.flink.ml.classification.logisticregression.OnlineLogisticRegressionModel;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.InMemorySinkFunction;
 import org.apache.flink.ml.util.InMemorySourceFunction;
@@ -212,7 +212,8 @@ public class OnlineLogisticRegressionTest extends TestLogger {
                                 trainDenseSource,
                                 new RowTypeInfo(
                                         new TypeInformation[] {
-                                            TypeInformation.of(DenseVector.class), Types.DOUBLE
+                                            TypeInformation.of(DenseIntDoubleVector.class),
+                                            Types.DOUBLE
                                         },
                                         new String[] {"features", "label"})));
 
@@ -222,7 +223,8 @@ public class OnlineLogisticRegressionTest extends TestLogger {
                                 predictDenseSource,
                                 new RowTypeInfo(
                                         new TypeInformation[] {
-                                            TypeInformation.of(DenseVector.class), Types.DOUBLE
+                                            TypeInformation.of(DenseIntDoubleVector.class),
+                                            Types.DOUBLE
                                         },
                                         new String[] {"features", "label"})));
 
@@ -232,7 +234,7 @@ public class OnlineLogisticRegressionTest extends TestLogger {
                                 trainSparseSource,
                                 new RowTypeInfo(
                                         new TypeInformation[] {
-                                            TypeInformation.of(SparseVector.class),
+                                            TypeInformation.of(SparseIntDoubleVector.class),
                                             Types.DOUBLE,
                                             Types.DOUBLE
                                         },
@@ -244,7 +246,8 @@ public class OnlineLogisticRegressionTest extends TestLogger {
                                 predictSparseSource,
                                 new RowTypeInfo(
                                         new TypeInformation[] {
-                                            TypeInformation.of(SparseVector.class), Types.DOUBLE
+                                            TypeInformation.of(SparseIntDoubleVector.class),
+                                            Types.DOUBLE
                                         },
                                         new String[] {"features", "label"})));
 
@@ -252,7 +255,7 @@ public class OnlineLogisticRegressionTest extends TestLogger {
                 tEnv.fromDataStream(
                         env.fromElements(
                                 Row.of(
-                                        new DenseVector(
+                                        Vectors.dense(
                                                 new double[] {
                                                     0.41233679404769874, -0.18088118293232122
                                                 }),
@@ -261,7 +264,7 @@ public class OnlineLogisticRegressionTest extends TestLogger {
                 tEnv.fromDataStream(
                         env.fromElements(
                                 Row.of(
-                                        new DenseVector(
+                                        Vectors.dense(
                                                 new double[] {
                                                     0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01,
                                                     0.01, 0.01
@@ -330,7 +333,7 @@ public class OnlineLogisticRegressionTest extends TestLogger {
      *
      * @param expectedRawInfo A list containing sets of expected result RawInfo.
      */
-    private void predictAndAssert(List<DenseVector> expectedRawInfo, boolean isSparse)
+    private void predictAndAssert(List<DenseIntDoubleVector> expectedRawInfo, boolean isSparse)
             throws Exception {
         if (isSparse) {
             predictSparseSource.addAll(PREDICT_SPARSE_ROWS);
@@ -339,15 +342,15 @@ public class OnlineLogisticRegressionTest extends TestLogger {
         }
         List<Row> rawResult =
                 outputSink.poll(isSparse ? PREDICT_SPARSE_ROWS.length : PREDICT_DENSE_ROWS.length);
-        List<DenseVector> resultDetail = new ArrayList<>(rawResult.size());
+        List<DenseIntDoubleVector> resultDetail = new ArrayList<>(rawResult.size());
         for (Row row : rawResult) {
             resultDetail.add(row.getFieldAs(3));
         }
         resultDetail.sort(TestUtils::compare);
         expectedRawInfo.sort(TestUtils::compare);
         for (int i = 0; i < resultDetail.size(); ++i) {
-            double[] realData = resultDetail.get(i).values;
-            double[] expectedData = expectedRawInfo.get(i).values;
+            double[] realData = resultDetail.get(i).getValues();
+            double[] expectedData = expectedRawInfo.get(i).getValues();
             for (int j = 0; j < expectedData.length; ++j) {
                 Assert.assertEquals(realData[j], expectedData[j], 1.0e-5);
             }
@@ -412,14 +415,14 @@ public class OnlineLogisticRegressionTest extends TestLogger {
 
     @Test
     public void testDenseFitAndPredict() throws Exception {
-        final List<DenseVector> expectedRawInfo1 =
+        final List<DenseIntDoubleVector> expectedRawInfo1 =
                 Arrays.asList(
-                        new DenseVector(new double[] {0.04481034155642882, 0.9551896584435712}),
-                        new DenseVector(new double[] {0.5353966697318491, 0.4646033302681509}));
-        final List<DenseVector> expectedRawInfo2 =
+                        Vectors.dense(new double[] {0.04481034155642882, 0.9551896584435712}),
+                        Vectors.dense(new double[] {0.5353966697318491, 0.4646033302681509}));
+        final List<DenseIntDoubleVector> expectedRawInfo2 =
                 Arrays.asList(
-                        new DenseVector(new double[] {0.013104324065967066, 0.9868956759340329}),
-                        new DenseVector(new double[] {0.5095144380001769, 0.49048556199982307}));
+                        Vectors.dense(new double[] {0.013104324065967066, 0.9868956759340329}),
+                        Vectors.dense(new double[] {0.5095144380001769, 0.49048556199982307}));
         OnlineLogisticRegression onlineLogisticRegression =
                 new OnlineLogisticRegression()
                         .setFeaturesCol("features")
@@ -446,14 +449,14 @@ public class OnlineLogisticRegressionTest extends TestLogger {
 
     @Test
     public void testSparseFitAndPredict() throws Exception {
-        final List<DenseVector> expectedRawInfo1 =
+        final List<DenseIntDoubleVector> expectedRawInfo1 =
                 Arrays.asList(
-                        new DenseVector(new double[] {0.4452309884735286, 0.5547690115264714}),
-                        new DenseVector(new double[] {0.5105551725414953, 0.4894448274585047}));
-        final List<DenseVector> expectedRawInfo2 =
+                        Vectors.dense(new double[] {0.4452309884735286, 0.5547690115264714}),
+                        Vectors.dense(new double[] {0.5105551725414953, 0.4894448274585047}));
+        final List<DenseIntDoubleVector> expectedRawInfo2 =
                 Arrays.asList(
-                        new DenseVector(new double[] {0.40310431554310666, 0.5968956844568933}),
-                        new DenseVector(new double[] {0.5249618837373886, 0.4750381162626114}));
+                        Vectors.dense(new double[] {0.40310431554310666, 0.5968956844568933}),
+                        Vectors.dense(new double[] {0.5249618837373886, 0.4750381162626114}));
         OnlineLogisticRegression onlineLogisticRegression =
                 new OnlineLogisticRegression()
                         .setFeaturesCol("features")
@@ -479,14 +482,14 @@ public class OnlineLogisticRegressionTest extends TestLogger {
 
     @Test
     public void testFitAndPredictWithWeightCol() throws Exception {
-        final List<DenseVector> expectedRawInfo1 =
+        final List<DenseIntDoubleVector> expectedRawInfo1 =
                 Arrays.asList(
-                        new DenseVector(new double[] {0.452491993753382, 0.547508006246618}),
-                        new DenseVector(new double[] {0.5069192929506545, 0.4930807070493455}));
-        final List<DenseVector> expectedRawInfo2 =
+                        Vectors.dense(new double[] {0.452491993753382, 0.547508006246618}),
+                        Vectors.dense(new double[] {0.5069192929506545, 0.4930807070493455}));
+        final List<DenseIntDoubleVector> expectedRawInfo2 =
                 Arrays.asList(
-                        new DenseVector(new double[] {0.41108882806164193, 0.5889111719383581}),
-                        new DenseVector(new double[] {0.5247727600974581, 0.4752272399025419}));
+                        Vectors.dense(new double[] {0.41108882806164193, 0.5889111719383581}),
+                        Vectors.dense(new double[] {0.5247727600974581, 0.4752272399025419}));
         OnlineLogisticRegression onlineLogisticRegression =
                 new OnlineLogisticRegression()
                         .setFeaturesCol("features")
@@ -517,20 +520,20 @@ public class OnlineLogisticRegressionTest extends TestLogger {
                 LogisticRegressionModelDataUtil.generateRandomModelData(tEnv, 2, 2022);
         DataStream<Row> modelData = tEnv.toDataStream(modelDataTable);
         Row modelRow = (Row) IteratorUtils.toList(modelData.executeAndCollect()).get(0);
-        Assert.assertEquals(2, ((DenseVector) modelRow.getField(0)).size());
+        Assert.assertEquals(2, ((DenseIntDoubleVector) modelRow.getField(0)).size());
         Assert.assertEquals(0L, modelRow.getField(1));
     }
 
     @Test
     public void testInitWithLogisticRegression() throws Exception {
-        final List<DenseVector> expectedRawInfo1 =
+        final List<DenseIntDoubleVector> expectedRawInfo1 =
                 Arrays.asList(
-                        new DenseVector(new double[] {0.037327343811250024, 0.96267265618875}),
-                        new DenseVector(new double[] {0.5684728224189707, 0.4315271775810293}));
-        final List<DenseVector> expectedRawInfo2 =
+                        Vectors.dense(new double[] {0.037327343811250024, 0.96267265618875}),
+                        Vectors.dense(new double[] {0.5684728224189707, 0.4315271775810293}));
+        final List<DenseIntDoubleVector> expectedRawInfo2 =
                 Arrays.asList(
-                        new DenseVector(new double[] {0.007758574555505882, 0.9922414254444941}),
-                        new DenseVector(new double[] {0.5257216567388069, 0.4742783432611931}));
+                        Vectors.dense(new double[] {0.007758574555505882, 0.9922414254444941}),
+                        Vectors.dense(new double[] {0.5257216567388069, 0.4742783432611931}));
         LogisticRegression logisticRegression =
                 new LogisticRegression()
                         .setLabelCol("label")
@@ -586,14 +589,14 @@ public class OnlineLogisticRegressionTest extends TestLogger {
 
     @Test
     public void testSaveAndReload() throws Exception {
-        final List<DenseVector> expectedRawInfo1 =
+        final List<DenseIntDoubleVector> expectedRawInfo1 =
                 Arrays.asList(
-                        new DenseVector(new double[] {0.04481034155642882, 0.9551896584435712}),
-                        new DenseVector(new double[] {0.5353966697318491, 0.4646033302681509}));
-        final List<DenseVector> expectedRawInfo2 =
+                        Vectors.dense(new double[] {0.04481034155642882, 0.9551896584435712}),
+                        Vectors.dense(new double[] {0.5353966697318491, 0.4646033302681509}));
+        final List<DenseIntDoubleVector> expectedRawInfo2 =
                 Arrays.asList(
-                        new DenseVector(new double[] {0.013104324065967066, 0.9868956759340329}),
-                        new DenseVector(new double[] {0.5095144380001769, 0.49048556199982307}));
+                        Vectors.dense(new double[] {0.013104324065967066, 0.9868956759340329}),
+                        Vectors.dense(new double[] {0.5095144380001769, 0.49048556199982307}));
         OnlineLogisticRegression onlineLogisticRegression =
                 new OnlineLogisticRegression()
                         .setFeaturesCol("features")
@@ -648,29 +651,30 @@ public class OnlineLogisticRegressionTest extends TestLogger {
 
         LogisticRegressionModelData expectedModelData =
                 new LogisticRegressionModelData(
-                        new DenseVector(new double[] {0.2994527071464283, -0.1412541067743284}),
-                        1L);
+                        Vectors.dense(new double[] {0.2994527071464283, -0.1412541067743284}), 1L);
         Assert.assertArrayEquals(
-                expectedModelData.coefficient.values, actualModelData.coefficient.values, 1e-5);
+                expectedModelData.coefficient.getValues(),
+                actualModelData.coefficient.getValues(),
+                1e-5);
         Assert.assertEquals(expectedModelData.modelVersion, actualModelData.modelVersion);
     }
 
     @Test
     public void testSetModelData() throws Exception {
         LogisticRegressionModelData modelData1 =
-                new LogisticRegressionModelData(new DenseVector(new double[] {0.085, -0.22}), 1L);
+                new LogisticRegressionModelData(Vectors.dense(new double[] {0.085, -0.22}), 1L);
 
         LogisticRegressionModelData modelData2 =
-                new LogisticRegressionModelData(new DenseVector(new double[] {0.075, -0.28}), 2L);
+                new LogisticRegressionModelData(Vectors.dense(new double[] {0.075, -0.28}), 2L);
 
-        final List<DenseVector> expectedRawInfo1 =
+        final List<DenseIntDoubleVector> expectedRawInfo1 =
                 Arrays.asList(
-                        new DenseVector(new double[] {0.6285496932692606, 0.3714503067307394}),
-                        new DenseVector(new double[] {0.7588710471221473, 0.24112895287785274}));
-        final List<DenseVector> expectedRawInfo2 =
+                        Vectors.dense(new double[] {0.6285496932692606, 0.3714503067307394}),
+                        Vectors.dense(new double[] {0.7588710471221473, 0.24112895287785274}));
+        final List<DenseIntDoubleVector> expectedRawInfo2 =
                 Arrays.asList(
-                        new DenseVector(new double[] {0.6673003248270917, 0.3326996751729083}),
-                        new DenseVector(new double[] {0.8779865510655934, 0.12201344893440658}));
+                        Vectors.dense(new double[] {0.6673003248270917, 0.3326996751729083}),
+                        Vectors.dense(new double[] {0.8779865510655934, 0.12201344893440658}));
 
         InMemorySourceFunction<LogisticRegressionModelData> modelDataSource =
                 new InMemorySourceFunction<>();

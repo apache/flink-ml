@@ -20,7 +20,7 @@ package org.apache.flink.ml.examples.classification;
 
 import org.apache.flink.ml.classification.knn.Knn;
 import org.apache.flink.ml.classification.knn.KnnModel;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -78,7 +78,8 @@ public class KnnExample {
         // Extracts and displays the results.
         for (CloseableIterator<Row> it = outputTable.execute().collect(); it.hasNext(); ) {
             Row row = it.next();
-            DenseVector features = (DenseVector) row.getField(knn.getFeaturesCol());
+            DenseIntDoubleVector features =
+                    (DenseIntDoubleVector) row.getField(knn.getFeaturesCol());
             double expectedResult = (Double) row.getField(knn.getLabelCol());
             double predictionResult = (Double) row.getField(knn.getPredictionCol());
             System.out.printf(

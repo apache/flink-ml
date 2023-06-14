@@ -25,6 +25,7 @@ import org.apache.flink.api.common.typeutils.base.TypeSerializerSingleton;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.ml.linalg.SparseLongDoubleVector;
+import org.apache.flink.ml.linalg.Vectors;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -49,14 +50,14 @@ public final class SparseLongDoubleVectorSerializer
 
     @Override
     public SparseLongDoubleVector createInstance() {
-        return new SparseLongDoubleVector(0, EMPTY_LONG_ARRAY, EMPTY_DOUBLE_ARRAY);
+        return Vectors.sparse(0, EMPTY_LONG_ARRAY, EMPTY_DOUBLE_ARRAY);
     }
 
     @Override
     public SparseLongDoubleVector copy(SparseLongDoubleVector from) {
         long[] indices = from.getIndices();
         double[] values = from.getValues();
-        return new SparseLongDoubleVector(
+        return Vectors.sparse(
                 from.size(),
                 Arrays.copyOf(indices, indices.length),
                 Arrays.copyOf(values, values.length));
@@ -116,7 +117,7 @@ public final class SparseLongDoubleVectorSerializer
         long[] indices = new long[len];
         double[] values = new double[len];
         readSparseVectorArrays(indices, values, source, len);
-        return new SparseLongDoubleVector(n, indices, values);
+        return Vectors.sparse(n, indices, values);
     }
 
     @Override
@@ -134,7 +135,7 @@ public final class SparseLongDoubleVectorSerializer
         indices = new long[len];
         values = new double[len];
         readSparseVectorArrays(indices, values, source, len);
-        return new SparseLongDoubleVector(n, indices, values);
+        return Vectors.sparse(n, indices, values);
     }
 
     @Override

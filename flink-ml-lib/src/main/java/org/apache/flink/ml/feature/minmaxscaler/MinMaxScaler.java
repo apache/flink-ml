@@ -26,8 +26,9 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -78,15 +79,15 @@ public class MinMaxScaler
         final String inputCol = getInputCol();
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
-        DataStream<DenseVector> inputData =
+        DataStream<DenseIntDoubleVector> inputData =
                 tEnv.toDataStream(inputs[0])
                         .map(
-                                (MapFunction<Row, DenseVector>)
+                                (MapFunction<Row, DenseIntDoubleVector>)
                                         value ->
-                                                (DenseVector)
+                                                (DenseIntDoubleVector)
                                                         ((Vector) value.getField(inputCol))
                                                                 .toDense());
-        DataStream<DenseVector> minMaxValues =
+        DataStream<DenseIntDoubleVector> minMaxValues =
                 inputData
                         .transform(
                                 "reduceInEachPartition",
@@ -100,14 +101,15 @@ public class MinMaxScaler
         DataStream<MinMaxScalerModelData> modelData =
                 DataStreamUtils.mapPartition(
                         minMaxValues,
-                        new RichMapPartitionFunction<DenseVector, MinMaxScalerModelData>() {
+                        new RichMapPartitionFunction<
+                                DenseIntDoubleVector, MinMaxScalerModelData>() {
                             @Override
                             public void mapPartition(
-                                    Iterable<DenseVector> values,
+                                    Iterable<DenseIntDoubleVector> values,
                                     Collector<MinMaxScalerModelData> out) {
-                                Iterator<DenseVector> iter = values.iterator();
-                                DenseVector minVector = iter.next();
-                                DenseVector maxVector = iter.next();
+                                Iterator<DenseIntDoubleVector> iter = values.iterator();
+                                DenseIntDoubleVector minVector = iter.next();
+                                DenseIntDoubleVector maxVector = iter.next();
                                 out.collect(new MinMaxScalerModelData(minVector, maxVector));
                             }
                         });
@@ -122,13 +124,15 @@ public class MinMaxScaler
      * A stream operator to compute the min and max values in each partition of the input bounded
      * data stream.
      */
-    public static class MinMaxReduceFunctionOperator extends AbstractStreamOperator<DenseVector>
-            implements OneInputStreamOperator<DenseVector, DenseVector>, BoundedOneInput {
-        private ListState<DenseVector> minState;
-        private ListState<DenseVector> maxState;
+    public static class MinMaxReduceFunctionOperator
+            extends AbstractStreamOperator<DenseIntDoubleVector>
+            implements OneInputStreamOperator<DenseIntDoubleVector, DenseIntDoubleVector>,
+                    BoundedOneInput {
+        private ListState<DenseIntDoubleVector> minState;
+        private ListState<DenseIntDoubleVector> maxState;
 
-        private DenseVector minVector;
-        private DenseVector maxVector;
+        private DenseIntDoubleVector minVector;
+        private DenseIntDoubleVector maxVector;
 
         @Override
         public void endInput() {
@@ -139,21 +143,24 @@ public class MinMaxScaler
         }
 
         @Override
-        public void processElement(StreamRecord<DenseVector> streamRecord) {
-            DenseVector currentValue = streamRecord.getValue();
+        public void processElement(StreamRecord<DenseIntDoubleVector> streamRecord) {
+            DenseIntDoubleVector currentVec = streamRecord.getValue();
             if (minVector == null) {
-                int vecSize = (int) currentValue.size();
-                minVector = new DenseVector(vecSize);
-                maxVector = new DenseVector(vecSize);
-                System.arraycopy(currentValue.values, 0, minVector.values, 0, vecSize);
-                System.arraycopy(currentValue.values, 0, maxVector.values, 0, vecSize);
+                int vecSize = (int) currentVec.size();
+                minVector = Vectors.dense(vecSize);
+                maxVector = Vectors.dense(vecSize);
+                System.arraycopy(currentVec.getValues(), 0, minVector.getValues(), 0, vecSize);
+                System.arraycopy(currentVec.getValues(), 0, maxVector.getValues(), 0, vecSize);
             } else {
                 Preconditions.checkArgument(
-                        currentValue.size() == maxVector.size(),
+                        currentVec.size() == maxVector.size(),
                         "CurrentValue should has same size with maxVector.");
-                for (int i = 0; i < currentValue.size(); ++i) {
-                    minVector.values[i] = Math.min(minVector.values[i], currentValue.values[i]);
-                    maxVector.values[i] = Math.max(maxVector.values[i], currentValue.values[i]);
+                double[] minValues = minVector.getValues();
+                double[] maxValues = maxVector.getValues();
+                double[] currentValues = currentVec.getValues();
+                for (int i = 0; i < currentVec.size(); ++i) {
+                    minValues[i] = Math.min(minValues[i], currentValues[i]);
+                    maxValues[i] = Math.max(maxValues[i], currentValues[i]);
                 }
             }
         }
@@ -166,12 +173,14 @@ public class MinMaxScaler
                     context.getOperatorStateStore()
                             .getListState(
                                     new ListStateDescriptor<>(
-                                            "minState", TypeInformation.of(DenseVector.class)));
+                                            "minState",
+                                            TypeInformation.of(DenseIntDoubleVector.class)));
             maxState =
                     context.getOperatorStateStore()
                             .getListState(
                                     new ListStateDescriptor<>(
-                                            "maxState", TypeInformation.of(DenseVector.class)));
+                                            "maxState",
+                                            TypeInformation.of(DenseIntDoubleVector.class)));
 
             OperatorStateUtils.getUniqueElement(minState, "minState").ifPresent(x -> minVector = x);
             OperatorStateUtils.getUniqueElement(maxState, "maxState").ifPresent(x -> maxVector = x);

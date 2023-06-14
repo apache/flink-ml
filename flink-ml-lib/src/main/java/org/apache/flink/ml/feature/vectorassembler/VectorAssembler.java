@@ -24,8 +24,8 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Transformer;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.common.param.HasHandleInvalid;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
@@ -139,16 +139,16 @@ public class VectorAssembler
                         }
                         vectorSize += 1;
                         nnz += 1;
-                    } else if (object instanceof SparseVector) {
-                        int localSize = (int) ((SparseVector) object).size();
+                    } else if (object instanceof SparseIntDoubleVector) {
+                        int localSize = (int) ((SparseIntDoubleVector) object).size();
                         checkSize(inputSizes[i], localSize);
-                        nnz += ((SparseVector) object).indices.length;
+                        nnz += ((SparseIntDoubleVector) object).getIndices().length;
                         vectorSize += localSize;
-                    } else if (object instanceof DenseVector) {
-                        int localSize = (int) ((DenseVector) object).size();
+                    } else if (object instanceof DenseIntDoubleVector) {
+                        int localSize = (int) ((DenseIntDoubleVector) object).size();
                         checkSize(inputSizes[i], localSize);
                         vectorSize += localSize;
-                        nnz += ((DenseVector) object).size();
+                        nnz += ((DenseIntDoubleVector) object).size();
                     } else {
                         throw new IllegalArgumentException(
                                 String.format(
@@ -160,9 +160,9 @@ public class VectorAssembler
                     nnz += inputSizes[i];
                     if (keepInvalid) {
                         if (inputSizes[i] > 1) {
-                            DenseVector tmpVec = new DenseVector(inputSizes[i]);
+                            DenseIntDoubleVector tmpVec = Vectors.dense(inputSizes[i]);
                             for (int j = 0; j < inputSizes[i]; ++j) {
-                                tmpVec.values[j] = Double.NaN;
+                                tmpVec.set(j, Double.NaN);
                             }
                             value.setField(inputCols[i], tmpVec);
                         } else {
@@ -213,17 +213,22 @@ public class VectorAssembler
             Object object = inputRow.getField(inputCol);
             if (object instanceof Number) {
                 values[currentOffset++] = ((Number) object).doubleValue();
-            } else if (object instanceof SparseVector) {
-                SparseVector sparseVector = (SparseVector) object;
-                for (int i = 0; i < sparseVector.indices.length; i++) {
-                    values[currentOffset + sparseVector.indices[i]] = sparseVector.values[i];
+            } else if (object instanceof SparseIntDoubleVector) {
+                SparseIntDoubleVector sparseVector = (SparseIntDoubleVector) object;
+                for (int i = 0; i < sparseVector.getIndices().length; i++) {
+                    values[currentOffset + sparseVector.getIndices()[i]] =
+                            sparseVector.getValues()[i];
                 }
                 currentOffset += sparseVector.size();
 
             } else {
-                DenseVector denseVector = (DenseVector) object;
+                DenseIntDoubleVector denseVector = (DenseIntDoubleVector) object;
                 System.arraycopy(
-                        denseVector.values, 0, values, currentOffset, (int) denseVector.size());
+                        denseVector.getValues(),
+                        0,
+                        values,
+                        currentOffset,
+                        (int) denseVector.size());
 
                 currentOffset += denseVector.size();
             }
@@ -247,26 +252,34 @@ public class VectorAssembler
                 values[currentOffset] = ((Number) object).doubleValue();
                 currentOffset++;
                 currentIndex++;
-            } else if (object instanceof SparseVector) {
-                SparseVector sparseVector = (SparseVector) object;
-                for (int i = 0; i < sparseVector.indices.length; i++) {
-                    indices[currentOffset + i] = sparseVector.indices[i] + currentIndex;
+            } else if (object instanceof SparseIntDoubleVector) {
+                SparseIntDoubleVector sparseVector = (SparseIntDoubleVector) object;
+                for (int i = 0; i < sparseVector.getIndices().length; i++) {
+                    indices[currentOffset + i] = sparseVector.getIndices()[i] + currentIndex;
                 }
                 System.arraycopy(
-                        sparseVector.values, 0, values, currentOffset, sparseVector.values.length);
+                        sparseVector.getValues(),
+                        0,
+                        values,
+                        currentOffset,
+                        sparseVector.getValues().length);
                 currentIndex += sparseVector.size();
-                currentOffset += sparseVector.indices.length;
+                currentOffset += sparseVector.getIndices().length;
             } else {
-                DenseVector denseVector = (DenseVector) object;
+                DenseIntDoubleVector denseVector = (DenseIntDoubleVector) object;
                 for (int i = 0; i < denseVector.size(); ++i) {
                     indices[currentOffset + i] = i + currentIndex;
                 }
                 System.arraycopy(
-                        denseVector.values, 0, values, currentOffset, denseVector.values.length);
+                        denseVector.getValues(),
+                        0,
+                        values,
+                        currentOffset,
+                        denseVector.getValues().length);
                 currentIndex += denseVector.size();
                 currentOffset += denseVector.size();
             }
         }
-        return new SparseVector(vectorSize, indices, values);
+        return Vectors.sparse(vectorSize, indices, values);
     }
 }

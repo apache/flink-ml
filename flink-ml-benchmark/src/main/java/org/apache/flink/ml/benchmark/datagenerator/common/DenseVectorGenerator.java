@@ -22,7 +22,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.benchmark.datagenerator.param.HasVectorDim;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.Preconditions;
 
@@ -52,7 +52,8 @@ public class DenseVectorGenerator extends InputTableGenerator<DenseVectorGenerat
                 @Override
                 protected RowTypeInfo getRowTypeInfo() {
                     return new RowTypeInfo(
-                            new TypeInformation[] {DenseVectorTypeInfo.INSTANCE}, columnNames[0]);
+                            new TypeInformation[] {DenseIntDoubleVectorTypeInfo.INSTANCE},
+                            columnNames[0]);
                 }
             }
         };

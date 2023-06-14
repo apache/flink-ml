@@ -20,7 +20,7 @@ package org.apache.flink.ml.examples.feature;
 
 import org.apache.flink.ml.feature.standardscaler.StandardScaler;
 import org.apache.flink.ml.feature.standardscaler.StandardScalerModel;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -55,8 +55,10 @@ public class StandardScalerExample {
         // Extracts and displays the results.
         for (CloseableIterator<Row> it = outputTable.execute().collect(); it.hasNext(); ) {
             Row row = it.next();
-            DenseVector inputValue = (DenseVector) row.getField(standardScaler.getInputCol());
-            DenseVector outputValue = (DenseVector) row.getField(standardScaler.getOutputCol());
+            DenseIntDoubleVector inputValue =
+                    (DenseIntDoubleVector) row.getField(standardScaler.getInputCol());
+            DenseIntDoubleVector outputValue =
+                    (DenseIntDoubleVector) row.getField(standardScaler.getOutputCol());
             System.out.printf("Input Value: %s\tOutput Value: %s\n", inputValue, outputValue);
         }
     }

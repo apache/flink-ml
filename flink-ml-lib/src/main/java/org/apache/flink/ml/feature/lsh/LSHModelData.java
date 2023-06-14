@@ -18,7 +18,7 @@
 
 package org.apache.flink.ml.feature.lsh;
 
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
 
 /**
@@ -33,7 +33,8 @@ abstract class LSHModelData {
      * @param vec input vector.
      * @return the mapping of LSH functions.
      */
-    public abstract DenseVector[] hashFunction(Vector<Integer, Double, int[], double[]> vec);
+    public abstract DenseIntDoubleVector[] hashFunction(
+            Vector<Integer, Double, int[], double[]> vec);
 
     /**
      * Calculates the distance between two different feature vectors using the corresponding

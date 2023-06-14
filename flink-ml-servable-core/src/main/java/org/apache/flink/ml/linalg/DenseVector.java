@@ -19,116 +19,15 @@
 package org.apache.flink.ml.linalg;
 
 import org.apache.flink.annotation.PublicEvolving;
-import org.apache.flink.api.common.typeinfo.TypeInfo;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfoFactory;
-import org.apache.flink.util.Preconditions;
 
-import java.util.Arrays;
-
-/** A dense vector of int indices and double values. */
-@TypeInfo(DenseVectorTypeInfoFactory.class)
+/** A dense vector of numerical values. */
 @PublicEvolving
-public class DenseVector implements DenseVectorInterface<Integer, Double, int[], double[]> {
-    public final double[] values;
+public interface DenseVector<I extends Number, V extends Number, IArray, VArray>
+        extends Vector<I, V, IArray, VArray> {
 
-    public DenseVector(double[] values) {
-        this.values = values;
-    }
-
-    public DenseVector(int size) {
-        this.values = new double[size];
-    }
-
-    public DenseVector(long size) {
-        Preconditions.checkArgument(
-                size < Integer.MAX_VALUE, "Size of dense vector exceeds INT.MAX.");
-        this.values = new double[(int) size];
-    }
+    /** Gets the values of this vector. */
+    VArray getValues();
 
     @Override
-    public long size() {
-        return values.length;
-    }
-
-    @Override
-    public Double get(Integer index) {
-        return values[index];
-    }
-
-    /** Avoids auto-boxing for better performance. */
-    public double get(int i) {
-        return values[i];
-    }
-
-    @Override
-    public void set(Integer index, Double value) {
-        values[index] = value;
-    }
-
-    /** Avoids auto-boxing for better performance. */
-    public void set(int i, double value) {
-        values[i] = value;
-    }
-
-    @Override
-    public double[] toArray() {
-        return values;
-    }
-
-    @Override
-    public DenseVector toDense() {
-        return this;
-    }
-
-    @Override
-    public SparseVector toSparse() {
-        int numNonZeros = 0;
-        for (double value : values) {
-            if (value != 0.0) {
-                numNonZeros++;
-            }
-        }
-
-        int[] nonZeroIndices = new int[numNonZeros];
-        double[] numZeroValues = new double[numNonZeros];
-        int k = 0;
-        for (int i = 0; i < values.length; i++) {
-            if (values[i] == 0.0) {
-                continue;
-            }
-            nonZeroIndices[k] = i;
-            numZeroValues[k] = values[i];
-            k++;
-        }
-
-        return new SparseVector(size(), nonZeroIndices, numZeroValues);
-    }
-
-    @Override
-    public double[] getValues() {
-        return values;
-    }
-
-    @Override
-    public String toString() {
-        return Arrays.toString(values);
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (!(obj instanceof DenseVector)) {
-            return false;
-        }
-        return Arrays.equals(values, ((DenseVector) obj).values);
-    }
-
-    @Override
-    public int hashCode() {
-        return Arrays.hashCode(values);
-    }
-
-    @Override
-    public DenseVector clone() {
-        return new DenseVector(values.clone());
-    }
+    DenseVector<I, V, IArray, VArray> clone();
 }

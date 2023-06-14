@@ -24,8 +24,8 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
@@ -98,7 +98,7 @@ public class IDF implements Estimator<IDF, IDFModel>, IDFParams<IDF> {
 
     /** The main logic to compute the model data of IDF. */
     private static class IDFAggregator
-            implements AggregateFunction<Vector, Tuple2<Long, DenseVector>, IDFModelData> {
+            implements AggregateFunction<Vector, Tuple2<Long, DenseIntDoubleVector>, IDFModelData> {
         private final int minDocFreq;
 
         public IDFAggregator(int minDocFreq) {
@@ -106,23 +106,23 @@ public class IDF implements Estimator<IDF, IDFModel>, IDFParams<IDF> {
         }
 
         @Override
-        public Tuple2<Long, DenseVector> createAccumulator() {
-            return Tuple2.of(0L, new DenseVector(new double[0]));
+        public Tuple2<Long, DenseIntDoubleVector> createAccumulator() {
+            return Tuple2.of(0L, Vectors.dense(new double[0]));
         }
 
         @Override
-        public Tuple2<Long, DenseVector> add(
-                Vector vector, Tuple2<Long, DenseVector> numDocsAndDocFreq) {
+        public Tuple2<Long, DenseIntDoubleVector> add(
+                Vector vector, Tuple2<Long, DenseIntDoubleVector> numDocsAndDocFreq) {
             if (numDocsAndDocFreq.f0 == 0) {
-                numDocsAndDocFreq.f1 = new DenseVector(vector.size());
+                numDocsAndDocFreq.f1 = Vectors.dense(vector.size());
             }
             numDocsAndDocFreq.f0 += 1L;
 
             double[] values;
-            if (vector instanceof SparseVector) {
-                values = ((SparseVector) vector).values;
+            if (vector instanceof SparseIntDoubleVector) {
+                values = ((SparseIntDoubleVector) vector).getValues();
             } else {
-                values = ((DenseVector) vector).values;
+                values = ((DenseIntDoubleVector) vector).getValues();
             }
             for (int i = 0; i < values.length; i++) {
                 values[i] = values[i] > 0 ? 1 : 0;
@@ -134,13 +134,13 @@ public class IDF implements Estimator<IDF, IDFModel>, IDFParams<IDF> {
         }
 
         @Override
-        public IDFModelData getResult(Tuple2<Long, DenseVector> numDocsAndDocFreq) {
+        public IDFModelData getResult(Tuple2<Long, DenseIntDoubleVector> numDocsAndDocFreq) {
             long numDocs = numDocsAndDocFreq.f0;
-            DenseVector docFreq = numDocsAndDocFreq.f1;
+            DenseIntDoubleVector docFreq = numDocsAndDocFreq.f1;
             Preconditions.checkState(numDocs > 0, "The training set is empty.");
 
             long[] filteredDocFreq = new long[(int) docFreq.size()];
-            double[] df = docFreq.values;
+            double[] df = docFreq.getValues();
             double[] idf = new double[df.length];
             for (int i = 0; i < idf.length; i++) {
                 if (df[i] >= minDocFreq) {
@@ -152,9 +152,9 @@ public class IDF implements Estimator<IDF, IDFModel>, IDFParams<IDF> {
         }
 
         @Override
-        public Tuple2<Long, DenseVector> merge(
-                Tuple2<Long, DenseVector> numDocsAndDocFreq1,
-                Tuple2<Long, DenseVector> numDocsAndDocFreq2) {
+        public Tuple2<Long, DenseIntDoubleVector> merge(
+                Tuple2<Long, DenseIntDoubleVector> numDocsAndDocFreq1,
+                Tuple2<Long, DenseIntDoubleVector> numDocsAndDocFreq2) {
             if (numDocsAndDocFreq1.f0 == 0) {
                 return numDocsAndDocFreq2;
             }

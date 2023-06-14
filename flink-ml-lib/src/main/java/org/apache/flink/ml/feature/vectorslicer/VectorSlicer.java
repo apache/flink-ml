@@ -23,8 +23,8 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Transformer;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -108,8 +108,8 @@ public class VectorSlicer implements Transformer<VectorSlicer>, VectorSlicerPara
 
         @Override
         public Row map(Row row) throws Exception {
-            Vector inputVec = row.getFieldAs(inputCol);
-            Vector outputVec;
+            Vector<Integer, Double, int[], double[]> inputVec = row.getFieldAs(inputCol);
+            Vector<Integer, Double, int[], double[]> outputVec;
             if (maxIndex >= inputVec.size()) {
                 throw new IllegalArgumentException(
                         "Index value "
@@ -120,16 +120,15 @@ public class VectorSlicer implements Transformer<VectorSlicer>, VectorSlicerPara
             if (inputVec instanceof DenseVector) {
                 double[] values = new double[indices.length];
                 for (int i = 0; i < indices.length; ++i) {
-                    values[i] = ((DenseVector) inputVec).values[indices[i]];
+                    values[i] = inputVec.get(indices[i]);
                 }
-                outputVec = new DenseVector(values);
+                outputVec = Vectors.dense(values);
             } else {
                 int nnz = 0;
-                SparseVector vec = (SparseVector) inputVec;
                 int[] outputIndices = new int[indices.length];
                 double[] outputValues = new double[indices.length];
                 for (int i = 0; i < indices.length; i++) {
-                    double val = vec.get(indices[i]);
+                    double val = inputVec.get(indices[i]);
                     if (val != 0) {
                         outputIndices[nnz] = i;
                         outputValues[nnz] = val;
@@ -140,7 +139,7 @@ public class VectorSlicer implements Transformer<VectorSlicer>, VectorSlicerPara
                     outputIndices = Arrays.copyOf(outputIndices, nnz);
                     outputValues = Arrays.copyOf(outputValues, nnz);
                 }
-                outputVec = new SparseVector(indices.length, outputIndices, outputValues);
+                outputVec = Vectors.sparse(indices.length, outputIndices, outputValues);
             }
             return Row.join(row, Row.of(outputVec));
         }

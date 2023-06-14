@@ -29,7 +29,7 @@ import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -129,8 +129,8 @@ public class NaiveBayes
                                         DataTypes.ARRAY(
                                                 DataTypes.MAP(
                                                         DataTypes.DOUBLE(), DataTypes.DOUBLE()))))
-                        .column("piArray", DataTypes.of(DenseVectorTypeInfo.INSTANCE))
-                        .column("labels", DataTypes.of(DenseVectorTypeInfo.INSTANCE))
+                        .column("piArray", DataTypes.of(DenseIntDoubleVectorTypeInfo.INSTANCE))
+                        .column("labels", DataTypes.of(DenseIntDoubleVectorTypeInfo.INSTANCE))
                         .build();
 
         NaiveBayesModel model =

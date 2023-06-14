@@ -26,11 +26,11 @@ import org.apache.flink.ml.classification.logisticregression.LogisticRegressionM
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelData;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelDataUtil;
 import org.apache.flink.ml.classification.logisticregression.LogisticRegressionModelServable;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.ml.servable.api.DataFrame;
 import org.apache.flink.ml.servable.types.BasicType;
 import org.apache.flink.ml.servable.types.DataTypes;
@@ -120,7 +120,9 @@ public class LogisticRegressionTest extends AbstractTestBase {
                                 binomialTrainData,
                                 new RowTypeInfo(
                                         new TypeInformation[] {
-                                            DenseVectorTypeInfo.INSTANCE, Types.DOUBLE, Types.DOUBLE
+                                            DenseIntDoubleVectorTypeInfo.INSTANCE,
+                                            Types.DOUBLE,
+                                            Types.DOUBLE
                                         },
                                         new String[] {"features", "label", "weight"})));
         multinomialDataTable =
@@ -129,7 +131,9 @@ public class LogisticRegressionTest extends AbstractTestBase {
                                 multinomialTrainData,
                                 new RowTypeInfo(
                                         new TypeInformation[] {
-                                            DenseVectorTypeInfo.INSTANCE, Types.DOUBLE, Types.DOUBLE
+                                            DenseIntDoubleVectorTypeInfo.INSTANCE,
+                                            Types.DOUBLE,
+                                            Types.DOUBLE
                                         },
                                         new String[] {"features", "label", "weight"})));
         binomialDataDataFrame =
@@ -149,10 +153,12 @@ public class LogisticRegressionTest extends AbstractTestBase {
             throws Exception {
         List<Row> predResult = IteratorUtils.toList(tEnv.toDataStream(output).executeAndCollect());
         for (Row predictionRow : predResult) {
-            DenseVector feature =
-                    (DenseVector) (((Vector) predictionRow.getField(featuresCol)).toDense());
+            DenseIntDoubleVector feature =
+                    (DenseIntDoubleVector)
+                            (((Vector) predictionRow.getField(featuresCol)).toDense());
             double prediction = (double) predictionRow.getField(predictionCol);
-            DenseVector rawPrediction = (DenseVector) predictionRow.getField(rawPredictionCol);
+            DenseIntDoubleVector rawPrediction =
+                    (DenseIntDoubleVector) predictionRow.getField(rawPredictionCol);
             if (feature.get(0) <= 5) {
                 assertEquals(0, prediction, TOLERANCE);
                 assertTrue(rawPrediction.get(0) > 0.5);
@@ -170,10 +176,12 @@ public class LogisticRegressionTest extends AbstractTestBase {
         int rawPredictionColIndex = output.getIndex(rawPredictionCol);
 
         for (org.apache.flink.ml.servable.api.Row predictionRow : output.collect()) {
-            DenseVector feature =
-                    (DenseVector) (((Vector) predictionRow.get(featuresColIndex)).toDense());
+            DenseIntDoubleVector feature =
+                    (DenseIntDoubleVector)
+                            (((Vector) predictionRow.get(featuresColIndex)).toDense());
             double prediction = (double) predictionRow.get(predictionColIndex);
-            DenseVector rawPrediction = (DenseVector) predictionRow.get(rawPredictionColIndex);
+            DenseIntDoubleVector rawPrediction =
+                    (DenseIntDoubleVector) predictionRow.get(rawPredictionColIndex);
             if (feature.get(0) <= 5) {
                 assertEquals(0, prediction, TOLERANCE);
                 assertTrue(rawPrediction.get(0) > 0.5);
@@ -263,7 +271,7 @@ public class LogisticRegressionTest extends AbstractTestBase {
     public void testInputTypeConversion() throws Exception {
         binomialDataTable = TestUtils.convertDataTypesToSparseInt(tEnv, binomialDataTable);
         assertArrayEquals(
-                new Class<?>[] {SparseVector.class, Integer.class, Integer.class},
+                new Class<?>[] {SparseIntDoubleVector.class, Integer.class, Integer.class},
                 TestUtils.getColumnDataTypes(binomialDataTable));
 
         LogisticRegression logisticRegression = new LogisticRegression().setWeightCol("weight");
@@ -312,7 +320,7 @@ public class LogisticRegressionTest extends AbstractTestBase {
                         LogisticRegressionModelDataUtil.getModelDataStream(model.getModelData()[0])
                                 .executeAndCollect());
         assertEquals(1, modelData.size());
-        assertArrayEquals(expectedCoefficient, modelData.get(0).coefficient.values, 0.1);
+        assertArrayEquals(expectedCoefficient, modelData.get(0).coefficient.getValues(), 0.1);
     }
 
     @Test
@@ -398,7 +406,9 @@ public class LogisticRegressionTest extends AbstractTestBase {
                                 binomialTrainData,
                                 new RowTypeInfo(
                                         new TypeInformation[] {
-                                            DenseVectorTypeInfo.INSTANCE, Types.DOUBLE, Types.DOUBLE
+                                            DenseIntDoubleVectorTypeInfo.INSTANCE,
+                                            Types.DOUBLE,
+                                            Types.DOUBLE
                                         },
                                         new String[] {"features", "label", "weight"})));
 
@@ -434,6 +444,6 @@ public class LogisticRegressionTest extends AbstractTestBase {
                         LogisticRegressionModelDataUtil.getModelDataStream(model.getModelData()[0])
                                 .executeAndCollect());
         final double errorTol = 1e-3;
-        assertArrayEquals(expectedCoefficient, modelData.get(0).coefficient.values, errorTol);
+        assertArrayEquals(expectedCoefficient, modelData.get(0).coefficient.getValues(), errorTol);
     }
 }

@@ -21,7 +21,7 @@ package org.apache.flink.ml.classification;
 import org.apache.flink.ml.classification.naivebayes.NaiveBayes;
 import org.apache.flink.ml.classification.naivebayes.NaiveBayesModel;
 import org.apache.flink.ml.classification.naivebayes.NaiveBayesModelData;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.ParamUtils;
@@ -170,10 +170,11 @@ public class NaiveBayesTest extends AbstractTestBase {
         predictTable = TestUtils.convertDataTypesToSparseInt(tEnv, predictTable);
 
         assertArrayEquals(
-                new Class<?>[] {SparseVector.class, Integer.class},
+                new Class<?>[] {SparseIntDoubleVector.class, Integer.class},
                 TestUtils.getColumnDataTypes(trainTable));
         assertArrayEquals(
-                new Class<?>[] {SparseVector.class}, TestUtils.getColumnDataTypes(predictTable));
+                new Class<?>[] {SparseIntDoubleVector.class},
+                TestUtils.getColumnDataTypes(predictTable));
 
         NaiveBayesModel model = estimator.fit(trainTable);
         Table outputTable = model.transform(predictTable)[0];

@@ -26,7 +26,7 @@ import org.apache.flink.metrics.Gauge;
 import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.common.distance.DistanceMeasure;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.VectorWithNorm;
 import org.apache.flink.ml.param.Param;
@@ -173,7 +173,8 @@ public class OnlineKMeansModel
                 bufferedPointsState.add(dataPoint);
                 return;
             }
-            DenseVector point = (DenseVector) ((Vector) dataPoint.getField(featuresCol)).toDense();
+            DenseIntDoubleVector point =
+                    (DenseIntDoubleVector) ((Vector) dataPoint.getField(featuresCol)).toDense();
             int closestCentroidId =
                     distanceMeasure.findClosest(centroids, new VectorWithNorm(point));
             output.collect(new StreamRecord<>(Row.join(dataPoint, Row.of(closestCentroidId))));

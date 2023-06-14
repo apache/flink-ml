@@ -33,8 +33,9 @@ import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.common.param.HasFlatten;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -113,10 +114,10 @@ public class FValueTest implements AlgoOperator<FValueTest>, FValueTestParams<FV
                                         })
                         .returns(Types.TUPLE(VectorTypeInfo.INSTANCE, Types.DOUBLE));
 
-        DataStream<Tuple5<Long, Double, Double, DenseVector, DenseVector>> summaries =
-                DataStreamUtils.aggregate(inputData, new SummaryAggregator());
+        DataStream<Tuple5<Long, Double, Double, DenseIntDoubleVector, DenseIntDoubleVector>>
+                summaries = DataStreamUtils.aggregate(inputData, new SummaryAggregator());
 
-        DataStream<DenseVector> covarianceInEachPartition =
+        DataStream<DenseIntDoubleVector> covarianceInEachPartition =
                 BroadcastUtils.withBroadcastStream(
                         Collections.singletonList(inputData),
                         Collections.singletonMap(broadcastSummaryKey, summaries),
@@ -126,10 +127,10 @@ public class FValueTest implements AlgoOperator<FValueTest>, FValueTestParams<FV
                                     input, new CalCovarianceOperator(broadcastSummaryKey));
                         });
 
-        DataStream<DenseVector> reducedCovariance =
+        DataStream<DenseIntDoubleVector> reducedCovariance =
                 DataStreamUtils.reduce(
                         covarianceInEachPartition,
-                        (ReduceFunction<DenseVector>)
+                        (ReduceFunction<DenseIntDoubleVector>)
                                 (sums1, sums2) -> {
                                     BLAS.axpy(1.0, sums1, sums2);
                                     return sums2;
@@ -156,24 +157,28 @@ public class FValueTest implements AlgoOperator<FValueTest>, FValueTestParams<FV
             return tEnv.fromDataStream(dataStream)
                     .as("featureIndex", "pValue", "degreeOfFreedom", "fValue");
         } else {
-            DataStream<Tuple3<DenseVector, long[], DenseVector>> output =
+            DataStream<Tuple3<DenseIntDoubleVector, long[], DenseIntDoubleVector>> output =
                     DataStreamUtils.mapPartition(
                             dataStream,
                             new MapPartitionFunction<
                                     Tuple4<Integer, Double, Long, Double>,
-                                    Tuple3<DenseVector, long[], DenseVector>>() {
+                                    Tuple3<DenseIntDoubleVector, long[], DenseIntDoubleVector>>() {
                                 @Override
                                 public void mapPartition(
                                         Iterable<Tuple4<Integer, Double, Long, Double>> iterable,
-                                        Collector<Tuple3<DenseVector, long[], DenseVector>>
+                                        Collector<
+                                                        Tuple3<
+                                                                DenseIntDoubleVector,
+                                                                long[],
+                                                                DenseIntDoubleVector>>
                                                 collector) {
                                     List<Tuple4<Integer, Double, Long, Double>> rows =
                                             IteratorUtils.toList(iterable.iterator());
                                     int numOfFeatures = rows.size();
 
-                                    DenseVector pValues = new DenseVector(numOfFeatures);
+                                    DenseIntDoubleVector pValues = Vectors.dense(numOfFeatures);
                                     long[] degrees = new long[numOfFeatures];
-                                    DenseVector fValues = new DenseVector(numOfFeatures);
+                                    DenseIntDoubleVector fValues = Vectors.dense(numOfFeatures);
 
                                     for (int i = 0; i < numOfFeatures; i++) {
                                         Tuple4<Integer, Double, Long, Double> tuple = rows.get(i);
@@ -190,7 +195,7 @@ public class FValueTest implements AlgoOperator<FValueTest>, FValueTestParams<FV
 
     /** Computes the covariance of each feature on each partition. */
     private static class CalCovarianceOperator
-            extends RichMapPartitionFunction<Tuple2<Vector, Double>, DenseVector> {
+            extends RichMapPartitionFunction<Tuple2<Vector, Double>, DenseIntDoubleVector> {
 
         private final String broadcastKey;
 
@@ -200,13 +205,14 @@ public class FValueTest implements AlgoOperator<FValueTest>, FValueTestParams<FV
 
         @Override
         public void mapPartition(
-                Iterable<Tuple2<Vector, Double>> iterable, Collector<DenseVector> collector) {
-            Tuple5<Long, Double, Double, DenseVector, DenseVector> summaries =
-                    (Tuple5<Long, Double, Double, DenseVector, DenseVector>)
+                Iterable<Tuple2<Vector, Double>> iterable,
+                Collector<DenseIntDoubleVector> collector) {
+            Tuple5<Long, Double, Double, DenseIntDoubleVector, DenseIntDoubleVector> summaries =
+                    (Tuple5<Long, Double, Double, DenseIntDoubleVector, DenseIntDoubleVector>)
                             getRuntimeContext().getBroadcastVariable(broadcastKey).get(0);
 
             int expectedNumOfFeatures = (int) summaries.f3.size();
-            DenseVector sumVector = new DenseVector(expectedNumOfFeatures);
+            DenseIntDoubleVector sumVector = Vectors.dense(expectedNumOfFeatures);
             for (Tuple2<Vector, Double> featuresAndLabel : iterable) {
                 Preconditions.checkArgument(
                         featuresAndLabel.f0.size() == expectedNumOfFeatures,
@@ -217,8 +223,9 @@ public class FValueTest implements AlgoOperator<FValueTest>, FValueTestParams<FV
                 double yDiff = featuresAndLabel.f1 - summaries.f1;
                 Vector<Integer, Double, int[], double[]> features = featuresAndLabel.f0;
                 if (yDiff != 0) {
+                    double[] values = sumVector.getValues();
                     for (int i = 0; i < expectedNumOfFeatures; i++) {
-                        sumVector.values[i] += yDiff * (features.get(i) - summaries.f3.get(i));
+                        values[i] += yDiff * (features.get(i) - summaries.f3.get(i));
                     }
                 }
             }
@@ -229,10 +236,11 @@ public class FValueTest implements AlgoOperator<FValueTest>, FValueTestParams<FV
 
     /** Computes the p-value, fValues and the number of degrees of freedom of input features. */
     private static class CalFValueOperator
-            extends RichMapPartitionFunction<DenseVector, Tuple4<Integer, Double, Long, Double>> {
+            extends RichMapPartitionFunction<
+                    DenseIntDoubleVector, Tuple4<Integer, Double, Long, Double>> {
 
         private final String broadcastKey;
-        private DenseVector sumVector;
+        private DenseIntDoubleVector sumVector;
 
         private CalFValueOperator(String broadcastKey) {
             this.broadcastKey = broadcastKey;
@@ -240,10 +248,10 @@ public class FValueTest implements AlgoOperator<FValueTest>, FValueTestParams<FV
 
         @Override
         public void mapPartition(
-                Iterable<DenseVector> iterable,
+                Iterable<DenseIntDoubleVector> iterable,
                 Collector<Tuple4<Integer, Double, Long, Double>> collector) {
-            Tuple5<Long, Double, Double, DenseVector, DenseVector> summaries =
-                    (Tuple5<Long, Double, Double, DenseVector, DenseVector>)
+            Tuple5<Long, Double, Double, DenseIntDoubleVector, DenseIntDoubleVector> summaries =
+                    (Tuple5<Long, Double, Double, DenseIntDoubleVector, DenseIntDoubleVector>)
                             getRuntimeContext().getBroadcastVariable(broadcastKey).get(0);
             int expectedNumOfFeatures = (int) summaries.f4.size();
 
@@ -274,46 +282,48 @@ public class FValueTest implements AlgoOperator<FValueTest>, FValueTestParams<FV
     private static class SummaryAggregator
             implements AggregateFunction<
                     Tuple2<Vector, Double>,
-                    Tuple5<Long, Double, Double, DenseVector, DenseVector>,
-                    Tuple5<Long, Double, Double, DenseVector, DenseVector>> {
+                    Tuple5<Long, Double, Double, DenseIntDoubleVector, DenseIntDoubleVector>,
+                    Tuple5<Long, Double, Double, DenseIntDoubleVector, DenseIntDoubleVector>> {
 
         @Override
-        public Tuple5<Long, Double, Double, DenseVector, DenseVector> createAccumulator() {
-            return Tuple5.of(
-                    0L, 0.0, 0.0, new DenseVector(new double[0]), new DenseVector(new double[0]));
+        public Tuple5<Long, Double, Double, DenseIntDoubleVector, DenseIntDoubleVector>
+                createAccumulator() {
+            return Tuple5.of(0L, 0.0, 0.0, Vectors.dense(), Vectors.dense());
         }
 
         @Override
-        public Tuple5<Long, Double, Double, DenseVector, DenseVector> add(
+        public Tuple5<Long, Double, Double, DenseIntDoubleVector, DenseIntDoubleVector> add(
                 Tuple2<Vector, Double> featuresAndLabel,
-                Tuple5<Long, Double, Double, DenseVector, DenseVector> summary) {
+                Tuple5<Long, Double, Double, DenseIntDoubleVector, DenseIntDoubleVector> summary) {
             Vector<Integer, Double, int[], double[]> features = featuresAndLabel.f0;
             double label = featuresAndLabel.f1;
 
             if (summary.f0 == 0) {
-                summary.f3 = new DenseVector((int) features.size());
-                summary.f4 = new DenseVector((int) features.size());
+                summary.f3 = Vectors.dense(features.size());
+                summary.f4 = Vectors.dense(features.size());
             }
             summary.f0 += 1L;
             summary.f1 += label;
             summary.f2 += label * label;
 
             BLAS.axpy(1.0, features, summary.f3);
+            double[] summaryF4Values = summary.f4.getValues();
             for (int i = 0; i < features.size(); i++) {
-                summary.f4.values[i] += features.get(i) * features.get(i);
+                double v = features.get(i);
+                summaryF4Values[i] += v * v;
             }
             return summary;
         }
 
         @Override
-        public Tuple5<Long, Double, Double, DenseVector, DenseVector> getResult(
-                Tuple5<Long, Double, Double, DenseVector, DenseVector> summary) {
+        public Tuple5<Long, Double, Double, DenseIntDoubleVector, DenseIntDoubleVector> getResult(
+                Tuple5<Long, Double, Double, DenseIntDoubleVector, DenseIntDoubleVector> summary) {
             final long numRows = summary.f0;
             Preconditions.checkState(numRows > 0, "The training set is empty.");
             int numOfFeatures = (int) summary.f3.size();
 
             double labelMean = summary.f1 / numRows;
-            Tuple5<Long, Double, Double, DenseVector, DenseVector> result =
+            Tuple5<Long, Double, Double, DenseIntDoubleVector, DenseIntDoubleVector> result =
                     Tuple5.of(
                             numRows,
                             labelMean,
@@ -321,24 +331,25 @@ public class FValueTest implements AlgoOperator<FValueTest>, FValueTestParams<FV
                                     (summary.f2 / numRows - labelMean * labelMean)
                                             * numRows
                                             / (numRows - 1)),
-                            new DenseVector(numOfFeatures),
-                            new DenseVector(numOfFeatures));
+                            Vectors.dense(numOfFeatures),
+                            Vectors.dense(numOfFeatures));
             for (int i = 0; i < summary.f3.size(); i++) {
                 double mean = summary.f3.get(i) / numRows;
-                result.f3.values[i] = mean;
-                result.f4.values[i] =
+                result.f3.set(i, mean);
+                result.f4.set(
+                        i,
                         Math.sqrt(
                                 (summary.f4.get(i) / numRows - mean * mean)
                                         * numRows
-                                        / (numRows - 1));
+                                        / (numRows - 1)));
             }
             return result;
         }
 
         @Override
-        public Tuple5<Long, Double, Double, DenseVector, DenseVector> merge(
-                Tuple5<Long, Double, Double, DenseVector, DenseVector> summary1,
-                Tuple5<Long, Double, Double, DenseVector, DenseVector> summary2) {
+        public Tuple5<Long, Double, Double, DenseIntDoubleVector, DenseIntDoubleVector> merge(
+                Tuple5<Long, Double, Double, DenseIntDoubleVector, DenseIntDoubleVector> summary1,
+                Tuple5<Long, Double, Double, DenseIntDoubleVector, DenseIntDoubleVector> summary2) {
             if (summary1.f0 == 0) {
                 return summary2;
             }

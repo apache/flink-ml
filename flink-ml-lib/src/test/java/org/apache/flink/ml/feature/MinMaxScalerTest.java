@@ -21,8 +21,8 @@ package org.apache.flink.ml.feature;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.ml.feature.minmaxscaler.MinMaxScaler;
 import org.apache.flink.ml.feature.minmaxscaler.MinMaxScalerModel;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
@@ -71,7 +71,7 @@ public class MinMaxScalerTest extends AbstractTestBase {
                             Row.of(Vectors.dense(50.0, 40.0)),
                             Row.of(Vectors.dense(100.0, 50.0))));
     private static final double EPS = 1.0e-5;
-    private static final List<DenseVector> EXPECTED_DATA =
+    private static final List<DenseIntDoubleVector> EXPECTED_DATA =
             new ArrayList<>(
                     Arrays.asList(
                             Vectors.dense(0.25, 0.1),
@@ -87,15 +87,15 @@ public class MinMaxScalerTest extends AbstractTestBase {
     }
 
     private static void verifyPredictionResult(
-            Table output, String outputCol, List<DenseVector> expected) throws Exception {
+            Table output, String outputCol, List<DenseIntDoubleVector> expected) throws Exception {
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) output).getTableEnvironment();
-        DataStream<DenseVector> stream =
+        DataStream<DenseIntDoubleVector> stream =
                 tEnv.toDataStream(output)
                         .map(
-                                (MapFunction<Row, DenseVector>)
-                                        row -> (DenseVector) row.getField(outputCol));
-        List<DenseVector> result = IteratorUtils.toList(stream.executeAndCollect());
+                                (MapFunction<Row, DenseIntDoubleVector>)
+                                        row -> (DenseIntDoubleVector) row.getField(outputCol));
+        List<DenseIntDoubleVector> result = IteratorUtils.toList(stream.executeAndCollect());
         TestBaseUtils.compareResultCollections(expected, result, TestUtils::compare);
     }
 
@@ -159,9 +159,10 @@ public class MinMaxScalerTest extends AbstractTestBase {
         trainDataTable = TestUtils.convertDataTypesToSparseInt(tEnv, trainDataTable);
         predictDataTable = TestUtils.convertDataTypesToSparseInt(tEnv, predictDataTable);
         assertArrayEquals(
-                new Class<?>[] {SparseVector.class}, TestUtils.getColumnDataTypes(trainDataTable));
+                new Class<?>[] {SparseIntDoubleVector.class},
+                TestUtils.getColumnDataTypes(trainDataTable));
         assertArrayEquals(
-                new Class<?>[] {SparseVector.class},
+                new Class<?>[] {SparseIntDoubleVector.class},
                 TestUtils.getColumnDataTypes(predictDataTable));
 
         MinMaxScaler minMaxScaler = new MinMaxScaler();
@@ -203,8 +204,8 @@ public class MinMaxScalerTest extends AbstractTestBase {
                 modelData.getResolvedSchema().getColumnNames());
         DataStream<Row> output = tEnv.toDataStream(modelData);
         List<Row> modelRows = IteratorUtils.toList(output.executeAndCollect());
-        assertEquals(new DenseVector(new double[] {0.0, 0.0}), modelRows.get(0).getField(0));
-        assertEquals(new DenseVector(new double[] {200.0, 400.0}), modelRows.get(0).getField(1));
+        assertEquals(Vectors.dense(new double[] {0.0, 0.0}), modelRows.get(0).getField(0));
+        assertEquals(Vectors.dense(new double[] {200.0, 400.0}), modelRows.get(0).getField(1));
     }
 
     @Test

@@ -27,8 +27,8 @@ import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorSerializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -45,13 +45,13 @@ import java.io.OutputStream;
  * classes to save/load model data.
  */
 public class MinMaxScalerModelData {
-    public DenseVector minVector;
+    public DenseIntDoubleVector minVector;
 
-    public DenseVector maxVector;
+    public DenseIntDoubleVector maxVector;
 
     public MinMaxScalerModelData() {}
 
-    public MinMaxScalerModelData(DenseVector minVector, DenseVector maxVector) {
+    public MinMaxScalerModelData(DenseIntDoubleVector minVector, DenseIntDoubleVector maxVector) {
         this.minVector = minVector;
         this.maxVector = maxVector;
     }
@@ -69,12 +69,14 @@ public class MinMaxScalerModelData {
                 .map(
                         x ->
                                 new MinMaxScalerModelData(
-                                        (DenseVector) x.getField(0), (DenseVector) x.getField(1)));
+                                        (DenseIntDoubleVector) x.getField(0),
+                                        (DenseIntDoubleVector) x.getField(1)));
     }
 
     /** Encoder for {@link MinMaxScalerModelData}. */
     public static class ModelDataEncoder implements Encoder<MinMaxScalerModelData> {
-        private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+        private final DenseIntDoubleVectorSerializer serializer =
+                new DenseIntDoubleVectorSerializer();
 
         @Override
         public void encode(MinMaxScalerModelData modelData, OutputStream outputStream)
@@ -91,14 +93,15 @@ public class MinMaxScalerModelData {
         public Reader<MinMaxScalerModelData> createReader(
                 Configuration config, FSDataInputStream stream) {
             return new Reader<MinMaxScalerModelData>() {
-                private final DenseVectorSerializer serializer = new DenseVectorSerializer();
+                private final DenseIntDoubleVectorSerializer serializer =
+                        new DenseIntDoubleVectorSerializer();
 
                 @Override
                 public MinMaxScalerModelData read() throws IOException {
                     DataInputView source = new DataInputViewStreamWrapper(stream);
                     try {
-                        DenseVector minVector = serializer.deserialize(source);
-                        DenseVector maxVector = serializer.deserialize(source);
+                        DenseIntDoubleVector minVector = serializer.deserialize(source);
+                        DenseIntDoubleVector maxVector = serializer.deserialize(source);
                         return new MinMaxScalerModelData(minVector, maxVector);
                     } catch (EOFException e) {
                         return null;

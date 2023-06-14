@@ -37,8 +37,9 @@ import org.apache.flink.ml.common.feature.LabeledPointWithWeight;
 import org.apache.flink.ml.common.iteration.TerminateOnMaxIterOrTol;
 import org.apache.flink.ml.common.lossfunc.LossFunc;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.Vectors;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.ml.regression.linearregression.LinearRegression;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
@@ -79,14 +80,14 @@ public class SGD implements Optimizer {
     }
 
     @Override
-    public DataStream<DenseVector> optimize(
-            DataStream<DenseVector> initModelData,
+    public DataStream<DenseIntDoubleVector> optimize(
+            DataStream<DenseIntDoubleVector> initModelData,
             DataStream<LabeledPointWithWeight> trainData,
             LossFunc lossFunc) {
         DataStreamList resultList =
                 Iterations.iterateBoundedStreamsUntilTermination(
                         DataStreamList.of(
-                                initModelData.broadcast().map(modelVec -> modelVec.values)),
+                                initModelData.broadcast().map(modelVec -> modelVec.getValues())),
                         ReplayableDataStreamList.notReplay(trainData.rebalance().map(x -> x)),
                         IterationConfig.newBuilder().build(),
                         new TrainIterationBody(lossFunc, params));
@@ -111,8 +112,8 @@ public class SGD implements Optimizer {
             // totalLoss].
             DataStream<double[]> variableStream = variableStreams.get(0);
             DataStream<LabeledPointWithWeight> trainData = dataStreams.get(0);
-            final OutputTag<DenseVector> modelDataOutputTag =
-                    new OutputTag<DenseVector>("MODEL_OUTPUT") {};
+            final OutputTag<DenseIntDoubleVector> modelDataOutputTag =
+                    new OutputTag<DenseIntDoubleVector>("MODEL_OUTPUT") {};
 
             SingleOutputStreamOperator<double[]> modelUpdateAndWeightAndLoss =
                     trainData
@@ -164,7 +165,7 @@ public class SGD implements Optimizer {
         private final LossFunc lossFunc;
 
         /** The outputTag to output the model data when iteration ends. */
-        private final OutputTag<DenseVector> modelDataOutputTag;
+        private final OutputTag<DenseIntDoubleVector> modelDataOutputTag;
 
         /** The cached training data. */
         private List<LabeledPointWithWeight> trainData;
@@ -177,9 +178,9 @@ public class SGD implements Optimizer {
         private ListState<Integer> nextBatchOffsetState;
 
         /** The model coefficient. */
-        private DenseVector coefficient;
+        private DenseIntDoubleVector coefficient;
 
-        private ListState<DenseVector> coefficientState;
+        private ListState<DenseIntDoubleVector> coefficientState;
 
         /** The dimension of the coefficient. */
         private int coefficientDim;
@@ -196,7 +197,9 @@ public class SGD implements Optimizer {
         private int localBatchSize;
 
         private CacheDataAndDoTrain(
-                LossFunc lossFunc, SGDParams params, OutputTag<DenseVector> modelDataOutputTag) {
+                LossFunc lossFunc,
+                SGDParams params,
+                OutputTag<DenseIntDoubleVector> modelDataOutputTag) {
             this.lossFunc = lossFunc;
             this.params = params;
             this.modelDataOutputTag = modelDataOutputTag;
@@ -232,7 +235,7 @@ public class SGD implements Optimizer {
             if (getTotalWeight() > 0) {
                 BLAS.axpy(
                         -params.learningRate / getTotalWeight(),
-                        new DenseVector(feedbackArray),
+                        Vectors.dense(feedbackArray),
                         coefficient,
                         coefficientDim);
                 double regLoss =
@@ -247,7 +250,7 @@ public class SGD implements Optimizer {
                 int epochWatermark, Context context, Collector<double[]> collector)
                 throws Exception {
             if (epochWatermark == 0) {
-                coefficient = new DenseVector(feedbackArray);
+                coefficient = Vectors.dense(feedbackArray);
                 coefficientDim = (int) coefficient.size();
                 feedbackArray = new double[coefficientDim + 2];
             } else {
@@ -271,7 +274,7 @@ public class SGD implements Optimizer {
                 Arrays.fill(feedbackArray, 0);
                 double totalLoss = 0;
                 double totalWeight = 0;
-                DenseVector cumGradientsWrapper = new DenseVector(feedbackArray);
+                DenseIntDoubleVector cumGradientsWrapper = Vectors.dense(feedbackArray);
                 for (LabeledPointWithWeight dataPoint : miniBatchData) {
                     totalLoss += lossFunc.computeLoss(dataPoint, coefficient);
                     lossFunc.computeGradient(dataPoint, coefficient, cumGradientsWrapper);
@@ -311,7 +314,8 @@ public class SGD implements Optimizer {
                     context.getOperatorStateStore()
                             .getListState(
                                     new ListStateDescriptor<>(
-                                            "coefficientState", DenseVectorTypeInfo.INSTANCE));
+                                            "coefficientState",
+                                            DenseIntDoubleVectorTypeInfo.INSTANCE));
             OperatorStateUtils.getUniqueElement(coefficientState, "coefficientState")
                     .ifPresent(x -> coefficient = x);
             if (coefficient != null) {

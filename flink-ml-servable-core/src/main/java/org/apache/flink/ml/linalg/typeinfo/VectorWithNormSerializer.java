@@ -24,9 +24,9 @@ import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
-import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.VectorWithNorm;
+import org.apache.flink.ml.linalg.Vectors;
 
 import java.io.IOException;
 
@@ -50,7 +50,7 @@ public class VectorWithNormSerializer extends TypeSerializer<VectorWithNorm> {
 
     @Override
     public VectorWithNorm createInstance() {
-        return new VectorWithNorm(new DenseVector(EMPTY));
+        return new VectorWithNorm(Vectors.dense(EMPTY));
     }
 
     @Override

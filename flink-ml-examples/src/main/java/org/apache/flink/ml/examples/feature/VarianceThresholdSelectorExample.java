@@ -20,7 +20,7 @@ package org.apache.flink.ml.examples.feature;
 
 import org.apache.flink.ml.feature.variancethresholdselector.VarianceThresholdSelector;
 import org.apache.flink.ml.feature.variancethresholdselector.VarianceThresholdSelectorModel;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -67,10 +67,10 @@ public class VarianceThresholdSelectorExample {
         System.out.printf("Variance Threshold: %s\n", threshold);
         for (CloseableIterator<Row> it = outputTable.execute().collect(); it.hasNext(); ) {
             Row row = it.next();
-            DenseVector inputValue =
-                    (DenseVector) row.getField(varianceThresholdSelector.getInputCol());
-            DenseVector outputValue =
-                    (DenseVector) row.getField(varianceThresholdSelector.getOutputCol());
+            DenseIntDoubleVector inputValue =
+                    (DenseIntDoubleVector) row.getField(varianceThresholdSelector.getInputCol());
+            DenseIntDoubleVector outputValue =
+                    (DenseIntDoubleVector) row.getField(varianceThresholdSelector.getOutputCol());
             System.out.printf("Input Values: %-15s\tOutput Values: %s\n", inputValue, outputValue);
         }
     }

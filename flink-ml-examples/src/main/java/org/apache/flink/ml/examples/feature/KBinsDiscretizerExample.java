@@ -21,7 +21,7 @@ package org.apache.flink.ml.examples.feature;
 import org.apache.flink.ml.feature.kbinsdiscretizer.KBinsDiscretizer;
 import org.apache.flink.ml.feature.kbinsdiscretizer.KBinsDiscretizerModel;
 import org.apache.flink.ml.feature.kbinsdiscretizer.KBinsDiscretizerParams;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -63,8 +63,10 @@ public class KBinsDiscretizerExample {
         // Extracts and displays the results.
         for (CloseableIterator<Row> it = outputTable.execute().collect(); it.hasNext(); ) {
             Row row = it.next();
-            DenseVector inputValue = (DenseVector) row.getField(kBinsDiscretizer.getInputCol());
-            DenseVector outputValue = (DenseVector) row.getField(kBinsDiscretizer.getOutputCol());
+            DenseIntDoubleVector inputValue =
+                    (DenseIntDoubleVector) row.getField(kBinsDiscretizer.getInputCol());
+            DenseIntDoubleVector outputValue =
+                    (DenseIntDoubleVector) row.getField(kBinsDiscretizer.getOutputCol());
             System.out.printf("Input Value: %s\tOutput Value: %s\n", inputValue, outputValue);
         }
     }

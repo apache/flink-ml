@@ -25,7 +25,7 @@ import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -127,7 +127,7 @@ public class LinearRegressionModel
 
         private final String featuresCol;
 
-        private DenseVector coefficient;
+        private DenseIntDoubleVector coefficient;
 
         public PredictLabelFunction(String broadcastModelKey, String featuresCol) {
             this.broadcastModelKey = broadcastModelKey;
@@ -142,8 +142,8 @@ public class LinearRegressionModel
                                 getRuntimeContext().getBroadcastVariable(broadcastModelKey).get(0);
                 coefficient = modelData.coefficient;
             }
-            DenseVector features =
-                    (DenseVector) ((Vector) dataPoint.getField(featuresCol)).toDense();
+            DenseIntDoubleVector features =
+                    (DenseIntDoubleVector) ((Vector) dataPoint.getField(featuresCol)).toDense();
             Row predictionResult = predictOneDataPoint(features, coefficient);
             return Row.join(dataPoint, predictionResult);
         }
@@ -156,7 +156,8 @@ public class LinearRegressionModel
      * @param coefficient The model parameters.
      * @return The prediction label and the raw probabilities.
      */
-    private static Row predictOneDataPoint(DenseVector feature, DenseVector coefficient) {
+    private static Row predictOneDataPoint(
+            DenseIntDoubleVector feature, DenseIntDoubleVector coefficient) {
         return Row.of(BLAS.dot(feature, coefficient));
     }
 }

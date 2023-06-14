@@ -22,8 +22,8 @@ import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Transformer;
 import org.apache.flink.ml.common.datastream.TableUtils;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
@@ -104,7 +104,7 @@ public class Interaction implements Transformer<Interaction>, InteractionParams<
                     return Row.join(value, Row.of((Object) null));
                 }
 
-                if (obj instanceof DenseVector) {
+                if (obj instanceof DenseIntDoubleVector) {
                     featureSize[i] = (int) ((Vector) obj).size();
                     if (featureIndices[i] == null || featureIndices[i].length != featureSize[i]) {
                         featureIndices[i] = new int[featureSize[i]];
@@ -113,13 +113,13 @@ public class Interaction implements Transformer<Interaction>, InteractionParams<
                         }
                     }
 
-                    featureValues[i] = ((DenseVector) obj).values;
+                    featureValues[i] = ((DenseIntDoubleVector) obj).getValues();
                     nnz *= featureSize[i];
-                } else if (obj instanceof SparseVector) {
+                } else if (obj instanceof SparseIntDoubleVector) {
                     featureSize[i] = (int) ((Vector) obj).size();
-                    featureIndices[i] = ((SparseVector) obj).indices;
-                    featureValues[i] = ((SparseVector) obj).values;
-                    nnz *= ((SparseVector) obj).values.length;
+                    featureIndices[i] = ((SparseIntDoubleVector) obj).getIndices();
+                    featureValues[i] = ((SparseIntDoubleVector) obj).getValues();
+                    nnz *= ((SparseIntDoubleVector) obj).getValues().length;
                     hasSparse = true;
                 } else {
                     featureSize[i] = 1;
@@ -170,7 +170,7 @@ public class Interaction implements Transformer<Interaction>, InteractionParams<
                     }
                     idxOffset *= prevValues.length;
                 }
-                ret = new DenseVector(values);
+                ret = Vectors.dense(values);
             }
 
             return Row.join(value, Row.of(ret));

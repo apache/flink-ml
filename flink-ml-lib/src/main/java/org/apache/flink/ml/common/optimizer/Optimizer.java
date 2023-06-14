@@ -21,7 +21,7 @@ package org.apache.flink.ml.common.optimizer;
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.ml.common.feature.LabeledPointWithWeight;
 import org.apache.flink.ml.common.lossfunc.LossFunc;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
 /**
@@ -39,8 +39,8 @@ public interface Optimizer {
      * @param lossFunc The loss function to optimize.
      * @return The fitted model data.
      */
-    DataStream<DenseVector> optimize(
-            DataStream<DenseVector> initModelData,
+    DataStream<DenseIntDoubleVector> optimize(
+            DataStream<DenseIntDoubleVector> initModelData,
             DataStream<LabeledPointWithWeight> trainData,
             LossFunc lossFunc);
 }

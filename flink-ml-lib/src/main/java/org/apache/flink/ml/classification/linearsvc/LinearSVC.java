@@ -25,8 +25,9 @@ import org.apache.flink.ml.common.feature.LabeledPointWithWeight;
 import org.apache.flink.ml.common.lossfunc.HingeLoss;
 import org.apache.flink.ml.common.optimizer.Optimizer;
 import org.apache.flink.ml.common.optimizer.SGD;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -77,8 +78,8 @@ public class LinearSVC implements Estimator<LinearSVC, LinearSVCModel>, LinearSV
                                                     || Double.compare(1.0, label) == 0,
                                             "LinearSVC only supports binary classification. But detected label: %s.",
                                             label);
-                                    DenseVector features =
-                                            (DenseVector)
+                                    DenseIntDoubleVector features =
+                                            (DenseIntDoubleVector)
                                                     (((Vector<Integer, Double, int[], double[]>)
                                                                     dataPoint.getField(
                                                                             getFeaturesCol()))
@@ -86,7 +87,7 @@ public class LinearSVC implements Estimator<LinearSVC, LinearSVCModel>, LinearSV
                                     return new LabeledPointWithWeight(features, label, weight);
                                 });
 
-        DataStream<DenseVector> initModelData =
+        DataStream<DenseIntDoubleVector> initModelData =
                 DataStreamUtils.reduce(
                                 trainData.map(x -> (int) x.getFeatures().size()),
                                 (ReduceFunction<Integer>)
@@ -96,7 +97,7 @@ public class LinearSVC implements Estimator<LinearSVC, LinearSVCModel>, LinearSV
                                                     "The training data should all have same dimensions.");
                                             return t0;
                                         })
-                        .map(DenseVector::new);
+                        .map(Vectors::dense);
 
         Optimizer optimizer =
                 new SGD(
@@ -106,7 +107,7 @@ public class LinearSVC implements Estimator<LinearSVC, LinearSVCModel>, LinearSV
                         getTol(),
                         getReg(),
                         getElasticNet());
-        DataStream<DenseVector> rawModelData =
+        DataStream<DenseIntDoubleVector> rawModelData =
                 optimizer.optimize(initModelData, trainData, HingeLoss.INSTANCE);
 
         DataStream<LinearSVCModelData> modelData = rawModelData.map(LinearSVCModelData::new);

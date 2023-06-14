@@ -19,7 +19,7 @@
 package org.apache.flink.ml.feature;
 
 import org.apache.flink.ml.feature.featurehasher.FeatureHasher;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -48,9 +48,9 @@ public class FeatureHasherTest extends AbstractTestBase {
     private static final List<Row> INPUT_DATA =
             Arrays.asList(Row.of(0, "a", 1.0, true), Row.of(1, "c", 1.0, false));
 
-    private static final SparseVector EXPECTED_OUTPUT_DATA_1 =
+    private static final SparseIntDoubleVector EXPECTED_OUTPUT_DATA_1 =
             Vectors.sparse(1000, new int[] {607, 635, 913}, new double[] {1.0, 1.0, 1.0});
-    private static final SparseVector EXPECTED_OUTPUT_DATA_2 =
+    private static final SparseIntDoubleVector EXPECTED_OUTPUT_DATA_2 =
             Vectors.sparse(1000, new int[] {242, 869, 913}, new double[] {1.0, 1.0, 1.0});
 
     @Before

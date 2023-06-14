@@ -21,8 +21,8 @@ package org.apache.flink.ml.classification.logisticregression;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorSerializer;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,13 +31,13 @@ import java.io.OutputStream;
 /** Model data of {@link LogisticRegressionModelServable}. */
 public class LogisticRegressionModelData {
 
-    public DenseVector coefficient;
+    public DenseIntDoubleVector coefficient;
 
     public long modelVersion;
 
     public LogisticRegressionModelData() {}
 
-    public LogisticRegressionModelData(DenseVector coefficient, long modelVersion) {
+    public LogisticRegressionModelData(DenseIntDoubleVector coefficient, long modelVersion) {
         this.coefficient = coefficient;
         this.modelVersion = modelVersion;
     }
@@ -52,7 +52,7 @@ public class LogisticRegressionModelData {
         DataOutputViewStreamWrapper dataOutputViewStreamWrapper =
                 new DataOutputViewStreamWrapper(outputStream);
 
-        DenseVectorSerializer serializer = new DenseVectorSerializer();
+        DenseIntDoubleVectorSerializer serializer = new DenseIntDoubleVectorSerializer();
         serializer.serialize(coefficient, dataOutputViewStreamWrapper);
         dataOutputViewStreamWrapper.writeLong(modelVersion);
     }
@@ -67,8 +67,8 @@ public class LogisticRegressionModelData {
         DataInputViewStreamWrapper dataInputViewStreamWrapper =
                 new DataInputViewStreamWrapper(inputStream);
 
-        DenseVectorSerializer serializer = new DenseVectorSerializer();
-        DenseVector coefficient = serializer.deserialize(dataInputViewStreamWrapper);
+        DenseIntDoubleVectorSerializer serializer = new DenseIntDoubleVectorSerializer();
+        DenseIntDoubleVector coefficient = serializer.deserialize(dataInputViewStreamWrapper);
         long modelVersion = dataInputViewStreamWrapper.readLong();
 
         return new LogisticRegressionModelData(coefficient, modelVersion);

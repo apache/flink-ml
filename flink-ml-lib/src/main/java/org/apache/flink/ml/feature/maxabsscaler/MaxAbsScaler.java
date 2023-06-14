@@ -23,10 +23,12 @@ import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.api.Estimator;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vector;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.Vectors;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -90,7 +92,7 @@ public class MaxAbsScaler
         DataStream<MaxAbsScalerModelData> modelData =
                 maxAbsValues.map(
                         (MapFunction<Vector, MaxAbsScalerModelData>)
-                                vector -> new MaxAbsScalerModelData((DenseVector) vector));
+                                vector -> new MaxAbsScalerModelData((DenseIntDoubleVector) vector));
 
         MaxAbsScalerModel model =
                 new MaxAbsScalerModel().setModelData(tEnv.fromDataStream(modelData));
@@ -104,8 +106,8 @@ public class MaxAbsScaler
      */
     private static class MaxAbsReduceFunctionOperator extends AbstractStreamOperator<Vector>
             implements OneInputStreamOperator<Vector, Vector>, BoundedOneInput {
-        private ListState<DenseVector> maxAbsState;
-        private DenseVector maxAbsVector;
+        private ListState<DenseIntDoubleVector> maxAbsState;
+        private DenseIntDoubleVector maxAbsVector;
 
         @Override
         public void endInput() {
@@ -116,28 +118,31 @@ public class MaxAbsScaler
 
         @Override
         public void processElement(StreamRecord<Vector> streamRecord) {
-            Vector currentValue = streamRecord.getValue();
+            Vector<Integer, Double, int[], double[]> currentValue = streamRecord.getValue();
 
             maxAbsVector =
-                    maxAbsVector == null
-                            ? new DenseVector((int) currentValue.size())
-                            : maxAbsVector;
+                    maxAbsVector == null ? Vectors.dense((int) currentValue.size()) : maxAbsVector;
             Preconditions.checkArgument(
                     currentValue.size() == maxAbsVector.size(),
                     "The training data should all have same dimensions.");
 
+            double[] maxAbsValues = maxAbsVector.getValues();
             if (currentValue instanceof DenseVector) {
-                double[] values = ((DenseVector) currentValue).values;
+                double[] values =
+                        ((DenseVector<Integer, Double, int[], double[]>) currentValue).getValues();
                 for (int i = 0; i < currentValue.size(); ++i) {
-                    maxAbsVector.values[i] = Math.max(maxAbsVector.values[i], Math.abs(values[i]));
+                    maxAbsValues[i] = Math.max(maxAbsValues[i], Math.abs(values[i]));
                 }
             } else if (currentValue instanceof SparseVector) {
-                int[] indices = ((SparseVector) currentValue).indices;
-                double[] values = ((SparseVector) currentValue).values;
+                int[] indices =
+                        ((SparseVector<Integer, Double, int[], double[]>) currentValue)
+                                .getIndices();
+                double[] values =
+                        ((SparseVector<Integer, Double, int[], double[]>) currentValue).getValues();
 
                 for (int i = 0; i < indices.length; ++i) {
-                    maxAbsVector.values[indices[i]] =
-                            Math.max(maxAbsVector.values[indices[i]], Math.abs(values[i]));
+                    maxAbsValues[indices[i]] =
+                            Math.max(maxAbsValues[indices[i]], Math.abs(values[i]));
                 }
             }
         }
@@ -149,7 +154,7 @@ public class MaxAbsScaler
                     context.getOperatorStateStore()
                             .getListState(
                                     new ListStateDescriptor<>(
-                                            "maxAbsState", DenseVectorTypeInfo.INSTANCE));
+                                            "maxAbsState", DenseIntDoubleVectorTypeInfo.INSTANCE));
 
             OperatorStateUtils.getUniqueElement(maxAbsState, "maxAbsState")
                     .ifPresent(x -> maxAbsVector = x);

@@ -24,7 +24,7 @@ import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -125,7 +125,7 @@ public class IDFModel implements Model<IDFModel>, IDFModelParams<IDFModel> {
     private static class ComputeTfIdfFunction extends RichMapFunction<Row, Row> {
         private final String inputCol;
         private final String broadcastKey;
-        private DenseVector idf;
+        private DenseIntDoubleVector idf;
 
         public ComputeTfIdfFunction(String broadcastKey, String inputCol) {
             this.broadcastKey = broadcastKey;

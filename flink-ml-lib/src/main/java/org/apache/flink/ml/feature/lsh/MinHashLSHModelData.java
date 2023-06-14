@@ -28,8 +28,9 @@ import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.util.Preconditions;
 
 import java.io.EOFException;
@@ -122,7 +123,7 @@ public class MinHashLSHModelData extends LSHModelData {
     }
 
     @Override
-    public DenseVector[] hashFunction(Vector<Integer, Double, int[], double[]> vec) {
+    public DenseIntDoubleVector[] hashFunction(Vector<Integer, Double, int[], double[]> vec) {
         int[] indices = vec.toSparse().getIndices();
         Preconditions.checkArgument(indices.length > 0, "Must have at least 1 non zero entry.");
         double[][] hashValues = new double[numHashTables][numHashFunctionsPerTable];
@@ -139,7 +140,7 @@ public class MinHashLSHModelData extends LSHModelData {
                 hashValues[i][j] = minv;
             }
         }
-        return Arrays.stream(hashValues).map(DenseVector::new).toArray(DenseVector[]::new);
+        return Arrays.stream(hashValues).map(Vectors::dense).toArray(DenseIntDoubleVector[]::new);
     }
 
     @Override

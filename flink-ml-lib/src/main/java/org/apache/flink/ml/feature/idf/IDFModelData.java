@@ -29,8 +29,8 @@ import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorSerializer;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorSerializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -48,7 +48,7 @@ import java.io.OutputStream;
  */
 public class IDFModelData {
     /** Inverse document frequency for all terms. */
-    public DenseVector idf;
+    public DenseIntDoubleVector idf;
     /** Document frequency for all terms after filtering out infrequent terms. */
     public long[] docFreq;
     /** Number of docs in the training set. */
@@ -56,7 +56,7 @@ public class IDFModelData {
 
     public IDFModelData() {}
 
-    public IDFModelData(DenseVector idf, long[] docFreq, long numDocs) {
+    public IDFModelData(DenseIntDoubleVector idf, long[] docFreq, long numDocs) {
         this.idf = idf;
         this.docFreq = docFreq;
         this.numDocs = numDocs;
@@ -77,7 +77,8 @@ public class IDFModelData {
 
     /** Encoder for {@link IDFModelData}. */
     public static class ModelDataEncoder implements Encoder<IDFModelData> {
-        private final DenseVectorSerializer denseVectorSerializer = new DenseVectorSerializer();
+        private final DenseIntDoubleVectorSerializer denseVectorSerializer =
+                new DenseIntDoubleVectorSerializer();
 
         @Override
         public void encode(IDFModelData modelData, OutputStream outputStream) throws IOException {
@@ -93,14 +94,14 @@ public class IDFModelData {
         @Override
         public Reader<IDFModelData> createReader(Configuration config, FSDataInputStream stream) {
             return new Reader<IDFModelData>() {
-                private final DenseVectorSerializer denseVectorSerializer =
-                        new DenseVectorSerializer();
+                private final DenseIntDoubleVectorSerializer denseVectorSerializer =
+                        new DenseIntDoubleVectorSerializer();
 
                 @Override
                 public IDFModelData read() throws IOException {
                     DataInputView source = new DataInputViewStreamWrapper(stream);
                     try {
-                        DenseVector idf = denseVectorSerializer.deserialize(source);
+                        DenseIntDoubleVector idf = denseVectorSerializer.deserialize(source);
                         long[] docFreq = LongPrimitiveArraySerializer.INSTANCE.deserialize(source);
                         long numDocs = LongSerializer.INSTANCE.deserialize(source);
                         return new IDFModelData(idf, docFreq, numDocs);

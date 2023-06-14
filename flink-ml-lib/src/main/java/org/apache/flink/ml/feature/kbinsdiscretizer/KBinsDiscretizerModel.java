@@ -24,7 +24,7 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -80,7 +80,7 @@ public class KBinsDiscretizerModel
                 new RowTypeInfo(
                         ArrayUtils.addAll(
                                 inputTypeInfo.getFieldTypes(),
-                                TypeInformation.of(DenseVector.class)),
+                                TypeInformation.of(DenseIntDoubleVector.class)),
                         ArrayUtils.addAll(inputTypeInfo.getFieldNames(), getOutputCol()));
 
         DataStream<Row> output =
@@ -149,8 +149,9 @@ public class KBinsDiscretizerModel
                                 getRuntimeContext().getBroadcastVariable(broadcastKey).get(0);
                 binEdges = modelData.binEdges;
             }
-            DenseVector inputVec = (DenseVector) (((Vector) row.getField(inputCol)).toDense());
-            DenseVector outputVec = inputVec.clone();
+            DenseIntDoubleVector inputVec =
+                    (DenseIntDoubleVector) (((Vector) row.getField(inputCol)).toDense());
+            DenseIntDoubleVector outputVec = inputVec.clone();
             for (int i = 0; i < inputVec.size(); i++) {
                 double targetFeature = inputVec.get(i);
                 int index = Arrays.binarySearch(binEdges[i], targetFeature);

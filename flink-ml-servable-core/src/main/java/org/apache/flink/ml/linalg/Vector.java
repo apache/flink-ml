@@ -24,7 +24,7 @@ import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfoFactory;
 
 import java.io.Serializable;
 
-/** A vector of double values. */
+/** A vector of numerical values. */
 @TypeInfo(VectorTypeInfoFactory.class)
 @PublicEvolving
 public interface Vector<I extends Number, V extends Number, IArray, VArray> extends Serializable {
@@ -42,10 +42,10 @@ public interface Vector<I extends Number, V extends Number, IArray, VArray> exte
     VArray toArray();
 
     /** Converts the instance to a dense vector. */
-    DenseVectorInterface<I, V, IArray, VArray> toDense();
+    DenseVector<I, V, IArray, VArray> toDense();
 
     /** Converts the instance to a sparse vector. */
-    SparseVectorInterface<I, V, IArray, VArray> toSparse();
+    SparseVector<I, V, IArray, VArray> toSparse();
 
     /** Makes a deep copy of the vector. */
     Vector<I, V, IArray, VArray> clone();

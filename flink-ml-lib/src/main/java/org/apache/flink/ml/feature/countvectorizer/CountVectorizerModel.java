@@ -23,9 +23,9 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.linalg.typeinfo.SparseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.SparseIntDoubleVectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -107,7 +107,8 @@ public class CountVectorizerModel
         RowTypeInfo outputTypeInfo =
                 new RowTypeInfo(
                         ArrayUtils.addAll(
-                                inputTypeInfo.getFieldTypes(), SparseVectorTypeInfo.INSTANCE),
+                                inputTypeInfo.getFieldTypes(),
+                                SparseIntDoubleVectorTypeInfo.INSTANCE),
                         ArrayUtils.addAll(inputTypeInfo.getFieldNames(), getOutputCol()));
 
         DataStream<Row> output =
@@ -177,7 +178,7 @@ public class CountVectorizerModel
                 }
             }
 
-            SparseVector outputVec =
+            SparseIntDoubleVector outputVec =
                     Vectors.sparse(
                             termCounts.length,
                             indices.stream().mapToInt(i -> i).toArray(),

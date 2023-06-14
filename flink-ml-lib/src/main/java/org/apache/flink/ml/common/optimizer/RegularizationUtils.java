@@ -20,7 +20,7 @@ package org.apache.flink.ml.common.optimizer;
 
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.ml.linalg.BLAS;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 
 /**
  * A utility class for algorithms that need to handle regularization. The regularization term is
@@ -45,7 +45,7 @@ class RegularizationUtils {
      * @return The loss introduced by regularization.
      */
     public static double regularize(
-            DenseVector coefficient,
+            DenseIntDoubleVector coefficient,
             final double reg,
             final double elasticNet,
             final double learningRate) {
@@ -60,7 +60,7 @@ class RegularizationUtils {
         } else if (Double.compare(elasticNet, 1) == 0) {
             // Only L1 regularization.
             double loss = 0;
-            double[] coefficientArray = coefficient.values;
+            double[] coefficientArray = coefficient.getValues();
             for (int i = 0; i < coefficientArray.length; i++) {
                 if (Double.compare(coefficientArray[i], 0) == 0) {
                     continue;
@@ -73,7 +73,7 @@ class RegularizationUtils {
         } else {
             // Both L1 and L2 are not zero.
             double loss = 0;
-            double[] coefficientArray = coefficient.values;
+            double[] coefficientArray = coefficient.getValues();
             for (int i = 0; i < coefficientArray.length; i++) {
                 loss +=
                         elasticNet * reg * Math.signum(coefficientArray[i])

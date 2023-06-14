@@ -19,7 +19,7 @@
 package org.apache.flink.ml.common.lossfunc;
 
 import org.apache.flink.ml.common.feature.LabeledPointWithWeight;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 
 import org.junit.Test;
@@ -31,8 +31,8 @@ import static org.junit.Assert.assertEquals;
 public class BinaryLogisticLossTest {
     private static final LabeledPointWithWeight dataPoint =
             new LabeledPointWithWeight(Vectors.dense(1.0, 2.0, 3.0), 1.0, 2.0);
-    private static final DenseVector coefficient = Vectors.dense(1.0, 1.0, 1.0);
-    private static final DenseVector cumGradient = Vectors.dense(0.0, 0.0, 0.0);
+    private static final DenseIntDoubleVector coefficient = Vectors.dense(1.0, 1.0, 1.0);
+    private static final DenseIntDoubleVector cumGradient = Vectors.dense(0.0, 0.0, 0.0);
     private static final double TOLERANCE = 1e-7;
 
     @Test
@@ -45,9 +45,13 @@ public class BinaryLogisticLossTest {
     public void computeGradient() {
         BinaryLogisticLoss.INSTANCE.computeGradient(dataPoint, coefficient, cumGradient);
         assertArrayEquals(
-                new double[] {-0.0049452, -0.0098904, -0.0148357}, cumGradient.values, TOLERANCE);
+                new double[] {-0.0049452, -0.0098904, -0.0148357},
+                cumGradient.getValues(),
+                TOLERANCE);
         BinaryLogisticLoss.INSTANCE.computeGradient(dataPoint, coefficient, cumGradient);
         assertArrayEquals(
-                new double[] {-0.0098904, -0.0197809, -0.0296714}, cumGradient.values, TOLERANCE);
+                new double[] {-0.0098904, -0.0197809, -0.0296714},
+                cumGradient.getValues(),
+                TOLERANCE);
     }
 }

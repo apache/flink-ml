@@ -23,7 +23,7 @@ import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.benchmark.datagenerator.param.HasVectorDim;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.ml.param.IntParam;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.param.ParamValidators;
@@ -113,7 +113,7 @@ public class LabeledPointWithWeightGenerator
                 protected RowTypeInfo getRowTypeInfo() {
                     return new RowTypeInfo(
                             new TypeInformation[] {
-                                DenseVectorTypeInfo.INSTANCE, Types.DOUBLE, Types.DOUBLE
+                                DenseIntDoubleVectorTypeInfo.INSTANCE, Types.DOUBLE, Types.DOUBLE
                             },
                             colNames[0]);
                 }

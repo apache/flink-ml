@@ -26,6 +26,7 @@ import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.linalg.DenseVector;
 import org.apache.flink.ml.linalg.SparseVector;
 import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
@@ -126,7 +127,7 @@ public class PolynomialExpansion
 
         @Override
         public Row map(Row row) throws Exception {
-            Vector vec = row.getFieldAs(inputCol);
+            Vector<Integer, Double, int[], double[]> vec = row.getFieldAs(inputCol);
             if (vec == null) {
                 throw new IllegalArgumentException("The vector must not be null.");
             }
@@ -134,14 +135,21 @@ public class PolynomialExpansion
             if (vec instanceof DenseVector) {
                 int size = (int) vec.size();
                 double[] retVals = new double[getResultVectorSize(size, degree) - 1];
-                expandDenseVector(((DenseVector) vec).values, size - 1, degree, 1.0, retVals, -1);
-                outputVec = new DenseVector(retVals);
+                expandDenseVector(
+                        ((DenseVector<Integer, Double, int[], double[]>) vec).getValues(),
+                        size - 1,
+                        degree,
+                        1.0,
+                        retVals,
+                        -1);
+                outputVec = Vectors.dense(retVals);
             } else if (vec instanceof SparseVector) {
-                SparseVector sparseVec = (SparseVector) vec;
-                int[] indices = sparseVec.indices;
-                double[] values = sparseVec.values;
+                SparseVector<Integer, Double, int[], double[]> sparseVec =
+                        (SparseVector<Integer, Double, int[], double[]>) vec;
+                int[] indices = sparseVec.getIndices();
+                double[] values = sparseVec.getValues();
                 int size = (int) sparseVec.size();
-                int nnz = sparseVec.values.length;
+                int nnz = sparseVec.getValues().length;
                 int nnzPolySize = getResultVectorSize(nnz, degree);
 
                 Tuple2<Integer, int[]> polyIndices = Tuple2.of(0, new int[nnzPolySize - 1]);
@@ -158,7 +166,7 @@ public class PolynomialExpansion
                         -1);
 
                 outputVec =
-                        new SparseVector(
+                        Vectors.sparse(
                                 getResultVectorSize(size, degree) - 1,
                                 polyIndices.f1,
                                 polyValues.f1);

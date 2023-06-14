@@ -69,7 +69,7 @@ format of the merging information is
 import org.apache.flink.ml.clustering.agglomerativeclustering.AgglomerativeClustering;
 import org.apache.flink.ml.clustering.agglomerativeclustering.AgglomerativeClusteringParams;
 import org.apache.flink.ml.common.distance.EuclideanDistanceMeasure;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;

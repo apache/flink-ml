@@ -19,8 +19,8 @@
 package org.apache.flink.ml.feature;
 
 import org.apache.flink.ml.feature.vectorslicer.VectorSlicer;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -59,12 +59,12 @@ public class VectorSlicerTest extends AbstractTestBase {
                             Vectors.dense(2.3, 4.1, 1.3, 2.4, 5.1, 4.1),
                             Vectors.sparse(5, new int[] {1, 2, 4}, new double[] {0.1, 0.2, 0.3})));
 
-    private static final DenseVector EXPECTED_OUTPUT_DATA_1 = Vectors.dense(2.1, 3.1, 2.3);
-    private static final DenseVector EXPECTED_OUTPUT_DATA_2 = Vectors.dense(2.3, 4.1, 1.3);
+    private static final DenseIntDoubleVector EXPECTED_OUTPUT_DATA_1 = Vectors.dense(2.1, 3.1, 2.3);
+    private static final DenseIntDoubleVector EXPECTED_OUTPUT_DATA_2 = Vectors.dense(2.3, 4.1, 1.3);
 
-    private static final SparseVector EXPECTED_OUTPUT_DATA_3 =
+    private static final SparseIntDoubleVector EXPECTED_OUTPUT_DATA_3 =
             Vectors.sparse(3, new int[] {1}, new double[] {0.1});
-    private static final SparseVector EXPECTED_OUTPUT_DATA_4 =
+    private static final SparseIntDoubleVector EXPECTED_OUTPUT_DATA_4 =
             Vectors.sparse(3, new int[] {1, 2}, new double[] {0.1, 0.2});
 
     @Before

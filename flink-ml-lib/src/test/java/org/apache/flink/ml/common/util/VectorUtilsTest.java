@@ -18,8 +18,8 @@
 
 package org.apache.flink.ml.common.util;
 
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 
 import org.junit.Test;
@@ -33,13 +33,13 @@ public class VectorUtilsTest {
 
     @Test
     public void testSelectByIndices() {
-        DenseVector denseVector = Vectors.dense(1.0, 2.0, 3.0, 4.0, 5.0);
+        DenseIntDoubleVector denseVector = Vectors.dense(1.0, 2.0, 3.0, 4.0, 5.0);
         assertArrayEquals(
                 Vectors.dense(2.0, 4.0).toArray(),
                 VectorUtils.selectByIndices(denseVector, new int[] {1, 3}).toArray(),
                 EPS);
 
-        SparseVector sparseVector =
+        SparseIntDoubleVector sparseVector =
                 Vectors.sparse(5, new int[] {1, 2, 3}, new double[] {2.0, 3.0, 4.0});
         assertArrayEquals(
                 Vectors.sparse(3, new int[] {1, 2}, new double[] {2.0, 4.0}).toArray(),

@@ -16,12 +16,26 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.linalg;
+package org.apache.flink.ml.linalg.typeinfo;
 
-/** A dense vector of numerical values. */
-public interface DenseVectorInterface<I extends Number, V extends Number, IArray, VArray>
-        extends Vector<I, V, IArray, VArray> {
+import org.apache.flink.api.common.typeinfo.TypeInfoFactory;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.java.typeutils.TypeExtractor;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 
-    /** Gets the values of this vector. */
-    VArray getValues();
+import java.lang.reflect.Type;
+import java.util.Map;
+
+/**
+ * Used by {@link TypeExtractor} to create a {@link TypeInformation} for implementations of {@link
+ * DenseIntDoubleVector}.
+ */
+public class DenseIntDoubleVectorTypeInfoFactory extends TypeInfoFactory<DenseIntDoubleVector> {
+
+    @Override
+    public TypeInformation<DenseIntDoubleVector> createTypeInfo(
+            Type t, Map<String, TypeInformation<?>> genericParameters) {
+
+        return new DenseIntDoubleVectorTypeInfo();
+    }
 }

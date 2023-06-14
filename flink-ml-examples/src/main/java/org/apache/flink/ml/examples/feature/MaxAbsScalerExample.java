@@ -20,7 +20,7 @@ package org.apache.flink.ml.examples.feature;
 
 import org.apache.flink.ml.feature.maxabsscaler.MaxAbsScaler;
 import org.apache.flink.ml.feature.maxabsscaler.MaxAbsScalerModel;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -64,8 +64,10 @@ public class MaxAbsScalerExample {
         // Extracts and displays the results.
         for (CloseableIterator<Row> it = outputTable.execute().collect(); it.hasNext(); ) {
             Row row = it.next();
-            DenseVector inputValue = (DenseVector) row.getField(maxAbsScaler.getInputCol());
-            DenseVector outputValue = (DenseVector) row.getField(maxAbsScaler.getOutputCol());
+            DenseIntDoubleVector inputValue =
+                    (DenseIntDoubleVector) row.getField(maxAbsScaler.getInputCol());
+            DenseIntDoubleVector outputValue =
+                    (DenseIntDoubleVector) row.getField(maxAbsScaler.getOutputCol());
             System.out.printf("Input Value: %-15s\tOutput Value: %s\n", inputValue, outputValue);
         }
     }

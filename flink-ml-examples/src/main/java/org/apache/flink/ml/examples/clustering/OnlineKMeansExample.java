@@ -23,9 +23,9 @@ import org.apache.flink.ml.clustering.kmeans.KMeansModelData;
 import org.apache.flink.ml.clustering.kmeans.OnlineKMeans;
 import org.apache.flink.ml.clustering.kmeans.OnlineKMeansModel;
 import org.apache.flink.ml.examples.util.PeriodicSourceFunction;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
@@ -73,13 +73,14 @@ public class OnlineKMeansExample {
         SourceFunction<Row> trainSource =
                 new PeriodicSourceFunction(1000, Arrays.asList(trainData1, trainData2));
         DataStream<Row> trainStream =
-                env.addSource(trainSource, new RowTypeInfo(DenseVectorTypeInfo.INSTANCE));
+                env.addSource(trainSource, new RowTypeInfo(DenseIntDoubleVectorTypeInfo.INSTANCE));
         Table trainTable = tEnv.fromDataStream(trainStream).as("features");
 
         SourceFunction<Row> predictSource =
                 new PeriodicSourceFunction(1000, Collections.singletonList(predictData));
         DataStream<Row> predictStream =
-                env.addSource(predictSource, new RowTypeInfo(DenseVectorTypeInfo.INSTANCE));
+                env.addSource(
+                        predictSource, new RowTypeInfo(DenseIntDoubleVectorTypeInfo.INSTANCE));
         Table predictTable = tEnv.fromDataStream(predictStream).as("features");
 
         // Creates an online K-means object and initializes its parameters and initial model data.
@@ -102,10 +103,12 @@ public class OnlineKMeansExample {
         // would change over time.
         for (CloseableIterator<Row> it = outputTable.execute().collect(); it.hasNext(); ) {
             Row row1 = it.next();
-            DenseVector features1 = (DenseVector) row1.getField(onlineKMeans.getFeaturesCol());
+            DenseIntDoubleVector features1 =
+                    (DenseIntDoubleVector) row1.getField(onlineKMeans.getFeaturesCol());
             Integer clusterId1 = (Integer) row1.getField(onlineKMeans.getPredictionCol());
             Row row2 = it.next();
-            DenseVector features2 = (DenseVector) row2.getField(onlineKMeans.getFeaturesCol());
+            DenseIntDoubleVector features2 =
+                    (DenseIntDoubleVector) row2.getField(onlineKMeans.getFeaturesCol());
             Integer clusterId2 = (Integer) row2.getField(onlineKMeans.getPredictionCol());
             if (Objects.equals(clusterId1, clusterId2)) {
                 System.out.printf("%s and %s are now in the same cluster.\n", features1, features2);

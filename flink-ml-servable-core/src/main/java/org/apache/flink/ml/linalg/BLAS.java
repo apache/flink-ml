@@ -27,24 +27,30 @@ public class BLAS {
             dev.ludovic.netlib.JavaBLAS.getInstance();
 
     /** \sum_i |x_i| . */
-    public static double asum(DenseVector x) {
-        return JAVA_BLAS.dasum((int) x.size(), x.values, 0, 1);
+    public static double asum(DenseVector<Integer, Double, int[], double[]> x) {
+        return JAVA_BLAS.dasum((int) x.size(), x.getValues(), 0, 1);
     }
 
     /** y += a * x . */
-    public static void axpy(double a, Vector<Integer, Double, int[], double[]> x, DenseVector y) {
+    public static void axpy(
+            double a,
+            Vector<Integer, Double, int[], double[]> x,
+            DenseVector<Integer, Double, int[], double[]> y) {
         Preconditions.checkArgument(x.size() == y.size(), "Vector size mismatched.");
         axpy(a, x, y, (int) x.size());
     }
 
     /** y += a * x for the first k dimensions, with the other dimensions unchanged. */
     public static void axpy(
-            double a, Vector<Integer, Double, int[], double[]> x, DenseVector y, int k) {
+            double a,
+            Vector<Integer, Double, int[], double[]> x,
+            DenseVector<Integer, Double, int[], double[]> y,
+            int k) {
         Preconditions.checkArgument(x.size() >= k && y.size() >= k);
         if (x instanceof SparseVector) {
-            axpy(a, (SparseVector) x, y, k);
+            axpy(a, (SparseVector<Integer, Double, int[], double[]>) x, y, k);
         } else if (x instanceof DenseVector) {
-            axpy(a, (DenseVector) x, y, k);
+            axpy(a, (DenseVector<Integer, Double, int[], double[]>) x, y, k);
         }
     }
 
@@ -53,17 +59,17 @@ public class BLAS {
             Vector<Integer, Double, int[], double[]> x,
             Vector<Integer, Double, int[], double[]> y) {
         Preconditions.checkArgument(x.size() == y.size(), "Vector size mismatched.");
-        if (x instanceof SparseVector) {
-            if (y instanceof SparseVector) {
-                hDot((SparseVector) x, (SparseVector) y);
+        if (x instanceof SparseIntDoubleVector) {
+            if (y instanceof SparseIntDoubleVector) {
+                hDot((SparseIntDoubleVector) x, (SparseIntDoubleVector) y);
             } else {
-                hDot((SparseVector) x, (DenseVector) y);
+                hDot((SparseIntDoubleVector) x, (DenseIntDoubleVector) y);
             }
         } else {
-            if (y instanceof SparseVector) {
-                hDot((DenseVector) x, (SparseVector) y);
+            if (y instanceof SparseIntDoubleVector) {
+                hDot((DenseIntDoubleVector) x, (SparseIntDoubleVector) y);
             } else {
-                hDot((DenseVector) x, (DenseVector) y);
+                hDot((DenseIntDoubleVector) x, (DenseIntDoubleVector) y);
             }
         }
     }
@@ -75,41 +81,54 @@ public class BLAS {
         Preconditions.checkArgument(x.size() == y.size(), "Vector size mismatched.");
         if (x instanceof SparseVector) {
             if (y instanceof SparseVector) {
-                return dot((SparseVector) x, (SparseVector) y);
+                return dot((SparseVector<Integer, Double, int[], double[]>) x, (SparseVector) y);
             } else {
-                return dot((DenseVector) y, (SparseVector) x);
+                return dot((DenseIntDoubleVector) y, (SparseIntDoubleVector) x);
             }
         } else {
-            if (y instanceof SparseVector) {
-                return dot((DenseVector) x, (SparseVector) y);
+            if (y instanceof SparseIntDoubleVector) {
+                return dot((DenseIntDoubleVector) x, (SparseIntDoubleVector) y);
             } else {
-                return dot((DenseVector) x, (DenseVector) y);
+                return dot((DenseIntDoubleVector) x, (DenseIntDoubleVector) y);
             }
         }
     }
 
-    private static double dot(DenseVector x, DenseVector y) {
-        return JAVA_BLAS.ddot((int) x.size(), x.values, 1, y.values, 1);
+    private static double dot(
+            DenseVector<Integer, Double, int[], double[]> x,
+            DenseVector<Integer, Double, int[], double[]> y) {
+        return JAVA_BLAS.ddot((int) x.size(), x.getValues(), 1, y.getValues(), 1);
     }
 
-    private static double dot(DenseVector x, SparseVector y) {
+    private static double dot(
+            DenseVector<Integer, Double, int[], double[]> x,
+            SparseVector<Integer, Double, int[], double[]> y) {
         double dotValue = 0.0;
-        for (int i = 0; i < y.indices.length; ++i) {
-            dotValue += y.values[i] * x.values[y.indices[i]];
+        int[] yi = y.getIndices();
+        double[] yv = y.getValues();
+        double[] xv = x.getValues();
+        for (int i = 0; i < yi.length; ++i) {
+            dotValue += yv[i] * xv[yi[i]];
         }
         return dotValue;
     }
 
-    private static double dot(SparseVector x, SparseVector y) {
+    private static double dot(
+            SparseVector<Integer, Double, int[], double[]> x,
+            SparseVector<Integer, Double, int[], double[]> y) {
         double dotValue = 0;
         int p0 = 0;
         int p1 = 0;
-        while (p0 < x.values.length && p1 < y.values.length) {
-            if (x.indices[p0] == y.indices[p1]) {
-                dotValue += x.values[p0] * y.values[p1];
+        int[] xi = x.getIndices();
+        int[] yi = y.getIndices();
+        double[] xv = x.getValues();
+        double[] yv = y.getValues();
+        while (p0 < xv.length && p1 < yv.length) {
+            if (xi[p0] == yi[p1]) {
+                dotValue += xv[p0] * yv[p1];
                 p0++;
                 p1++;
-            } else if (x.indices[p0] < y.indices[p1]) {
+            } else if (xi[p0] < yi[p1]) {
                 p0++;
             } else {
                 p1++;
@@ -120,18 +139,18 @@ public class BLAS {
 
     /** \sqrt(\sum_i x_i * x_i) . */
     public static double norm2(Vector<Integer, Double, int[], double[]> x) {
-        if (x instanceof DenseVector) {
-            return norm2((DenseVector) x);
+        if (x instanceof DenseIntDoubleVector) {
+            return norm2((DenseIntDoubleVector) x);
         }
-        return norm2((SparseVector) x);
+        return norm2((SparseIntDoubleVector) x);
     }
 
-    private static double norm2(DenseVector x) {
-        return JAVA_BLAS.dnrm2((int) x.size(), x.values, 1);
+    private static double norm2(DenseVector<Integer, Double, int[], double[]> x) {
+        return JAVA_BLAS.dnrm2((int) x.size(), x.getValues(), 1);
     }
 
-    private static double norm2(SparseVector x) {
-        return JAVA_BLAS.dnrm2(x.values.length, x.values, 1);
+    private static double norm2(SparseVector<Integer, Double, int[], double[]> x) {
+        return JAVA_BLAS.dnrm2(x.getValues().length, x.getValues(), 1);
     }
 
     /** Calculates the p-norm of the vector x. */
@@ -139,7 +158,9 @@ public class BLAS {
         Preconditions.checkArgument(p >= 1.0, "p value must >= 1.0, but the current p is : " + p);
         double norm = 0.0;
         double[] data =
-                (x instanceof DenseVector) ? ((DenseVector) x).values : ((SparseVector) x).values;
+                (x instanceof DenseIntDoubleVector)
+                        ? ((DenseIntDoubleVector) x).getValues()
+                        : ((SparseIntDoubleVector) x).getValues();
 
         if (p == 1.0) {
             for (double datum : data) {
@@ -163,10 +184,10 @@ public class BLAS {
 
     /** x = x * a . */
     public static void scal(double a, Vector<Integer, Double, int[], double[]> x) {
-        if (x instanceof DenseVector) {
-            JAVA_BLAS.dscal((int) x.size(), a, ((DenseVector) x).values, 1);
+        if (x instanceof DenseIntDoubleVector) {
+            JAVA_BLAS.dscal((int) x.size(), a, ((DenseIntDoubleVector) x).getValues(), 1);
         } else {
-            double[] values = ((SparseVector) x).values;
+            double[] values = ((SparseIntDoubleVector) x).getValues();
             JAVA_BLAS.dscal(values.length, a, values, 1);
         }
     }
@@ -185,9 +206,9 @@ public class BLAS {
             double alpha,
             DenseMatrix matrix,
             boolean transMatrix,
-            DenseVector x,
+            DenseVector<Integer, Double, int[], double[]> x,
             double beta,
-            DenseVector y) {
+            DenseVector<Integer, Double, int[], double[]> y) {
         Preconditions.checkArgument(
                 transMatrix
                         ? (matrix.numRows() == x.size() && matrix.numCols() == y.size())
@@ -201,69 +222,101 @@ public class BLAS {
                 alpha,
                 matrix.values,
                 matrix.numRows(),
-                x.values,
+                x.getValues(),
                 1,
                 beta,
-                y.values,
+                y.getValues(),
                 1);
     }
 
-    private static void axpy(double a, DenseVector x, DenseVector y, int k) {
-        JAVA_BLAS.daxpy(k, a, x.values, 1, y.values, 1);
+    private static void axpy(
+            double a,
+            DenseVector<Integer, Double, int[], double[]> x,
+            DenseVector<Integer, Double, int[], double[]> y,
+            int k) {
+        JAVA_BLAS.daxpy(k, a, x.getValues(), 1, y.getValues(), 1);
     }
 
-    private static void axpy(double a, SparseVector x, DenseVector y, int k) {
-        for (int i = 0; i < x.indices.length; i++) {
-            int index = x.indices[i];
+    private static void axpy(
+            double a,
+            SparseVector<Integer, Double, int[], double[]> x,
+            DenseVector<Integer, Double, int[], double[]> y,
+            int k) {
+        int[] xi = x.getIndices();
+        double[] xv = x.getValues();
+        double[] yv = y.getValues();
+        for (int i = 0; i < xi.length; i++) {
+            int index = xi[i];
             if (index >= k) {
                 return;
             }
-            y.values[index] += a * x.values[i];
+            yv[index] += a * xv[i];
         }
     }
 
-    private static void hDot(SparseVector x, SparseVector y) {
+    private static void hDot(
+            SparseVector<Integer, Double, int[], double[]> x,
+            SparseVector<Integer, Double, int[], double[]> y) {
         int idx = 0;
         int idy = 0;
-        while (idx < x.indices.length && idy < y.indices.length) {
-            int indexX = x.indices[idx];
-            while (idy < y.indices.length && y.indices[idy] < indexX) {
-                y.values[idy] = 0;
+        int[] xi = x.getIndices();
+        double[] xv = x.getValues();
+        int[] yi = y.getIndices();
+        double[] yv = y.getValues();
+
+        while (idx < xi.length && idy < yi.length) {
+            int indexX = xi[idx];
+            while (idy < yi.length && yi[idy] < indexX) {
+                yv[idy] = 0;
                 idy++;
             }
-            if (idy < y.indices.length && y.indices[idy] == indexX) {
-                y.values[idy] *= x.values[idx];
+            if (idy < yi.length && yi[idy] == indexX) {
+                yv[idy] *= xv[idx];
                 idy++;
             }
             idx++;
         }
-        while (idy < y.indices.length) {
-            y.values[idy] = 0;
+        while (idy < yi.length) {
+            yv[idy] = 0;
             idy++;
         }
     }
 
-    private static void hDot(SparseVector x, DenseVector y) {
+    private static void hDot(
+            SparseVector<Integer, Double, int[], double[]> x,
+            DenseVector<Integer, Double, int[], double[]> y) {
         int idx = 0;
+        int[] xi = x.getIndices();
+        double[] xv = x.getValues();
+        double[] yv = y.getValues();
         for (int i = 0; i < y.size(); i++) {
-            if (idx < x.indices.length && x.indices[idx] == i) {
-                y.values[i] *= x.values[idx];
+            if (idx < xi.length && xi[idx] == i) {
+                yv[i] *= xv[idx];
                 idx++;
             } else {
-                y.values[i] = 0;
+                yv[i] = 0;
             }
         }
     }
 
-    private static void hDot(DenseVector x, SparseVector y) {
-        for (int i = 0; i < y.values.length; i++) {
-            y.values[i] *= x.values[y.indices[i]];
+    private static void hDot(
+            DenseVector<Integer, Double, int[], double[]> x,
+            SparseVector<Integer, Double, int[], double[]> y) {
+        double[] xv = x.getValues();
+        int[] yi = y.getIndices();
+        double[] yv = y.getValues();
+        for (int i = 0; i < yv.length; i++) {
+            yv[i] *= xv[yi[i]];
         }
     }
 
-    private static void hDot(DenseVector x, DenseVector y) {
-        for (int i = 0; i < x.values.length; i++) {
-            y.values[i] *= x.values[i];
+    private static void hDot(
+            DenseVector<Integer, Double, int[], double[]> x,
+            DenseVector<Integer, Double, int[], double[]> y) {
+        double[] xv = x.getValues();
+        double[] yv = y.getValues();
+        for (int i = 0; i < xv.length; i++) {
+            yv[i] *= xv[i];
         }
     }
 }

@@ -19,20 +19,22 @@
 package org.apache.flink.ml.classification;
 
 import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.classification.knn.Knn;
 import org.apache.flink.ml.classification.knn.KnnModel;
 import org.apache.flink.ml.classification.knn.KnnModelData;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.DenseMatrix;
-import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.linalg.SparseVector;
+import org.apache.flink.ml.linalg.SparseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
@@ -94,15 +96,14 @@ public class KnnTest extends AbstractTestBase {
     public void before() {
         env = TestUtils.getExecutionEnvironment();
         tEnv = StreamTableEnvironment.create(env);
-        Schema schema =
-                Schema.newBuilder()
-                        .column("f0", DataTypes.of(DenseVector.class))
-                        .column("f1", DataTypes.DOUBLE())
-                        .build();
-        DataStream<Row> dataStream = env.fromCollection(trainRows);
-        trainData = tEnv.fromDataStream(dataStream, schema).as("features", "label");
-        DataStream<Row> predDataStream = env.fromCollection(predictRows);
-        predictData = tEnv.fromDataStream(predDataStream, schema).as("features", "label");
+        RowTypeInfo rowTypeInfo =
+                new RowTypeInfo(
+                        new TypeInformation[] {DenseIntDoubleVectorTypeInfo.INSTANCE, Types.DOUBLE},
+                        new String[] {"features", "label"});
+        DataStream<Row> dataStream = env.fromCollection(trainRows, rowTypeInfo);
+        trainData = tEnv.fromDataStream(dataStream);
+        DataStream<Row> predDataStream = env.fromCollection(predictRows, rowTypeInfo);
+        predictData = tEnv.fromDataStream(predDataStream);
     }
 
     private static void verifyPredictionResult(Table output, String labelCol, String predictionCol)
@@ -179,10 +180,10 @@ public class KnnTest extends AbstractTestBase {
         trainData = TestUtils.convertDataTypesToSparseInt(tEnv, trainData);
         predictData = TestUtils.convertDataTypesToSparseInt(tEnv, predictData);
         assertArrayEquals(
-                new Class<?>[] {SparseVector.class, Integer.class},
+                new Class<?>[] {SparseIntDoubleVector.class, Integer.class},
                 TestUtils.getColumnDataTypes(trainData));
         assertArrayEquals(
-                new Class<?>[] {SparseVector.class, Integer.class},
+                new Class<?>[] {SparseIntDoubleVector.class, Integer.class},
                 TestUtils.getColumnDataTypes(predictData));
 
         Knn knn = new Knn();
@@ -232,8 +233,8 @@ public class KnnTest extends AbstractTestBase {
         KnnModelData data =
                 new KnnModelData(
                         (DenseMatrix) modelRows.get(0).getField(0),
-                        (DenseVector) modelRows.get(0).getField(1),
-                        (DenseVector) modelRows.get(0).getField(2));
+                        (DenseIntDoubleVector) modelRows.get(0).getField(1),
+                        (DenseIntDoubleVector) modelRows.get(0).getField(2));
         Assert.assertNotNull(data);
         assertEquals(2, data.packedFeatures.numRows());
         assertEquals(data.packedFeatures.numCols(), data.labels.size());

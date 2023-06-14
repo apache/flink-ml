@@ -23,8 +23,9 @@ import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.common.util.QuantileSummary;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vector;
+import org.apache.flink.ml.linalg.Vectors;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
@@ -73,12 +74,12 @@ public class RobustScaler
         final String inputCol = getInputCol();
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
-        DataStream<DenseVector> inputData =
+        DataStream<DenseIntDoubleVector> inputData =
                 tEnv.toDataStream(inputs[0])
                         .map(
-                                (MapFunction<Row, DenseVector>)
+                                (MapFunction<Row, DenseIntDoubleVector>)
                                         value ->
-                                                (DenseVector)
+                                                (DenseIntDoubleVector)
                                                         ((Vector) value.getField(inputCol))
                                                                 .toDense());
         DataStream<RobustScalerModelData> modelData =
@@ -96,7 +97,8 @@ public class RobustScaler
      * RobustScalerModelData}.
      */
     private static class QuantileAggregator
-            implements AggregateFunction<DenseVector, QuantileSummary[], RobustScalerModelData> {
+            implements AggregateFunction<
+                    DenseIntDoubleVector, QuantileSummary[], RobustScalerModelData> {
 
         private final double relativeError;
         private final double lower;
@@ -114,7 +116,8 @@ public class RobustScaler
         }
 
         @Override
-        public QuantileSummary[] add(DenseVector denseVector, QuantileSummary[] quantileSummaries) {
+        public QuantileSummary[] add(
+                DenseIntDoubleVector denseVector, QuantileSummary[] quantileSummaries) {
             if (quantileSummaries.length == 0) {
                 quantileSummaries = new QuantileSummary[(int) denseVector.size()];
                 for (int i = 0; i < denseVector.size(); i++) {
@@ -139,15 +142,15 @@ public class RobustScaler
         @Override
         public RobustScalerModelData getResult(QuantileSummary[] quantileSummaries) {
             Preconditions.checkState(quantileSummaries.length != 0, "The training set is empty.");
-            DenseVector medianVector = new DenseVector(quantileSummaries.length);
-            DenseVector rangeVector = new DenseVector(quantileSummaries.length);
+            DenseIntDoubleVector medianVector = Vectors.dense(quantileSummaries.length);
+            DenseIntDoubleVector rangeVector = Vectors.dense(quantileSummaries.length);
 
             for (int i = 0; i < quantileSummaries.length; i++) {
                 QuantileSummary compressed = quantileSummaries[i].compress();
 
                 double[] quantiles = compressed.query(new double[] {0.5, lower, upper});
-                medianVector.values[i] = quantiles[0];
-                rangeVector.values[i] = quantiles[2] - quantiles[1];
+                medianVector.set(i, quantiles[0]);
+                rangeVector.set(i, quantiles[2] - quantiles[1]);
             }
             return new RobustScalerModelData(medianVector, rangeVector);
         }

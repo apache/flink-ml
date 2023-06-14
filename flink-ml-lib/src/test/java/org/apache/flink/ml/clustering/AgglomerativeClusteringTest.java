@@ -31,9 +31,9 @@ import org.apache.flink.ml.common.window.CountTumblingWindows;
 import org.apache.flink.ml.common.window.EventTimeTumblingWindows;
 import org.apache.flink.ml.common.window.GlobalWindows;
 import org.apache.flink.ml.common.window.ProcessingTimeTumblingWindows;
-import org.apache.flink.ml.linalg.DenseVector;
+import org.apache.flink.ml.linalg.DenseIntDoubleVector;
 import org.apache.flink.ml.linalg.Vectors;
-import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
+import org.apache.flink.ml.linalg.typeinfo.DenseIntDoubleVectorTypeInfo;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -71,7 +71,7 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
     private StreamExecutionEnvironment env;
     private Table inputDataTable;
 
-    private static final List<DenseVector> INPUT_DATA =
+    private static final List<DenseIntDoubleVector> INPUT_DATA =
             Arrays.asList(
                     Vectors.dense(1, 1),
                     Vectors.dense(1, 4),
@@ -97,7 +97,7 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
     private static final double[] EUCLIDEAN_COMPLETE_MERGE_DISTANCES =
             new double[] {1, 1.5, 3, 3.3541019, 5};
 
-    private static final List<Set<DenseVector>> EUCLIDEAN_WARD_NUM_CLUSTERS_AS_TWO_RESULT =
+    private static final List<Set<DenseIntDoubleVector>> EUCLIDEAN_WARD_NUM_CLUSTERS_AS_TWO_RESULT =
             Arrays.asList(
                     new HashSet<>(
                             Arrays.asList(
@@ -107,38 +107,42 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
                                     Vectors.dense(4, 0))),
                     new HashSet<>(Arrays.asList(Vectors.dense(1, 4), Vectors.dense(4, 4))));
 
-    private static final List<Set<DenseVector>> EUCLIDEAN_WARD_THRESHOLD_AS_TWO_RESULT =
+    private static final List<Set<DenseIntDoubleVector>> EUCLIDEAN_WARD_THRESHOLD_AS_TWO_RESULT =
             Arrays.asList(
                     new HashSet<>(Arrays.asList(Vectors.dense(1, 1), Vectors.dense(1, 0))),
                     new HashSet<>(Collections.singletonList(Vectors.dense(1, 4))),
                     new HashSet<>(Collections.singletonList(Vectors.dense(4, 4))),
                     new HashSet<>(Arrays.asList(Vectors.dense(4, 1.5), Vectors.dense(4, 0))));
 
-    private static final List<Set<DenseVector>> EUCLIDEAN_WARD_COUNT_FIVE_WINDOW_AS_TWO_RESULT =
-            Arrays.asList(
-                    new HashSet<>(Arrays.asList(Vectors.dense(1, 1), Vectors.dense(1, 0))),
-                    new HashSet<>(
-                            Arrays.asList(
-                                    Vectors.dense(1, 4),
-                                    Vectors.dense(4, 4),
-                                    Vectors.dense(4, 1.5))));
+    private static final List<Set<DenseIntDoubleVector>>
+            EUCLIDEAN_WARD_COUNT_FIVE_WINDOW_AS_TWO_RESULT =
+                    Arrays.asList(
+                            new HashSet<>(Arrays.asList(Vectors.dense(1, 1), Vectors.dense(1, 0))),
+                            new HashSet<>(
+                                    Arrays.asList(
+                                            Vectors.dense(1, 4),
+                                            Vectors.dense(4, 4),
+                                            Vectors.dense(4, 1.5))));
 
-    private static final List<Set<DenseVector>> EUCLIDEAN_WARD_EVENT_TIME_WINDOW_AS_TWO_RESULT =
-            Arrays.asList(
-                    new HashSet<>(Arrays.asList(Vectors.dense(1, 1), Vectors.dense(1, 0))),
-                    new HashSet<>(Collections.singletonList(Vectors.dense(1, 4))),
-                    new HashSet<>(Arrays.asList(Vectors.dense(4, 0), Vectors.dense(4, 1.5))),
-                    new HashSet<>(Collections.singletonList(Vectors.dense(4, 4))));
+    private static final List<Set<DenseIntDoubleVector>>
+            EUCLIDEAN_WARD_EVENT_TIME_WINDOW_AS_TWO_RESULT =
+                    Arrays.asList(
+                            new HashSet<>(Arrays.asList(Vectors.dense(1, 1), Vectors.dense(1, 0))),
+                            new HashSet<>(Collections.singletonList(Vectors.dense(1, 4))),
+                            new HashSet<>(
+                                    Arrays.asList(Vectors.dense(4, 0), Vectors.dense(4, 1.5))),
+                            new HashSet<>(Collections.singletonList(Vectors.dense(4, 4))));
 
-    private static final List<Set<DenseVector>> EUCLIDEAN_AVERAGE_NUM_CLUSTERS_AS_TWO_RESULT =
-            Arrays.asList(
-                    new HashSet<>(
-                            Arrays.asList(
-                                    Vectors.dense(1, 1),
-                                    Vectors.dense(1, 0),
-                                    Vectors.dense(4, 1.5),
-                                    Vectors.dense(4, 0))),
-                    new HashSet<>(Arrays.asList(Vectors.dense(1, 4), Vectors.dense(4, 4))));
+    private static final List<Set<DenseIntDoubleVector>>
+            EUCLIDEAN_AVERAGE_NUM_CLUSTERS_AS_TWO_RESULT =
+                    Arrays.asList(
+                            new HashSet<>(
+                                    Arrays.asList(
+                                            Vectors.dense(1, 1),
+                                            Vectors.dense(1, 0),
+                                            Vectors.dense(4, 1.5),
+                                            Vectors.dense(4, 0))),
+                            new HashSet<>(Arrays.asList(Vectors.dense(1, 4), Vectors.dense(4, 4))));
 
     private static final double TOLERANCE = 1e-7;
 
@@ -303,7 +307,9 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
     public void testTransformWithEventTimeTumblingWindows() throws Exception {
         RowTypeInfo outputTypeInfo =
                 new RowTypeInfo(
-                        new TypeInformation<?>[] {DenseVectorTypeInfo.INSTANCE, Types.INSTANT},
+                        new TypeInformation<?>[] {
+                            DenseIntDoubleVectorTypeInfo.INSTANCE, Types.INSTANT
+                        },
                         new String[] {"features", "ts"});
 
         Instant baseTime = Instant.now();
@@ -314,7 +320,7 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
 
         Schema schema =
                 Schema.newBuilder()
-                        .column("features", DataTypes.of(DenseVectorTypeInfo.INSTANCE))
+                        .column("features", DataTypes.of(DenseIntDoubleVectorTypeInfo.INSTANCE))
                         .column("ts", DataTypes.TIMESTAMP_LTZ(3))
                         .watermark("ts", "ts - INTERVAL '5' SECOND")
                         .build();
@@ -331,16 +337,17 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
         Table[] outputs = agglomerativeClustering.transform(inputDataTable);
 
         List<Row> output = IteratorUtils.toList(tEnv.toDataStream(outputs[0]).executeAndCollect());
-        List<Set<DenseVector>> actualGroups =
+        List<Set<DenseIntDoubleVector>> actualGroups =
                 KMeansTest.groupFeaturesByPrediction(
                         output,
                         agglomerativeClustering.getFeaturesCol(),
                         agglomerativeClustering.getPredictionCol());
 
         boolean isAllSubSet = true;
-        for (Set<DenseVector> expectedSet : EUCLIDEAN_WARD_EVENT_TIME_WINDOW_AS_TWO_RESULT) {
+        for (Set<DenseIntDoubleVector> expectedSet :
+                EUCLIDEAN_WARD_EVENT_TIME_WINDOW_AS_TWO_RESULT) {
             boolean isSubset = false;
-            for (Set<DenseVector> actualSet : actualGroups) {
+            for (Set<DenseIntDoubleVector> actualSet : actualGroups) {
                 if (actualSet.containsAll(expectedSet)) {
                     isSubset = true;
                     break;
@@ -440,13 +447,13 @@ public class AgglomerativeClusteringTest extends AbstractTestBase {
 
     @SuppressWarnings("unchecked")
     public void verifyClusteringResult(
-            List<Set<DenseVector>> expected,
+            List<Set<DenseIntDoubleVector>> expected,
             Table outputTable,
             String featureCol,
             String predictionCol)
             throws Exception {
         List<Row> output = IteratorUtils.toList(tEnv.toDataStream(outputTable).executeAndCollect());
-        List<Set<DenseVector>> actualGroups =
+        List<Set<DenseIntDoubleVector>> actualGroups =
                 KMeansTest.groupFeaturesByPrediction(output, featureCol, predictionCol);
         assertTrue(CollectionUtils.isEqualCollection(expected, actualGroups));
     }

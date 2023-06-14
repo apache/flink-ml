@@ -19,20 +19,20 @@
 package org.apache.flink.ml.linalg;
 
 import org.apache.flink.api.common.typeinfo.TypeInfo;
-import org.apache.flink.ml.linalg.typeinfo.SparseLongDoubleVectorTypeInfoFactory;
+import org.apache.flink.ml.linalg.typeinfo.SparseIntDoubleVectorTypeInfoFactory;
 import org.apache.flink.util.Preconditions;
 
 import java.util.Arrays;
+import java.util.Objects;
 
-/** A sparse vector of long indices and double values. */
-@TypeInfo(SparseLongDoubleVectorTypeInfoFactory.class)
-public class SparseLongDoubleVector implements SparseVector<Long, Double, long[], double[]> {
-
-    private final long n;
-    private long[] indices;
+/** A sparse vector of int indices and double values. */
+@TypeInfo(SparseIntDoubleVectorTypeInfoFactory.class)
+public class SparseIntDoubleVector implements SparseVector<Integer, Double, int[], double[]> {
+    public long n;
+    private int[] indices;
     private double[] values;
 
-    SparseLongDoubleVector(long n, long[] indices, double[] values) {
+    SparseIntDoubleVector(long n, int[] indices, double[] values) {
         this.n = n;
         this.indices = indices;
         this.values = values;
@@ -43,27 +43,17 @@ public class SparseLongDoubleVector implements SparseVector<Long, Double, long[]
     }
 
     @Override
-    public long[] getIndices() {
-        return indices;
-    }
-
-    @Override
-    public double[] getValues() {
-        return values;
-    }
-
-    @Override
     public long size() {
         return n;
     }
 
     @Override
-    public Double get(Long index) {
-        return get(index.longValue());
+    public Double get(Integer integer) {
+        return get(integer.intValue());
     }
 
     /** Avoids auto-boxing for better performance. */
-    public double get(long i) {
+    public double get(int i) {
         int pos = Arrays.binarySearch(indices, i);
         if (pos >= 0) {
             return values[pos];
@@ -72,18 +62,18 @@ public class SparseLongDoubleVector implements SparseVector<Long, Double, long[]
     }
 
     @Override
-    public void set(Long index, Double value) {
-        set(index.longValue(), value.doubleValue());
+    public void set(Integer index, Double value) {
+        set(index.intValue(), value.doubleValue());
     }
 
     /** Avoids auto-boxing for better performance. */
-    public void set(long i, double value) {
+    public void set(int i, double value) {
         int pos = Arrays.binarySearch(indices, i);
         if (pos >= 0) {
             values[pos] = value;
         } else if (value != 0.0) {
             Preconditions.checkArgument(i < n, "Index out of bounds: " + i);
-            long[] indices = new long[this.indices.length + 1];
+            int[] indices = new int[this.indices.length + 1];
             double[] values = new double[this.indices.length + 1];
             System.arraycopy(this.indices, 0, indices, 0, -pos - 1);
             System.arraycopy(this.values, 0, values, 0, -pos - 1);
@@ -97,36 +87,54 @@ public class SparseLongDoubleVector implements SparseVector<Long, Double, long[]
     }
 
     @Override
+    public int[] getIndices() {
+        return indices;
+    }
+
+    @Override
+    public double[] getValues() {
+        return values;
+    }
+
+    @Override
     public double[] toArray() {
-        Preconditions.checkState(n < Integer.MAX_VALUE, "The size of array exceeds INT.MAX.");
         double[] result = new double[(int) n];
         for (int i = 0; i < indices.length; i++) {
-            result[(int) indices[i]] = values[i];
+            result[indices[i]] = values[i];
         }
         return result;
     }
 
     @Override
-    public DenseVector<Long, Double, long[], double[]> toDense() {
-        throw new UnsupportedOperationException(
-                "Vector with long key cannot be converted to dense vector.");
+    public DenseIntDoubleVector toDense() {
+        return Vectors.dense(toArray());
     }
 
     @Override
-    public SparseVector<Long, Double, long[], double[]> toSparse() {
+    public SparseIntDoubleVector toSparse() {
         return this;
     }
 
     @Override
-    public SparseLongDoubleVector clone() {
-        return new SparseLongDoubleVector(n, indices.clone(), values.clone());
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        SparseIntDoubleVector that = (SparseIntDoubleVector) o;
+        return n == that.n
+                && Arrays.equals(indices, that.indices)
+                && Arrays.equals(values, that.values);
     }
 
     @Override
-    public String toString() {
-        String sbr =
-                "(" + n + ", " + Arrays.toString(indices) + ", " + Arrays.toString(values) + ")";
-        return sbr;
+    public int hashCode() {
+        int result = Objects.hash(n);
+        result = 31 * result + Arrays.hashCode(indices);
+        result = 31 * result + Arrays.hashCode(values);
+        return result;
     }
 
     /**
@@ -172,9 +180,9 @@ public class SparseLongDoubleVector implements SparseVector<Long, Double, long[]
     }
 
     /** Sorts the indices and values using quick sort. */
-    private static void sortImpl(long[] indices, double[] values, int low, int high) {
+    private static void sortImpl(int[] indices, double[] values, int low, int high) {
         int pivotPos = (low + high) / 2;
-        long pivot = indices[pivotPos];
+        int pivot = indices[pivotPos];
         swapIndexAndValue(indices, values, pivotPos, high);
 
         int pos = low - 1;
@@ -192,12 +200,24 @@ public class SparseLongDoubleVector implements SparseVector<Long, Double, long[]
         }
     }
 
-    private static void swapIndexAndValue(long[] indices, double[] values, int index1, int index2) {
-        long tempIndex = indices[index1];
+    private static void swapIndexAndValue(int[] indices, double[] values, int index1, int index2) {
+        int tempIndex = indices[index1];
         indices[index1] = indices[index2];
         indices[index2] = tempIndex;
         double tempValue = values[index1];
         values[index1] = values[index2];
         values[index2] = tempValue;
+    }
+
+    @Override
+    public String toString() {
+        String sbr =
+                "(" + n + ", " + Arrays.toString(indices) + ", " + Arrays.toString(values) + ")";
+        return sbr;
+    }
+
+    @Override
+    public SparseIntDoubleVector clone() {
+        return new SparseIntDoubleVector(n, indices.clone(), values.clone());
     }
 }
