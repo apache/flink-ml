@@ -36,6 +36,9 @@ public interface BinaryClassificationEvaluatorParams<T>
     String AREA_UNDER_PR = "areaUnderPR";
     String AREA_UNDER_LORENZ = "areaUnderLorenz";
     String KS = "ks";
+    String PRECISION = "precision";
+    String RECALL = "recall";
+    String F1 = "f1";
 
     /**
      * Param for supported metric names in binary classification evaluation (supports

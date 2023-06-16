@@ -125,6 +125,7 @@ public class BinaryClassificationEvaluatorTest extends AbstractTestBase {
     public void before() {
         env = TestUtils.getExecutionEnvironment();
         tEnv = StreamTableEnvironment.create(env);
+        //标签 ，特征向量
         inputDataTable =
                 tEnv.fromDataStream(env.fromCollection(INPUT_DATA)).as("label", "rawPrediction");
         inputDataTableScore =
@@ -171,14 +172,20 @@ public class BinaryClassificationEvaluatorTest extends AbstractTestBase {
                         .setMetricsNames(
                                 BinaryClassificationEvaluatorParams.AREA_UNDER_PR,
                                 BinaryClassificationEvaluatorParams.KS,
-                                BinaryClassificationEvaluatorParams.AREA_UNDER_ROC);
+                                BinaryClassificationEvaluatorParams.AREA_UNDER_ROC,
+                                BinaryClassificationEvaluatorParams.PRECISION,
+                                BinaryClassificationEvaluatorParams.F1,
+                                BinaryClassificationEvaluatorParams.RECALL);
         Table evalResult = eval.transform(inputDataTable)[0];
         List<Row> results = IteratorUtils.toList(evalResult.execute().collect());
         assertArrayEquals(
                 new String[] {
                     BinaryClassificationEvaluatorParams.AREA_UNDER_PR,
                     BinaryClassificationEvaluatorParams.KS,
-                    BinaryClassificationEvaluatorParams.AREA_UNDER_ROC
+                    BinaryClassificationEvaluatorParams.AREA_UNDER_ROC,
+                    BinaryClassificationEvaluatorParams.PRECISION,
+                    BinaryClassificationEvaluatorParams.F1,
+                    BinaryClassificationEvaluatorParams.RECALL
                 },
                 evalResult.getResolvedSchema().getColumnNames().toArray());
         Row result = results.get(0);
@@ -199,14 +206,20 @@ public class BinaryClassificationEvaluatorTest extends AbstractTestBase {
                         .setMetricsNames(
                                 BinaryClassificationEvaluatorParams.AREA_UNDER_PR,
                                 BinaryClassificationEvaluatorParams.KS,
-                                BinaryClassificationEvaluatorParams.AREA_UNDER_ROC);
+                                BinaryClassificationEvaluatorParams.AREA_UNDER_ROC,
+                                BinaryClassificationEvaluatorParams.PRECISION,
+                                BinaryClassificationEvaluatorParams.F1,
+                                BinaryClassificationEvaluatorParams.RECALL);
         Table evalResult = eval.transform(inputDataTable)[0];
         List<Row> results = IteratorUtils.toList(evalResult.execute().collect());
         assertArrayEquals(
                 new String[] {
                     BinaryClassificationEvaluatorParams.AREA_UNDER_PR,
                     BinaryClassificationEvaluatorParams.KS,
-                    BinaryClassificationEvaluatorParams.AREA_UNDER_ROC
+                    BinaryClassificationEvaluatorParams.AREA_UNDER_ROC,
+                    BinaryClassificationEvaluatorParams.PRECISION,
+                    BinaryClassificationEvaluatorParams.F1,
+                    BinaryClassificationEvaluatorParams.RECALL
                 },
                 evalResult.getResolvedSchema().getColumnNames().toArray());
         Row result = results.get(0);
@@ -222,14 +235,21 @@ public class BinaryClassificationEvaluatorTest extends AbstractTestBase {
                         .setMetricsNames(
                                 BinaryClassificationEvaluatorParams.AREA_UNDER_PR,
                                 BinaryClassificationEvaluatorParams.KS,
-                                BinaryClassificationEvaluatorParams.AREA_UNDER_ROC);
+                                BinaryClassificationEvaluatorParams.AREA_UNDER_ROC,
+                                BinaryClassificationEvaluatorParams.PRECISION,
+                                BinaryClassificationEvaluatorParams.F1,
+                                BinaryClassificationEvaluatorParams.RECALL
+                        );
         Table evalResult = eval.transform(inputDataTableScore)[0];
         List<Row> results = IteratorUtils.toList(evalResult.execute().collect());
         assertArrayEquals(
                 new String[] {
                     BinaryClassificationEvaluatorParams.AREA_UNDER_PR,
                     BinaryClassificationEvaluatorParams.KS,
-                    BinaryClassificationEvaluatorParams.AREA_UNDER_ROC
+                    BinaryClassificationEvaluatorParams.AREA_UNDER_ROC,
+                    BinaryClassificationEvaluatorParams.PRECISION,
+                    BinaryClassificationEvaluatorParams.F1,
+                    BinaryClassificationEvaluatorParams.RECALL
                 },
                 evalResult.getResolvedSchema().getColumnNames().toArray());
         Row result = results.get(0);
@@ -252,14 +272,20 @@ public class BinaryClassificationEvaluatorTest extends AbstractTestBase {
                         .setMetricsNames(
                                 BinaryClassificationEvaluatorParams.AREA_UNDER_PR,
                                 BinaryClassificationEvaluatorParams.KS,
-                                BinaryClassificationEvaluatorParams.AREA_UNDER_ROC);
+                                BinaryClassificationEvaluatorParams.AREA_UNDER_ROC,
+                                BinaryClassificationEvaluatorParams.PRECISION,
+                                BinaryClassificationEvaluatorParams.F1,
+                                BinaryClassificationEvaluatorParams.RECALL);
         Table evalResult = eval.transform(inputDataTable)[0];
         List<Row> results = IteratorUtils.toList(evalResult.execute().collect());
         assertArrayEquals(
                 new String[] {
                     BinaryClassificationEvaluatorParams.AREA_UNDER_PR,
                     BinaryClassificationEvaluatorParams.KS,
-                    BinaryClassificationEvaluatorParams.AREA_UNDER_ROC
+                    BinaryClassificationEvaluatorParams.AREA_UNDER_ROC,
+                    BinaryClassificationEvaluatorParams.PRECISION,
+                    BinaryClassificationEvaluatorParams.F1,
+                    BinaryClassificationEvaluatorParams.RECALL
                 },
                 evalResult.getResolvedSchema().getColumnNames().toArray());
         Row result = results.get(0);
@@ -276,7 +302,10 @@ public class BinaryClassificationEvaluatorTest extends AbstractTestBase {
                                 BinaryClassificationEvaluatorParams.AREA_UNDER_ROC,
                                 BinaryClassificationEvaluatorParams.AREA_UNDER_PR,
                                 BinaryClassificationEvaluatorParams.KS,
-                                BinaryClassificationEvaluatorParams.AREA_UNDER_LORENZ);
+                                BinaryClassificationEvaluatorParams.AREA_UNDER_LORENZ,
+                                BinaryClassificationEvaluatorParams.PRECISION,
+                                BinaryClassificationEvaluatorParams.F1,
+                                BinaryClassificationEvaluatorParams.RECALL);
         Table evalResult = eval.transform(inputDataTableWithMultiScore)[0];
         List<Row> results = IteratorUtils.toList(evalResult.execute().collect());
         assertArrayEquals(
@@ -284,7 +313,10 @@ public class BinaryClassificationEvaluatorTest extends AbstractTestBase {
                     BinaryClassificationEvaluatorParams.AREA_UNDER_ROC,
                     BinaryClassificationEvaluatorParams.AREA_UNDER_PR,
                     BinaryClassificationEvaluatorParams.KS,
-                    BinaryClassificationEvaluatorParams.AREA_UNDER_LORENZ
+                    BinaryClassificationEvaluatorParams.AREA_UNDER_LORENZ,
+                    BinaryClassificationEvaluatorParams.PRECISION,
+                    BinaryClassificationEvaluatorParams.F1,
+                    BinaryClassificationEvaluatorParams.RECALL
                 },
                 evalResult.getResolvedSchema().getColumnNames().toArray());
         Row result = results.get(0);
@@ -314,7 +346,10 @@ public class BinaryClassificationEvaluatorTest extends AbstractTestBase {
                         .setMetricsNames(
                                 BinaryClassificationEvaluatorParams.AREA_UNDER_PR,
                                 BinaryClassificationEvaluatorParams.KS,
-                                BinaryClassificationEvaluatorParams.AREA_UNDER_ROC);
+                                BinaryClassificationEvaluatorParams.AREA_UNDER_ROC,
+                                BinaryClassificationEvaluatorParams.PRECISION,
+                                BinaryClassificationEvaluatorParams.F1,
+                                BinaryClassificationEvaluatorParams.RECALL);
         BinaryClassificationEvaluator loadedEval =
                 TestUtils.saveAndReload(
                         tEnv,
@@ -326,7 +361,10 @@ public class BinaryClassificationEvaluatorTest extends AbstractTestBase {
                 new String[] {
                     BinaryClassificationEvaluatorParams.AREA_UNDER_PR,
                     BinaryClassificationEvaluatorParams.KS,
-                    BinaryClassificationEvaluatorParams.AREA_UNDER_ROC
+                    BinaryClassificationEvaluatorParams.AREA_UNDER_ROC,
+                    BinaryClassificationEvaluatorParams.PRECISION,
+                    BinaryClassificationEvaluatorParams.F1,
+                    BinaryClassificationEvaluatorParams.RECALL
                 },
                 evalResult.getResolvedSchema().getColumnNames().toArray());
         List<Row> results = IteratorUtils.toList(evalResult.execute().collect());

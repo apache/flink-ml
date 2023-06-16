@@ -68,6 +68,7 @@ public class BroadcastUtils {
             Function<List<DataStream<?>>, DataStream<OUT>> userDefinedFunction) {
         Preconditions.checkArgument(inputList.size() > 0);
 
+        // bcStreams为需要广播的中间算子
         StreamExecutionEnvironment env = inputList.get(0).getExecutionEnvironment();
         String[] broadcastNames = new String[bcStreams.size()];
         DataStream<?>[] broadcastInputs = new DataStream[bcStreams.size()];

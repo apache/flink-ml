@@ -169,10 +169,14 @@ public class BinaryClassificationEvaluator
                                     return t2;
                                 });
 
+        // First sort the scores from large to small, and then set the rank of the sample corresponding to the largest score to n,
+        // The rank of the sample corresponding to the second largest score is n-1, and so on.
+        // Then add the ranks of all positive samples, and then subtract the M-1 combination of two positive samples
         DataStream<Double> areaUnderROC =
                 middleAreaUnderROC.map(
                         (MapFunction<double[], Double>)
                                 value -> {
+                            // <score, order, ispostive, weight>
                                     if (value[1] > 0 && value[2] > 0) {
                                         return (value[0] - 1. * value[1] * (value[1] + 1) / 2)
                                                 / (value[1] * value[2]);
@@ -184,6 +188,7 @@ public class BinaryClassificationEvaluator
         Map<String, DataStream<?>> broadcastMap = new HashMap<>();
         broadcastMap.put(partitionSummariesKey, partitionSummaries);
         broadcastMap.put(AREA_UNDER_ROC, areaUnderROC);
+        // Gather evaluation information for local sorting
         DataStream<BinaryMetrics> localMetrics =
                 BroadcastUtils.withBroadcastStream(
                         Collections.singletonList(sortEvalData),
@@ -366,6 +371,9 @@ public class BinaryClassificationEvaluator
             map.put(AREA_UNDER_PR, reduceMetrics.areaUnderPR);
             map.put(AREA_UNDER_LORENZ, reduceMetrics.areaUnderLorenz);
             map.put(KS, reduceMetrics.ks);
+            map.put(PRECISION, reduceMetrics.precision);
+            map.put(RECALL, reduceMetrics.recall);
+            map.put(F1, reduceMetrics.f1);
             out.collect(map);
         }
     }
@@ -408,23 +416,36 @@ public class BinaryClassificationEvaluator
         }
     }
 
+    //更新二分类预估值指标
     private static void updateBinaryMetrics(
             Tuple3<Double, Boolean, Double> cur,
             BinaryMetrics binaryMetrics,
             long[] countValues,
             double[] recordValues) {
+        // 正确预测为真，正确预测为假，全部预测为真，全部预测为假
         if (binaryMetrics.count == 0) {
+            //正确预测为真/全部预测为真
             recordValues[0] = countValues[2] == 0 ? 1.0 : 1.0 * countValues[0] / countValues[2];
+            //正确预测为假/全部预测为假
             recordValues[1] = countValues[3] == 0 ? 1.0 : 1.0 * countValues[1] / countValues[3];
+            //正确预测为真的、全部预测为真（精确率）
             recordValues[2] =
                     countValues[0] + countValues[1] == 0
                             ? 1.0
                             : 1.0 * countValues[0] / (countValues[0] + countValues[1]);
+            // 所有的预测正确（正类负类）/总样本 (准确率)
             recordValues[3] =
                     1.0 * (countValues[0] + countValues[1]) / (countValues[2] + countValues[3]);
         }
 
         binaryMetrics.count++;
+        //cur:
+        // maximum score in this partition
+        //   f0 -> public double maxScore;
+        //  // real positives in this partition
+        //  f1 -> public long curPositive;
+        // // real negatives in this partition
+        //  f2 -> public long curNegative;
         if (cur.f1) {
             countValues[0]++;
         } else {
@@ -443,6 +464,9 @@ public class BinaryClassificationEvaluator
         binaryMetrics.areaUnderLorenz +=
                 ((positiveRate - recordValues[3]) * (tpr + recordValues[0]) / 2);
         binaryMetrics.areaUnderPR += ((tpr - recordValues[0]) * (precision + recordValues[2]) / 2);
+        binaryMetrics.precision = precision ;
+        binaryMetrics.recall = tpr ;
+        binaryMetrics.f1 = 1 / precision + 1 / tpr;
         binaryMetrics.ks = Math.max(Math.abs(fpr - tpr), binaryMetrics.ks);
 
         recordValues[0] = tpr;
@@ -698,6 +722,15 @@ public class BinaryClassificationEvaluator
 
         /* Area under Lorenz */
         public double areaUnderLorenz;
+
+        /* precision  */
+        public double precision;
+
+        /* recall */
+        public double recall;
+
+        /*  F-measure */
+        public double f1;
 
         /* Area under PRC */
         public double areaUnderPR;
