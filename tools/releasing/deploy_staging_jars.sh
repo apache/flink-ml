@@ -22,6 +22,14 @@
 ##
 MVN=${MVN:-mvn}
 CUSTOM_OPTIONS=${CUSTOM_OPTIONS:-}
+SUPPORTED_FLINK_VERSIONS=${SUPPORTED_FLINK_VERSIONS:-}
+
+# The variable SUPPORTED_FLINK_VERSIONS must be set, which contains all supported flink
+# versions with comma separated, e.g. "1.15,1.16.1.17".
+if [ "${SUPPORTED_FLINK_VERSIONS}" = "" ]; then
+    echo "Variable SUPPORTED_FLINK_VERSIONS is not set, stop deploying."
+    exit 1
+fi
 
 # fail immediately
 set -o errexit
@@ -41,7 +49,11 @@ fi
 
 cd ${PROJECT_ROOT}
 
-echo "Deploying to repository.apache.org"
-${MVN} clean deploy -Papache-release -DskipTests -DretryFailedDeploymentCount=10 $CUSTOM_OPTIONS
+IFS=',' read -r -a arr <<< "${SUPPORTED_FLINK_VERSIONS}"
+for v in ${arr[@]}
+do
+    echo "Deploying Flink ML with flink-${v} to repository.apache.org."
+    ${MVN} clean deploy -Papache-release -Pflink-${v} -DskipTests -DretryFailedDeploymentCount=10 $CUSTOM_OPTIONS
+done
 
 cd ${CURR_DIR}
