@@ -32,7 +32,9 @@ jobs:
     strategy:
       matrix:
         os: ['macOS-latest', 'ubuntu-20.04']
-        python-version: ['3.7', '3.8']
+        # TODO: Revert back to 3.7 once the Mac agent's Python v3.7 contains bz2 again,
+        # the issue can be tracked via https://github.com/actions/setup-python/issues/682.
+        python-version: ['3.7.16', '3.8']
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
