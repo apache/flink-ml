@@ -31,7 +31,7 @@ under the License.
   <artifactId>flink-ml-parent</artifactId>
   <groupId>org.apache.flink</groupId>
   <name>Flink ML</name>
-  <version>2.3-SNAPSHOT</version>
+  <version>2.4-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <url>http://flink.apache.org</url>
