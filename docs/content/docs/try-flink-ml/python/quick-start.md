@@ -256,7 +256,7 @@ $ tar -xzf flink-*.tgz
 
 ### Set Up Flink Library and Environment Variables
 
-Run the followig commands after having downloaded Flink.
+Run the following commands after having downloaded Flink:
 
 ```bash
 cd ${path_to_flink}
@@ -284,7 +284,7 @@ cp apache-flink-ml-*/deps/lib/* $FLINK_HOME/lib/
 
 Given that you have followed this [guideline]({{< ref
 "docs/development/build-and-install#build-and-install-python-sdk" >}}), you
-would have already built Flink ML's Java SDK. Now, you need to copy the
+would have already built Flink ML's Python SDK. Now, you need to copy the
 generated library files to Flink's folder with the following commands.
 
 ```shell
