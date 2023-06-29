@@ -248,19 +248,19 @@ $ java -version
 
 ### Download Flink
 
-[Download Flink 1.17](https://flink.apache.org/downloads.html), then extract the archive:
+Download [Flink 1.17](https://flink.apache.org/downloads.html), then extract the archive:
 
 ```shell
 $ tar -xzf flink-*.tgz
 ```
 
-### Set Up Flink Environment Variables
+### Set Up Flink Library and Environment Variables
 
-After having downloaded Flink, please register `$FLINK_HOME` as an environment
-variable into your local environment.
+Run the followig commands after having downloaded Flink.
 
 ```bash
 cd ${path_to_flink}
+cp opt/flink-python* lib/
 export FLINK_HOME=`pwd`
 ```
 
@@ -271,20 +271,13 @@ initialization.
 
 {{< stable >}}
 
-Please [download the correponding binary
-release](https://flink.apache.org/downloads.html) of Flink ML, then extract the
-archive:
+Please download [Flink ML Python
+source](https://flink.apache.org/downloads.html) and extract the jar files into
+Flink's library folder.
 
 ```shell
-tar -xzf flink-ml-*.tgz
-```
-
-Then you may copy the extracted library files to Flink's folder with the
-following commands.
-
-```shell
-cd ${path_to_flink_ml}
-cp ./lib/*.jar $FLINK_HOME/lib/
+tar -xzf apache-flink-ml*.tar.gz
+cp apache-flink-ml-*/deps/lib/* $FLINK_HOME/lib/
 ```
 
 {{< /stable >}} {{< unstable >}}
