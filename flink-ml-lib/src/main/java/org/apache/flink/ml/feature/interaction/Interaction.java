@@ -30,6 +30,7 @@ import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.RowUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -101,7 +102,7 @@ public class Interaction implements Transformer<Interaction>, InteractionParams<
             for (int i = 0; i < inputCols.length; ++i) {
                 Object obj = value.getField(inputCols[i]);
                 if (obj == null) {
-                    return Row.join(value, Row.of((Object) null));
+                    return RowUtils.append(value, null);
                 }
 
                 if (obj instanceof DenseVector) {
@@ -173,7 +174,7 @@ public class Interaction implements Transformer<Interaction>, InteractionParams<
                 ret = new DenseVector(values);
             }
 
-            return Row.join(value, Row.of(ret));
+            return RowUtils.append(value, ret);
         }
     }
 

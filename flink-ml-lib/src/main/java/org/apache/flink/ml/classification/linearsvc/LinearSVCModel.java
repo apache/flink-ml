@@ -20,6 +20,7 @@ package org.apache.flink.ml.classification.linearsvc;
 
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
@@ -32,6 +33,7 @@ import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.RowUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -153,9 +155,14 @@ public class LinearSVCModel implements Model<LinearSVCModel>, LinearSVCModelPara
                                 getRuntimeContext().getBroadcastVariable(broadcastModelKey).get(0);
                 coefficient = modelData.coefficient;
             }
+
             DenseVector features = ((Vector) dataPoint.getField(featuresCol)).toDense();
-            Row predictionResult = predictOneDataPoint(features, coefficient, threshold);
-            return Row.join(dataPoint, predictionResult);
+            Tuple2<Double, DenseVector> predictionResult =
+                    predictOneDataPoint(features, coefficient, threshold);
+            Row result = RowUtils.cloneWithReservedFields(dataPoint, 2);
+            result.setField(dataPoint.getArity(), predictionResult.f0);
+            result.setField(dataPoint.getArity() + 1, predictionResult.f1);
+            return result;
         }
     }
 
@@ -167,9 +174,9 @@ public class LinearSVCModel implements Model<LinearSVCModel>, LinearSVCModelPara
      * @param threshold The threshold for prediction.
      * @return The prediction label and the raw predictions.
      */
-    private static Row predictOneDataPoint(
+    private static Tuple2<Double, DenseVector> predictOneDataPoint(
             DenseVector feature, DenseVector coefficient, double threshold) {
         double dotValue = BLAS.dot(feature, coefficient);
-        return Row.of(dotValue >= threshold ? 1.0 : 0.0, Vectors.dense(dotValue, -dotValue));
+        return Tuple2.of(dotValue >= threshold ? 1.0 : 0.0, Vectors.dense(dotValue, -dotValue));
     }
 }

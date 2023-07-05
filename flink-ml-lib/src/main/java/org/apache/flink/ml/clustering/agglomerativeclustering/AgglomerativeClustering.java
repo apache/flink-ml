@@ -33,6 +33,7 @@ import org.apache.flink.ml.linalg.VectorWithNorm;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.RowUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.functions.windowing.ProcessAllWindowFunction;
@@ -263,7 +264,7 @@ public class AgglomerativeClustering
             }
 
             for (int i = 0; i < numDataPoints; i++) {
-                output.collect(Row.join(inputList.get(i), Row.of(clusterIds[i])));
+                output.collect(RowUtils.append(inputList.get(i), clusterIds[i]));
             }
 
             // Outputs the merge info.

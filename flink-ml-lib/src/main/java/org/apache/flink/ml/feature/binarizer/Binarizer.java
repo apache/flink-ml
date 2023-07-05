@@ -33,6 +33,7 @@ import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.RowUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -111,11 +112,13 @@ public class Binarizer implements Transformer<Binarizer>, BinarizerParams<Binari
                 return null;
             }
 
-            Row result = new Row(inputCols.length);
+            Row result = RowUtils.cloneWithReservedFields(input, inputCols.length);
             for (int i = 0; i < inputCols.length; ++i) {
-                result.setField(i, binarizerFunc(input.getField(inputCols[i]), thresholds[i]));
+                result.setField(
+                        i + input.getArity(),
+                        binarizerFunc(input.getField(inputCols[i]), thresholds[i]));
             }
-            return Row.join(input, result);
+            return result;
         }
 
         private Object binarizerFunc(Object obj, double threshold) {

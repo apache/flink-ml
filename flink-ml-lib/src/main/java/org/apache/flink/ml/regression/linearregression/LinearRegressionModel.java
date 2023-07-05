@@ -30,6 +30,7 @@ import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.RowUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -143,8 +144,8 @@ public class LinearRegressionModel
                 coefficient = modelData.coefficient;
             }
             DenseVector features = ((Vector) dataPoint.getField(featuresCol)).toDense();
-            Row predictionResult = predictOneDataPoint(features, coefficient);
-            return Row.join(dataPoint, predictionResult);
+            double predictionResult = predictOneDataPoint(features, coefficient);
+            return RowUtils.append(dataPoint, predictionResult);
         }
     }
 
@@ -155,7 +156,7 @@ public class LinearRegressionModel
      * @param coefficient The model parameters.
      * @return The prediction label and the raw probabilities.
      */
-    private static Row predictOneDataPoint(DenseVector feature, DenseVector coefficient) {
-        return Row.of(BLAS.dot(feature, coefficient));
+    private static double predictOneDataPoint(DenseVector feature, DenseVector coefficient) {
+        return BLAS.dot(feature, coefficient);
     }
 }

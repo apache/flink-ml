@@ -30,6 +30,7 @@ import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.RowUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -125,7 +126,7 @@ public class UnivariateFeatureSelectorModel
             }
 
             if (indices.length == 0) {
-                return Row.join(row, Row.of(Vectors.dense()));
+                return RowUtils.append(row, Vectors.dense());
             } else {
                 Vector inputVec = ((Vector) row.getField(inputCol));
                 Preconditions.checkArgument(
@@ -135,7 +136,7 @@ public class UnivariateFeatureSelectorModel
                         inputVec.size(),
                         indices[indices.length - 1] + 1);
                 Vector outputVec = VectorUtils.selectByIndices(inputVec, indices);
-                return Row.join(row, Row.of(outputVec));
+                return RowUtils.append(row, outputVec);
             }
         }
     }

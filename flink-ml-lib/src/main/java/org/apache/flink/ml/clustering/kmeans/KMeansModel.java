@@ -32,6 +32,7 @@ import org.apache.flink.ml.linalg.VectorWithNorm;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.RowUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -140,7 +141,7 @@ public class KMeansModel implements Model<KMeansModel>, KMeansModelParams<KMeans
             DenseVector point = ((Vector) dataPoint.getField(featuresCol)).toDense();
             int closestCentroidId =
                     distanceMeasure.findClosest(centroids, new VectorWithNorm(point));
-            return Row.join(dataPoint, Row.of(closestCentroidId));
+            return RowUtils.append(dataPoint, closestCentroidId);
         }
     }
 

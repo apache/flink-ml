@@ -29,6 +29,7 @@ import org.apache.flink.ml.common.param.HasHandleInvalid;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.RowUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -163,7 +164,7 @@ public class StringIndexerModel
                 }
             }
 
-            Row outputIndices = new Row(inputCols.length);
+            Row result = RowUtils.cloneWithReservedFields(input, inputCols.length);
             for (int i = 0; i < inputCols.length; i++) {
                 Object objVal = input.getField(inputCols[i]);
                 String stringVal;
@@ -179,7 +180,7 @@ public class StringIndexerModel
                 }
 
                 if (modelDataMap[i].containsKey(stringVal)) {
-                    outputIndices.setField(i, modelDataMap[i].get(stringVal));
+                    result.setField(i + input.getArity(), modelDataMap[i].get(stringVal));
                 } else {
                     switch (handleInValid) {
                         case SKIP_INVALID:
@@ -192,7 +193,7 @@ public class StringIndexerModel
                                             + HANDLE_INVALID
                                             + " parameter for more options.");
                         case KEEP_INVALID:
-                            outputIndices.setField(i, (double) modelDataMap[i].size());
+                            result.setField(i + input.getArity(), (double) modelDataMap[i].size());
                             break;
                         default:
                             throw new UnsupportedOperationException(
@@ -201,7 +202,7 @@ public class StringIndexerModel
                 }
             }
 
-            out.collect(Row.join(input, outputIndices));
+            out.collect(result);
         }
     }
 }

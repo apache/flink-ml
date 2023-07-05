@@ -28,6 +28,7 @@ import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.RowUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -146,18 +147,18 @@ public class IndexToStringModel
                 stringArrays = modelData.stringArrays;
             }
 
-            Row outputStrings = new Row(inputCols.length);
+            Row result = RowUtils.cloneWithReservedFields(input, inputCols.length);
             for (int i = 0; i < inputCols.length; i++) {
                 int stringId = (Integer) input.getField(inputCols[i]);
                 if (stringId < stringArrays[i].length && stringId >= 0) {
-                    outputStrings.setField(i, stringArrays[i][stringId]);
+                    result.setField(i + input.getArity(), stringArrays[i][stringId]);
                 } else {
                     throw new RuntimeException(
                             "The input contains unseen index: " + stringId + ".");
                 }
             }
 
-            out.collect(Row.join(input, outputStrings));
+            out.collect(result);
         }
     }
 }

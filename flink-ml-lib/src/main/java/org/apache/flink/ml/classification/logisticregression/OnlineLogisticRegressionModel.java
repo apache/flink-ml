@@ -32,6 +32,7 @@ import org.apache.flink.ml.linalg.Vector;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.RowUtils;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
@@ -165,14 +166,11 @@ public class OnlineLogisticRegressionModel
             Vector features = (Vector) dataPoint.getField(servable.getFeaturesCol());
             Tuple2<Double, DenseVector> predictionResult = servable.transform(features);
 
-            output.collect(
-                    new StreamRecord<>(
-                            Row.join(
-                                    dataPoint,
-                                    Row.of(
-                                            predictionResult.f0,
-                                            predictionResult.f1,
-                                            modelDataVersion))));
+            Row result = RowUtils.cloneWithReservedFields(dataPoint, 3);
+            result.setField(dataPoint.getArity(), predictionResult.f0);
+            result.setField(dataPoint.getArity() + 1, predictionResult.f1);
+            result.setField(dataPoint.getArity() + 2, modelDataVersion);
+            output.collect(new StreamRecord<>(result));
         }
     }
 

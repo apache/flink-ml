@@ -28,6 +28,7 @@ import org.apache.flink.ml.common.param.HasHandleInvalid;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.RowUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -102,7 +103,7 @@ public class Bucketizer implements Transformer<Bucketizer>, BucketizerParams<Buc
 
         @Override
         public void flatMap(Row value, Collector<Row> out) {
-            Row outputRow = new Row(inputCols.length);
+            Row result = RowUtils.cloneWithReservedFields(value, inputCols.length);
 
             for (int i = 0; i < inputCols.length; i++) {
                 double feature = ((Number) value.getField(inputCols[i])).doubleValue();
@@ -115,13 +116,13 @@ public class Bucketizer implements Transformer<Bucketizer>, BucketizerParams<Buc
                         if (index == splits.length - 1) {
                             index--;
                         }
-                        outputRow.setField(i, index);
+                        result.setField(i + value.getArity(), index);
                     } else {
                         index = -index - 1;
                         if (index == 0 || index == splits.length) {
                             isInvalid = true;
                         } else {
-                            outputRow.setField(i, index - 1);
+                            result.setField(i + value.getArity(), index - 1);
                         }
                     }
                 } else {
@@ -138,7 +139,7 @@ public class Bucketizer implements Transformer<Bucketizer>, BucketizerParams<Buc
                         case SKIP_INVALID:
                             return;
                         case KEEP_INVALID:
-                            outputRow.setField(i, (double) splits.length - 1);
+                            result.setField(i + value.getArity(), (double) splits.length - 1);
                             break;
                         default:
                             throw new UnsupportedOperationException(
@@ -146,7 +147,7 @@ public class Bucketizer implements Transformer<Bucketizer>, BucketizerParams<Buc
                     }
                 }
             }
-            out.collect(Row.join(value, outputRow));
+            out.collect(result);
         }
     }
 
