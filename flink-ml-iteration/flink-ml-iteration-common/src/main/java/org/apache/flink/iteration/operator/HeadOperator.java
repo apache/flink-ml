@@ -461,12 +461,14 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
             PrioritizedDeque<BufferConsumerWithPartialRecordLength> queue =
                     ReflectionUtils.getFieldValue(
                             pipelinedSubpartition, PipelinedSubpartition.class, "buffers");
-            for (BufferConsumerWithPartialRecordLength bufferConsumer : queue) {
-                if (!bufferConsumer.getBufferConsumer().isBuffer()) {
-                    events.add(
-                            EventSerializer.fromBuffer(
-                                    bufferConsumer.getBufferConsumer().copy().build(),
-                                    getClass().getClassLoader()));
+            synchronized (queue) {
+                for (BufferConsumerWithPartialRecordLength bufferConsumer : queue) {
+                    if (!bufferConsumer.getBufferConsumer().isBuffer()) {
+                        events.add(
+                                EventSerializer.fromBuffer(
+                                        bufferConsumer.getBufferConsumer().copy().build(),
+                                        getClass().getClassLoader()));
+                    }
                 }
             }
         } else {
