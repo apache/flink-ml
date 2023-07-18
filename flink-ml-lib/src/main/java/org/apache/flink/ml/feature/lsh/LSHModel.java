@@ -39,6 +39,7 @@ import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
+import org.apache.flink.ml.util.RowUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -331,7 +332,7 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
                                 getRuntimeContext().getBroadcastVariable(MODEL_DATA_BC_KEY).get(0);
             }
             Vector[] hashValues = modelData.hashFunction(value.getFieldAs(inputCol));
-            return Row.join(value, Row.of((Object) hashValues));
+            return RowUtils.append(value, hashValues);
         }
     }
 
@@ -369,7 +370,7 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
             }
             Vector vec = value.getFieldAs(inputCol);
             double dist = modelData.keyDistance(key, vec);
-            out.collect(Row.join(value, Row.of(dist)));
+            out.collect(RowUtils.append(value, dist));
         }
     }
 
@@ -446,10 +447,10 @@ abstract class LSHModel<T extends LSHModel<T>> implements Model<T>, LSHModelPara
 
         @Override
         public void flatMap(Row value, Collector<Row> out) throws Exception {
-            Row kept = Row.of(value.getField(idCol), value.getField(inputCol));
             DenseVector[] hashValues = value.getFieldAs(outputCol);
             for (int i = 0; i < hashValues.length; i += 1) {
-                out.collect(Row.join(kept, Row.of(i, hashValues[i])));
+                out.collect(
+                        Row.of(value.getField(idCol), value.getField(inputCol), i, hashValues[i]));
             }
         }
     }

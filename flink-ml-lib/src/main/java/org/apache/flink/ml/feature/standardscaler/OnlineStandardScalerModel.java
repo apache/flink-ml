@@ -36,6 +36,7 @@ import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.RowUtils;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -276,13 +277,13 @@ public class OnlineStandardScalerModel
             if (modelVersionCol == null) {
                 output.collect(
                         new StreamRecord<>(
-                                Row.join(dataPoint, Row.of(outputVec)),
+                                RowUtils.append(dataPoint, outputVec),
                                 streamRecord.getTimestamp()));
             } else {
-                output.collect(
-                        new StreamRecord<>(
-                                Row.join(dataPoint, Row.of(outputVec, modelVersion)),
-                                streamRecord.getTimestamp()));
+                Row result = RowUtils.cloneWithReservedFields(dataPoint, 2);
+                result.setField(dataPoint.getArity(), outputVec);
+                result.setField(dataPoint.getArity() + 1, modelVersion);
+                output.collect(new StreamRecord<>(result, streamRecord.getTimestamp()));
             }
         }
     }

@@ -27,6 +27,7 @@ import org.apache.flink.ml.linalg.typeinfo.SparseVectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.RowUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -153,7 +154,7 @@ public class HashingTF implements Transformer<HashingTF>, HashingTFParams<Hashin
                 values[idx] = entry.getValue();
                 idx++;
             }
-            return Row.join(row, Row.of(Vectors.sparse(numFeatures, indices, values)));
+            return RowUtils.append(row, Vectors.sparse(numFeatures, indices, values));
         }
     }
 

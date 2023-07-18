@@ -29,6 +29,7 @@ import org.apache.flink.ml.linalg.typeinfo.DenseVectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.RowUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -119,7 +120,7 @@ public class DCT implements Transformer<DCT>, DCTParams<DCT> {
 
             dctTransformer.accept(array, true);
 
-            return Row.join(row, Row.of(Vectors.dense(array)));
+            return RowUtils.append(row, Vectors.dense(array));
         }
     }
 

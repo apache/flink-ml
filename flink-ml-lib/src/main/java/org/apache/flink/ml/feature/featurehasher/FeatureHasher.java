@@ -27,6 +27,7 @@ import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.RowUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Table;
@@ -137,7 +138,7 @@ public class FeatureHasher
                 values[pos] = entry.getValue();
                 pos++;
             }
-            return Row.join(row, Row.of(new SparseVector(numFeatures, indices, values)));
+            return RowUtils.append(row, new SparseVector(numFeatures, indices, values));
         }
     }
 

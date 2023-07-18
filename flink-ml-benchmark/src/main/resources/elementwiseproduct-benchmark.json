@@ -15,18 +15,18 @@
 
 {
   "version": 1,
-  "elementwiseproduct10000000": {
+  "elementwiseproduct100000000": {
     "inputData": {
       "className": "org.apache.flink.ml.benchmark.datagenerator.common.DenseVectorGenerator",
       "paramMap": {
         "vectorDim": 5,
         "colNames": [
           [
-            "featuresCol"
+            "input"
           ]
         ],
         "seed": 2,
-        "numValues": 10000000
+        "numValues": 100000000
       }
     },
     "stage": {

@@ -28,6 +28,7 @@ import org.apache.flink.ml.common.datastream.TableUtils;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.RowUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -153,18 +154,18 @@ public class ImputerModel implements Model<ImputerModel>, ImputerModelParams<Imp
                                                 col));
             }
 
-            Row outputRow = new Row(inputCols.length);
+            Row result = RowUtils.cloneWithReservedFields(row, inputCols.length);
             for (int i = 0; i < inputCols.length; i++) {
                 Object value = row.getField(i);
                 if (value == null || Double.valueOf(value.toString()).equals(missingValue)) {
                     double surrogate = surrogates.get(inputCols[i]);
-                    outputRow.setField(i, surrogate);
+                    result.setField(i + row.getArity(), surrogate);
                 } else {
-                    outputRow.setField(i, Double.valueOf(value.toString()));
+                    result.setField(i + row.getArity(), Double.valueOf(value.toString()));
                 }
             }
 
-            return Row.join(row, outputRow);
+            return result;
         }
     }
 }

@@ -32,6 +32,7 @@ import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.RowUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -116,7 +117,7 @@ public class VectorAssembler
                         nnz * RATIO > vectorSize
                                 ? assembleDense(inputCols, value, vectorSize)
                                 : assembleSparse(inputCols, value, vectorSize, nnz);
-                out.collect(Row.join(value, Row.of(assembledVec)));
+                out.collect(RowUtils.append(value, assembledVec));
             } catch (Exception e) {
                 if (handleInvalid.equals(ERROR_INVALID)) {
                     throw new RuntimeException("Vector assembler failed with exception : " + e);

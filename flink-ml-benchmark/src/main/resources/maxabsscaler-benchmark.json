@@ -22,7 +22,7 @@
         "vectorDim": 100,
         "colNames": [
           [
-            "featuresCol"
+            "input"
           ]
         ],
         "seed": 2,

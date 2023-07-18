@@ -30,6 +30,7 @@ import org.apache.flink.ml.linalg.typeinfo.VectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.RowUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -138,7 +139,7 @@ public class RobustScalerModel
             if (withScaling) {
                 BLAS.hDot(scales, outputVec);
             }
-            return Row.join(row, Row.of(outputVec));
+            return RowUtils.append(row, outputVec);
         }
     }
 

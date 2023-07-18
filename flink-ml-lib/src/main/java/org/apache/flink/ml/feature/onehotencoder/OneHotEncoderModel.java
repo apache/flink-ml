@@ -31,6 +31,7 @@ import org.apache.flink.ml.linalg.typeinfo.SparseVectorTypeInfo;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.ml.util.RowUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -167,7 +168,7 @@ public class OneHotEncoderModel
             for (Tuple2<Integer, Integer> tup : model) {
                 categorySizes[tup.f0] = tup.f1 + offset;
             }
-            Row result = new Row(categorySizes.length);
+            Row result = RowUtils.cloneWithReservedFields(row, categorySizes.length);
             for (int i = 0; i < categorySizes.length; i++) {
                 Number number = (Number) row.getField(inputCols[i]);
                 Preconditions.checkArgument(
@@ -175,15 +176,17 @@ public class OneHotEncoderModel
                         String.format("Value %s cannot be parsed as indexed integer.", number));
                 int idx = number.intValue();
                 if (idx == categorySizes[i]) {
-                    result.setField(i, Vectors.sparse(categorySizes[i], new int[0], new double[0]));
+                    result.setField(
+                            i + row.getArity(),
+                            Vectors.sparse(categorySizes[i], new int[0], new double[0]));
                 } else {
                     result.setField(
-                            i,
+                            i + row.getArity(),
                             Vectors.sparse(categorySizes[i], new int[] {idx}, new double[] {1.0}));
                 }
             }
 
-            return Row.join(row, result);
+            return result;
         }
     }
 }
