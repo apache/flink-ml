@@ -46,7 +46,8 @@ import java.util.List;
  * <p>This class basically stores data in file system, and provides the option to cache them in
  * memory. In order to use the memory caching option, users need to allocate certain managed memory
  * for the wrapper operator through {@link
- * org.apache.flink.api.dag.Transformation#declareManagedMemoryUseCaseAtOperatorScope}.
+ * org.apache.flink.api.dag.Transformation#declareManagedMemoryUseCaseAtOperatorScope} and set
+ * `memorySubFraction` with a value larger than 0.
  *
  * <p>NOTE: Users need to explicitly invoke this class's {@link
  * #snapshotState(StateSnapshotContext)} method in order to store the recorded data in snapshot.
@@ -62,7 +63,6 @@ public class ListStateWithCache<T> implements ListState<T> {
     /** The data cache writer for the received records. */
     private final DataCacheWriter<T> dataCacheWriter;
 
-    @SuppressWarnings("unchecked")
     public ListStateWithCache(
             TypeSerializer<T> serializer,
             StreamTask<?, ?> containingTask,
@@ -70,6 +70,25 @@ public class ListStateWithCache<T> implements ListState<T> {
             StateInitializationContext stateInitializationContext,
             OperatorID operatorID)
             throws IOException {
+        this(
+                serializer,
+                containingTask,
+                runtimeContext,
+                stateInitializationContext,
+                operatorID,
+                0.);
+    }
+
+    @SuppressWarnings("unchecked")
+    public ListStateWithCache(
+            TypeSerializer<T> serializer,
+            StreamTask<?, ?> containingTask,
+            StreamingRuntimeContext runtimeContext,
+            StateInitializationContext stateInitializationContext,
+            OperatorID operatorID,
+            double memorySubFraction)
+            throws IOException {
+        Preconditions.checkArgument(memorySubFraction >= 0. && memorySubFraction <= 1.);
         this.serializer = serializer;
 
         MemorySegmentPool segmentPool = null;
@@ -80,13 +99,13 @@ public class ListStateWithCache<T> implements ListState<T> {
                                 ManagedMemoryUseCase.OPERATOR,
                                 runtimeContext.getTaskManagerRuntimeInfo().getConfiguration(),
                                 runtimeContext.getUserCodeClassLoader());
-        if (fraction > 0) {
+        if (fraction * memorySubFraction > 0) {
             MemoryManager memoryManager = containingTask.getEnvironment().getMemoryManager();
             segmentPool =
                     new LazyMemorySegmentPool(
                             containingTask,
                             memoryManager,
-                            memoryManager.computeNumberOfPages(fraction));
+                            memoryManager.computeNumberOfPages(fraction * memorySubFraction));
         }
 
         basePath =
