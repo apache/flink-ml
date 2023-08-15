@@ -38,6 +38,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.TypeExtractor;
 import org.apache.flink.core.memory.ManagedMemoryUseCase;
 import org.apache.flink.iteration.datacache.nonkeyed.ListStateWithCache;
+import org.apache.flink.iteration.datacache.nonkeyed.OperatorScopeManagedMemoryManager;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.common.datastream.sort.CoGroupOperator;
 import org.apache.flink.ml.common.window.CountTumblingWindows;
@@ -483,9 +484,13 @@ public class DataStreamUtils {
         public void initializeState(StateInitializationContext context) throws Exception {
             super.initializeState(context);
 
+            OperatorScopeManagedMemoryManager manager = new OperatorScopeManagedMemoryManager();
+            manager.register("values-state", 1.);
             valuesState =
                     new ListStateWithCache<>(
                             getOperatorConfig().getTypeSerializerIn(0, getClass().getClassLoader()),
+                            manager,
+                            "values-state",
                             getContainingTask(),
                             getRuntimeContext(),
                             context,

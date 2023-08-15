@@ -36,6 +36,7 @@ import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.Iterations;
 import org.apache.flink.iteration.ReplayableDataStreamList;
 import org.apache.flink.iteration.datacache.nonkeyed.ListStateWithCache;
+import org.apache.flink.iteration.datacache.nonkeyed.OperatorScopeManagedMemoryManager;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
@@ -239,9 +240,13 @@ public class KMeans implements Estimator<KMeans, KMeansModel>, KMeansParams<KMea
                     context.getOperatorStateStore()
                             .getListState(new ListStateDescriptor<>("centroids", type));
 
+            OperatorScopeManagedMemoryManager manager = new OperatorScopeManagedMemoryManager();
+            manager.register("points-state", 1.);
             points =
                     new ListStateWithCache<>(
                             new VectorWithNormSerializer(),
+                            manager,
+                            "points-state",
                             getContainingTask(),
                             getRuntimeContext(),
                             context,

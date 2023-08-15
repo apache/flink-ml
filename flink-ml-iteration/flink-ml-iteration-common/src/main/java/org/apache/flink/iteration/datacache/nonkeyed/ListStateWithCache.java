@@ -63,32 +63,28 @@ public class ListStateWithCache<T> implements ListState<T> {
     /** The data cache writer for the received records. */
     private final DataCacheWriter<T> dataCacheWriter;
 
+    /**
+     * Creates an instance of {@link ListStateWithCache}.
+     *
+     * @param serializer The type serializer of data.
+     * @param manager Operator-scope managed memory manager.
+     * @param key The key registered in the manager.
+     * @param containingTask The container task.
+     * @param runtimeContext The runtime context.
+     * @param stateInitializationContext The state initialization state.
+     * @param operatorID The operator ID.
+     */
+    @SuppressWarnings("unchecked")
     public ListStateWithCache(
             TypeSerializer<T> serializer,
+            OperatorScopeManagedMemoryManager manager,
+            String key,
             StreamTask<?, ?> containingTask,
             StreamingRuntimeContext runtimeContext,
             StateInitializationContext stateInitializationContext,
             OperatorID operatorID)
             throws IOException {
-        this(
-                serializer,
-                containingTask,
-                runtimeContext,
-                stateInitializationContext,
-                operatorID,
-                0.);
-    }
-
-    @SuppressWarnings("unchecked")
-    public ListStateWithCache(
-            TypeSerializer<T> serializer,
-            StreamTask<?, ?> containingTask,
-            StreamingRuntimeContext runtimeContext,
-            StateInitializationContext stateInitializationContext,
-            OperatorID operatorID,
-            double memorySubFraction)
-            throws IOException {
-        Preconditions.checkArgument(memorySubFraction >= 0. && memorySubFraction <= 1.);
+        double memorySubFraction = manager.getFraction(key);
         this.serializer = serializer;
 
         MemorySegmentPool segmentPool = null;
@@ -123,7 +119,7 @@ public class ListStateWithCache<T> implements ListState<T> {
                 inputs.size() < 2, "The input from raw operator state should be one or zero.");
 
         List<Segment> priorFinishedSegments = new ArrayList<>();
-        if (inputs.size() > 0) {
+        if (!inputs.isEmpty()) {
             DataCacheSnapshot dataCacheSnapshot =
                     DataCacheSnapshot.recover(
                             inputs.get(0).getStream(),

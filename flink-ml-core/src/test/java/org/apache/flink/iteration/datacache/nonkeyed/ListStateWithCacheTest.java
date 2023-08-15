@@ -19,6 +19,7 @@
 package org.apache.flink.iteration.datacache.nonkeyed;
 
 import org.apache.flink.api.common.typeinfo.Types;
+import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.base.StringSerializer;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.MemorySize;
@@ -26,7 +27,6 @@ import org.apache.flink.configuration.TaskManagerOptions;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.runtime.jobgraph.JobGraph;
-import org.apache.flink.runtime.memory.MemoryReservationException;
 import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.minicluster.MiniClusterConfiguration;
 import org.apache.flink.runtime.state.StateInitializationContext;
@@ -41,12 +41,13 @@ import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorStateHandler;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.testcontainers.shaded.org.apache.commons.lang3.RandomStringUtils;
+
+import java.util.Random;
 
 /** Tests {@link ListStateWithCache}. */
 public class ListStateWithCacheTest {
@@ -68,27 +69,21 @@ public class ListStateWithCacheTest {
     }
 
     @Test
-    public void testCorrectMemorySubFraction() throws Exception {
+    public void testWithMemoryWeights() throws Exception {
         try (MiniCluster miniCluster = new MiniCluster(createMiniClusterConfiguration())) {
             miniCluster.start();
-            JobGraph jobGraph = getJobGraph(2, 1. / 2);
+            int n = 5;
+            Random random = new Random();
+            double[] weights = new double[n];
+            for (int i = 0; i < n; i += 1) {
+                weights[i] = random.nextInt(100);
+            }
+            JobGraph jobGraph = getJobGraph(weights);
             miniCluster.executeJobBlocking(jobGraph);
         }
     }
 
-    @Test
-    public void testIncorrectMemorySubFraction() {
-        try (MiniCluster miniCluster = new MiniCluster(createMiniClusterConfiguration())) {
-            miniCluster.start();
-            JobGraph jobGraph = getJobGraph(2, 0.6);
-            miniCluster.executeJobBlocking(jobGraph);
-        } catch (Exception e) {
-            Throwable rootCause = ExceptionUtils.getRootCause(e);
-            Assert.assertEquals(MemoryReservationException.class, rootCause.getClass());
-        }
-    }
-
-    private JobGraph getJobGraph(int times, double memorySubFraction) {
+    private JobGraph getJobGraph(double[] weights) {
         Configuration configuration = new Configuration();
         StreamExecutionEnvironment env = TestUtils.getExecutionEnvironment(configuration);
         env.setParallelism(1);
@@ -97,13 +92,13 @@ public class ListStateWithCacheTest {
         DataStream<String> data =
                 env.fromSequence(1, n).map(d -> RandomStringUtils.randomAlphabetic(1024 * 1024));
         DataStream<Integer> counter =
-                data.transform("cache", Types.INT, new CacheDataOperator(times, memorySubFraction));
+                data.transform("cache", Types.INT, new CacheDataOperator(weights));
         DataStreamUtils.setManagedMemoryWeight(counter, 100);
         counter.addSink(
                 new SinkFunction<Integer>() {
                     @Override
                     public void invoke(Integer value, Context context) throws Exception {
-                        Assert.assertEquals((Integer) (n * times), value);
+                        Assert.assertEquals((Integer) (n * weights.length), value);
                         SinkFunction.super.invoke(value, context);
                     }
                 });
@@ -114,19 +109,16 @@ public class ListStateWithCacheTest {
             implements OneInputStreamOperator<String, Integer>,
                     BoundedOneInput,
                     StreamOperatorStateHandler.CheckpointedStreamOperator {
-
-        private final int times;
-        private final double memorySubFraction;
+        private final double[] weights;
         private transient ListStateWithCache<String>[] cached;
 
-        public CacheDataOperator(int times, double memorySubFraction) {
-            this.times = times;
-            this.memorySubFraction = memorySubFraction;
+        public CacheDataOperator(double[] weights) {
+            this.weights = weights;
         }
 
         @Override
         public void processElement(StreamRecord<String> element) throws Exception {
-            for (int i = 0; i < times; i += 1) {
+            for (int i = 0; i < weights.length; i += 1) {
                 cached[i].add(element.getValue());
             }
         }
@@ -134,7 +126,7 @@ public class ListStateWithCacheTest {
         @Override
         public void endInput() throws Exception {
             int counter = 0;
-            for (int i = 0; i < times; i += 1) {
+            for (int i = 0; i < weights.length; i += 1) {
                 for (String ignored : cached[i].get()) {
                     counter += 1;
                 }
@@ -143,19 +135,27 @@ public class ListStateWithCacheTest {
             output.collect(new StreamRecord<>(counter));
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         public void initializeState(StateInitializationContext context) throws Exception {
-            //noinspection unchecked
-            cached = new ListStateWithCache[times];
-            for (int i = 0; i < times; i += 1) {
+            TypeSerializer<String>[] serializers =
+                    (TypeSerializer<String>[]) new TypeSerializer[weights.length];
+            OperatorScopeManagedMemoryManager manager = new OperatorScopeManagedMemoryManager();
+            for (int i = 0; i < weights.length; i += 1) {
+                serializers[i] = StringSerializer.INSTANCE;
+                manager.register("state-" + i, weights[i]);
+            }
+            cached = new ListStateWithCache[weights.length];
+            for (int i = 0; i < weights.length; i += 1) {
                 cached[i] =
                         new ListStateWithCache<>(
-                                StringSerializer.INSTANCE,
+                                serializers[i],
+                                manager,
+                                "state-" + i,
                                 getContainingTask(),
                                 getRuntimeContext(),
                                 context,
-                                getOperatorID(),
-                                memorySubFraction);
+                                getOperatorID());
             }
         }
 
