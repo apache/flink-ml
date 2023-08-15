@@ -94,6 +94,7 @@ under the License.
                   <include>org.apache.flink:flink-ml-lib-${flink.main.version}</include>
                   <include>org.apache.flink:flink-ml-benchmark-${flink.main.version}</include>
                   <include>dev.ludovic.netlib:blas</include>
+                  <include>it.unimi.dsi:fastutil</include>
                 </includes>
               </artifactSet>
             </configuration>
