@@ -22,7 +22,6 @@ import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.common.typeutils.base.StringSerializer;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.MemorySize;
-import org.apache.flink.configuration.RestOptions;
 import org.apache.flink.configuration.TaskManagerOptions;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.util.TestUtils;
@@ -59,7 +58,6 @@ public class ListStateWithCacheTest {
         // Set managed memory size to a small value, so when the instance of ListStateWithCache
         // tries to allocate memory, it will use up all managed memory assigned to itself.
         configuration.set(TaskManagerOptions.MANAGED_MEMORY_SIZE, MemorySize.ofMebiBytes(16));
-        configuration.set(RestOptions.PORT, 18082);
         configuration.set(
                 ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
         return new MiniClusterConfiguration.Builder()
