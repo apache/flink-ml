@@ -35,11 +35,11 @@ import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 import org.apache.commons.collections.IteratorUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-import org.testcontainers.shaded.org.apache.commons.lang3.RandomStringUtils;
 
 import java.io.File;
 import java.util.ArrayList;
