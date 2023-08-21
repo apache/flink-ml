@@ -52,6 +52,7 @@ import org.apache.flink.ml.linalg.typeinfo.VectorWithNormSerializer;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -240,17 +241,19 @@ public class KMeans implements Estimator<KMeans, KMeansModel>, KMeansParams<KMea
                     context.getOperatorStateStore()
                             .getListState(new ListStateDescriptor<>("centroids", type));
 
-            OperatorScopeManagedMemoryManager manager = new OperatorScopeManagedMemoryManager();
-            manager.register("points-state", 1.);
+            final OperatorID operatorID = config.getOperatorID();
+            final OperatorScopeManagedMemoryManager manager =
+                    OperatorScopeManagedMemoryManager.getOrCreate(operatorID);
+            final String stateKey = "points-state";
+            manager.register(stateKey, 1.);
             points =
                     new ListStateWithCache<>(
                             new VectorWithNormSerializer(),
-                            manager,
-                            "points-state",
+                            stateKey,
                             getContainingTask(),
                             getRuntimeContext(),
                             context,
-                            config.getOperatorID());
+                            operatorID);
         }
 
         @Override

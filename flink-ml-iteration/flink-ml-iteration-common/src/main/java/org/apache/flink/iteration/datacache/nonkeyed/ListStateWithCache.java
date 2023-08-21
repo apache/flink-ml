@@ -67,7 +67,6 @@ public class ListStateWithCache<T> implements ListState<T> {
      * Creates an instance of {@link ListStateWithCache}.
      *
      * @param serializer The type serializer of data.
-     * @param manager Operator-scope managed memory manager.
      * @param key The key registered in the manager.
      * @param containingTask The container task.
      * @param runtimeContext The runtime context.
@@ -77,14 +76,12 @@ public class ListStateWithCache<T> implements ListState<T> {
     @SuppressWarnings("unchecked")
     public ListStateWithCache(
             TypeSerializer<T> serializer,
-            OperatorScopeManagedMemoryManager manager,
             String key,
             StreamTask<?, ?> containingTask,
             StreamingRuntimeContext runtimeContext,
             StateInitializationContext stateInitializationContext,
             OperatorID operatorID)
             throws IOException {
-        double memorySubFraction = manager.getFraction(key);
         this.serializer = serializer;
 
         MemorySegmentPool segmentPool = null;
@@ -95,13 +92,18 @@ public class ListStateWithCache<T> implements ListState<T> {
                                 ManagedMemoryUseCase.OPERATOR,
                                 runtimeContext.getTaskManagerRuntimeInfo().getConfiguration(),
                                 runtimeContext.getUserCodeClassLoader());
-        if (fraction * memorySubFraction > 0) {
-            MemoryManager memoryManager = containingTask.getEnvironment().getMemoryManager();
-            segmentPool =
-                    new LazyMemorySegmentPool(
-                            containingTask,
-                            memoryManager,
-                            memoryManager.computeNumberOfPages(fraction * memorySubFraction));
+        if (fraction > 0) {
+            OperatorScopeManagedMemoryManager manager =
+                    OperatorScopeManagedMemoryManager.getOrCreate(operatorID);
+            double memorySubFraction = manager.getFraction(key);
+            if (fraction * memorySubFraction > 0) {
+                MemoryManager memoryManager = containingTask.getEnvironment().getMemoryManager();
+                segmentPool =
+                        new LazyMemorySegmentPool(
+                                containingTask,
+                                memoryManager,
+                                memoryManager.computeNumberOfPages(fraction * memorySubFraction));
+            }
         }
 
         basePath =

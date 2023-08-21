@@ -27,6 +27,7 @@ import org.apache.flink.configuration.TaskManagerOptions;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
 import org.apache.flink.ml.util.TestUtils;
 import org.apache.flink.runtime.jobgraph.JobGraph;
+import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.minicluster.MiniClusterConfiguration;
 import org.apache.flink.runtime.state.StateInitializationContext;
@@ -138,9 +139,11 @@ public class ListStateWithCacheTest {
         @SuppressWarnings("unchecked")
         @Override
         public void initializeState(StateInitializationContext context) throws Exception {
+            final OperatorID operatorID = getOperatorID();
             TypeSerializer<String>[] serializers =
                     (TypeSerializer<String>[]) new TypeSerializer[weights.length];
-            OperatorScopeManagedMemoryManager manager = new OperatorScopeManagedMemoryManager();
+            final OperatorScopeManagedMemoryManager manager =
+                    OperatorScopeManagedMemoryManager.getOrCreate(operatorID);
             for (int i = 0; i < weights.length; i += 1) {
                 serializers[i] = StringSerializer.INSTANCE;
                 manager.register("state-" + i, weights[i]);
@@ -150,12 +153,11 @@ public class ListStateWithCacheTest {
                 cached[i] =
                         new ListStateWithCache<>(
                                 serializers[i],
-                                manager,
                                 "state-" + i,
                                 getContainingTask(),
                                 getRuntimeContext(),
                                 context,
-                                getOperatorID());
+                                operatorID);
             }
         }
 

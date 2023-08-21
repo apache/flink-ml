@@ -48,6 +48,7 @@ import org.apache.flink.ml.common.window.GlobalWindows;
 import org.apache.flink.ml.common.window.ProcessingTimeSessionWindows;
 import org.apache.flink.ml.common.window.ProcessingTimeTumblingWindows;
 import org.apache.flink.ml.common.window.Windows;
+import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.runtime.state.VoidNamespace;
@@ -484,17 +485,19 @@ public class DataStreamUtils {
         public void initializeState(StateInitializationContext context) throws Exception {
             super.initializeState(context);
 
-            OperatorScopeManagedMemoryManager manager = new OperatorScopeManagedMemoryManager();
-            manager.register("values-state", 1.);
+            final OperatorID operatorID = config.getOperatorID();
+            final OperatorScopeManagedMemoryManager manager =
+                    OperatorScopeManagedMemoryManager.getOrCreate(operatorID);
+            final String stateKey = "values-state";
+            manager.register(stateKey, 1.);
             valuesState =
                     new ListStateWithCache<>(
                             getOperatorConfig().getTypeSerializerIn(0, getClass().getClassLoader()),
-                            manager,
-                            "values-state",
+                            stateKey,
                             getContainingTask(),
                             getRuntimeContext(),
                             context,
-                            config.getOperatorID());
+                            operatorID);
         }
 
         @Override
