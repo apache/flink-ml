@@ -234,7 +234,7 @@ public class BinaryClassificationEvaluator
                 reduceMetrics = reduceMetrics.merge(iter.next());
             }
             Map<String, Double> map = new HashMap<>();
-            map.put(AREA_UNDER_ROC, 1. - reduceMetrics.areaUnderROC);
+            map.put(AREA_UNDER_ROC, reduceMetrics.areaUnderROC);
             map.put(AREA_UNDER_PR, reduceMetrics.areaUnderPR);
             map.put(AREA_UNDER_LORENZ, reduceMetrics.areaUnderLorenz);
             map.put(KS, reduceMetrics.ks);
@@ -257,22 +257,24 @@ public class BinaryClassificationEvaluator
 
             List<BinarySummary> statistics =
                     getRuntimeContext().getBroadcastVariable(partitionSummariesKey);
-            double[] countValues =
+            double[] accWeights =
                     reduceBinarySummary(statistics, getRuntimeContext().getIndexOfThisSubtask());
 
-            double totalTrue = countValues[2];
-            double totalFalse = countValues[3];
-            if (totalTrue == 0) {
-                LOG.warn("There is no positive sample in data!");
+            double totalSumWeightsPos = accWeights[2];
+            double totalSumWeightsNeg = accWeights[3];
+            if (totalSumWeightsPos == 0) {
+                LOG.warn("There is no positive samples in data!");
             }
-            if (totalFalse == 0) {
-                LOG.warn("There is no negative sample in data!");
+            if (totalSumWeightsNeg == 0) {
+                LOG.warn("There is no negative samples in data!");
             }
 
-            BinaryMetrics metrics = new BinaryMetrics(0L);
+            BinaryMetrics metrics = new BinaryMetrics(0);
+            // Stores values of TPR, FPR, Precision, and PR calculated from samples with scores
+            // ranging from the maximum to the current one.
             double[] tprFprPrecision = new double[4];
             for (Tuple3<Double, Boolean, Double> t3 : iterable) {
-                updateBinaryMetrics(t3, metrics, countValues, tprFprPrecision);
+                updateBinaryMetrics(t3, metrics, accWeights, tprFprPrecision);
             }
             collector.collect(metrics);
         }
@@ -281,36 +283,36 @@ public class BinaryClassificationEvaluator
     private static void updateBinaryMetrics(
             Tuple3<Double, Boolean, Double> cur,
             BinaryMetrics binaryMetrics,
-            double[] countValues,
+            double[] accWeights,
             double[] recordValues) {
-        if (binaryMetrics.count == 0) {
-            recordValues[0] = countValues[2] == 0 ? 1.0 : countValues[0] / countValues[2];
-            recordValues[1] = countValues[3] == 0 ? 1.0 : countValues[1] / countValues[3];
+        if (binaryMetrics.sumWeights == 0) {
+            recordValues[0] = accWeights[2] == 0 ? 1.0 : accWeights[0] / accWeights[2];
+            recordValues[1] = accWeights[3] == 0 ? 1.0 : accWeights[1] / accWeights[3];
             recordValues[2] =
-                    countValues[0] + countValues[1] == 0
+                    accWeights[0] + accWeights[1] == 0
                             ? 1.0
-                            : countValues[0] / (countValues[0] + countValues[1]);
-            recordValues[3] = (countValues[0] + countValues[1]) / (countValues[2] + countValues[3]);
+                            : accWeights[0] / (accWeights[0] + accWeights[1]);
+            recordValues[3] = (accWeights[0] + accWeights[1]) / (accWeights[2] + accWeights[3]);
         }
 
         boolean isPos = cur.f1;
         double weight = cur.f2;
-        binaryMetrics.count += weight;
+        binaryMetrics.sumWeights += weight;
         if (isPos) {
-            countValues[0] += weight;
+            accWeights[0] += weight;
         } else {
-            countValues[1] += weight;
+            accWeights[1] += weight;
         }
 
-        double tpr = countValues[2] == 0 ? 1.0 : countValues[0] / countValues[2];
-        double fpr = countValues[3] == 0 ? 1.0 : countValues[1] / countValues[3];
+        double tpr = accWeights[2] == 0 ? 1.0 : accWeights[0] / accWeights[2];
+        double fpr = accWeights[3] == 0 ? 1.0 : accWeights[1] / accWeights[3];
         double precision =
-                countValues[0] + countValues[1] == 0
+                accWeights[0] + accWeights[1] == 0
                         ? 1.0
-                        : countValues[0] / (countValues[0] + countValues[1]);
-        double positiveRate = (countValues[0] + countValues[1]) / (countValues[2] + countValues[3]);
+                        : accWeights[0] / (accWeights[0] + accWeights[1]);
+        double positiveRate = (accWeights[0] + accWeights[1]) / (accWeights[2] + accWeights[3]);
 
-        binaryMetrics.areaUnderROC += (fpr + recordValues[1]) * (tpr - recordValues[0]) / 2;
+        binaryMetrics.areaUnderROC += (fpr - recordValues[1]) * (tpr + recordValues[0]) / 2;
         binaryMetrics.areaUnderLorenz +=
                 ((positiveRate - recordValues[3]) * (tpr + recordValues[0]) / 2);
         binaryMetrics.areaUnderPR += ((tpr - recordValues[0]) * (precision + recordValues[2]) / 2);
@@ -325,25 +327,28 @@ public class BinaryClassificationEvaluator
     /**
      * @param values Reduce Summary of all workers.
      * @param taskId current taskId.
-     * @return [curTrue, curFalse, TotalTrue, TotalFalse]
+     * @return An array storing sum of weights of positives/negatives of tasks before the current
+     *     one, and sum of weights of positives/negatives of all tasks.
      */
     private static double[] reduceBinarySummary(List<BinarySummary> values, int taskId) {
         List<BinarySummary> list = new ArrayList<>(values);
         list.sort(Comparator.comparingDouble(t -> -t.maxScore));
-        double curTrue = 0;
-        double curFalse = 0;
-        double totalTrue = 0;
-        double totalFalse = 0;
+        double prefixSumWeightsPos = 0;
+        double prefixSumWeightsNeg = 0;
+        double totalSumWeightsPos = 0;
+        double totalSumWeightsNeg = 0;
 
         for (BinarySummary statistics : list) {
             if (statistics.taskId == taskId) {
-                curFalse = totalFalse;
-                curTrue = totalTrue;
+                prefixSumWeightsNeg = totalSumWeightsNeg;
+                prefixSumWeightsPos = totalSumWeightsPos;
             }
-            totalTrue += statistics.sumWeightPos;
-            totalFalse += statistics.sumWeightNeg;
+            totalSumWeightsPos += statistics.sumWeightsPos;
+            totalSumWeightsNeg += statistics.sumWeightsNeg;
         }
-        return new double[] {curTrue, curFalse, totalTrue, totalFalse};
+        return new double[] {
+            prefixSumWeightsPos, prefixSumWeightsNeg, totalSumWeightsPos, totalSumWeightsNeg
+        };
     }
 
     /**
@@ -358,9 +363,9 @@ public class BinaryClassificationEvaluator
         double weight = evalElement.f2;
         double score = evalElement.f0;
         if (isPos) {
-            statistics.sumWeightPos += weight;
+            statistics.sumWeightsPos += weight;
         } else {
-            statistics.sumWeightNeg += weight;
+            statistics.sumWeightsNeg += weight;
         }
         if (Double.compare(statistics.maxScore, score) < 0) {
             statistics.maxScore = score;
@@ -511,25 +516,25 @@ public class BinaryClassificationEvaluator
         // maximum score in this partition
         public double maxScore;
         // sum of weights of positives in this partition
-        public double sumWeightPos;
+        public double sumWeightsPos;
         // sum of weights of negatives in this partition
-        public double sumWeightNeg;
+        public double sumWeightsNeg;
 
         public BinarySummary() {}
 
         public BinarySummary(
-                Integer taskId, double maxScore, double sumWeightPos, double sumWeightNeg) {
+                Integer taskId, double maxScore, double sumWeightsPos, double sumWeightsNeg) {
             this.taskId = taskId;
             this.maxScore = maxScore;
-            this.sumWeightPos = sumWeightPos;
-            this.sumWeightNeg = sumWeightNeg;
+            this.sumWeightsPos = sumWeightsPos;
+            this.sumWeightsNeg = sumWeightsNeg;
         }
     }
 
     /** The evaluation metrics for binary classification. */
     public static class BinaryMetrics {
-        /* The count of samples. */
-        public double count;
+        /* The sum of weights of samples. */
+        public double sumWeights;
 
         /* Area under ROC */
         public double areaUnderROC;
@@ -545,15 +550,15 @@ public class BinaryClassificationEvaluator
 
         public BinaryMetrics() {}
 
-        public BinaryMetrics(long count) {
-            this.count = count;
+        public BinaryMetrics(long sumWeights) {
+            this.sumWeights = sumWeights;
         }
 
         public BinaryMetrics merge(BinaryMetrics binaryClassMetrics) {
             if (null == binaryClassMetrics) {
                 return this;
             }
-            count += binaryClassMetrics.count;
+            sumWeights += binaryClassMetrics.sumWeights;
             areaUnderROC += binaryClassMetrics.areaUnderROC;
             areaUnderLorenz += binaryClassMetrics.areaUnderLorenz;
             areaUnderPR += binaryClassMetrics.areaUnderPR;
