@@ -16,10 +16,10 @@
 # limitations under the License.
 ################################################################################
 import os
-
 from pyflink.common import Types
-from pyflink.ml.linalg import Vectors, DenseVectorTypeInfo
+
 from pyflink.ml.evaluation.binaryclassification import BinaryClassificationEvaluator
+from pyflink.ml.linalg import Vectors, DenseVectorTypeInfo
 from pyflink.ml.tests.test_utils import PyFlinkMLTestCase
 
 
@@ -111,7 +111,7 @@ class BinaryClassificationEvaluatorTest(PyFlinkMLTestCase):
         self.expected_data_m = [0.8571428571428571, 0.9377705627705628,
                                 0.8571428571428571, 0.6488095238095237]
 
-        self.expected_data_w = 0.8911680911680911
+        self.expected_data_w = [0.8717948717948718, 0.9510202726261435]
 
         self.eps = 1e-5
 
@@ -185,11 +185,11 @@ class BinaryClassificationEvaluatorTest(PyFlinkMLTestCase):
 
     def test_evaluate_with_weight(self):
         evaluator = BinaryClassificationEvaluator() \
-            .set_metrics_names("areaUnderROC") \
+            .set_metrics_names("areaUnderROC", "areaUnderPR") \
             .set_weight_col("weight")
         output = evaluator.transform(self.input_data_table_with_weight)[0]
         self.assertEqual(
-            ["areaUnderROC"],
+            ["areaUnderROC", "areaUnderPR"],
             output.get_schema().get_field_names())
         results = [result for result in output.execute().collect()]
         result = results[0]

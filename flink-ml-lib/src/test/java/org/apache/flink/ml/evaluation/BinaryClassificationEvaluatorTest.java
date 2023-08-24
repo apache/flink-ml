@@ -118,7 +118,8 @@ public class BinaryClassificationEvaluatorTest extends AbstractTestBase {
             new double[] {
                 0.8571428571428571, 0.9377705627705628, 0.8571428571428571, 0.6488095238095237
             };
-    private static final double EXPECTED_DATA_W = 0.8911680911680911;
+    private static final double[] EXPECTED_DATA_W =
+            new double[] {0.8717948717948718, 0.9510202726261435};
     private static final double EPS = 1.0e-5;
 
     @Before
@@ -297,14 +298,20 @@ public class BinaryClassificationEvaluatorTest extends AbstractTestBase {
     public void testEvaluateWithWeight() {
         BinaryClassificationEvaluator eval =
                 new BinaryClassificationEvaluator()
-                        .setMetricsNames(BinaryClassificationEvaluatorParams.AREA_UNDER_ROC)
+                        .setMetricsNames(
+                                BinaryClassificationEvaluatorParams.AREA_UNDER_ROC,
+                                BinaryClassificationEvaluatorParams.AREA_UNDER_PR)
                         .setWeightCol("weight");
         Table evalResult = eval.transform(inputDataTableWithWeight)[0];
-        List<Row> results = IteratorUtils.toList(evalResult.execute().collect());
+        Row result = (Row) IteratorUtils.toList(evalResult.execute().collect()).get(0);
         assertArrayEquals(
-                new String[] {BinaryClassificationEvaluatorParams.AREA_UNDER_ROC},
+                new String[] {
+                    BinaryClassificationEvaluatorParams.AREA_UNDER_ROC,
+                    BinaryClassificationEvaluatorParams.AREA_UNDER_PR
+                },
                 evalResult.getResolvedSchema().getColumnNames().toArray());
-        assertEquals(EXPECTED_DATA_W, results.get(0).getFieldAs(0), EPS);
+        assertArrayEquals(
+                EXPECTED_DATA_W, new double[] {result.getFieldAs(0), result.getFieldAs(1)}, EPS);
     }
 
     @Test
