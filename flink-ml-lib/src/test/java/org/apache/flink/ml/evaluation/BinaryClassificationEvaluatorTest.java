@@ -311,7 +311,7 @@ public class BinaryClassificationEvaluatorTest extends AbstractTestBase {
                 },
                 evalResult.getResolvedSchema().getColumnNames().toArray());
         assertArrayEquals(
-                EXPECTED_DATA_W, new double[] {result.getFieldAs(0), result.getFieldAs(1)}, 1e-9);
+                EXPECTED_DATA_W, new double[] {result.getFieldAs(0), result.getFieldAs(1)}, EPS);
     }
 
     @Test
