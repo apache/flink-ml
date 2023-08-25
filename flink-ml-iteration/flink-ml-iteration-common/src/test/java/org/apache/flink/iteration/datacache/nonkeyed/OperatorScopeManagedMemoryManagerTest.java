@@ -18,6 +18,8 @@
 
 package org.apache.flink.iteration.datacache.nonkeyed;
 
+import org.apache.flink.runtime.jobgraph.OperatorID;
+
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.junit.Assert;
 import org.junit.Test;
@@ -29,7 +31,9 @@ public class OperatorScopeManagedMemoryManagerTest {
 
     @Test
     public void testUsage() {
-        OperatorScopeManagedMemoryManager manager = new OperatorScopeManagedMemoryManager();
+        OperatorID operatorID = new OperatorID();
+        OperatorScopeManagedMemoryManager manager =
+                OperatorScopeManagedMemoryManager.getOrCreate(operatorID);
         manager.register("state-1", 100);
         manager.register("state-2", 400);
         Assert.assertEquals(manager.getFraction("state-1"), 0.2, EPS);
@@ -38,7 +42,9 @@ public class OperatorScopeManagedMemoryManagerTest {
 
     @Test
     public void testZeroUsage() {
-        OperatorScopeManagedMemoryManager manager = new OperatorScopeManagedMemoryManager();
+        OperatorID operatorID = new OperatorID();
+        OperatorScopeManagedMemoryManager manager =
+                OperatorScopeManagedMemoryManager.getOrCreate(operatorID);
         manager.register("state-1", 0);
         manager.register("state-2", 0);
         Assert.assertEquals(manager.getFraction("state-1"), 0, EPS);
@@ -47,7 +53,9 @@ public class OperatorScopeManagedMemoryManagerTest {
 
     @Test
     public void testInvalidUsage() {
-        OperatorScopeManagedMemoryManager manager = new OperatorScopeManagedMemoryManager();
+        OperatorID operatorID = new OperatorID();
+        OperatorScopeManagedMemoryManager manager =
+                OperatorScopeManagedMemoryManager.getOrCreate(operatorID);
         try {
             manager.register("state-1", 100);
             Assert.assertEquals(manager.getFraction("state-1"), 1., EPS);

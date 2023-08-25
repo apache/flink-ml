@@ -96,7 +96,7 @@ public class ListStateWithCache<T> implements ListState<T> {
             OperatorScopeManagedMemoryManager manager =
                     OperatorScopeManagedMemoryManager.getOrCreate(operatorID);
             double memorySubFraction = manager.getFraction(key);
-            if (fraction * memorySubFraction > 0) {
+            if (memorySubFraction > 0) {
                 MemoryManager memoryManager = containingTask.getEnvironment().getMemoryManager();
                 segmentPool =
                         new LazyMemorySegmentPool(

@@ -55,7 +55,7 @@ public class OperatorScopeManagedMemoryManager {
     /** Stores sum of weights of all usages. */
     protected double sum;
 
-    OperatorScopeManagedMemoryManager() {}
+    private OperatorScopeManagedMemoryManager() {}
 
     /**
      * Gets or creates an instance identified by the operator ID.
