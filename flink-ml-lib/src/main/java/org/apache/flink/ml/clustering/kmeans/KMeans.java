@@ -59,6 +59,7 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
@@ -241,16 +242,17 @@ public class KMeans implements Estimator<KMeans, KMeansModel>, KMeansParams<KMea
                     context.getOperatorStateStore()
                             .getListState(new ListStateDescriptor<>("centroids", type));
 
+            final StreamTask<?, ?> containingTask = getContainingTask();
             final OperatorID operatorID = config.getOperatorID();
             final OperatorScopeManagedMemoryManager manager =
-                    OperatorScopeManagedMemoryManager.getOrCreate(operatorID);
+                    OperatorScopeManagedMemoryManager.getOrCreate(containingTask, operatorID);
             final String stateKey = "points-state";
             manager.register(stateKey, 1.);
             points =
                     new ListStateWithCache<>(
                             new VectorWithNormSerializer(),
                             stateKey,
-                            getContainingTask(),
+                            containingTask,
                             getRuntimeContext(),
                             context,
                             operatorID);

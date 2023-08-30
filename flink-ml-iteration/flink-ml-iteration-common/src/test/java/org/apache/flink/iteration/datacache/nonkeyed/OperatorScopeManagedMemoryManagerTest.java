@@ -18,7 +18,11 @@
 
 package org.apache.flink.iteration.datacache.nonkeyed;
 
+import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.jobgraph.OperatorID;
+import org.apache.flink.runtime.operators.testutils.DummyEnvironment;
+import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
+import org.apache.flink.streaming.runtime.tasks.StreamTask;
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.junit.Assert;
@@ -29,11 +33,22 @@ public class OperatorScopeManagedMemoryManagerTest {
 
     private static final double EPS = 1e-9;
 
+    private static class MockStreamTask
+            extends StreamTask<Integer, OneInputStreamOperator<Integer, Integer>> {
+        protected MockStreamTask(Environment env) throws Exception {
+            super(env);
+        }
+
+        @Override
+        protected void init() {}
+    }
+
     @Test
-    public void testUsage() {
+    public void testUsage() throws Exception {
         OperatorID operatorID = new OperatorID();
         OperatorScopeManagedMemoryManager manager =
-                OperatorScopeManagedMemoryManager.getOrCreate(operatorID);
+                OperatorScopeManagedMemoryManager.getOrCreate(
+                        new MockStreamTask(new DummyEnvironment()), operatorID);
         manager.register("state-1", 100);
         manager.register("state-2", 400);
         Assert.assertEquals(manager.getFraction("state-1"), 0.2, EPS);
@@ -41,10 +56,11 @@ public class OperatorScopeManagedMemoryManagerTest {
     }
 
     @Test
-    public void testZeroUsage() {
+    public void testZeroUsage() throws Exception {
         OperatorID operatorID = new OperatorID();
         OperatorScopeManagedMemoryManager manager =
-                OperatorScopeManagedMemoryManager.getOrCreate(operatorID);
+                OperatorScopeManagedMemoryManager.getOrCreate(
+                        new MockStreamTask(new DummyEnvironment()), operatorID);
         manager.register("state-1", 0);
         manager.register("state-2", 0);
         Assert.assertEquals(manager.getFraction("state-1"), 0, EPS);
@@ -52,10 +68,11 @@ public class OperatorScopeManagedMemoryManagerTest {
     }
 
     @Test
-    public void testInvalidUsage() {
+    public void testInvalidUsage() throws Exception {
         OperatorID operatorID = new OperatorID();
         OperatorScopeManagedMemoryManager manager =
-                OperatorScopeManagedMemoryManager.getOrCreate(operatorID);
+                OperatorScopeManagedMemoryManager.getOrCreate(
+                        new MockStreamTask(new DummyEnvironment()), operatorID);
         try {
             manager.register("state-1", 100);
             Assert.assertEquals(manager.getFraction("state-1"), 1., EPS);

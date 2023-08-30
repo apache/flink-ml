@@ -94,7 +94,7 @@ public class ListStateWithCache<T> implements ListState<T> {
                                 runtimeContext.getUserCodeClassLoader());
         if (fraction > 0) {
             OperatorScopeManagedMemoryManager manager =
-                    OperatorScopeManagedMemoryManager.getOrCreate(operatorID);
+                    OperatorScopeManagedMemoryManager.getOrCreate(containingTask, operatorID);
             double memorySubFraction = manager.getFraction(key);
             if (memorySubFraction > 0) {
                 MemoryManager memoryManager = containingTask.getEnvironment().getMemoryManager();

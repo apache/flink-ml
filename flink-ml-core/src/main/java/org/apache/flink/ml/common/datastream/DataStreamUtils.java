@@ -74,6 +74,7 @@ import org.apache.flink.streaming.api.windowing.windows.GlobalWindow;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.streaming.api.windowing.windows.Window;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.util.Collector;
 
@@ -485,16 +486,17 @@ public class DataStreamUtils {
         public void initializeState(StateInitializationContext context) throws Exception {
             super.initializeState(context);
 
+            StreamTask<?, ?> containingTask = getContainingTask();
             final OperatorID operatorID = config.getOperatorID();
             final OperatorScopeManagedMemoryManager manager =
-                    OperatorScopeManagedMemoryManager.getOrCreate(operatorID);
+                    OperatorScopeManagedMemoryManager.getOrCreate(containingTask, operatorID);
             final String stateKey = "values-state";
             manager.register(stateKey, 1.);
             valuesState =
                     new ListStateWithCache<>(
                             getOperatorConfig().getTypeSerializerIn(0, getClass().getClassLoader()),
                             stateKey,
-                            getContainingTask(),
+                            containingTask,
                             getRuntimeContext(),
                             context,
                             operatorID);

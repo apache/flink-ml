@@ -41,6 +41,7 @@ import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorStateHandler;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.streaming.runtime.tasks.StreamTask;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.Assert;
@@ -139,11 +140,12 @@ public class ListStateWithCacheTest {
         @SuppressWarnings("unchecked")
         @Override
         public void initializeState(StateInitializationContext context) throws Exception {
+            StreamTask<?, ?> containingTask = getContainingTask();
             final OperatorID operatorID = getOperatorID();
             TypeSerializer<String>[] serializers =
                     (TypeSerializer<String>[]) new TypeSerializer[weights.length];
             final OperatorScopeManagedMemoryManager manager =
-                    OperatorScopeManagedMemoryManager.getOrCreate(operatorID);
+                    OperatorScopeManagedMemoryManager.getOrCreate(containingTask, operatorID);
             for (int i = 0; i < weights.length; i += 1) {
                 serializers[i] = StringSerializer.INSTANCE;
                 manager.register("state-" + i, weights[i]);
@@ -154,7 +156,7 @@ public class ListStateWithCacheTest {
                         new ListStateWithCache<>(
                                 serializers[i],
                                 "state-" + i,
-                                getContainingTask(),
+                                containingTask,
                                 getRuntimeContext(),
                                 context,
                                 operatorID);

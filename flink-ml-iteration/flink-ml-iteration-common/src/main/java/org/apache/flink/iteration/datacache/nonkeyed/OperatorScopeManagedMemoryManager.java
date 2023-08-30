@@ -19,7 +19,9 @@
 package org.apache.flink.iteration.datacache.nonkeyed;
 
 import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.jobgraph.OperatorID;
+import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.util.Preconditions;
 
 import java.util.Collections;
@@ -45,8 +47,9 @@ public class OperatorScopeManagedMemoryManager {
      * Stores instances corresponding to operators. The instance is expected to be released after
      * some point after the corresponding operator ID is unused.
      */
-    private static final Map<OperatorID, OperatorScopeManagedMemoryManager> managers =
-            Collections.synchronizedMap(new WeakHashMap<>());
+    private static final Map<
+                    Tuple2<StreamTask<?, ?>, OperatorID>, OperatorScopeManagedMemoryManager>
+            managers = Collections.synchronizedMap(new WeakHashMap<>());
 
     /** Stores keys and weights of memory usages. */
     protected Map<String, Double> weights = new HashMap<>();
@@ -60,12 +63,15 @@ public class OperatorScopeManagedMemoryManager {
     /**
      * Gets or creates an instance identified by the operator ID.
      *
+     * @param containingTask The container task.
      * @param operatorID The operator ID.
      * @return An instance of {@link OperatorScopeManagedMemoryManager}.
      */
-    public static OperatorScopeManagedMemoryManager getOrCreate(OperatorID operatorID) {
+    public static OperatorScopeManagedMemoryManager getOrCreate(
+            StreamTask<?, ?> containingTask, OperatorID operatorID) {
         return managers.computeIfAbsent(
-                operatorID, (key) -> new OperatorScopeManagedMemoryManager());
+                Tuple2.of(containingTask, operatorID),
+                (key) -> new OperatorScopeManagedMemoryManager());
     }
 
     /**
@@ -76,7 +82,9 @@ public class OperatorScopeManagedMemoryManager {
      */
     public void register(String key, double weight) {
         Preconditions.checkState(!frozen, "Cannot call register after getFraction is called.");
-        Preconditions.checkState(!weights.containsKey(key), "Cannot set a same key {} twice.", key);
+        Preconditions.checkState(
+                !weights.containsKey(key),
+                String.format("Cannot set a same key \"%s\" twice.", key));
         Preconditions.checkArgument(weight >= 0, "The weight must be non-negative.");
         weights.put(key, weight);
     }
