@@ -486,7 +486,7 @@ public class DataStreamUtils {
         public void initializeState(StateInitializationContext context) throws Exception {
             super.initializeState(context);
 
-            StreamTask<?, ?> containingTask = getContainingTask();
+            final StreamTask<?, ?> containingTask = getContainingTask();
             final OperatorID operatorID = config.getOperatorID();
             final OperatorScopeManagedMemoryManager manager =
                     OperatorScopeManagedMemoryManager.getOrCreate(containingTask, operatorID);
@@ -496,10 +496,8 @@ public class DataStreamUtils {
                     new ListStateWithCache<>(
                             getOperatorConfig().getTypeSerializerIn(0, getClass().getClassLoader()),
                             stateKey,
-                            containingTask,
-                            getRuntimeContext(),
                             context,
-                            operatorID);
+                            this);
         }
 
         @Override

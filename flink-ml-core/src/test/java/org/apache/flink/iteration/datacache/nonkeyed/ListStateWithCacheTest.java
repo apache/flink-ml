@@ -31,7 +31,6 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.minicluster.MiniClusterConfiguration;
 import org.apache.flink.runtime.state.StateInitializationContext;
-import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -49,8 +48,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import java.util.Random;
-
 /** Tests {@link ListStateWithCache}. */
 public class ListStateWithCacheTest {
 
@@ -65,8 +62,8 @@ public class ListStateWithCacheTest {
                 ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
         return new MiniClusterConfiguration.Builder()
                 .setConfiguration(configuration)
-                .setNumTaskManagers(1)
-                .setNumSlotsPerTaskManager(1)
+                .setNumTaskManagers(2)
+                .setNumSlotsPerTaskManager(2)
                 .build();
     }
 
@@ -74,12 +71,7 @@ public class ListStateWithCacheTest {
     public void testWithMemoryWeights() throws Exception {
         try (MiniCluster miniCluster = new MiniCluster(createMiniClusterConfiguration())) {
             miniCluster.start();
-            int n = 5;
-            Random random = new Random();
-            double[] weights = new double[n];
-            for (int i = 0; i < n; i += 1) {
-                weights[i] = random.nextInt(100);
-            }
+            double[] weights = new double[] {10, 20, 20, 40, 0};
             JobGraph jobGraph = getJobGraph(weights);
             miniCluster.executeJobBlocking(jobGraph);
         }
@@ -88,7 +80,7 @@ public class ListStateWithCacheTest {
     private JobGraph getJobGraph(double[] weights) {
         Configuration configuration = new Configuration();
         StreamExecutionEnvironment env = TestUtils.getExecutionEnvironment(configuration);
-        env.setParallelism(1);
+        env.setParallelism(4);
 
         final int n = 10;
         DataStream<String> data =
@@ -96,12 +88,12 @@ public class ListStateWithCacheTest {
         DataStream<Integer> counter =
                 data.transform("cache", Types.INT, new CacheDataOperator(weights));
         DataStreamUtils.setManagedMemoryWeight(counter, 100);
-        counter.addSink(
+        DataStream<Integer> sum = DataStreamUtils.reduce(counter, Integer::sum);
+        sum.addSink(
                 new SinkFunction<Integer>() {
                     @Override
-                    public void invoke(Integer value, Context context) throws Exception {
+                    public void invoke(Integer value, Context context) {
                         Assert.assertEquals((Integer) (n * weights.length), value);
-                        SinkFunction.super.invoke(value, context);
                     }
                 });
         return env.getStreamGraph().getJobGraph();
@@ -152,20 +144,8 @@ public class ListStateWithCacheTest {
             }
             cached = new ListStateWithCache[weights.length];
             for (int i = 0; i < weights.length; i += 1) {
-                cached[i] =
-                        new ListStateWithCache<>(
-                                serializers[i],
-                                "state-" + i,
-                                containingTask,
-                                getRuntimeContext(),
-                                context,
-                                operatorID);
+                cached[i] = new ListStateWithCache<>(serializers[i], "state-" + i, context, this);
             }
-        }
-
-        @Override
-        public void snapshotState(StateSnapshotContext context) throws Exception {
-            super.snapshotState(context);
         }
     }
 }

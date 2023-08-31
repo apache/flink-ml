@@ -250,12 +250,7 @@ public class KMeans implements Estimator<KMeans, KMeansModel>, KMeansParams<KMea
             manager.register(stateKey, 1.);
             points =
                     new ListStateWithCache<>(
-                            new VectorWithNormSerializer(),
-                            stateKey,
-                            containingTask,
-                            getRuntimeContext(),
-                            context,
-                            operatorID);
+                            new VectorWithNormSerializer(), stateKey, context, this);
         }
 
         @Override

@@ -77,8 +77,7 @@ public class OperatorScopeManagedMemoryManagerTest {
             manager.register("state-1", 100);
             Assert.assertEquals(manager.getFraction("state-1"), 1., EPS);
             manager.register("state-2", 400);
-            Assert.assertEquals(manager.getFraction("state-2"), 0.8, EPS);
-            throw new RuntimeException();
+            Assert.fail();
         } catch (Exception e) {
             Assert.assertEquals(
                     IllegalStateException.class, ExceptionUtils.getRootCause(e).getClass());

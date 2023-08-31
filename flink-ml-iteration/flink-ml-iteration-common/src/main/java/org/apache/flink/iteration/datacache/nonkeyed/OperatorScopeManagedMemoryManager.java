@@ -45,25 +45,25 @@ public class OperatorScopeManagedMemoryManager {
 
     /**
      * Stores instances corresponding to operators. The instance is expected to be released after
-     * some point after the corresponding operator ID is unused.
+     * some point after the corresponding task and operator ID are garbage-collected.
      */
     private static final Map<
                     Tuple2<StreamTask<?, ?>, OperatorID>, OperatorScopeManagedMemoryManager>
             managers = Collections.synchronizedMap(new WeakHashMap<>());
 
     /** Stores keys and weights of memory usages. */
-    protected Map<String, Double> weights = new HashMap<>();
+    private final Map<String, Double> weights = new HashMap<>();
     /** Indicates whether the `weights` is frozen. */
-    protected boolean frozen = false;
+    private boolean frozen = false;
     /** Stores sum of weights of all usages. */
-    protected double sum;
+    private double sum;
 
     private OperatorScopeManagedMemoryManager() {}
 
     /**
-     * Gets or creates an instance identified by the operator ID.
+     * Gets or creates an instance identified by the containing task and operator ID.
      *
-     * @param containingTask The container task.
+     * @param containingTask The containing task.
      * @param operatorID The operator ID.
      * @return An instance of {@link OperatorScopeManagedMemoryManager}.
      */
