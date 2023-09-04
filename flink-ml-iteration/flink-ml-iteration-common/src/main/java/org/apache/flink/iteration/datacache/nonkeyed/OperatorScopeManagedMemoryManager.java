@@ -19,7 +19,6 @@
 package org.apache.flink.iteration.datacache.nonkeyed;
 
 import org.apache.flink.annotation.PublicEvolving;
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.util.Preconditions;
@@ -45,10 +44,9 @@ public class OperatorScopeManagedMemoryManager {
 
     /**
      * Stores instances corresponding to operators. The instance is expected to be released after
-     * some point after the corresponding task and operator ID are garbage-collected.
+     * some point after the corresponding task or operator ID is garbage-collected.
      */
-    private static final Map<
-                    Tuple2<StreamTask<?, ?>, OperatorID>, OperatorScopeManagedMemoryManager>
+    private static final Map<StreamTask<?, ?>, Map<OperatorID, OperatorScopeManagedMemoryManager>>
             managers = Collections.synchronizedMap(new WeakHashMap<>());
 
     /** Stores keys and weights of memory usages. */
@@ -69,9 +67,9 @@ public class OperatorScopeManagedMemoryManager {
      */
     public static OperatorScopeManagedMemoryManager getOrCreate(
             StreamTask<?, ?> containingTask, OperatorID operatorID) {
-        return managers.computeIfAbsent(
-                Tuple2.of(containingTask, operatorID),
-                (key) -> new OperatorScopeManagedMemoryManager());
+        Map<OperatorID, OperatorScopeManagedMemoryManager> m =
+                managers.computeIfAbsent(containingTask, (key) -> new WeakHashMap<>());
+        return m.computeIfAbsent(operatorID, (key) -> new OperatorScopeManagedMemoryManager());
     }
 
     /**
@@ -96,7 +94,8 @@ public class OperatorScopeManagedMemoryManager {
      * @return The fraction.
      */
     public double getFraction(String key) {
-        Preconditions.checkArgument(weights.containsKey(key));
+        Preconditions.checkArgument(
+                weights.containsKey(key), String.format("%s is not registered yet.", key));
         if (!frozen) {
             frozen = true;
             sum = weights.values().stream().mapToDouble(d -> d).sum();
