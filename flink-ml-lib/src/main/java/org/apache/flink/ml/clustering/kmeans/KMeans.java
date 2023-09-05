@@ -36,6 +36,7 @@ import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.Iterations;
 import org.apache.flink.iteration.ReplayableDataStreamList;
 import org.apache.flink.iteration.datacache.nonkeyed.ListStateWithCache;
+import org.apache.flink.iteration.datacache.nonkeyed.OperatorScopeManagedMemoryManager;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.api.Estimator;
 import org.apache.flink.ml.common.datastream.DataStreamUtils;
@@ -51,12 +52,14 @@ import org.apache.flink.ml.linalg.typeinfo.VectorWithNormSerializer;
 import org.apache.flink.ml.param.Param;
 import org.apache.flink.ml.util.ParamUtils;
 import org.apache.flink.ml.util.ReadWriteUtils;
+import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.internal.TableImpl;
@@ -239,13 +242,15 @@ public class KMeans implements Estimator<KMeans, KMeansModel>, KMeansParams<KMea
                     context.getOperatorStateStore()
                             .getListState(new ListStateDescriptor<>("centroids", type));
 
+            final StreamTask<?, ?> containingTask = getContainingTask();
+            final OperatorID operatorID = config.getOperatorID();
+            final OperatorScopeManagedMemoryManager manager =
+                    OperatorScopeManagedMemoryManager.getOrCreate(containingTask, operatorID);
+            final String stateKey = "points-state";
+            manager.register(stateKey, 1.);
             points =
                     new ListStateWithCache<>(
-                            new VectorWithNormSerializer(),
-                            getContainingTask(),
-                            getRuntimeContext(),
-                            context,
-                            config.getOperatorID());
+                            new VectorWithNormSerializer(), stateKey, context, this);
         }
 
         @Override

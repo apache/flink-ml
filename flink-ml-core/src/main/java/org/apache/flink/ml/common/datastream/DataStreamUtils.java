@@ -38,6 +38,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.TypeExtractor;
 import org.apache.flink.core.memory.ManagedMemoryUseCase;
 import org.apache.flink.iteration.datacache.nonkeyed.ListStateWithCache;
+import org.apache.flink.iteration.datacache.nonkeyed.OperatorScopeManagedMemoryManager;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
 import org.apache.flink.ml.common.datastream.sort.CoGroupOperator;
 import org.apache.flink.ml.common.window.CountTumblingWindows;
@@ -47,6 +48,7 @@ import org.apache.flink.ml.common.window.GlobalWindows;
 import org.apache.flink.ml.common.window.ProcessingTimeSessionWindows;
 import org.apache.flink.ml.common.window.ProcessingTimeTumblingWindows;
 import org.apache.flink.ml.common.window.Windows;
+import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.runtime.state.VoidNamespace;
@@ -72,6 +74,7 @@ import org.apache.flink.streaming.api.windowing.windows.GlobalWindow;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.streaming.api.windowing.windows.Window;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.util.Collector;
 
@@ -483,13 +486,18 @@ public class DataStreamUtils {
         public void initializeState(StateInitializationContext context) throws Exception {
             super.initializeState(context);
 
+            final StreamTask<?, ?> containingTask = getContainingTask();
+            final OperatorID operatorID = config.getOperatorID();
+            final OperatorScopeManagedMemoryManager manager =
+                    OperatorScopeManagedMemoryManager.getOrCreate(containingTask, operatorID);
+            final String stateKey = "values-state";
+            manager.register(stateKey, 1.);
             valuesState =
                     new ListStateWithCache<>(
                             getOperatorConfig().getTypeSerializerIn(0, getClass().getClassLoader()),
-                            getContainingTask(),
-                            getRuntimeContext(),
+                            stateKey,
                             context,
-                            config.getOperatorID());
+                            this);
         }
 
         @Override

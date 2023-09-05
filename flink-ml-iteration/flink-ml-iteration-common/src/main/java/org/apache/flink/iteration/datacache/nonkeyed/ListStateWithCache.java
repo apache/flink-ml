@@ -23,11 +23,14 @@ import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.core.memory.ManagedMemoryUseCase;
 import org.apache.flink.iteration.operator.OperatorUtils;
+import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.memory.MemoryManager;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StatePartitionStreamProvider;
 import org.apache.flink.runtime.state.StateSnapshotContext;
+import org.apache.flink.streaming.api.graph.StreamConfig;
+import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.StreamingRuntimeContext;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.table.runtime.util.LazyMemorySegmentPool;
@@ -46,7 +49,8 @@ import java.util.List;
  * <p>This class basically stores data in file system, and provides the option to cache them in
  * memory. In order to use the memory caching option, users need to allocate certain managed memory
  * for the wrapper operator through {@link
- * org.apache.flink.api.dag.Transformation#declareManagedMemoryUseCaseAtOperatorScope}.
+ * org.apache.flink.api.dag.Transformation#declareManagedMemoryUseCaseAtOperatorScope} and register
+ * usage through {@link OperatorScopeManagedMemoryManager#register}.
  *
  * <p>NOTE: Users need to explicitly invoke this class's {@link
  * #snapshotState(StateSnapshotContext)} method in order to store the recorded data in snapshot.
@@ -62,40 +66,53 @@ public class ListStateWithCache<T> implements ListState<T> {
     /** The data cache writer for the received records. */
     private final DataCacheWriter<T> dataCacheWriter;
 
+    /**
+     * Creates an instance of {@link ListStateWithCache}.
+     *
+     * @param serializer The type serializer of data.
+     * @param key The key registered in the manager.
+     * @param stateInitializationContext The state initialization state.
+     * @param operator The operator to new the instance.
+     */
     @SuppressWarnings("unchecked")
     public ListStateWithCache(
             TypeSerializer<T> serializer,
-            StreamTask<?, ?> containingTask,
-            StreamingRuntimeContext runtimeContext,
+            String key,
             StateInitializationContext stateInitializationContext,
-            OperatorID operatorID)
+            AbstractStreamOperator<?> operator)
             throws IOException {
         this.serializer = serializer;
 
+        final StreamConfig config = operator.getOperatorConfig();
+        final OperatorID operatorID = config.getOperatorID();
+        StreamTask<?, ?> containingTask = operator.getContainingTask();
+        final Environment environment = containingTask.getEnvironment();
+        final StreamingRuntimeContext runtimeContext = operator.getRuntimeContext();
+
         MemorySegmentPool segmentPool = null;
         double fraction =
-                containingTask
-                        .getConfiguration()
-                        .getManagedMemoryFractionOperatorUseCaseOfSlot(
-                                ManagedMemoryUseCase.OPERATOR,
-                                runtimeContext.getTaskManagerRuntimeInfo().getConfiguration(),
-                                runtimeContext.getUserCodeClassLoader());
+                config.getManagedMemoryFractionOperatorUseCaseOfSlot(
+                        ManagedMemoryUseCase.OPERATOR,
+                        runtimeContext.getTaskManagerRuntimeInfo().getConfiguration(),
+                        runtimeContext.getUserCodeClassLoader());
         if (fraction > 0) {
-            MemoryManager memoryManager = containingTask.getEnvironment().getMemoryManager();
-            segmentPool =
-                    new LazyMemorySegmentPool(
-                            containingTask,
-                            memoryManager,
-                            memoryManager.computeNumberOfPages(fraction));
+            OperatorScopeManagedMemoryManager manager =
+                    OperatorScopeManagedMemoryManager.getOrCreate(containingTask, operatorID);
+            double memorySubFraction = manager.getFraction(key);
+            if (memorySubFraction > 0) {
+                MemoryManager memoryManager = environment.getMemoryManager();
+                segmentPool =
+                        new LazyMemorySegmentPool(
+                                operator,
+                                memoryManager,
+                                memoryManager.computeNumberOfPages(fraction * memorySubFraction));
+            }
         }
 
         basePath =
                 OperatorUtils.getDataCachePath(
-                        containingTask.getEnvironment().getTaskManagerInfo().getConfiguration(),
-                        containingTask
-                                .getEnvironment()
-                                .getIOManager()
-                                .getSpillingDirectoriesPaths());
+                        environment.getTaskManagerInfo().getConfiguration(),
+                        environment.getIOManager().getSpillingDirectoriesPaths());
 
         List<StatePartitionStreamProvider> inputs =
                 IteratorUtils.toList(
@@ -104,7 +121,7 @@ public class ListStateWithCache<T> implements ListState<T> {
                 inputs.size() < 2, "The input from raw operator state should be one or zero.");
 
         List<Segment> priorFinishedSegments = new ArrayList<>();
-        if (inputs.size() > 0) {
+        if (!inputs.isEmpty()) {
             DataCacheSnapshot dataCacheSnapshot =
                     DataCacheSnapshot.recover(
                             inputs.get(0).getStream(),
