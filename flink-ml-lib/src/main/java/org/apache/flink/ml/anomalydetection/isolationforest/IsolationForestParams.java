@@ -18,39 +18,49 @@
 
 package org.apache.flink.ml.anomalydetection.isolationforest;
 
-import org.apache.flink.ml.common.param.HasDistanceMeasure;
-import org.apache.flink.ml.common.param.HasFeaturesCol;
-import org.apache.flink.ml.common.param.HasPredictionCol;
-import org.apache.flink.ml.common.param.HasWindows;
+import org.apache.flink.ml.param.DoubleParam;
 import org.apache.flink.ml.param.IntParam;
 import org.apache.flink.ml.param.Param;
 
 /**
- * Params of {@link IsolationForestModel}.
+ * Params of {@link IsolationForest}.
  *
  * @param <T> The class of this instance.
  */
-public interface IsolationForestParams<T>
-        extends HasDistanceMeasure<T>, HasFeaturesCol<T>, HasPredictionCol<T>, HasWindows<T> {
-    Param<Integer> TREES_NUMBER =
-            new IntParam("treesNumber", "The max number of trees to create.", 2);
+public interface IsolationForestParams<T> extends IsolationForestModelParams<T> {
+    Param<Integer> MAX_SAMPLES =
+            new IntParam(
+                    "maxSamples",
+                    "The number of samplesData to train and its max value is preferably 256.",
+                    256);
 
-    Param<Integer> ITERS =
-            new IntParam("iters", "The max iterations for calculate cluster center.", 2);
+    Param<Double> MAX_FEATURES =
+            new DoubleParam(
+                    "maxFeatures",
+                    "The number of features used to train each tree and it is treated as a fraction in the range (0, 1.0].",
+                    1.0);
 
-    default Integer getTreesNumber() {
-        return get(TREES_NUMBER);
+    default int getNumTrees() {
+        return get(NUM_TREES);
     }
 
-    default T setTreesNumber(Integer value) {
-        return set(TREES_NUMBER, value);
+    default T setNumTrees(int value) {
+        return set(NUM_TREES, value);
     }
 
-    default Integer getIters() {
-        return get(ITERS);
+    default int getMaxSamples() {
+        return get(MAX_SAMPLES);
     }
 
-    default T setIters(Integer value) {
-        return set(ITERS, value);
+    default T setMaxSamples(int value) {
+        return set(MAX_SAMPLES, value);
+    }
+
+    default double getMaxFeatures() {
+        return get(MAX_FEATURES);
+    }
+
+    default T setMaxFeatures(double value) {
+        return set(MAX_FEATURES, value);
     }
 }

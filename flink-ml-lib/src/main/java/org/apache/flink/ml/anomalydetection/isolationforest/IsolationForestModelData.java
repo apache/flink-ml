@@ -27,7 +27,6 @@ import org.apache.flink.connector.file.src.reader.SimpleStreamFormat;
 import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
-import org.apache.flink.ml.anomalydetection.isolationforest.IsolationForest.IForest;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -45,9 +44,7 @@ import java.io.OutputStream;
  */
 public class IsolationForestModelData {
 
-    public IForest iForest;
-
-    public IsolationForestModelData() {}
+    public final IForest iForest;
 
     public IsolationForestModelData(IForest iForest) {
         this.iForest = iForest;

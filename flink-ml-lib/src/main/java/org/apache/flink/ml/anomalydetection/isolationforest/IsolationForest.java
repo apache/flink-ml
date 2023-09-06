@@ -22,6 +22,7 @@ import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.MapPartitionFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
+import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
@@ -61,15 +62,14 @@ import org.apache.flink.util.OutputTag;
 import org.apache.flink.util.Preconditions;
 
 import java.io.IOException;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Random;
 
 /**
  * An Estimator which implements the Isolation Forest algorithm.
@@ -88,12 +88,8 @@ public class IsolationForest
     @Override
     public IsolationForestModel fit(Table... inputs) {
         Preconditions.checkArgument(inputs.length == 1);
-        Integer treesNumber = getTreesNumber();
-        Integer iters = getIters();
-        Preconditions.checkArgument(
-                treesNumber != null || treesNumber > 0, "Param treesNumber is illegal.");
-        Preconditions.checkArgument(iters != null || iters > 0, "Param iters is illegal.");
-        IForest iForest = new IForest(treesNumber, iters);
+
+        IForest iForest = new IForest(getNumTrees());
         StreamTableEnvironment tEnv =
                 (StreamTableEnvironment) ((TableImpl) inputs[0]).getTableEnvironment();
 
@@ -101,7 +97,9 @@ public class IsolationForest
                 tEnv.toDataStream(inputs[0]).map(new FormatDataMapFunction(getFeaturesCol()));
 
         DataStream<IForest> initModelData =
-                selectRandomSample1(points).map(new InitModelData(iForest)).setParallelism(1);
+                selectRandomSample(points, getMaxSamples())
+                        .map(new InitModelData(iForest, getMaxIter(), getMaxFeatures()))
+                        .setParallelism(1);
 
         DataStream<IsolationForestModelData> finalModelData =
                 Iterations.iterateBoundedStreamsUntilTermination(
@@ -111,7 +109,7 @@ public class IsolationForest
                                         .setOperatorLifeCycle(
                                                 IterationConfig.OperatorLifeCycle.ALL_ROUND)
                                         .build(),
-                                new IsolationForestIterationBody(iters))
+                                new IsolationForestIterationBody(getMaxIter()))
                         .get(0);
 
         Table finalModelDataTable = tEnv.fromDataStream(finalModelData);
@@ -125,7 +123,7 @@ public class IsolationForest
         ReadWriteUtils.saveMetadata(this, path);
     }
 
-    public static IsolationForestModel load(StreamTableEnvironment tEnv, String path)
+    public static IsolationForest load(StreamTableEnvironment tEnv, String path)
             throws IOException {
         return ReadWriteUtils.loadStageParam(path);
     }
@@ -137,7 +135,6 @@ public class IsolationForest
 
     private static class FormatDataMapFunction implements MapFunction<Row, DenseVector[]> {
         private final String featuresCol;
-        private List<DenseVector> list;
 
         public FormatDataMapFunction(String featuresCol) {
             this.featuresCol = featuresCol;
@@ -145,18 +142,18 @@ public class IsolationForest
 
         @Override
         public DenseVector[] map(Row row) throws Exception {
-            list = new ArrayList<>(256);
+            List<DenseVector> list = new ArrayList<>(256);
             DenseVector denseVector = ((Vector) row.getField(featuresCol)).toDense();
             list.add(denseVector);
             return list.toArray(new DenseVector[0]);
         }
     }
 
-    private static DataStream<DenseVector[]> selectRandomSample1(
-            DataStream<DenseVector[]> samplesData) {
+    private static DataStream<DenseVector[]> selectRandomSample(
+            DataStream<DenseVector[]> samplesData, int maxSamples) {
         DataStream<DenseVector[]> resultStream =
                 DataStreamUtils.mapPartition(
-                        DataStreamUtils.sample(samplesData, 256, System.currentTimeMillis()),
+                        DataStreamUtils.sample(samplesData, maxSamples, System.nanoTime()),
                         (MapPartitionFunction<DenseVector[], DenseVector[]>)
                                 (iterable, collector) -> {
                                     Iterator<DenseVector[]> samplesDataIterator =
@@ -172,26 +169,44 @@ public class IsolationForest
         return resultStream;
     }
 
-    private static class InitModelData implements MapFunction<DenseVector[], IForest> {
+    private static class InitModelData extends RichMapFunction<DenseVector[], IForest> {
         private final IForest iForest;
+        private final int iters;
+        private final double maxFeatures;
 
-        private InitModelData(IForest iForest) {
+        private InitModelData(IForest iForest, int iters, double maxFeatures) {
             this.iForest = iForest;
+            this.iters = iters;
+            this.maxFeatures = maxFeatures;
         }
 
         @Override
         public IForest map(DenseVector[] denseVectors) throws Exception {
-            iForest.createIForest(denseVectors);
-            DenseVector scores = iForest.calculateAnomalyScore(denseVectors);
-            iForest.classifyByCluster(scores);
+            int n = denseVectors[0].size();
+            int numFeatures = Math.min(n, Math.max(1, (int) (maxFeatures * n)));
+
+            List<Integer> tempList = new ArrayList<>(n);
+            for (int i = 0; i < n; i++) {
+                tempList.add(i);
+            }
+            Collections.shuffle(tempList);
+
+            int[] featuresIndicts = new int[numFeatures];
+            for (int j = 0; j < numFeatures; j++) {
+                featuresIndicts[j] = tempList.get(j);
+            }
+
+            iForest.generateIsolationForest(denseVectors, featuresIndicts);
+            DenseVector scores = iForest.calculateScore(denseVectors);
+            iForest.classifyByCluster(scores, iters);
             return iForest;
         }
     }
 
     private static class IsolationForestIterationBody implements IterationBody {
-        private final Integer iters;
+        private final int iters;
 
-        public IsolationForestIterationBody(Integer iters) {
+        public IsolationForestIterationBody(int iters) {
             this.iters = iters;
         }
 
@@ -212,7 +227,7 @@ public class IsolationForest
                             .transform(
                                     "CentersUpdateAccumulator",
                                     TypeInformation.of(IForest.class),
-                                    new CentersUpdateAccumulator(modelDataOutputTag));
+                                    new CentersUpdateAccumulator(modelDataOutputTag, iters));
 
             DataStream<IsolationForestModelData> newModelData =
                     centers.countWindowAll(centers.getParallelism())
@@ -260,14 +275,17 @@ public class IsolationForest
                     IterationListener<IForest> {
         private final OutputTag<IForest> modelDataOutputTag;
 
+        private final int iters;
+
         private ListStateWithCache<DenseVector[]> samplesData;
 
         private ListState<IForest> samplesDataCenter;
 
         private ListStateWithCache<DenseVector[]> samplesDataScores;
 
-        public CentersUpdateAccumulator(OutputTag<IForest> modelDataOutputTag) {
+        public CentersUpdateAccumulator(OutputTag<IForest> modelDataOutputTag, int iters) {
             this.modelDataOutputTag = modelDataOutputTag;
+            this.iters = iters;
         }
 
         @Override
@@ -328,7 +346,7 @@ public class IsolationForest
             List<DenseVector> list = new ArrayList<>();
             while (samplesDataIterator.hasNext()) {
                 DenseVector[] sampleData = samplesDataIterator.next();
-                list.add(centers.calculateAnomalyScore(sampleData));
+                list.add(centers.calculateScore(sampleData));
             }
             DenseVector[] scores = list.toArray(new DenseVector[0]);
             samplesDataScores.add(scores);
@@ -344,12 +362,16 @@ public class IsolationForest
                     Objects.requireNonNull(
                             OperatorStateUtils.getUniqueElement(samplesDataCenter, "centers")
                                     .orElse(null));
-            double centers0Sum1 = 0.0, centers1Sum1 = 0.0, centers0Sum2 = 0.0, centers1Sum2 = 0.0;
-            int size1 = 0, size2 = 0;
+            double centers0Sum1 = 0.0;
+            double centers1Sum1 = 0.0;
+            double centers0Sum2 = 0.0;
+            double centers1Sum2 = 0.0;
+            int size1 = 0;
+            int size2 = 0;
             Iterator<DenseVector[]> samplesDataScoresIterator = samplesDataScores.get().iterator();
             while (samplesDataScoresIterator.hasNext()) {
                 for (DenseVector denseVector : samplesDataScoresIterator.next()) {
-                    DenseVector denseVector1 = centers.classifyByCluster(denseVector);
+                    DenseVector denseVector1 = centers.classifyByCluster(denseVector, iters);
                     centers0Sum1 += denseVector1.get(0);
                     centers1Sum1 += denseVector1.get(1);
                     size1++;
@@ -367,245 +389,6 @@ public class IsolationForest
             samplesDataCenter.clear();
             samplesDataScores.clear();
             samplesData.clear();
-        }
-    }
-
-    /** Construct isolation forest. */
-    public static class IForest implements Serializable {
-        public int treesNumber;
-        public int iters;
-        public List<ITree> iTreeList;
-        public Double center0;
-        public Double center1;
-        public int subSamplesSize;
-
-        public IForest() {}
-
-        public IForest(int treesNumber, int iters) {
-            this.iters = iters;
-            this.treesNumber = treesNumber;
-            this.iTreeList = new ArrayList<>();
-            this.center0 = null;
-            this.center1 = null;
-        }
-
-        private void createIForest(DenseVector[] samplesData) throws Exception {
-            this.subSamplesSize = Math.min(256, samplesData.length);
-
-            // 限制高度(向上取整)
-            int limitHeight = (int) Math.ceil(Math.log(subSamplesSize) / Math.log(2));
-
-            int rows = samplesData.length;
-
-            Random random = new Random(System.currentTimeMillis());
-            for (int i = 0; i < this.treesNumber; i++) {
-                DenseVector[] subSamples = new DenseVector[subSamplesSize];
-                for (int j = 0; j < subSamplesSize; j++) {
-                    int r = random.nextInt(rows);
-                    subSamples[j] = samplesData[r];
-                }
-                ITree iTree = ITree.createITree(subSamples, 0, limitHeight);
-                this.iTreeList.add(iTree);
-            }
-        }
-
-        private DenseVector calculateAnomalyScore(DenseVector[] samplesData) throws Exception {
-            int n = samplesData.length;
-
-            DenseVector scores = new DenseVector(n);
-            for (int i = 0; i < n; i++) {
-                double pathLengthSum = 0;
-                for (ITree iTree : iTreeList) {
-                    pathLengthSum += calculatePathLength(samplesData[i], iTree);
-                }
-
-                double pathLengthAvg = pathLengthSum / iTreeList.size();
-                double cn = calculateCn(subSamplesSize);
-                double index = pathLengthAvg / cn;
-                scores.set(i, Math.pow(2, -index));
-            }
-            return scores;
-        }
-
-        private double calculatePathLength(DenseVector sampleData, ITree iTree) throws Exception {
-            double pathLength = -1;
-            ITree tmpITree = iTree;
-            while (tmpITree != null) {
-                pathLength += 1;
-                if (tmpITree.leftTree == null
-                        || tmpITree.rightTree == null
-                        || sampleData.get(tmpITree.attributeIndex)
-                                == tmpITree.splitAttributeValue) {
-                    break;
-                } else if (sampleData.get(tmpITree.attributeIndex) < tmpITree.splitAttributeValue) {
-                    tmpITree = tmpITree.leftTree;
-                } else {
-                    tmpITree = tmpITree.rightTree;
-                }
-            }
-
-            return pathLength + calculateCn(tmpITree.leafNodesNum);
-        }
-
-        private double calculateCn(double n) {
-            if (n <= 1) {
-                return 0;
-            }
-            return 2.0 * (Math.log(n - 1.0) + 0.5772156649015329) - 2.0 * (n - 1.0) / n;
-        }
-
-        private DenseVector classifyByCluster(DenseVector scores) {
-            int scoresSize = scores.size();
-            this.center0 = scores.get(0); // Cluster center of abnormal
-            this.center1 = scores.get(0); // Cluster center of normal
-
-            for (int p = 1; p < scores.size(); p++) {
-                if (scores.get(p) > center0) {
-                    center0 = scores.get(p);
-                }
-
-                if (scores.get(p) < center1) {
-                    center1 = scores.get(p);
-                }
-            }
-
-            int cnt0, cnt1;
-            double diff0, diff1;
-            int[] labels = new int[scoresSize];
-
-            for (int i = 0; i < iters; i++) {
-                cnt0 = 0;
-                cnt1 = 0;
-
-                for (int j = 0; j < scoresSize; j++) {
-                    diff0 = Math.abs(scores.get(j) - center0);
-                    diff1 = Math.abs(scores.get(j) - center1);
-
-                    if (diff0 < diff1) {
-                        labels[j] = 0;
-                        cnt0++;
-                    } else {
-                        labels[j] = 1;
-                        cnt1++;
-                    }
-                }
-
-                diff0 = center0;
-                diff1 = center1;
-
-                center0 = 0.0;
-                center1 = 0.0;
-                for (int k = 0; k < scoresSize; k++) {
-                    if (labels[k] == 0) {
-                        center0 += scores.get(k);
-                    } else {
-                        center1 += scores.get(k);
-                    }
-                }
-
-                center0 /= cnt0;
-                center1 /= cnt1;
-
-                if (center0 - diff0 <= 1e-6 && center1 - diff1 <= 1e-6) {
-                    break;
-                }
-            }
-            return new DenseVector(new double[] {center0, center1});
-        }
-    }
-
-    /** Construct isolation tree. */
-    public static class ITree implements Serializable {
-        public int attributeIndex;
-        public double splitAttributeValue;
-        public ITree leftTree, rightTree;
-        public int currentHeight;
-        public int leafNodesNum;
-
-        public ITree() {}
-
-        public ITree(int attributeIndex, double splitAttributeValue) {
-            this.attributeIndex = attributeIndex;
-            this.splitAttributeValue = splitAttributeValue;
-            this.leftTree = null;
-            this.rightTree = null;
-            this.currentHeight = 0;
-            this.leafNodesNum = 1;
-        }
-
-        public static ITree createITree(
-                DenseVector[] samplesData, int currentHeight, int limitHeight) {
-            ITree iTree = null;
-            if (samplesData.length == 0) {
-                return iTree;
-            } else if (samplesData.length == 1 || currentHeight >= limitHeight) {
-                iTree = new ITree(0, samplesData[0].get(0));
-                iTree.leafNodesNum = samplesData.length;
-                iTree.currentHeight = currentHeight;
-                return iTree;
-            }
-
-            int rows = samplesData.length;
-            int cols = samplesData[0].size();
-
-            boolean flag = true;
-            for (int i = 1; i < rows; i++) {
-                if (!samplesData[i].equals(samplesData[i - 1])) {
-                    flag = false;
-                    break;
-                }
-            }
-            if (flag) {
-                iTree = new ITree(0, samplesData[0].get(0));
-                iTree.leafNodesNum = samplesData.length;
-                iTree.currentHeight = currentHeight;
-                return iTree;
-            }
-
-            Random random = new Random(System.currentTimeMillis());
-            int attributeIndex = random.nextInt(cols);
-
-            double maxValue = samplesData[0].get(attributeIndex);
-            double minValue = samplesData[0].get(attributeIndex);
-            for (int i = 1; i < rows; i++) {
-                if (samplesData[i].get(attributeIndex) < minValue) {
-                    minValue = samplesData[i].get(attributeIndex);
-                }
-                if (samplesData[i].get(attributeIndex) > maxValue) {
-                    maxValue = samplesData[i].get(attributeIndex);
-                }
-            }
-
-            double splitAttributeValue = (maxValue - minValue) * random.nextDouble() + minValue;
-
-            int leftNodesNum = 0;
-            int rightNodesNum = 0;
-            for (int i = 0; i < rows; i++) {
-                if (samplesData[i].get(attributeIndex) < splitAttributeValue) {
-                    leftNodesNum++;
-                } else {
-                    rightNodesNum++;
-                }
-            }
-
-            DenseVector[] leftSamples = new DenseVector[leftNodesNum];
-            DenseVector[] rightSamples = new DenseVector[rightNodesNum];
-            int l = 0, r = 0;
-            for (int i = 0; i < rows; i++) {
-                if (samplesData[i].get(attributeIndex) < splitAttributeValue) {
-                    leftSamples[l++] = samplesData[i];
-                } else {
-                    rightSamples[r++] = samplesData[i];
-                }
-            }
-
-            ITree root = new ITree(attributeIndex, splitAttributeValue);
-            root.currentHeight = currentHeight;
-            root.leafNodesNum = samplesData.length;
-            root.leftTree = createITree(leftSamples, currentHeight + 1, limitHeight);
-            root.rightTree = createITree(rightSamples, currentHeight + 1, limitHeight);
-
-            return root;
         }
     }
 }

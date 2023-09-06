@@ -19,7 +19,31 @@
 package org.apache.flink.ml.anomalydetection.isolationforest;
 
 import org.apache.flink.ml.common.param.HasFeaturesCol;
+import org.apache.flink.ml.common.param.HasMaxIter;
 import org.apache.flink.ml.common.param.HasPredictionCol;
+import org.apache.flink.ml.common.param.HasRawPredictionCol;
+import org.apache.flink.ml.common.param.HasWindows;
+import org.apache.flink.ml.param.IntParam;
+import org.apache.flink.ml.param.Param;
 
-/** IsolationForestModelParams. */
-public interface IsolationForestModelParams<T> extends HasFeaturesCol<T>, HasPredictionCol<T> {}
+/**
+ * Params of {@link IsolationForestModel}.
+ *
+ * @param <T> The class of this instance.
+ */
+public interface IsolationForestModelParams<T>
+        extends HasMaxIter<T>,
+                HasFeaturesCol<T>,
+                HasPredictionCol<T>,
+                HasRawPredictionCol<T>,
+                HasWindows<T> {
+    Param<Integer> NUM_TREES = new IntParam("numTrees", "The max number of ITrees to create.", 100);
+
+    default int getNumTrees() {
+        return get(NUM_TREES);
+    }
+
+    default T setNumTrees(int value) {
+        return set(NUM_TREES, value);
+    }
+}

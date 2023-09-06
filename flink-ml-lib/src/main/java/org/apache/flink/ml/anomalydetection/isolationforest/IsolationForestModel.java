@@ -21,7 +21,6 @@ package org.apache.flink.ml.anomalydetection.isolationforest;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
-import org.apache.flink.ml.anomalydetection.isolationforest.IsolationForest.ITree;
 import org.apache.flink.ml.api.Model;
 import org.apache.flink.ml.common.broadcast.BroadcastUtils;
 import org.apache.flink.ml.common.datastream.TableUtils;
@@ -50,7 +49,7 @@ import java.util.Map;
  * A Model which detection anomaly data using the model data computed by {@link IsolationForest}.
  */
 public class IsolationForestModel
-        implements Model<IsolationForestModel>, IsolationForestParams<IsolationForestModel> {
+        implements Model<IsolationForestModel>, IsolationForestModelParams<IsolationForestModel> {
     private final Map<Param<?>, Object> paramMap = new HashMap<>();
 
     private Table modelDataTable;
@@ -160,41 +159,13 @@ public class IsolationForestModel
             double pathLengthSum = 0;
             int treesNumber = iTreeList.size();
             for (int j = 0; j < treesNumber; j++) {
-                pathLengthSum += calculatePathLength(sampleData, iTreeList.get(j));
+                pathLengthSum += ITree.calculatePathLength(sampleData, iTreeList.get(j));
             }
             double pathLengthAvg = pathLengthSum / treesNumber;
-            double cn = calculateCn(subSamplesSize);
-            double score = Math.pow(2, -(pathLengthAvg / cn));
+            double cn = ITree.calculateCn(subSamplesSize);
+            double score = Math.pow(2, -pathLengthAvg / cn);
 
             return Math.abs(score - center0) > Math.abs(score - center1) ? 1 : 0;
-        }
-
-        private double calculatePathLength(DenseVector sampleData, ITree iTree) throws Exception {
-            double pathLength = -1;
-            ITree tmpITree = iTree;
-            while (tmpITree != null) {
-                pathLength += 1;
-                if (tmpITree.leftTree == null
-                        || tmpITree.rightTree == null
-                        || sampleData.get(tmpITree.attributeIndex)
-                                == tmpITree.splitAttributeValue) {
-                    break;
-                } else if (sampleData.get(tmpITree.attributeIndex) < tmpITree.splitAttributeValue) {
-                    tmpITree = tmpITree.leftTree;
-                } else {
-                    tmpITree = tmpITree.rightTree;
-                }
-            }
-
-            assert tmpITree != null;
-            return pathLength + calculateCn(tmpITree.leafNodesNum);
-        }
-
-        private double calculateCn(double n) {
-            if (n <= 1) {
-                return 0;
-            }
-            return 2.0 * (Math.log(n - 1.0) + 0.5772156649015329) - 2.0 * (n - 1.0) / n;
         }
     }
 }

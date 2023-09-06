@@ -33,7 +33,6 @@ import org.apache.flink.util.CloseableIterator;
 public class IsolationForestExample {
     public static void main(String[] args) {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.setParallelism(10);
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         // Generates input data.
@@ -45,34 +44,14 @@ public class IsolationForestExample {
                         Vectors.dense(1.1, 2.1),
                         Vectors.dense(0.1, 0.1));
 
-        DataStream<DenseVector> inputStream2 =
-                env.fromElements(
-                        Vectors.dense(4),
-                        Vectors.dense(1),
-                        Vectors.dense(4),
-                        Vectors.dense(5),
-                        Vectors.dense(3),
-                        Vectors.dense(6),
-                        Vectors.dense(2),
-                        Vectors.dense(5),
-                        Vectors.dense(6),
-                        Vectors.dense(2),
-                        Vectors.dense(5),
-                        Vectors.dense(7),
-                        Vectors.dense(1),
-                        Vectors.dense(8),
-                        Vectors.dense(12),
-                        Vectors.dense(33),
-                        Vectors.dense(4),
-                        Vectors.dense(7),
-                        Vectors.dense(6),
-                        Vectors.dense(7),
-                        Vectors.dense(8),
-                        Vectors.dense(55));
-
         Table inputTable = tEnv.fromDataStream(inputStream).as("features");
 
-        IsolationForest isolationForest = new IsolationForest().setTreesNumber(100).setIters(1);
+        IsolationForest isolationForest =
+                new IsolationForest()
+                        .setNumTrees(100)
+                        .setMaxIter(10)
+                        .setMaxSamples(256)
+                        .setMaxFeatures(1.0);
 
         IsolationForestModel isolationForestModel = isolationForest.fit(inputTable);
 
