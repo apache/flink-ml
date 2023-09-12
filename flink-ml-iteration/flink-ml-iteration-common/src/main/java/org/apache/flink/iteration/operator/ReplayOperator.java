@@ -266,7 +266,7 @@ public class ReplayOperator<T> extends AbstractStreamOperator<IterationRecord<T>
             dataCacheWriter.finish();
             emitEpochWatermark(epochWatermark);
             return;
-        } else if (epochWatermark == Integer.MAX_VALUE) {
+        } else if (epochWatermark == IterationRecord.END_EPOCH_WATERMARK) {
             emitEpochWatermark(epochWatermark);
             return;
         }

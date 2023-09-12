@@ -18,17 +18,24 @@
 
 package org.apache.flink.iteration.operator;
 
+import org.apache.flink.api.common.ExecutionConfig;
+import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
+import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.iteration.IterationID;
 import org.apache.flink.iteration.IterationRecord;
+import org.apache.flink.iteration.operator.feedback.SpillableFeedbackChannel;
+import org.apache.flink.iteration.operator.feedback.SpillableFeedbackChannelBroker;
+import org.apache.flink.iteration.typeinfo.IterationRecordTypeInfo;
+import org.apache.flink.runtime.memory.MemoryAllocationException;
 import org.apache.flink.runtime.testutils.DirectScheduledExecutorService;
-import org.apache.flink.statefun.flink.core.feedback.FeedbackChannel;
-import org.apache.flink.statefun.flink.core.feedback.FeedbackChannelBroker;
+import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.util.OneInputStreamOperatorTestHarness;
 import org.apache.flink.util.TestLogger;
 
 import org.junit.Test;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -42,16 +49,21 @@ public class TailOperatorTest extends TestLogger {
     public void testIncrementRoundWithoutObjectReuse() throws Exception {
         IterationID iterationId = new IterationID();
 
+        IterationRecordTypeInfo typeInfo =
+                new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO);
+        TypeSerializer serializer = typeInfo.createSerializer(new ExecutionConfig());
         OneInputStreamOperatorTestHarness<IterationRecord<?>, Void> testHarness =
-                new OneInputStreamOperatorTestHarness<>(new TailOperator(iterationId, 0));
+                new OneInputStreamOperatorTestHarness<>(
+                        new TailOperator(iterationId, 0), serializer);
         testHarness.open();
+        SpillableFeedbackChannel channel =
+                initializeFeedbackChannel(testHarness.getOperator(), iterationId, 0, 0, 0);
 
         testHarness.processElement(IterationRecord.newRecord(1, 1), 2);
         testHarness.processElement(IterationRecord.newRecord(2, 1), 3);
         testHarness.processElement(IterationRecord.newEpochWatermark(2, "sender1"), 4);
 
-        List<StreamRecord<IterationRecord<?>>> iterationRecords =
-                getFeedbackRecords(iterationId, 0, 0, 0);
+        List<StreamRecord<IterationRecord<?>>> iterationRecords = getFeedbackRecords(channel);
         assertEquals(
                 Arrays.asList(
                         new StreamRecord<>(IterationRecord.newRecord(1, 2), 2),
@@ -64,10 +76,17 @@ public class TailOperatorTest extends TestLogger {
     public void testIncrementRoundWithObjectReuse() throws Exception {
         IterationID iterationId = new IterationID();
 
+        IterationRecordTypeInfo typeInfo =
+                new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO);
+        TypeSerializer serializer = typeInfo.createSerializer(new ExecutionConfig());
+
         OneInputStreamOperatorTestHarness<IterationRecord<?>, Void> testHarness =
-                new OneInputStreamOperatorTestHarness<>(new TailOperator(iterationId, 0));
+                new OneInputStreamOperatorTestHarness<>(
+                        new TailOperator(iterationId, 0), serializer);
         testHarness.getExecutionConfig().enableObjectReuse();
         testHarness.open();
+        SpillableFeedbackChannel channel =
+                initializeFeedbackChannel(testHarness.getOperator(), iterationId, 0, 0, 0);
 
         IterationRecord<Integer> reuse = IterationRecord.newRecord(1, 1);
         testHarness.processElement(reuse, 2);
@@ -80,8 +99,7 @@ public class TailOperatorTest extends TestLogger {
         reuse.setSender("sender1");
         testHarness.processElement(reuse, 4);
 
-        List<StreamRecord<IterationRecord<?>>> iterationRecords =
-                getFeedbackRecords(iterationId, 0, 0, 0);
+        List<StreamRecord<IterationRecord<?>>> iterationRecords = getFeedbackRecords(channel);
         assertEquals(
                 Arrays.asList(
                         new StreamRecord<>(IterationRecord.newRecord(1, 2), 2),
@@ -90,17 +108,60 @@ public class TailOperatorTest extends TestLogger {
                 iterationRecords);
     }
 
+    @Test
+    public void testSpillFeedbackToDisk() throws Exception {
+        IterationID iterationId = new IterationID();
+
+        IterationRecordTypeInfo typeInfo =
+                new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO);
+        TypeSerializer serializer = typeInfo.createSerializer(new ExecutionConfig());
+        OneInputStreamOperatorTestHarness<IterationRecord<?>, Void> testHarness =
+                new OneInputStreamOperatorTestHarness<>(
+                        new TailOperator(iterationId, 0), serializer);
+        testHarness.open();
+        initializeFeedbackChannel(testHarness.getOperator(), iterationId, 0, 0, 0);
+
+        File spillPath =
+                new File(
+                        testHarness
+                                .getOperator()
+                                .getContainingTask()
+                                .getEnvironment()
+                                .getIOManager()
+                                .getSpillingDirectoriesPaths()[0]);
+        assertEquals(0, spillPath.listFiles().length);
+
+        for (int i = 0; i < 10; i++) {
+            testHarness.processElement(IterationRecord.newRecord(i, 1), i);
+        }
+        assertEquals(0, spillPath.listFiles().length);
+
+        for (int i = 0; i < (1 << 16); i++) {
+            testHarness.processElement(IterationRecord.newRecord(i, 1), i);
+        }
+        assertEquals(1, spillPath.listFiles().length);
+    }
+
     static List<StreamRecord<IterationRecord<?>>> getFeedbackRecords(
-            IterationID iterationId, int feedbackIndex, int subtaskIndex, int attemptNumber) {
-        FeedbackChannel<StreamRecord<IterationRecord<?>>> feedbackChannel =
-                FeedbackChannelBroker.get()
-                        .getChannel(
-                                OperatorUtils.<StreamRecord<IterationRecord<?>>>createFeedbackKey(
-                                                iterationId, feedbackIndex)
-                                        .withSubTaskIndex(subtaskIndex, attemptNumber));
+            SpillableFeedbackChannel<StreamRecord<IterationRecord<?>>> feedbackChannel) {
         List<StreamRecord<IterationRecord<?>>> iterationRecords = new ArrayList<>();
         OperatorUtils.registerFeedbackConsumer(
                 feedbackChannel, iterationRecords::add, new DirectScheduledExecutorService());
         return iterationRecords;
+    }
+
+    static SpillableFeedbackChannel<StreamRecord<IterationRecord<?>>> initializeFeedbackChannel(
+            AbstractStreamOperator operator,
+            IterationID iterationId,
+            int feedbackIndex,
+            int subtaskIndex,
+            int attemptNumber)
+            throws MemoryAllocationException {
+        return SpillableFeedbackChannelBroker.get()
+                .getChannel(
+                        OperatorUtils.<StreamRecord<IterationRecord<?>>>createFeedbackKey(
+                                        iterationId, feedbackIndex)
+                                .withSubTaskIndex(subtaskIndex, attemptNumber),
+                        channel -> OperatorUtils.initializeFeedbackChannel(channel, operator));
     }
 }

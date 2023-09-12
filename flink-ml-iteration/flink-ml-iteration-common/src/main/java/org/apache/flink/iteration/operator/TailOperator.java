@@ -22,8 +22,8 @@ import org.apache.flink.iteration.IterationID;
 import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.iteration.checkpoint.Checkpoints;
 import org.apache.flink.iteration.checkpoint.CheckpointsBroker;
-import org.apache.flink.statefun.flink.core.feedback.FeedbackChannel;
-import org.apache.flink.statefun.flink.core.feedback.FeedbackChannelBroker;
+import org.apache.flink.iteration.operator.feedback.SpillableFeedbackChannel;
+import org.apache.flink.iteration.operator.feedback.SpillableFeedbackChannelBroker;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackKey;
 import org.apache.flink.statefun.flink.core.feedback.SubtaskFeedbackKey;
 import org.apache.flink.streaming.api.graph.StreamConfig;
@@ -51,7 +51,7 @@ public class TailOperator extends AbstractStreamOperator<Void>
     /** We distinguish how the record is processed according to if objectReuse is enabled. */
     private transient Consumer<StreamRecord<IterationRecord<?>>> recordConsumer;
 
-    private transient FeedbackChannel<StreamRecord<IterationRecord<?>>> channel;
+    private transient SpillableFeedbackChannel<StreamRecord<IterationRecord<?>>> channel;
 
     public TailOperator(IterationID iterationId, int feedbackIndex) {
         this.iterationId = Objects.requireNonNull(iterationId);
@@ -78,8 +78,8 @@ public class TailOperator extends AbstractStreamOperator<Void>
         SubtaskFeedbackKey<StreamRecord<IterationRecord<?>>> key =
                 feedbackKey.withSubTaskIndex(indexOfThisSubtask, attemptNum);
 
-        FeedbackChannelBroker broker = FeedbackChannelBroker.get();
-        this.channel = broker.getChannel(key);
+        SpillableFeedbackChannelBroker broker = SpillableFeedbackChannelBroker.get();
+        this.channel = broker.getChannel(key, null);
 
         this.recordConsumer =
                 getExecutionConfig().isObjectReuseEnabled()

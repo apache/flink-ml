@@ -21,21 +21,28 @@ package org.apache.flink.iteration.operator;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.MemorySize;
 import org.apache.flink.core.fs.Path;
+import org.apache.flink.core.memory.ManagedMemoryUseCase;
 import org.apache.flink.iteration.IterationID;
+import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.iteration.config.IterationOptions;
+import org.apache.flink.iteration.operator.feedback.SpillableFeedbackChannel;
 import org.apache.flink.iteration.proxy.ProxyKeySelector;
 import org.apache.flink.iteration.typeinfo.IterationRecordSerializer;
 import org.apache.flink.iteration.typeinfo.IterationRecordTypeInfo;
-import org.apache.flink.iteration.utils.ReflectionUtils;
 import org.apache.flink.runtime.jobgraph.OperatorID;
-import org.apache.flink.statefun.flink.core.feedback.FeedbackChannel;
+import org.apache.flink.runtime.memory.MemoryAllocationException;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackConsumer;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackKey;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.graph.StreamConfig.NetworkInputConfig;
+import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperator;
+import org.apache.flink.streaming.runtime.streamrecord.StreamElementSerializer;
+import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.OutputTag;
 import org.apache.flink.util.function.SupplierWithException;
@@ -43,7 +50,6 @@ import org.apache.flink.util.function.ThrowingConsumer;
 
 import java.io.IOException;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Executor;
@@ -66,15 +72,38 @@ public class OperatorUtils {
 
     /** Registers the specified {@code feedbackConsumer} to the {@code feedbackChannel}. */
     public static <V> void registerFeedbackConsumer(
-            FeedbackChannel<V> feedbackChannel,
+            SpillableFeedbackChannel<V> feedbackChannel,
             FeedbackConsumer<V> feedbackConsumer,
             Executor executor) {
-        ReflectionUtils.callMethod(
-                feedbackChannel,
-                FeedbackChannel.class,
-                "registerConsumer",
-                Arrays.asList(FeedbackConsumer.class, Executor.class),
-                Arrays.asList(feedbackConsumer, executor));
+        feedbackChannel.registerConsumer(feedbackConsumer, executor);
+    }
+
+    /** Initialize the given {@code feedbackChannel}. */
+    public static void initializeFeedbackChannel(
+            SpillableFeedbackChannel feedbackChannel, AbstractStreamOperator<?> operator)
+            throws MemoryAllocationException {
+        StreamTask<?, ?> containingTask = operator.getContainingTask();
+        TypeSerializer<StreamRecord<IterationRecord<?>>> serializer =
+                new StreamElementSerializer(
+                        operator.getOperatorConfig()
+                                .getTypeSerializerIn(0, operator.getUserCodeClassloader()));
+        MemorySize totalManagedMemory =
+                new MemorySize(containingTask.getEnvironment().getMemoryManager().getMemorySize());
+        double fraction =
+                containingTask
+                        .getConfiguration()
+                        .getManagedMemoryFractionOperatorUseCaseOfSlot(
+                                ManagedMemoryUseCase.OPERATOR,
+                                operator.getRuntimeContext()
+                                        .getTaskManagerRuntimeInfo()
+                                        .getConfiguration(),
+                                operator.getRuntimeContext().getUserCodeClassLoader());
+        long feedbackChannelBufferSize = totalManagedMemory.multiply(fraction).getBytes();
+        feedbackChannel.initialize(
+                containingTask.getEnvironment().getIOManager(),
+                containingTask.getEnvironment().getMemoryManager(),
+                serializer,
+                feedbackChannelBufferSize);
     }
 
     public static <T> void processOperatorOrUdfIfSatisfy(

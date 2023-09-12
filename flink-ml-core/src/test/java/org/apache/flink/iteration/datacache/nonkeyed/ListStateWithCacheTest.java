@@ -48,6 +48,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import static org.apache.flink.iteration.utils.DataStreamUtils.setManagedMemoryWeight;
+
 /** Tests {@link ListStateWithCache}. */
 public class ListStateWithCacheTest {
 
@@ -87,7 +89,7 @@ public class ListStateWithCacheTest {
                 env.fromSequence(1, n).map(d -> RandomStringUtils.randomAlphabetic(1024 * 1024));
         DataStream<Integer> counter =
                 data.transform("cache", Types.INT, new CacheDataOperator(weights));
-        DataStreamUtils.setManagedMemoryWeight(counter, 100);
+        setManagedMemoryWeight(counter, 100);
         DataStream<Integer> sum = DataStreamUtils.reduce(counter, Integer::sum);
         sum.addSink(
                 new SinkFunction<Integer>() {

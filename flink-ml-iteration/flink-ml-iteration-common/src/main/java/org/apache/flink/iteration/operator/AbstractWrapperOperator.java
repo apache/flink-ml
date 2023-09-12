@@ -125,7 +125,7 @@ public abstract class AbstractWrapperOperator<T>
     @SuppressWarnings({"unchecked", "rawtypes"})
     protected void notifyEpochWatermarkIncrement(IterationListener<?> listener, int epochWatermark)
             throws Exception {
-        if (epochWatermark != Integer.MAX_VALUE) {
+        if (epochWatermark != IterationRecord.END_EPOCH_WATERMARK) {
             listener.onEpochWatermarkIncremented(
                     epochWatermark,
                     iterationContext,

@@ -53,7 +53,7 @@ public class IterationRecordSerializerTest extends TestLogger {
         testSerializeAndDeserialize(
                 IterationRecord.newEpochWatermark(10, "sender1"), VoidSerializer.INSTANCE);
         testSerializeAndDeserialize(
-                IterationRecord.newEpochWatermark(Integer.MAX_VALUE, "sender1"),
+                IterationRecord.newEpochWatermark(IterationRecord.END_EPOCH_WATERMARK, "sender1"),
                 VoidSerializer.INSTANCE);
     }
 

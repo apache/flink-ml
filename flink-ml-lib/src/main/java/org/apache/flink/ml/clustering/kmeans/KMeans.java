@@ -74,6 +74,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import static org.apache.flink.iteration.utils.DataStreamUtils.setManagedMemoryWeight;
+
 /**
  * An Estimator which implements the k-means clustering algorithm.
  *
@@ -163,7 +165,7 @@ public class KMeans implements Estimator<KMeans, KMeansModel>, KMeansParams<KMea
                                                     DenseVectorTypeInfo.INSTANCE)),
                                     new CentroidsUpdateAccumulator(distanceMeasure));
 
-            DataStreamUtils.setManagedMemoryWeight(centroidIdAndPoints, 100);
+            setManagedMemoryWeight(centroidIdAndPoints, 100);
 
             int parallelism = centroidIdAndPoints.getParallelism();
             DataStream<KMeansModelData> newModelData =

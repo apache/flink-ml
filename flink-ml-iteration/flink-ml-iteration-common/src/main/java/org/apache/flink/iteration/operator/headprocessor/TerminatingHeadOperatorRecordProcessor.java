@@ -26,7 +26,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 /**
  * Processor used after we received terminated globally aligned event from the coordinator, but
- * before we received the (Integer.MAX_VALUE + 1) from the feedback channel again.
+ * before we received the Integer.MAX_VALUE from the feedback channel again.
  */
 public class TerminatingHeadOperatorRecordProcessor implements HeadOperatorRecordProcessor {
 
@@ -51,7 +51,7 @@ public class TerminatingHeadOperatorRecordProcessor implements HeadOperatorRecor
     @Override
     public boolean processFeedbackElement(StreamRecord<IterationRecord<?>> record) {
         if (record.getValue().getType() == IterationRecord.Type.EPOCH_WATERMARK) {
-            return record.getValue().getEpoch() == Integer.MAX_VALUE + 1;
+            return record.getValue().getEpoch() == Integer.MAX_VALUE;
         }
 
         return false;

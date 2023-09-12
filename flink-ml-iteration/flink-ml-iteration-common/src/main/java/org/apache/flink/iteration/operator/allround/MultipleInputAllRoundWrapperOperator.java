@@ -83,7 +83,7 @@ public class MultipleInputAllRoundWrapperOperator<OUT>
         super.endInput(i);
 
         if (wrappedOperator instanceof BoundedMultiInput) {
-            setIterationContextRound(Integer.MAX_VALUE);
+            setIterationContextRound(IterationRecord.END_EPOCH_WATERMARK);
             ((BoundedMultiInput) wrappedOperator).endInput(i);
             clearIterationContextRound();
         }

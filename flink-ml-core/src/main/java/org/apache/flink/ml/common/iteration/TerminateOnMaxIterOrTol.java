@@ -20,6 +20,7 @@ package org.apache.flink.ml.common.iteration;
 
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.iteration.IterationListener;
+import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
 
@@ -46,7 +47,7 @@ public class TerminateOnMaxIterOrTol
     }
 
     public TerminateOnMaxIterOrTol(Double tol) {
-        this.maxIter = Integer.MAX_VALUE;
+        this.maxIter = IterationRecord.END_EPOCH_WATERMARK;
         this.tol = tol;
     }
 

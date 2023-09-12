@@ -213,7 +213,7 @@ public abstract class AbstractPerRoundWrapperOperator<T, S extends StreamOperato
             // the onEpochWatermarkIncrement must be from 0 and increment by 1 each time, except
             // for the last round.
             try {
-                if (epochWatermark < Integer.MAX_VALUE) {
+                if (epochWatermark < IterationRecord.END_EPOCH_WATERMARK) {
                     S wrappedOperator = wrappedOperators.remove(epochWatermark);
                     if (wrappedOperator != null) {
                         closeStreamOperator(wrappedOperator, epochWatermark, epochWatermark);
