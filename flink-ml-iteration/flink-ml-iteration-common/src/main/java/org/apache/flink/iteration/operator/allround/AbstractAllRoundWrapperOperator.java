@@ -181,14 +181,14 @@ public abstract class AbstractAllRoundWrapperOperator<T, S extends StreamOperato
 
     @Override
     public void finish() throws Exception {
-        setIterationContextRound(Integer.MAX_VALUE);
+        setIterationContextRound(IterationRecord.END_EPOCH_WATERMARK);
         wrappedOperator.finish();
         clearIterationContextRound();
     }
 
     @Override
     public void close() throws Exception {
-        setIterationContextRound(Integer.MAX_VALUE);
+        setIterationContextRound(IterationRecord.END_EPOCH_WATERMARK);
         wrappedOperator.close();
         clearIterationContextRound();
     }

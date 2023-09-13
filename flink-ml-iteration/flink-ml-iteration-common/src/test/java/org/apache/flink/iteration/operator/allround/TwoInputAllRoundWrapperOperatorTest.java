@@ -86,11 +86,13 @@ public class TwoInputAllRoundWrapperOperatorTest extends TestLogger {
                     new StreamRecord<>(IterationRecord.newEpochWatermark(5, "only-one-1")), 1);
             harness.processElement(
                     new StreamRecord<>(
-                            IterationRecord.newEpochWatermark(Integer.MAX_VALUE, "only-one-0")),
+                            IterationRecord.newEpochWatermark(
+                                    IterationRecord.END_EPOCH_WATERMARK, "only-one-0")),
                     0);
             harness.processElement(
                     new StreamRecord<>(
-                            IterationRecord.newEpochWatermark(Integer.MAX_VALUE, "only-one-1")),
+                            IterationRecord.newEpochWatermark(
+                                    IterationRecord.END_EPOCH_WATERMARK, "only-one-1")),
                     1);
 
             // Checks the output
@@ -103,7 +105,7 @@ public class TwoInputAllRoundWrapperOperatorTest extends TestLogger {
                                             5, OperatorUtils.getUniqueSenderId(operatorId, 0))),
                             new StreamRecord<>(
                                     IterationRecord.newEpochWatermark(
-                                            Integer.MAX_VALUE,
+                                            IterationRecord.END_EPOCH_WATERMARK,
                                             OperatorUtils.getUniqueSenderId(operatorId, 0)))),
                     new ArrayList<>(harness.getOutput()));
 

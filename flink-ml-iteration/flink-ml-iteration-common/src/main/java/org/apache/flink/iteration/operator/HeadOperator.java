@@ -38,6 +38,8 @@ import org.apache.flink.iteration.operator.event.CoordinatorCheckpointEvent;
 import org.apache.flink.iteration.operator.event.GloballyAlignedEvent;
 import org.apache.flink.iteration.operator.event.SubtaskAlignedEvent;
 import org.apache.flink.iteration.operator.event.TerminatingOnInitializeEvent;
+import org.apache.flink.iteration.operator.feedback.SpillableFeedbackChannel;
+import org.apache.flink.iteration.operator.feedback.SpillableFeedbackChannelBroker;
 import org.apache.flink.iteration.operator.headprocessor.HeadOperatorRecordProcessor;
 import org.apache.flink.iteration.operator.headprocessor.HeadOperatorState;
 import org.apache.flink.iteration.operator.headprocessor.RegularHeadOperatorRecordProcessor;
@@ -57,14 +59,13 @@ import org.apache.flink.runtime.io.network.partition.PrioritizedDeque;
 import org.apache.flink.runtime.io.network.partition.consumer.InputChannel;
 import org.apache.flink.runtime.io.network.partition.consumer.LocalInputChannel;
 import org.apache.flink.runtime.io.network.partition.consumer.RemoteInputChannel;
+import org.apache.flink.runtime.memory.MemoryAllocationException;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.runtime.operators.coordination.OperatorEventGateway;
 import org.apache.flink.runtime.operators.coordination.OperatorEventHandler;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StatePartitionStreamProvider;
 import org.apache.flink.runtime.state.StateSnapshotContext;
-import org.apache.flink.statefun.flink.core.feedback.FeedbackChannel;
-import org.apache.flink.statefun.flink.core.feedback.FeedbackChannelBroker;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackConsumer;
 import org.apache.flink.statefun.flink.core.feedback.FeedbackKey;
 import org.apache.flink.statefun.flink.core.feedback.SubtaskFeedbackKey;
@@ -126,6 +127,8 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
     private final IterationID iterationId;
 
     private final int feedbackIndex;
+
+    private SpillableFeedbackChannel<StreamRecord<IterationRecord<?>>> feedbackChannel;
 
     private final boolean isCriteriaStream;
 
@@ -422,16 +425,19 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
         }
     }
 
-    private void registerFeedbackConsumer(Executor mailboxExecutor) {
+    private void registerFeedbackConsumer(Executor mailboxExecutor)
+            throws MemoryAllocationException {
         int indexOfThisSubtask = getRuntimeContext().getIndexOfThisSubtask();
         int attemptNum = getRuntimeContext().getAttemptNumber();
         FeedbackKey<StreamRecord<IterationRecord<?>>> feedbackKey =
                 OperatorUtils.createFeedbackKey(iterationId, feedbackIndex);
         SubtaskFeedbackKey<StreamRecord<IterationRecord<?>>> key =
                 feedbackKey.withSubTaskIndex(indexOfThisSubtask, attemptNum);
-        FeedbackChannelBroker broker = FeedbackChannelBroker.get();
-        FeedbackChannel<StreamRecord<IterationRecord<?>>> channel = broker.getChannel(key);
-        OperatorUtils.registerFeedbackConsumer(channel, this, mailboxExecutor);
+        SpillableFeedbackChannelBroker broker = SpillableFeedbackChannelBroker.get();
+        this.feedbackChannel =
+                broker.getChannel(
+                        key, channel -> OperatorUtils.initializeFeedbackChannel(channel, this));
+        OperatorUtils.registerFeedbackConsumer(feedbackChannel, this, mailboxExecutor);
     }
 
     private List<AbstractEvent> parseInputChannelEvents(InputChannel inputChannel)
@@ -496,6 +502,11 @@ public class HeadOperator extends AbstractStreamOperator<IterationRecord<?>>
     @VisibleForTesting
     public HeadOperatorStatus getStatus() {
         return status;
+    }
+
+    @VisibleForTesting
+    public SpillableFeedbackChannel getFeedbackChannel() {
+        return feedbackChannel;
     }
 
     @VisibleForTesting

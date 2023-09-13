@@ -51,7 +51,7 @@ public class OutputOperator<T> extends AbstractStreamOperator<T>
             reusable.replace(streamRecord.getValue().getValue(), streamRecord.getTimestamp());
             output.collect(reusable);
         } else if (streamRecord.getValue().getType() == Type.EPOCH_WATERMARK
-                && streamRecord.getValue().getEpoch() == Integer.MAX_VALUE) {
+                && streamRecord.getValue().getEpoch() == IterationRecord.END_EPOCH_WATERMARK) {
             output.emitWatermark(new Watermark(Long.MAX_VALUE));
         }
     }

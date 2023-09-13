@@ -19,6 +19,7 @@
 package org.apache.flink.iteration.progresstrack;
 
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.iteration.IterationRecord;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -109,7 +110,7 @@ public class OperatorEpochWatermarkTracker {
 
         public void finish() {
             for (int i = 0; i < numberOfChannels; ++i) {
-                allChannelsLowerBound.updateValue(i, Integer.MAX_VALUE);
+                allChannelsLowerBound.updateValue(i, IterationRecord.END_EPOCH_WATERMARK);
             }
         }
 

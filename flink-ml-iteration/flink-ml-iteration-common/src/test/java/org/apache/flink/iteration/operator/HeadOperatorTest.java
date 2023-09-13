@@ -19,12 +19,15 @@
 package org.apache.flink.iteration.operator;
 
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
+import org.apache.flink.core.memory.ManagedMemoryUseCase;
 import org.apache.flink.iteration.IterationID;
 import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.iteration.operator.event.CoordinatorCheckpointEvent;
 import org.apache.flink.iteration.operator.event.GloballyAlignedEvent;
 import org.apache.flink.iteration.operator.event.SubtaskAlignedEvent;
 import org.apache.flink.iteration.operator.event.TerminatingOnInitializeEvent;
+import org.apache.flink.iteration.operator.feedback.SpillableFeedbackChannel;
+import org.apache.flink.iteration.operator.feedback.SpillableFeedbackChannelBroker;
 import org.apache.flink.iteration.operator.headprocessor.RegularHeadOperatorRecordProcessor;
 import org.apache.flink.iteration.typeinfo.IterationRecordTypeInfo;
 import org.apache.flink.runtime.checkpoint.CheckpointMetaData;
@@ -35,11 +38,10 @@ import org.apache.flink.runtime.io.network.api.CheckpointBarrier;
 import org.apache.flink.runtime.io.network.api.EndOfData;
 import org.apache.flink.runtime.io.network.api.StopMode;
 import org.apache.flink.runtime.jobgraph.OperatorID;
+import org.apache.flink.runtime.memory.MemoryAllocationException;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.runtime.operators.coordination.OperatorEventGateway;
 import org.apache.flink.runtime.state.CheckpointStorageLocationReference;
-import org.apache.flink.statefun.flink.core.feedback.FeedbackChannel;
-import org.apache.flink.statefun.flink.core.feedback.FeedbackChannelBroker;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -171,7 +173,7 @@ public class HeadOperatorTest extends TestLogger {
                                             putFeedbackRecords(
                                                     iterationId,
                                                     IterationRecord.newEpochWatermark(
-                                                            Integer.MAX_VALUE + 1, "tail"),
+                                                            Integer.MAX_VALUE, "tail"),
                                                     null);
 
                                             return null;
@@ -204,7 +206,7 @@ public class HeadOperatorTest extends TestLogger {
                                     new StreamRecord<>(IterationRecord.newRecord(4, 1), 4),
                                     new StreamRecord<>(
                                             IterationRecord.newEpochWatermark(
-                                                    Integer.MAX_VALUE,
+                                                    IterationRecord.END_EPOCH_WATERMARK,
                                                     OperatorUtils.getUniqueSenderId(operatorId, 0)),
                                             0)),
                             new ArrayList<>(harness.getOutput()));
@@ -353,7 +355,6 @@ public class HeadOperatorTest extends TestLogger {
                                     .getLastJobManagerTaskStateSnapshot();
                         });
         assertNotNull(taskStateSnapshot);
-        cleanupFeedbackChannel(iterationId);
         createHarnessAndRun(
                 iterationId,
                 operatorId,
@@ -367,6 +368,7 @@ public class HeadOperatorTest extends TestLogger {
                             Collections.emptyMap(),
                             -1,
                             -1);
+                    harness.processAll();
                     return null;
                 });
     }
@@ -409,7 +411,6 @@ public class HeadOperatorTest extends TestLogger {
                                     .getLastJobManagerTaskStateSnapshot();
                         });
         assertNotNull(taskStateSnapshot);
-        cleanupFeedbackChannel(iterationId);
         createHarnessAndRun(
                 iterationId,
                 operatorId,
@@ -484,7 +485,6 @@ public class HeadOperatorTest extends TestLogger {
                                     .getLastJobManagerTaskStateSnapshot();
                         });
         assertNotNull(taskStateSnapshot);
-        cleanupFeedbackChannel(iterationId);
         createHarnessAndRun(
                 iterationId,
                 operatorId,
@@ -498,6 +498,7 @@ public class HeadOperatorTest extends TestLogger {
                             Collections.singletonMap(1, 1L),
                             1,
                             0);
+                    harness.processAll();
                     return null;
                 });
     }
@@ -554,7 +555,6 @@ public class HeadOperatorTest extends TestLogger {
                                     .getLastJobManagerTaskStateSnapshot();
                         });
         assertNotNull(taskStateSnapshot);
-        cleanupFeedbackChannel(iterationId);
         createHarnessAndRun(
                 iterationId,
                 operatorId,
@@ -577,6 +577,7 @@ public class HeadOperatorTest extends TestLogger {
                             },
                             5,
                             4);
+                    harness.processAll();
                     return null;
                 });
     }
@@ -630,7 +631,6 @@ public class HeadOperatorTest extends TestLogger {
                         });
 
         assertNotNull(taskStateSnapshot);
-        cleanupFeedbackChannel(iterationId);
         createHarnessAndRun(
                 iterationId,
                 operatorId,
@@ -644,6 +644,7 @@ public class HeadOperatorTest extends TestLogger {
                             Collections.emptyMap(),
                             5,
                             4);
+                    harness.processAll();
                     return null;
                 });
     }
@@ -685,7 +686,6 @@ public class HeadOperatorTest extends TestLogger {
                                     .getLastJobManagerTaskStateSnapshot();
                         });
         assertNotNull(taskStateSnapshot);
-        cleanupFeedbackChannel(iterationId);
         createHarnessAndRun(
                 iterationId,
                 operatorId,
@@ -702,7 +702,7 @@ public class HeadOperatorTest extends TestLogger {
 
                     putFeedbackRecords(
                             iterationId,
-                            IterationRecord.newEpochWatermark(Integer.MAX_VALUE + 1, "tail"),
+                            IterationRecord.newEpochWatermark(Integer.MAX_VALUE, "tail"),
                             null);
                     harness.processEvent(new EndOfData(StopMode.DRAIN));
                     harness.finishProcessing();
@@ -813,6 +813,12 @@ public class HeadOperatorTest extends TestLogger {
                                 OneInputStreamTask::new,
                                 new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO))
                         .addInput(new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO))
+                        .modifyStreamConfig(
+                                // Set the fraction to 0.5 to make sure there are enough pages
+                                // for each feedback queue.
+                                streamConfig ->
+                                        streamConfig.setManagedMemoryFractionOperatorOfUseCase(
+                                                ManagedMemoryUseCase.OPERATOR, 0.5))
                         .setTaskStateSnapshot(
                                 1, snapshot == null ? new TaskStateSnapshot() : snapshot)
                         .setupOutputForSingletonOperatorChain(
@@ -828,6 +834,7 @@ public class HeadOperatorTest extends TestLogger {
                 return runnable.apply(harness);
             } finally {
                 RecordingHeadOperatorFactory.latestHeadOperator.close();
+                RecordingHeadOperatorFactory.latestHeadOperator.getFeedbackChannel().close();
             }
         }
     }
@@ -850,13 +857,15 @@ public class HeadOperatorTest extends TestLogger {
     }
 
     private static void putFeedbackRecords(
-            IterationID iterationId, IterationRecord<?> record, @Nullable Long timestamp) {
-        FeedbackChannel<StreamRecord<IterationRecord<?>>> feedbackChannel =
-                FeedbackChannelBroker.get()
+            IterationID iterationId, IterationRecord<?> record, @Nullable Long timestamp)
+            throws MemoryAllocationException {
+        SpillableFeedbackChannel<StreamRecord<IterationRecord<?>>> feedbackChannel =
+                SpillableFeedbackChannelBroker.get()
                         .getChannel(
                                 OperatorUtils.<StreamRecord<IterationRecord<?>>>createFeedbackKey(
                                                 iterationId, 0)
-                                        .withSubTaskIndex(0, 0));
+                                        .withSubTaskIndex(0, 0),
+                                null);
         feedbackChannel.put(
                 timestamp == null
                         ? new StreamRecord<>(record)
@@ -887,20 +896,6 @@ public class HeadOperatorTest extends TestLogger {
             assertEquals(
                     expectedLastGloballyAligned, recordProcessor.getLatestRoundGloballyAligned());
         }
-    }
-
-    /**
-     * We have to manually cleanup the feedback channel due to not be able to set the attempt
-     * number.
-     */
-    private static void cleanupFeedbackChannel(IterationID iterationId) {
-        FeedbackChannel<StreamRecord<IterationRecord<?>>> feedbackChannel =
-                FeedbackChannelBroker.get()
-                        .getChannel(
-                                OperatorUtils.<StreamRecord<IterationRecord<?>>>createFeedbackKey(
-                                                iterationId, 0)
-                                        .withSubTaskIndex(0, 0));
-        feedbackChannel.close();
     }
 
     private static class RecordingOperatorEventGateway implements OperatorEventGateway {
@@ -937,7 +932,6 @@ public class HeadOperatorTest extends TestLogger {
         @Override
         public <T extends StreamOperator<IterationRecord<?>>> T createStreamOperator(
                 StreamOperatorParameters<IterationRecord<?>> streamOperatorParameters) {
-
             latestHeadOperator = super.createStreamOperator(streamOperatorParameters);
             return (T) latestHeadOperator;
         }

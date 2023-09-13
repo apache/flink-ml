@@ -116,7 +116,7 @@ public class RegularHeadOperatorRecordProcessor implements HeadOperatorRecordPro
                 new StreamRecord<>(
                         IterationRecord.newEpochWatermark(
                                 globallyAlignedEvent.isTerminated()
-                                        ? Integer.MAX_VALUE
+                                        ? IterationRecord.END_EPOCH_WATERMARK
                                         : globallyAlignedEvent.getEpoch(),
                                 senderId),
                         0);

@@ -33,6 +33,7 @@ import org.apache.flink.iteration.operator.TailOperator;
 import org.apache.flink.iteration.operator.allround.AllRoundOperatorWrapper;
 import org.apache.flink.iteration.operator.perround.PerRoundOperatorWrapper;
 import org.apache.flink.iteration.typeinfo.IterationRecordTypeInfo;
+import org.apache.flink.iteration.utils.DataStreamUtils;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -456,21 +457,25 @@ public class Iterations {
         return new DataStreamList(
                 map(
                         inputStreams,
-                        (index, dataStream) ->
-                                ((SingleOutputStreamOperator<IterationRecord<?>>) dataStream)
-                                        .transform(
-                                                "head-"
-                                                        + variableStreams
-                                                                .get(index)
-                                                                .getTransformation()
-                                                                .getName(),
-                                                (IterationRecordTypeInfo) dataStream.getType(),
-                                                new HeadOperatorFactory(
-                                                        iterationId,
-                                                        startHeaderIndex + index,
-                                                        isCriteriaStream,
-                                                        totalInitVariableParallelism))
-                                        .setParallelism(dataStream.getParallelism())));
+                        (index, dataStream) -> {
+                            DataStream ds =
+                                    ((SingleOutputStreamOperator<IterationRecord<?>>) dataStream)
+                                            .transform(
+                                                    "head-"
+                                                            + variableStreams
+                                                                    .get(index)
+                                                                    .getTransformation()
+                                                                    .getName(),
+                                                    (IterationRecordTypeInfo) dataStream.getType(),
+                                                    new HeadOperatorFactory(
+                                                            iterationId,
+                                                            startHeaderIndex + index,
+                                                            isCriteriaStream,
+                                                            totalInitVariableParallelism))
+                                            .setParallelism(dataStream.getParallelism());
+                            DataStreamUtils.setManagedMemoryWeight(ds, 100);
+                            return ds;
+                        }));
     }
 
     private static DataStreamList addTails(

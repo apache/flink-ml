@@ -22,6 +22,8 @@ import java.util.Objects;
 /** The wrapper for the records in iterative stream. */
 public class IterationRecord<T> implements Cloneable {
 
+    public static final int END_EPOCH_WATERMARK = Integer.MAX_VALUE - 1;
+
     /** The type of iteration records. */
     public enum Type {
         RECORD,

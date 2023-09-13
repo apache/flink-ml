@@ -36,7 +36,6 @@ import org.apache.flink.api.common.typeutils.base.IntSerializer;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.TypeExtractor;
-import org.apache.flink.core.memory.ManagedMemoryUseCase;
 import org.apache.flink.iteration.datacache.nonkeyed.ListStateWithCache;
 import org.apache.flink.iteration.datacache.nonkeyed.OperatorScopeManagedMemoryManager;
 import org.apache.flink.iteration.operator.OperatorStateUtils;
@@ -75,7 +74,6 @@ import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.streaming.api.windowing.windows.Window;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
-import org.apache.flink.table.api.TableException;
 import org.apache.flink.util.Collector;
 
 import org.apache.commons.collections.IteratorUtils;
@@ -86,8 +84,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Optional;
 import java.util.Random;
+
+import static org.apache.flink.iteration.utils.DataStreamUtils.setManagedMemoryWeight;
 
 /** Provides utility functions for {@link DataStream}. */
 @Internal
@@ -319,29 +318,6 @@ public class DataStreamUtils {
                 .setParallelism(1)
                 .map(x -> x, input.getType())
                 .setParallelism(inputParallelism);
-    }
-
-    /**
-     * Sets {Transformation#declareManagedMemoryUseCaseAtOperatorScope(ManagedMemoryUseCase, int)}
-     * using the given bytes for {@link ManagedMemoryUseCase#OPERATOR}.
-     *
-     * <p>This method is in reference to Flink's ExecNodeUtil.setManagedMemoryWeight. The provided
-     * bytes should be in the same scale as existing usage in Flink, for example,
-     * StreamExecWindowAggregate.WINDOW_AGG_MEMORY_RATIO.
-     */
-    public static <T> void setManagedMemoryWeight(DataStream<T> dataStream, long memoryBytes) {
-        if (memoryBytes > 0) {
-            final int weightInMebibyte = Math.max(1, (int) (memoryBytes >> 20));
-            final Optional<Integer> previousWeight =
-                    dataStream
-                            .getTransformation()
-                            .declareManagedMemoryUseCaseAtOperatorScope(
-                                    ManagedMemoryUseCase.OPERATOR, weightInMebibyte);
-            if (previousWeight.isPresent()) {
-                throw new TableException(
-                        "Managed memory weight has been set, this should not happen.");
-            }
-        }
     }
 
     /**
