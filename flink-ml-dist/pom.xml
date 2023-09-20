@@ -46,12 +46,6 @@ under the License.
             <version>${project.version}</version>
         </dependency>
 
-        <dependency>
-            <groupId>org.apache.flink</groupId>
-            <artifactId>flink-ml-python-${flink.main.version}</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
         <!-- Stateful Functions Dependencies -->
 
         <dependency>
