@@ -45,8 +45,8 @@ class IndexToStringModelTest(PyFlinkMLTestCase):
             ))
 
         self.expected_prediction = [
-            Row(0, 3, 'a', '2.0'),
-            Row(1, 2, 'b', '1.0'),
+            Row(input_col1=0, input_col2=3, output_col1='a', output_col2='2.0'),
+            Row(input_col1=1, input_col2=2, output_col1='b', output_col2='1.0'),
         ]
 
     def test_output_schema(self):

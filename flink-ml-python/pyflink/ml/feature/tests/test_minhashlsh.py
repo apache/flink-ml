@@ -179,8 +179,8 @@ class MinHashLSHTest(PyFlinkMLTestCase):
             .set_num_hash_tables(5) \
             .set_num_hash_functions_per_table(1)
         expected = [
-            Row(0, 0.75),
-            Row(1, 0.75),
+            Row(id=0, distCol=0.75),
+            Row(id=1, distCol=0.75),
         ]
 
         model: MinHashLSHModel = lsh.fit(self.data)
@@ -198,8 +198,8 @@ class MinHashLSHTest(PyFlinkMLTestCase):
             .set_num_hash_tables(5) \
             .set_num_hash_functions_per_table(1)
         expected = [
-            Row(0, 0.75),
-            Row(1, 0.75),
+            Row(id=0, distCol=0.75),
+            Row(id=1, distCol=0.75),
         ]
 
         model: MinHashLSHModel = lsh.fit(self.data)
@@ -230,6 +230,8 @@ class MinHashLSHTest(PyFlinkMLTestCase):
             Row(1, 5, .5),
             Row(2, 5, .5)
         ]
+        for r in expected:
+            r.set_field_names(['datasetA.id', 'datasetB.id', 'distCol'])
         output = model.approx_similarity_join(data_a, data_b, .6, "id")
         actual_result = [r for r in self.t_env.to_data_stream(output).execute_and_collect()]
 
