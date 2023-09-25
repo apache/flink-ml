@@ -58,11 +58,11 @@ class StringIndexerTest(PyFlinkMLTestCase):
                     [Types.STRING(), Types.DOUBLE()])))
 
         self.expected_alphabetic_asc_predict_data = [
-            Row('a', 2.0, 0, 3),
-            Row('b', 1.0, 1, 2),
-            Row('e', 2.0, 4, 3),
-            Row('f', None, 4, 4),
-            Row(None, None, 4, 4),
+            Row(input_col1='a', input_col2=2.0, output_col1=0, output_col2=3),
+            Row(input_col1='b', input_col2=1.0, output_col1=1, output_col2=2),
+            Row(input_col1='e', input_col2=2.0, output_col1=4, output_col2=3),
+            Row(input_col1='f', input_col2=None, output_col1=4, output_col2=4),
+            Row(input_col1=None, input_col2=None, output_col1=4, output_col2=4),
         ]
 
     def test_param(self):
@@ -122,11 +122,11 @@ class StringIndexerTest(PyFlinkMLTestCase):
             .set_string_order_type("frequencyDesc")
 
         expected_predict_data = [
-            Row('a', 2.0, 1, 0),
-            Row('b', 1.0, 0, 2),
-            Row('e', 2.0, 2, 0),
-            Row('f', None, 2, 2),
-            Row(None, None, 2, 2),
+            Row(input_col1='a', input_col2=2.0, output_col1=1, output_col2=0),
+            Row(input_col1='b', input_col2=1.0, output_col1=0, output_col2=2),
+            Row(input_col1='e', input_col2=2.0, output_col1=2, output_col2=0),
+            Row(input_col1='f', input_col2=None, output_col1=2, output_col2=2),
+            Row(input_col1=None, input_col2=None, output_col1=2, output_col2=2),
         ]
 
         output = string_indexer.fit(self.train_table).transform(self.predict_table)[0]

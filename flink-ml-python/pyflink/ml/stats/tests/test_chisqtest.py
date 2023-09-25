@@ -50,8 +50,8 @@ class ChiSqTestTest(PyFlinkMLTestCase):
         )
 
         self.expected_output_data = [
-            Row(0, 0.03419350755, 6, 13.61904761905),
-            Row(1, 0.24220177737, 6, 7.94444444444)]
+            Row(featureIndex=0, pValue=0.03419350755, degreeOfFreedom=6, statistic=13.61904761905),
+            Row(featureIndex=1, pValue=0.24220177737, degreeOfFreedom=6, statistic=7.94444444444)]
 
     def test_param(self):
         chi_sq_test = ChiSqTest()

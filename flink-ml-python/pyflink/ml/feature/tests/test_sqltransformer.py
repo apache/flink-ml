@@ -34,8 +34,8 @@ class SQLTransformerTest(PyFlinkMLTestCase):
                     ['id', 'v1', 'v2'],
                     [Types.INT(), Types.DOUBLE(), Types.DOUBLE()])))
         self.expected_output = [
-            (0, 1.0, 3.0, 4.0, 3.0),
-            (2, 2.0, 5.0, 7.0, 10.0)
+            Row(id=0, v1=1.0, v2=3.0, v3=4.0, v4=3.0),
+            Row(id=2, v1=2.0, v2=5.0, v3=7.0, v4=10.0)
         ]
 
     def test_param(self):
@@ -62,4 +62,4 @@ class SQLTransformerTest(PyFlinkMLTestCase):
         actual_output.sort(key=lambda x: x[0])
         self.assertEqual(len(self.expected_output), len(actual_output))
         for i in range(len(actual_output)):
-            self.assertEqual(Row(*self.expected_output[i]), actual_output[i])
+            self.assertEqual(self.expected_output[i], actual_output[i])
