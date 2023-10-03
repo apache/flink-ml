@@ -22,7 +22,7 @@ from pathlib import Path
 # Because the project and the dependent `pyflink` project have the same directory structure,
 # we need to manually add `flink-ml-python` path to `sys.path` in the test of this project to change
 # the order of package search.
-flink_ml_python_dir = Path(__file__).parents[5]
+flink_ml_python_dir = Path(__file__).parents[4]
 sys.path.append(str(flink_ml_python_dir))
 
 import pyflink
