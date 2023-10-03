@@ -154,6 +154,10 @@ public class KBinsDiscretizerModel
             DenseVector outputVec = inputVec.clone();
             for (int i = 0; i < inputVec.size(); i++) {
                 double targetFeature = inputVec.get(i);
+                if (Double.isNaN(targetFeature)) {
+                    outputVec.set(i, binEdges[i].length - 1);
+                    continue;
+                }
                 int index = Arrays.binarySearch(binEdges[i], targetFeature);
                 if (index < 0) {
                     // Computes the index to insert.
