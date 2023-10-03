@@ -16,31 +16,26 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.linalg;
+package org.apache.flink.ml.recommendation.als;
 
-import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.ml.common.ps.iterations.ProcessStage;
 
-import java.io.Serializable;
+/** An iteration stage that copy the aggregating data to the all reduce data. */
+public class CopyAllReduceData extends ProcessStage<AlsMLSession> {
 
-/** A matrix of double values. */
-@PublicEvolving
-public interface Matrix extends Serializable {
+    private final int rank;
 
-    /** Gets number of rows. */
-    int numRows();
+    public CopyAllReduceData(int rank) {
+        this.rank = rank;
+    }
 
-    /** Gets number of columns. */
-    int numCols();
-
-    /** Gets value of the (i,j) element. */
-    double get(int i, int j);
-
-    /** Adds value to the (i,j) element. */
-    double add(int i, int j, double value);
-
-    /** Sets value of the (i,j) element. */
-    double set(int i, int j, double value);
-
-    /** Converts the instance to a dense matrix. */
-    DenseMatrix toDense();
+    @Override
+    public void process(AlsMLSession session) throws Exception {
+        System.arraycopy(
+                session.aggregatorSDAArray.elements(),
+                0,
+                session.allReduceBuffer[0],
+                0,
+                rank * rank);
+    }
 }

@@ -16,31 +16,17 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.linalg;
-
-import org.apache.flink.annotation.PublicEvolving;
+package org.apache.flink.ml.common.ps.iterations;
 
 import java.io.Serializable;
 
-/** A matrix of double values. */
-@PublicEvolving
-public interface Matrix extends Serializable {
-
-    /** Gets number of rows. */
-    int numRows();
-
-    /** Gets number of columns. */
-    int numCols();
-
-    /** Gets value of the (i,j) element. */
-    double get(int i, int j);
-
-    /** Adds value to the (i,j) element. */
-    double add(int i, int j, double value);
-
-    /** Sets value of the (i,j) element. */
-    double set(int i, int j, double value);
-
-    /** Converts the instance to a dense matrix. */
-    DenseMatrix toDense();
-}
+/**
+ * Iterative machine learning training usually incurs local computation step (e.g., computing
+ * gradients) and global communication step (e.g., all-reduce and parameter servers to aggregate the
+ * updates from workers).
+ *
+ * <p>To describe the above iteration training process, we model the training process as a sequence
+ * of iteration stages. An iteration stage could be either local computation or global
+ * communication.
+ */
+public interface IterationStage extends Serializable {}
