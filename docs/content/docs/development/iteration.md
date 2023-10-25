@@ -31,10 +31,10 @@ algorithms, iteration might be used in offline or online training process. In
 general, two types of iterations are required and Flink ML supports both of them
 in order to provide the infrastructure for a variety of algorithms.
 
-1. **Bounded Iteration**: Usually used in the offline case. In this case the
-   algorithm usually trains on a bounded dataset, it updates the parameters for
+1. **Bounded Iteration**: Usually used in the offline case. In this case, the
+   algorithm usually trains on a bounded dataset. It updates the parameters for
    multiple rounds until convergence.
-2. **Unbounded Iteration**: Usually used in the online case, in this case the
+2. **Unbounded Iteration**: Usually used in the online case, in this case, the
    algorithm usually trains on an unbounded dataset. It accumulates a mini-batch
    of data and then do one update to the parameters. 
 
@@ -219,7 +219,7 @@ DataStream<double[]> finalModel = resultStreams.get("final_model");
 
 - `initParameters`: input data that needs to be transmitted through feedback
   edge.
-- `dataset`: input data that does not need to be tarnsmitted through feed back
+- `dataset`: input data that does not need to be transmitted through feedback
   edge.
 - `newModelUpdate`: data to be transmitted through feedback edge
 - `modelOutput`: final output of the iteration body
