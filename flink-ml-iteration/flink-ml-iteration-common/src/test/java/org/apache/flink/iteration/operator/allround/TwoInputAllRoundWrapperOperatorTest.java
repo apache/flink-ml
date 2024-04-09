@@ -23,6 +23,7 @@ import org.apache.flink.iteration.IterationListener;
 import org.apache.flink.iteration.IterationRecord;
 import org.apache.flink.iteration.operator.OperatorUtils;
 import org.apache.flink.iteration.operator.WrapperOperatorFactory;
+import org.apache.flink.iteration.proxy.ProxyKeySelector;
 import org.apache.flink.iteration.typeinfo.IterationRecordTypeInfo;
 import org.apache.flink.runtime.checkpoint.CheckpointMetaData;
 import org.apache.flink.runtime.checkpoint.CheckpointMetricsBuilder;
@@ -74,8 +75,14 @@ public class TwoInputAllRoundWrapperOperatorTest extends TestLogger {
                 new StreamTaskMailboxTestHarnessBuilder<>(
                                 TwoInputStreamTask::new,
                                 new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO))
-                        .addInput(new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO))
-                        .addInput(new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO))
+                        .addInput(
+                                new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO),
+                                1,
+                                new ProxyKeySelector<Integer, Integer>(x -> x % 2))
+                        .addInput(
+                                new IterationRecordTypeInfo<>(BasicTypeInfo.INT_TYPE_INFO),
+                                1,
+                                new ProxyKeySelector<Integer, Integer>(x -> x % 2))
                         .setupOutputForSingletonOperatorChain(wrapperFactory, operatorId)
                         .build()) {
             harness.processElement(new StreamRecord<>(IterationRecord.newRecord(5, 1), 2), 0);
