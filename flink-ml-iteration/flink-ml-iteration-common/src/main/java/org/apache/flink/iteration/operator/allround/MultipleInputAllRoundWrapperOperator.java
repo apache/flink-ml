@@ -127,8 +127,10 @@ public class MultipleInputAllRoundWrapperOperator<OUT>
         @Override
         public void setKeyContextElement(StreamRecord<IterationRecord<IN>> record)
                 throws Exception {
-            reusedInput.replace(record.getValue(), record.getTimestamp());
-            input.setKeyContextElement(reusedInput);
+            if (record.getValue().getType() == IterationRecord.Type.RECORD) {
+                reusedInput.replace(record.getValue().getValue(), record.getTimestamp());
+                input.setKeyContextElement(reusedInput);
+            }
         }
     }
 }

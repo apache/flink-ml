@@ -50,6 +50,40 @@ public class TwoInputAllRoundWrapperOperator<IN1, IN2, OUT>
     }
 
     @Override
+    public void setKeyContextElement1(StreamRecord<?> record) throws Exception {
+        setKeyContextElement(record, reusedInput1, wrappedOperator::setKeyContextElement1);
+    }
+
+    @Override
+    public void setKeyContextElement2(StreamRecord<?> record) throws Exception {
+        setKeyContextElement(record, reusedInput2, wrappedOperator::setKeyContextElement2);
+    }
+
+    private void setKeyContextElement(
+            StreamRecord<?> record,
+            StreamRecord<?> reusedInput,
+            ThrowingConsumer<StreamRecord<?>, Exception> processor)
+            throws Exception {
+        if (!(record.getValue() instanceof IterationRecord)) {
+            super.setKeyContextElement1(record);
+            return;
+        }
+
+        IterationRecord<?> iterationRecord = (IterationRecord<?>) record.getValue();
+        switch (iterationRecord.getType()) {
+            case RECORD:
+                reusedInput.replace(iterationRecord.getValue(), record.getTimestamp());
+                processor.accept(reusedInput);
+                break;
+            case EPOCH_WATERMARK:
+                break;
+            default:
+                throw new FlinkRuntimeException(
+                        "Not supported iteration record type: " + iterationRecord.getType());
+        }
+    }
+
+    @Override
     public void processElement1(StreamRecord<IterationRecord<IN1>> element) throws Exception {
         processElement(element, 0, reusedInput1, wrappedOperator::processElement1);
     }

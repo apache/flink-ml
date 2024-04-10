@@ -177,7 +177,7 @@ public class MultipleInputPerRoundWrapperOperator<OUT>
             if (element.getValue().getType() == IterationRecord.Type.RECORD) {
                 // Ensures the operators are created.
                 getWrappedOperator(element.getValue().getEpoch());
-                reusedInput.replace(element.getValue(), element.getTimestamp());
+                reusedInput.replace(element.getValue().getValue(), element.getTimestamp());
                 operatorInputsByEpoch
                         .get(element.getValue().getEpoch())
                         .get(inputIndex)
