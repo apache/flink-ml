@@ -16,31 +16,31 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.linalg;
+package org.apache.flink.ml.common.ps;
 
-import org.apache.flink.annotation.PublicEvolving;
+/** Mock pojo class to test all reduce. */
+public class MockPojo {
+    public int i;
+    public int j;
 
-import java.io.Serializable;
+    public MockPojo(int i, int j) {
+        this.i = i;
+        this.j = j;
+    }
 
-/** A matrix of double values. */
-@PublicEvolving
-public interface Matrix extends Serializable {
+    public MockPojo() {}
 
-    /** Gets number of rows. */
-    int numRows();
+    @Override
+    public String toString() {
+        return i + "-" + j;
+    }
 
-    /** Gets number of columns. */
-    int numCols();
-
-    /** Gets value of the (i,j) element. */
-    double get(int i, int j);
-
-    /** Adds value to the (i,j) element. */
-    double add(int i, int j, double value);
-
-    /** Sets value of the (i,j) element. */
-    double set(int i, int j, double value);
-
-    /** Converts the instance to a dense matrix. */
-    DenseMatrix toDense();
+    @Override
+    public boolean equals(Object obj) {
+        if (obj instanceof MockPojo) {
+            MockPojo other = (MockPojo) obj;
+            return i == other.i && j == other.j;
+        }
+        return false;
+    }
 }

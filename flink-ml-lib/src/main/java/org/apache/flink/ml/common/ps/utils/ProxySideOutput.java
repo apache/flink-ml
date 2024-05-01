@@ -16,31 +16,23 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.linalg;
+package org.apache.flink.ml.common.ps.utils;
 
-import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.streaming.api.operators.Output;
+import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.util.OutputTag;
+import org.apache.flink.util.Preconditions;
 
-import java.io.Serializable;
+/** A collector that can only output using {@link OutputTag}. */
+public final class ProxySideOutput {
+    private final Output<?> output;
 
-/** A matrix of double values. */
-@PublicEvolving
-public interface Matrix extends Serializable {
+    public ProxySideOutput(Output<?> output) {
+        this.output = output;
+    }
 
-    /** Gets number of rows. */
-    int numRows();
-
-    /** Gets number of columns. */
-    int numCols();
-
-    /** Gets value of the (i,j) element. */
-    double get(int i, int j);
-
-    /** Adds value to the (i,j) element. */
-    double add(int i, int j, double value);
-
-    /** Sets value of the (i,j) element. */
-    double set(int i, int j, double value);
-
-    /** Converts the instance to a dense matrix. */
-    DenseMatrix toDense();
+    public <T> void output(OutputTag<T> outputTag, StreamRecord<T> record) {
+        Preconditions.checkNotNull(outputTag);
+        output.collect(outputTag, record);
+    }
 }

@@ -16,31 +16,18 @@
  * limitations under the License.
  */
 
-package org.apache.flink.ml.linalg;
+package org.apache.flink.ml.common.ps.iterations;
 
-import org.apache.flink.annotation.PublicEvolving;
-
-import java.io.Serializable;
-
-/** A matrix of double values. */
-@PublicEvolving
-public interface Matrix extends Serializable {
-
-    /** Gets number of rows. */
-    int numRows();
-
-    /** Gets number of columns. */
-    int numCols();
-
-    /** Gets value of the (i,j) element. */
-    double get(int i, int j);
-
-    /** Adds value to the (i,j) element. */
-    double add(int i, int j, double value);
-
-    /** Sets value of the (i,j) element. */
-    double set(int i, int j, double value);
-
-    /** Converts the instance to a dense matrix. */
-    DenseMatrix toDense();
+/**
+ * A local computation stage of the training process. The input and output of {@link ProcessStage}
+ * can be accessed via {@link MLSession}.
+ *
+ * @param <T> Type of the training data.
+ */
+public abstract class ProcessStage<T extends MLSession> implements IterationStage {
+    /**
+     * Does a local computation logic using the information from session. Example stages could be
+     * computing gradients.
+     */
+    public abstract void process(T session) throws Exception;
 }
