@@ -145,6 +145,10 @@ public class OnlineLogisticRegressionModel
             LogisticRegressionModelData modelData = streamRecord.getValue();
             coefficient = modelData.coefficient;
             modelDataVersion = modelData.modelVersion;
+            servable =
+                    new LogisticRegressionModelServable(
+                            new LogisticRegressionModelData(coefficient, modelDataVersion));
+            ParamUtils.updateExistingParams(servable, params);
             for (Row dataPoint : bufferedPointsState.get()) {
                 processElement(new StreamRecord<>(dataPoint));
             }
@@ -160,7 +164,7 @@ public class OnlineLogisticRegressionModel
             if (servable == null) {
                 servable =
                         new LogisticRegressionModelServable(
-                                new LogisticRegressionModelData(coefficient, 0L));
+                                new LogisticRegressionModelData(coefficient, modelDataVersion));
                 ParamUtils.updateExistingParams(servable, params);
             }
             Vector features = (Vector) dataPoint.getField(servable.getFeaturesCol());
