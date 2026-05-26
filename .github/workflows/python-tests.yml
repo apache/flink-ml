@@ -17,7 +17,7 @@ name: Python Tests
 
 on:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 0 1 * *'
   push:
     branches: [ '**' ]
   pull_request:
