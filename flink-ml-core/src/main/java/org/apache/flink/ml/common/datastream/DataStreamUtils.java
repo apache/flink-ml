@@ -247,6 +247,59 @@ public class DataStreamUtils {
     }
 
     /**
+     * Applies a {@link AggregateFunction} on a bounded keyed data stream. The output stream
+     * contains one stream record for each key.
+     *
+     * @param input The input keyed data stream.
+     * @param func The user defined aggredate function.
+     * @param accType The type information of intermediate data.
+     * @param outType The type information of the output.
+     * @return The result data stream.
+     * @param <K> The key type of input.
+     * @param <IN> The class type of input.
+     * @param <ACC> The type of intermediate data.
+     * @param <OUT> The class type of output.
+     */
+    public static <K, IN, ACC, OUT> DataStream<OUT> keyedAggregate(
+            KeyedStream<IN, K> input,
+            AggregateFunction<IN, ACC, OUT> func,
+            TypeInformation<ACC> accType,
+            TypeInformation<OUT> outType) {
+        return input.transform(
+                        "Keyed GroupReduce",
+                        outType,
+                        new KeyedAggregateOperator<>(
+                                func, accType.createSerializer(input.getExecutionConfig())))
+                .setParallelism(input.getParallelism());
+    }
+
+    /**
+     * Applies a {@link AggregateFunction} on a bounded keyed data stream. The output stream
+     * contains one stream record for each key.
+     *
+     * @param input The input keyed data stream.
+     * @param func The user defined aggredate function.
+     * @param accTypeSerializer The type serializer of intermediate data.
+     * @param outType The type information of the output.
+     * @return The result data stream.
+     * @param <K> The key type of input.
+     * @param <IN> The class type of input.
+     * @param <ACC> The type of intermediate data.
+     * @param <OUT> The class type of output.
+     */
+    public static <K, IN, ACC, OUT> DataStream<OUT> keyedAggregate(
+            KeyedStream<IN, K> input,
+            AggregateFunction<IN, ACC, OUT> func,
+            TypeSerializer<ACC> accTypeSerializer,
+            TypeInformation<OUT> outType) {
+        return input.transform(
+                        "Keyed GroupReduce",
+                        outType,
+                        new KeyedAggregateOperator<>(func, accTypeSerializer))
+                .setParallelism(input.getParallelism());
+    }
+
+    /**
      * Aggregates the elements in each partition of the input bounded stream, and then merges the
      * partial results of all partitions. The output stream contains the aggregated result and its
      * parallelism is one.
@@ -544,6 +597,64 @@ public class DataStreamUtils {
                 state.add(result);
             }
         }
+    }
+
+    private static class KeyedAggregateOperator<IN, K, ACC, OUT>
+            extends AbstractUdfStreamOperator<OUT, AggregateFunction<IN, ACC, OUT>>
+            implements OneInputStreamOperator<IN, OUT>, Triggerable<K, VoidNamespace> {
+
+        AggregateFunction aggregator;
+
+        private static final String STATE_NAME = "_op_state";
+
+        private transient ValueState<ACC> values;
+
+        private final TypeSerializer<ACC> serializer;
+
+        private InternalTimerService<VoidNamespace> timerService;
+
+        public KeyedAggregateOperator(
+                AggregateFunction<IN, ACC, OUT> aggregator, TypeSerializer<ACC> serializer) {
+            super(aggregator);
+            this.serializer = serializer;
+        }
+
+        @Override
+        public void open() throws Exception {
+            super.open();
+            ValueStateDescriptor<ACC> stateId = new ValueStateDescriptor<>(STATE_NAME, serializer);
+            values = getPartitionedState(stateId);
+            timerService =
+                    getInternalTimerService("end-key-timers", new VoidNamespaceSerializer(), this);
+        }
+
+        @Override
+        public void processElement(StreamRecord<IN> element) throws Exception {
+            IN value = element.getValue();
+            ACC currentValue = values.value();
+
+            if (currentValue == null) {
+                // Registers a timer for emitting the result at the end when this is the
+                // first input for this key.
+                timerService.registerEventTimeTimer(VoidNamespace.INSTANCE, Long.MAX_VALUE);
+                currentValue = userFunction.createAccumulator();
+            }
+
+            currentValue = userFunction.add(value, currentValue);
+            values.update(currentValue);
+        }
+
+        @Override
+        public void onEventTime(InternalTimer<K, VoidNamespace> timer) throws Exception {
+            ACC currentValue = values.value();
+            if (currentValue != null) {
+                output.collect(
+                        new StreamRecord<>(userFunction.getResult(currentValue), Long.MAX_VALUE));
+            }
+        }
+
+        @Override
+        public void onProcessingTime(InternalTimer<K, VoidNamespace> timer) throws Exception {}
     }
 
     /**
