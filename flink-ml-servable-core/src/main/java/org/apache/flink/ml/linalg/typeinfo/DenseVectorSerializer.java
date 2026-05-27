@@ -25,7 +25,6 @@ import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.ml.linalg.DenseVector;
-import org.apache.flink.ml.util.Bits;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -38,7 +37,8 @@ public final class DenseVectorSerializer extends TypeSerializer<DenseVector> {
 
     private static final double[] EMPTY = new double[0];
 
-    private final byte[] buf = new byte[1024];
+    private final OptimizedDoublePrimitiveArraySerializer valuesSerializer =
+            new OptimizedDoublePrimitiveArraySerializer();
 
     @Override
     public boolean isImmutableType() {
@@ -79,53 +79,21 @@ public final class DenseVectorSerializer extends TypeSerializer<DenseVector> {
         if (vector == null) {
             throw new IllegalArgumentException("The vector must not be null.");
         }
-
-        final int len = vector.values.length;
-        target.writeInt(len);
-
-        for (int i = 0; i < len; i++) {
-            Bits.putDouble(buf, (i & 127) << 3, vector.values[i]);
-            if ((i & 127) == 127) {
-                target.write(buf);
-            }
-        }
-        target.write(buf, 0, (len & 127) << 3);
+        valuesSerializer.serialize(vector.values, target);
     }
 
     @Override
     public DenseVector deserialize(DataInputView source) throws IOException {
-        int len = source.readInt();
-        double[] values = new double[len];
-        readDoubleArray(values, source, len);
-        return new DenseVector(values);
-    }
-
-    // Reads `len` double values from `source` into `dst`.
-    private void readDoubleArray(double[] dst, DataInputView source, int len) throws IOException {
-        int index = 0;
-        for (int i = 0; i < (len >> 7); i++) {
-            source.readFully(buf, 0, 1024);
-            for (int j = 0; j < 128; j++) {
-                dst[index++] = Bits.getDouble(buf, j << 3);
-            }
-        }
-        source.readFully(buf, 0, (len << 3) & 1023);
-        for (int j = 0; j < (len & 127); j++) {
-            dst[index++] = Bits.getDouble(buf, j << 3);
-        }
+        return new DenseVector(valuesSerializer.deserialize(source));
     }
 
     @Override
     public DenseVector deserialize(DenseVector reuse, DataInputView source) throws IOException {
         int len = source.readInt();
         if (len == reuse.values.length) {
-            readDoubleArray(reuse.values, source, len);
-            return reuse;
+            valuesSerializer.deserialize(reuse.values, source);
         }
-
-        double[] values = new double[len];
-        readDoubleArray(values, source, len);
-        return new DenseVector(values);
+        return new DenseVector(valuesSerializer.deserialize(source));
     }
 
     @Override

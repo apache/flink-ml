@@ -36,6 +36,7 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -210,15 +211,26 @@ public class KBinsDiscretizer
         int numColumns = input.get(0).size();
         int numData = input.size();
         double[][] binEdges = new double[numColumns][];
-        double[] features = new double[numData];
 
         for (int columnId = 0; columnId < numColumns; columnId++) {
+            double[] features = new double[numData];
             for (int i = 0; i < numData; i++) {
                 features[i] = input.get(i).get(columnId);
             }
             Arrays.sort(features);
+            int n = numData;
 
-            if (features[0] == features[numData - 1]) {
+            {
+                int validRange = numData;
+                while (validRange > 0 && Double.isNaN(features[validRange - 1])) {
+                    validRange -= 1;
+                }
+                if (validRange < numData) {
+                    features = ArrayUtils.subarray(features, 0, validRange);
+                }
+            }
+
+            if (features[0] == features[features.length - 1]) {
                 LOG.warn("Feature " + columnId + " is constant and the output will all be zero.");
                 binEdges[columnId] =
                         new double[] {Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY};
@@ -231,7 +243,7 @@ public class KBinsDiscretizer
                     for (int binEdgeId = 0; binEdgeId < numBins; binEdgeId++) {
                         tempBinEdges[binEdgeId] = features[(int) (binEdgeId * width)];
                     }
-                    tempBinEdges[numBins] = features[numData - 1];
+                    tempBinEdges[numBins] = features[features.length - 1];
                 } else {
                     tempBinEdges = features;
                 }

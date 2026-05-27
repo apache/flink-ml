@@ -20,6 +20,7 @@ package org.apache.flink.ml.util;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.serialization.Encoder;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.source.Source;
 import org.apache.flink.connector.file.sink.FileSink;
 import org.apache.flink.connector.file.src.FileSource;
@@ -321,6 +322,30 @@ public class ReadWriteUtils {
                 FileSource.forRecordStreamFormat(modelDecoder, FileUtils.getDataPath(path)).build();
         DataStream<T> modelDataStream =
                 env.fromSource(source, WatermarkStrategy.noWatermarks(), "modelData");
+        return tEnv.fromDataStream(modelDataStream);
+    }
+
+    /**
+     * Loads the model data from the given path using the model decoder. This overloaded version
+     * returns a table with only 1 column whose type is the class of the model data.
+     *
+     * @param tEnv A StreamTableEnvironment instance.
+     * @param path The parent directory of the model data file.
+     * @param modelDecoder The decoder used to decode the model data.
+     * @param typeInfo The type information of model data.
+     * @param <T> The class type of the model data.
+     * @return The loaded model data.
+     */
+    public static <T> Table loadModelData(
+            StreamTableEnvironment tEnv,
+            String path,
+            SimpleStreamFormat<T> modelDecoder,
+            TypeInformation<T> typeInfo) {
+        StreamExecutionEnvironment env = TableUtils.getExecutionEnvironment(tEnv);
+        Source<T, ?, ?> source =
+                FileSource.forRecordStreamFormat(modelDecoder, FileUtils.getDataPath(path)).build();
+        DataStream<T> modelDataStream =
+                env.fromSource(source, WatermarkStrategy.noWatermarks(), "modelData", typeInfo);
         return tEnv.fromDataStream(modelDataStream);
     }
 }

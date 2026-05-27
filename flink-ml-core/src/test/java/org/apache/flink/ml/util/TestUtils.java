@@ -51,6 +51,7 @@ import org.apache.flink.util.function.FunctionWithException;
 
 import org.apache.commons.collections.IteratorUtils;
 import org.apache.commons.lang3.ArrayUtils;
+import org.junit.Assert;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -323,5 +324,65 @@ public class TestUtils {
             rowList.add(new org.apache.flink.ml.servable.api.Row(values));
         }
         return new DataFrame(columnNames, dataTypes, rowList);
+    }
+
+    /**
+     * Compare two lists of elements with the given comparator. Different from {@link
+     * org.apache.flink.test.util.TestBaseUtils#compareResultCollections}, the comparator is also
+     * used when comparing elements.
+     */
+    public static <X> void compareResultCollectionsWithComparator(
+            List<X> expected, List<X> actual, Comparator<X> comparator) {
+        Assert.assertEquals(expected.size(), actual.size());
+        expected.sort(comparator);
+        actual.sort(comparator);
+        for (int i = 0; i < expected.size(); i++) {
+            Assert.assertEquals(0, comparator.compare(expected.get(i), actual.get(i)));
+        }
+    }
+
+    /**
+     * Compare two doubles with specified delta. If the differences between the two doubles are
+     * equal or less than delta, they are considered equal. Otherwise, they are compared with
+     * default comparison.
+     */
+    public static class DoubleComparatorWithDelta implements Comparator<Double> {
+        private final double delta;
+
+        public DoubleComparatorWithDelta(double delta) {
+            this.delta = delta;
+        }
+
+        @Override
+        public int compare(Double o1, Double o2) {
+            return Math.abs(o1 - o2) <= delta ? 0 : Double.compare(o1, o2);
+        }
+    }
+
+    /**
+     * Compare two dense vectors with specified delta. When comparing their values, {@link
+     * DoubleComparatorWithDelta} is used.
+     */
+    public static class DenseVectorComparatorWithDelta implements Comparator<DenseVector> {
+        private final DoubleComparatorWithDelta doubleComparatorWithDelta;
+
+        public DenseVectorComparatorWithDelta(double delta) {
+            doubleComparatorWithDelta = new DoubleComparatorWithDelta(delta);
+        }
+
+        @Override
+        public int compare(DenseVector o1, DenseVector o2) {
+            if (o1.size() != o2.size()) {
+                return Integer.compare(o1.size(), o2.size());
+            } else {
+                for (int i = 0; i < o1.size(); i++) {
+                    int cmp = doubleComparatorWithDelta.compare(o1.get(i), o2.get(i));
+                    if (cmp != 0) {
+                        return cmp;
+                    }
+                }
+            }
+            return 0;
+        }
     }
 }

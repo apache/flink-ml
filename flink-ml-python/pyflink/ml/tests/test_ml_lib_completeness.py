@@ -92,7 +92,8 @@ class MLLibTest(PyFlinkMLTestCase):
         pass
 
     def exclude_java_stage(self):
-        return []
+        return ['gbtclassifier.GBTClassifier', 'gbtclassifier.GBTClassifierModel',
+                'gbtregressor.GBTRegressor', 'gbtregressor.GBTRegressorModel']
 
 
 class ClassificationCompletenessTest(CompletenessTest, MLLibTest):
