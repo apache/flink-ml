@@ -86,6 +86,18 @@ public class DenseMatrix implements Matrix {
     }
 
     @Override
+    public double add(int i, int j, double value) {
+        Preconditions.checkArgument(i >= 0 && i < numRows && j >= 0 && j < numCols);
+        return values[numRows * j + i] += value;
+    }
+
+    @Override
+    public double set(int i, int j, double value) {
+        Preconditions.checkArgument(i >= 0 && i < numRows && j >= 0 && j < numCols);
+        return values[numRows * j + i] = value;
+    }
+
+    @Override
     public DenseMatrix toDense() {
         return this;
     }

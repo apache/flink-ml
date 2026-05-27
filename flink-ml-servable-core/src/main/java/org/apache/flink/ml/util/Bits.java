@@ -44,6 +44,13 @@ public class Bits {
         return Double.longBitsToDouble(getLong(b, off));
     }
 
+    public static int getInt(byte[] b, int off) {
+        return ((b[off + 3] & 0xFF))
+                + ((b[off + 2] & 0xFF) << 8)
+                + ((b[off + 1] & 0xFF) << 16)
+                + ((b[off]) << 24);
+    }
+
     /*
      * Methods for packing primitive values into byte arrays starting at given
      * offsets.
@@ -62,5 +69,76 @@ public class Bits {
 
     public static void putDouble(byte[] b, int off, double val) {
         putLong(b, off, Double.doubleToLongBits(val));
+    }
+
+    public static void putInt(byte[] b, int off, int val) {
+        b[off + 3] = (byte) (val);
+        b[off + 2] = (byte) (val >>> 8);
+        b[off + 1] = (byte) (val >>> 16);
+        b[off] = (byte) (val >>> 24);
+    }
+
+    /** Gets a long array from the byte array starting from the given offset. */
+    public static long[] getLongArray(byte[] bytes, int offset) {
+        int size = Bits.getInt(bytes, offset);
+        offset += Integer.BYTES;
+        long[] result = new long[size];
+        for (int i = 0; i < size; i++) {
+            result[i] = Bits.getLong(bytes, offset);
+            offset += Long.BYTES;
+        }
+        return result;
+    }
+
+    /**
+     * Puts a long array to the byte array starting from the given offset.
+     *
+     * @return the next position to write on.
+     */
+    public static int putLongArray(long[] array, byte[] bytes, int offset) {
+        Bits.putInt(bytes, offset, array.length);
+        offset += Integer.BYTES;
+        for (int i = 0; i < array.length; i++) {
+            Bits.putLong(bytes, offset, array[i]);
+            offset += Long.BYTES;
+        }
+        return offset;
+    }
+
+    /** Returns the size of a long array in bytes. */
+    public static int getLongArraySizeInBytes(long[] array) {
+        return Integer.BYTES + array.length * Long.BYTES;
+    }
+
+    /** Gets a double array from the byte array starting from the given offset. */
+    public static double[] getDoubleArray(byte[] bytes, int offset) {
+        int size = Bits.getInt(bytes, offset);
+        offset += Integer.BYTES;
+        double[] result = new double[size];
+        for (int i = 0; i < size; i++) {
+            result[i] = Bits.getDouble(bytes, offset);
+            offset += Long.BYTES;
+        }
+        return result;
+    }
+
+    /**
+     * Puts a double array to the byte array starting from the given offset.
+     *
+     * @return the next position to write on.
+     */
+    public static int putDoubleArray(double[] array, byte[] bytes, int offset) {
+        Bits.putInt(bytes, offset, array.length);
+        offset += Integer.BYTES;
+        for (int i = 0; i < array.length; i++) {
+            Bits.putDouble(bytes, offset, array[i]);
+            offset += Double.BYTES;
+        }
+        return offset;
+    }
+
+    /** Returns the size of a double array in bytes. */
+    public static int getDoubleArraySizeInBytes(double[] array) {
+        return Integer.BYTES + array.length * Long.BYTES;
     }
 }
