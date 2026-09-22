@@ -36,3 +36,24 @@
 
   - Does this pull request introduce a new feature? (yes / no)
   - If yes, how is the feature documented? (not applicable / docs / JavaDocs / not documented)
+
+---
+
+##### Was generative AI tooling used to co-author this PR?
+
+<!--
+If generative AI tooling has been used in the process of authoring this PR, please
+change the checkbox below to `[X]` and replace the placeholder in the "Generated-by"
+line with the tool name and version. Otherwise remove the "Generated-by" line.
+See the ASF Generative Tooling Guidance for details:
+https://www.apache.org/legal/generative-tooling.html
+
+You are responsible for the quality and correctness of every change in this PR
+regardless of the tooling used. Low-effort AI-generated PRs will be closed. See
+https://flink.apache.org/how-to-contribute/contribute-code/#ai-assisted-contributions
+for the full guidance.
+-->
+
+- [ ] Yes (please specify the tool below)
+
+Generated-by: [Tool Name and Version]
